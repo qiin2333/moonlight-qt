@@ -10,7 +10,7 @@ OverlayManager::OverlayManager() :
     memset(m_Overlays, 0, sizeof(m_Overlays));
 
     m_Overlays[OverlayType::OverlayDebug].color = {0xBD, 0xF9, 0xE7, 0xFF};
-    m_Overlays[OverlayType::OverlayDebug].fontSize = 18;
+    m_Overlays[OverlayType::OverlayDebug].fontSize = 20;
     m_Overlays[OverlayType::OverlayDebug].bgcolor = {0x00, 0x00, 0x00, 0x96};
 
     m_Overlays[OverlayType::OverlayStatusUpdate].color = {0xCC, 0x00, 0x00, 0xFF};
@@ -156,15 +156,14 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
 
     if (m_Overlays[type].enabled)
     {
-        TTF_SetFontWrappedAlign(m_Overlays[type].font, TTF_WRAPPED_ALIGN_CENTER);
+        // TTF_SetFontWrappedAlign(m_Overlays[type].font, TTF_WRAPPED_ALIGN_CENTER);
         TTF_SetFontStyle(m_Overlays[type].font, TTF_STYLE_BOLD);
 
         // The _Wrapped variant is required for line breaks to work
-        SDL_Surface *surface = TTF_RenderUTF8_LCD_Wrapped(m_Overlays[type].font,
+        SDL_Surface *surface = TTF_RenderUTF8_LCD(m_Overlays[type].font,
                                                           m_Overlays[type].text,
                                                           m_Overlays[type].color,
-                                                          m_Overlays[type].bgcolor,
-                                                          996);
+                                                          m_Overlays[type].bgcolor);
         SDL_AtomicSetPtr((void **)&m_Overlays[type].surface, surface);
     }
 
