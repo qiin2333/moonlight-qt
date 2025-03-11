@@ -1,9 +1,9 @@
 #include <Limelight.h>
 #include "ffmpeg.h"
 #include "streaming/session.h"
+#include "streaming/network/bandwidth.h"
 
 #include <h264_stream.h>
-
 extern "C" {
 #include <libavutil/mastering_display_metadata.h>
 #include <libavutil/pixdesc.h>
@@ -744,10 +744,10 @@ void FFmpegVideoDecoder::addVideoStats(VIDEO_STATS& src, VIDEO_STATS& dst)
     dst.renderedFps = (float)dst.renderedFrames / ((float)(now - dst.measurementStartTimestamp) / 1000);
 }
 
-void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS& stats, char* output, int length)
+void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, int length)
 {
     int offset = 0;
-    const char* codecString;
+    const char *codecString;
     int ret;
 
     // Start with an empty string
@@ -772,19 +772,23 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS& stats, char* output, i
         break;
 
     case VIDEO_FORMAT_H265_MAIN10:
-        if (LiGetCurrentHostDisplayHdrMode()) {
+        if (LiGetCurrentHostDisplayHdrMode())
+        {
             codecString = "HEVC 10-bit HDR";
         }
-        else {
+        else
+        {
             codecString = "HEVC 10-bit SDR";
         }
         break;
 
     case VIDEO_FORMAT_H265_REXT10_444:
-        if (LiGetCurrentHostDisplayHdrMode()) {
+        if (LiGetCurrentHostDisplayHdrMode())
+        {
             codecString = "HEVC 10-bit HDR 4:4:4";
         }
-        else {
+        else
+        {
             codecString = "HEVC 10-bit SDR 4:4:4";
         }
         break;
@@ -798,19 +802,23 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS& stats, char* output, i
         break;
 
     case VIDEO_FORMAT_AV1_MAIN10:
-        if (LiGetCurrentHostDisplayHdrMode()) {
+        if (LiGetCurrentHostDisplayHdrMode())
+        {
             codecString = "AV1 10-bit HDR";
         }
-        else {
+        else
+        {
             codecString = "AV1 10-bit SDR";
         }
         break;
 
     case VIDEO_FORMAT_AV1_HIGH10_444:
-        if (LiGetCurrentHostDisplayHdrMode()) {
+        if (LiGetCurrentHostDisplayHdrMode())
+        {
             codecString = "AV1 10-bit HDR 4:4:4";
         }
-        else {
+        else
+        {
             codecString = "AV1 10-bit SDR 4:4:4";
         }
         break;
@@ -821,18 +829,21 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS& stats, char* output, i
         break;
     }
 
-    if (stats.receivedFps > 0) {
-        if (m_VideoDecoderCtx != nullptr) {
+    if (stats.receivedFps > 0)
+    {
+        if (m_VideoDecoderCtx != nullptr)
+        {
             ret = snprintf(&output[offset],
                            length - offset,
-                           " %dx%d@%.2f %s Codec: %s %s",
+                           " %dx%d@%.0f %s %s %s",
                            m_VideoDecoderCtx->width,
                            m_VideoDecoderCtx->height,
                            stats.totalFps,
                            "  ",
                            codecString,
                            " ");
-            if (ret < 0 || ret >= length - offset) {
+            if (ret < 0 || ret >= length - offset)
+            {
                 SDL_assert(false);
                 return;
             }
@@ -842,11 +853,12 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS& stats, char* output, i
 
         ret = snprintf(&output[offset],
                        length - offset,
-                       " Frames: Rx %.2f/ De %.2f/ Rd %.2f FPS \n",
+                       " Frames: Rx %.1f/ De %.1f/ Rd %.1f FPS \n",
                        stats.receivedFps,
                        stats.decodedFps,
                        stats.renderedFps);
-        if (ret < 0 || ret >= length - offset) {
+        if (ret < 0 || ret >= length - offset)
+        {
             SDL_assert(false);
             return;
         }
@@ -854,25 +866,51 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS& stats, char* output, i
         offset += ret;
     }
 
-    if (stats.renderedFrames != 0) {
+    if (stats.renderedFrames != 0)
+    {
         char rttString[32];
+        char bandwidthString[32];
+        // 将返回的带宽值除以10以修正显示
+        int bandwidthKbps = BandwidthCalculator::instance()->getCurrentBandwidthKbps() / 10;
 
-        if (stats.lastRtt != 0) {
+        if (stats.lastRtt != 0)
+        {
             snprintf(rttString, sizeof(rttString), "%u ± %ums", stats.lastRtt, stats.lastRttVariance);
         }
-        else {
+        else
+        {
             snprintf(rttString, sizeof(rttString), "N/A");
         }
 
+        if (bandwidthKbps != 0)
+        {
+            if (bandwidthKbps >= 1000)
+            {
+                float mbps = bandwidthKbps / 1000.0f;
+                snprintf(bandwidthString, sizeof(bandwidthString), "%.2f Mbps", mbps);
+            }
+            else
+            {
+                snprintf(bandwidthString, sizeof(bandwidthString), "%d Kbps", bandwidthKbps);
+            }
+        }
+        else
+        {
+            snprintf(bandwidthString, sizeof(bandwidthString), "N/A");
+        }
+
         ret = snprintf(&output[offset],
                        length - offset,
-                       " Latency: %s %s Drops: %.2f%% \n"
+                       " Latency: %s "
+                       " Drops: %.2f%% "
+                       " Bandwidth: %s "
                        " Decode: %.2fms ",
                        rttString,
-                       "  ",
                        (float)stats.networkDroppedFrames / stats.totalFrames * 100,
+                       bandwidthString,
                        (float)stats.totalDecodeTime / stats.decodedFrames);
-        if (ret < 0 || ret >= length - offset) {
+        if (ret < 0 || ret >= length - offset)
+        {
             SDL_assert(false);
             return;
         }
@@ -880,14 +918,16 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS& stats, char* output, i
         offset += ret;
     }
 
-    if (stats.framesWithHostProcessingLatency > 0) {
+    if (stats.framesWithHostProcessingLatency > 0)
+    {
         ret = snprintf(&output[offset],
                        length - offset,
                        " Encode: %.1fms ",
-                    //    (float)stats.minHostProcessingLatency / 10,
-                    //    (float)stats.maxHostProcessingLatency / 10,
+                       //    (float)stats.minHostProcessingLatency / 10,
+                       //    (float)stats.maxHostProcessingLatency / 10,
                        (float)stats.totalHostProcessingLatency / 10 / stats.framesWithHostProcessingLatency);
-        if (ret < 0 || ret >= length - offset) {
+        if (ret < 0 || ret >= length - offset)
+        {
             SDL_assert(false);
             return;
         }

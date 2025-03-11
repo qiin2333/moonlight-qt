@@ -20,7 +20,7 @@ ApplicationWindow {
 
     id: window
     width: 1280
-    height: 600
+    height: 640
 
     // This function runs prior to creation of the initial StackView item
     function doEarlyInit() {
@@ -221,11 +221,19 @@ ApplicationWindow {
         }
     }
 
-    header: ToolBar {
+    // 添加工具栏作为浮动元素
+    ToolBar {
         id: toolBar
         height: 60
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.topMargin: 5
-        anchors.bottomMargin: 5
+        z: 1  // 确保工具栏在其他内容上方
+        
+        background: Rectangle {
+            color: "transparent"  // 完全透明
+        }
 
         Label {
             id: titleLabel
