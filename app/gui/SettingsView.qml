@@ -11,7 +11,7 @@ import SystemProperties 1.0
 Flickable {
     id: settingsPage
     objectName: qsTr("Settings")
-
+    topMargin: 60
     signal languageChanged()
 
     boundsBehavior: Flickable.OvershootBounds
@@ -824,7 +824,6 @@ Flickable {
         }
 
         GroupBox {
-
             id: audioSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12

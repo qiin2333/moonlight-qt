@@ -50,7 +50,7 @@ CenteredGridView {
     function pairingComplete(error)
     {
         // Close the PIN dialog
-        paircontextMenu.close()
+        pairDialog.close()
 
         // Display a failed dialog if we got an error
         if (error !== undefined) {
