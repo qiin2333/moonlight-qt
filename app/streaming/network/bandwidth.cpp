@@ -5,6 +5,13 @@
 #include <iphlpapi.h>
 #endif
 
+#ifdef Q_OS_DARWIN
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#endif
+
 BandwidthCalculator *BandwidthCalculator::s_instance = nullptr;
 
 BandwidthCalculator *BandwidthCalculator::instance()
@@ -119,6 +126,8 @@ bool SystemNetworkStats::getNetworkUsage(qint64 &bytesReceived, qint64 &bytesSen
 #elif defined(Q_OS_DARWIN)
     return getMacOSNetworkUsage(bytesReceived, bytesSent);
 #else
+    Q_UNUSED(bytesReceived);
+    Q_UNUSED(bytesSent);
     return false;
 #endif
 }
@@ -203,25 +212,34 @@ bool SystemNetworkStats::getLinuxNetworkUsage(qint64 &bytesReceived, qint64 &byt
 #elif defined(Q_OS_DARWIN)
 bool SystemNetworkStats::getMacOSNetworkUsage(qint64 &bytesReceived, qint64 &bytesSent)
 {
-    // macOS 实现：使用 getifaddrs 或 IOKit
-    // TODO: 实现具体代码
-    return false;
-}
-#endif
+    struct ifaddrs *ifaddrs;
+    bytesReceived = 0;
+    bytesSent = 0;
 
-// 适配Limelight接口的函数实现
-bool LiGetBandwidthStatistics(int *bandwidthKbps, float *packetLossRate)
-{
-    if (bandwidthKbps != nullptr)
-    {
-        *bandwidthKbps = BandwidthCalculator::instance()->getCurrentBandwidthKbps();
+    if (getifaddrs(&ifaddrs) == -1) {
+        return false;
     }
 
-    // 我们目前没有实现丢包率计算
-    if (packetLossRate != nullptr)
-    {
-        *packetLossRate = 0.0f;
+    for (struct ifaddrs *ifa = ifaddrs; ifa != nullptr; ifa = ifa->ifa_next) {
+        // 忽略非网络接口
+        if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_LINK) {
+            continue;
+        }
+
+        // 忽略回环接口
+        if (strncmp(ifa->ifa_name, "lo", 2) == 0) {
+            continue;
+        }
+
+        // 获取接口数据
+        if (ifa->ifa_data != nullptr) {
+            struct if_data *stats = (struct if_data *)ifa->ifa_data;
+            bytesReceived += stats->ifi_ibytes;
+            bytesSent += stats->ifi_obytes;
+        }
     }
 
+    freeifaddrs(ifaddrs);
     return true;
 }
+#endif
