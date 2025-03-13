@@ -93,11 +93,36 @@ Flickable {
         StreamingPreferences.save()
     }
 
+    PcView {
+        id: pcViewPage
+    }
+
+    Rectangle {
+        parent: settingsPage
+        anchors.fill: parent
+        z: -2
+
+        Image {
+            anchors.fill: parent
+            source: pcViewPage.currentBgUrl || "qrc:/res/gura.png"
+            opacity: 0.3
+            fillMode: Image.PreserveAspectCrop
+        }
+    }
+
+    Rectangle {
+        parent: settingsPage
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.6)
+        z: -1
+    }
+
     Column {
         padding: 10
         id: settingsColumn1
         width: settingsPage.width / 2
         spacing: 15
+        z: 1
 
         GroupBox {
             id: basicSettingsGroupBox
@@ -285,7 +310,7 @@ Flickable {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                slider.value = StreamingPreferences.bitrateKbps
+                                slider.value = Math.log(StreamingPreferences.bitrateKbps)
                             }
 
                             lastIndexValue = currentIndex
@@ -451,7 +476,7 @@ Flickable {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                slider.value = StreamingPreferences.bitrateKbps
+                                slider.value = Math.log(StreamingPreferences.bitrateKbps)
                             }
 
                             lastIndexValue = currentIndex
@@ -681,18 +706,38 @@ Flickable {
                 Slider {
                     id: slider
 
-                    value: StreamingPreferences.bitrateKbps
+                    // 使用对数刻度来实现非线性调整
+                    property real logMin: Math.log(500)
+                    property real logMax: Math.log(800000)
+                    property real linearThreshold: 100000 // 100 Mbps 的线性调整阈值
 
-                    stepSize: 500
-                    from : 500
-                    to: 800000
+                    value: Math.log(StreamingPreferences.bitrateKbps)
+                    stepSize: (logMax - logMin) / 200
+                    from: logMin
+                    to: logMax
 
                     snapMode: "SnapOnRelease"
                     width: Math.min(bitrateDesc.implicitWidth, parent.width)
 
                     onValueChanged: {
-                        bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(value / 1000.0)
-                        StreamingPreferences.bitrateKbps = value
+                        var linearValue;
+                        if (Math.exp(value) <= linearThreshold) {
+                            // 在 100 Mbps 以下使用线性调整
+                            linearValue = Math.exp(value);
+                        } else {
+                            // 在 100 Mbps 以上使用对数调整
+                            linearValue = Math.exp(value);
+                        }
+                        
+                        // 根据条件格式化显示文本
+                        var displayValue = linearValue / 1000.0;
+                        if (displayValue < 100) {
+                            bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(displayValue.toFixed(1))
+                        } else {
+                            bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(Math.round(displayValue))
+                        }
+                        
+                        StreamingPreferences.bitrateKbps = linearValue
                     }
 
                     Component.onCompleted: {
@@ -1619,7 +1664,7 @@ Flickable {
                                                                                                       StreamingPreferences.height,
                                                                                                       StreamingPreferences.fps,
                                                                                                       StreamingPreferences.enableYUV444);
-                            slider.value = StreamingPreferences.bitrateKbps
+                            slider.value = Math.log(StreamingPreferences.bitrateKbps)
                         }
                     }
 
@@ -1642,7 +1687,7 @@ Flickable {
                     onCheckedChanged: {
                         StreamingPreferences.unlockBitrate = checked
                         StreamingPreferences.bitrateKbps = Math.min(StreamingPreferences.bitrateKbps, slider.to)
-                        slider.value = StreamingPreferences.bitrateKbps
+                        slider.value = Math.log(StreamingPreferences.bitrateKbps)
                     }
 
                     ToolTip.delay: 1000

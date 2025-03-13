@@ -14,6 +14,7 @@ import ImageUtils 1.0
 
 CenteredGridView {
     property ComputerModel computerModel : createModel()
+    property string currentBgUrl: backgroundImage.currentImageUrl  // 添加根组件属性用于外部访问
 
     id: pcGrid
     focus: true
@@ -487,7 +488,7 @@ CenteredGridView {
         Settings {
             id: settings
             property string cachedImagePath: ""
-            property int lastRefreshTime: 0
+            property real lastRefreshTime: Date.now()
         }
         
         onStatusChanged: {
@@ -524,6 +525,7 @@ CenteredGridView {
 
         function handleImageResponse(url) {
             currentImageUrl = url
+            pcGrid.currentBgUrl = url  // 同步更新根组件属性
             var cachePath = imageUtils.saveImageFromUrl(url)
             if (cachePath) {
                 settings.cachedImagePath = cachePath
@@ -549,11 +551,11 @@ CenteredGridView {
                     source = fileUrl;
                     console.log("loadBackgroundImageFromCache: " + fileUrl);
                     currentImageUrl = fileUrl;
+                    pcGrid.currentBgUrl = fileUrl;  // 初始化时同步属性
                     
                     // 检查是否需要刷新（如果上次刷新时间超过1小时）
-                    var currentTime = Math.floor(Date.now() / 1000);
-                    var oneHour = 60 * 60;
-                    if (currentTime - settings.lastRefreshTime > oneHour) {
+                    var oneHour = 60 * 60 * 1000 * 24 * 7;
+                    if (Date.now() - settings.lastRefreshTime > oneHour) {
                         loadNewImageTimer.start();
                     }
                 } catch (e) {
@@ -603,6 +605,7 @@ CenteredGridView {
                         backgroundImage.source = filePath;
                     }
                     currentImageUrl = filePath;
+                    pcGrid.currentBgUrl = filePath;  // 拖放时同步属性
                 } else {
                     errorDialog.text = qsTr("不支持的图片格式")
                     errorDialog.open()
@@ -649,7 +652,7 @@ CenteredGridView {
         }
     }
     
-    // 添加上下文菜单 - 改名为backgroundContextMenu避免冲突
+    // 添加上下文菜单
     NavigableMenu {
         id: backgroundContextMenu
         property int lastRefreshTime: 0  // 明确声明属性

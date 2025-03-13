@@ -291,19 +291,19 @@ ApplicationWindow {
             }
 
             NavigableToolButton {
-                id: discordButton
+                id: qqButton
                 visible: SystemProperties.hasBrowser &&
                          qmltypeof(stackView.currentItem, "SettingsView")
 
-                iconSource: "qrc:/res/discord.svg"
+                iconSource: "qrc:/res/qq-2.svg"
 
                 ToolTip.delay: 1000
                 ToolTip.timeout: 3000
                 ToolTip.visible: hovered
-                ToolTip.text: qsTr("Join our community on Discord")
+                ToolTip.text: qsTr("来裙里丸")
 
                 // TODO need to make sure browser is brought to foreground.
-                onClicked: Qt.openUrlExternally("https://moonlight-stream.org/discord");
+                onClicked: Qt.openUrlExternally("https://qm.qq.com/cgi-bin/qm/qr?k=wI7aTvDQdd900n1L_wjjJw3qNP0yOgUa&jump_from=webapi&authKey=CDBn7sGy7HpCKYTcFmoEdNuG/zmkrBWUC/W5A/oZZycKzXwuO/XFCA97IpJRktj3");
 
                 Keys.onDownPressed: {
                     stackView.currentItem.forceActiveFocus(Qt.TabFocus)

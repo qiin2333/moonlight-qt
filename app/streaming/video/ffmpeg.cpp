@@ -870,8 +870,7 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
     {
         char rttString[32];
         char bandwidthString[32];
-        // 将返回的带宽值除以10以修正显示
-        int bandwidthKbps = BandwidthCalculator::instance()->getCurrentBandwidthKbps() / 10;
+        int bandwidthKbps = BandwidthCalculator::instance()->getCurrentBandwidthKbps();
 
         if (stats.lastRtt != 0)
         {
