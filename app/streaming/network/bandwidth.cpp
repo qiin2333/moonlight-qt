@@ -139,12 +139,6 @@ bool SystemNetworkStats::getWindowsNetworkUsage(qint64 &bytesReceived, qint64 &b
     bytesReceived = 0;
     bytesSent = 0;
 
-    // 需要包含头文件：
-    // #include <winsock2.h>
-    // #include <ws2tcpip.h>
-    // #include <iphlpapi.h>
-    // 并链接 iphlpapi.lib
-
     PMIB_IF_TABLE2 pIfTable = NULL;
     ULONG error = GetIfTable2(&pIfTable);
 
@@ -153,21 +147,27 @@ bool SystemNetworkStats::getWindowsNetworkUsage(qint64 &bytesReceived, qint64 &b
         return false;
     }
 
-    // 累加所有网络接口的流量
+    // 累加有效网络接口的流量
     for (ULONG i = 0; i < pIfTable->NumEntries; i++)
     {
         MIB_IF_ROW2 row = pIfTable->Table[i];
 
-        // 跳过未连接或虚拟接口
-        if (row.OperStatus != IfOperStatusUp ||
-            row.MediaType == NdisMediumLoopback ||
-            row.Type == IF_TYPE_SOFTWARE_LOOPBACK)
+        // 确保只计算有效的物理网络接口
+        // 排除虚拟适配器、隧道接口等
+        if (row.OperStatus == IfOperStatusUp &&
+            row.MediaType != NdisMediumLoopback &&
+            row.Type != IF_TYPE_SOFTWARE_LOOPBACK &&
+            row.Type != IF_TYPE_TUNNEL &&
+            !(row.InterfaceAndOperStatusFlags.FilterInterface) &&
+            row.TransmitLinkSpeed > 0 && 
+            row.ReceiveLinkSpeed > 0)
         {
-            continue;
+            // 检查是否是实际在用的接口 - 有流量的接口
+            if (row.InOctets > 0 || row.OutOctets > 0) {
+                bytesReceived += row.InOctets;
+                bytesSent += row.OutOctets;
+            }
         }
-
-        bytesReceived += row.InOctets;
-        bytesSent += row.OutOctets;
     }
 
     // 释放表资源
