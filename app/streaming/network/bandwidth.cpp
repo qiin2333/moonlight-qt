@@ -12,6 +12,13 @@
 #include <net/if.h>
 #endif
 
+#ifdef Q_OS_LINUX
+#include <QTimer>
+#include <QFile>
+#include <QTextStream>
+#include <QRegExp>
+#endif
+
 BandwidthCalculator *BandwidthCalculator::s_instance = nullptr;
 
 BandwidthCalculator *BandwidthCalculator::instance()

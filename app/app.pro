@@ -1,4 +1,4 @@
-QT += core quick network quickcontrols2 quickdialogs2 svg gui-private
+QT += core quick network quickcontrols2 svg gui-private
 CONFIG += c++11
 
 unix:!macx {
