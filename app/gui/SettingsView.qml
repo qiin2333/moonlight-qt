@@ -105,7 +105,7 @@ Flickable {
         Image {
             anchors.fill: parent
             source: pcViewPage.currentBgUrl || "qrc:/res/gura.png"
-            opacity: 0.3
+            opacity: 0.35
             fillMode: Image.PreserveAspectCrop
         }
     }
@@ -113,7 +113,7 @@ Flickable {
     Rectangle {
         parent: settingsPage
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.6)
+        color: Qt.rgba(0, 0, 0, 0.55)
         z: -1
     }
 
@@ -128,8 +128,12 @@ Flickable {
             id: basicSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Basic Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">⚙ " + qsTr("Basic Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -719,6 +723,33 @@ Flickable {
                     snapMode: "SnapOnRelease"
                     width: Math.min(bitrateDesc.implicitWidth, parent.width)
 
+                    handle: Rectangle {
+                        x: slider.visualPosition * (slider.width - width)
+                        y: (slider.height - height) / 2
+                        width: 24
+                        height: 24
+                        radius: 12
+                        color: "#FFA5D2"
+                        border.color: "#ffffff"
+                        border.width: 2
+                    }
+                    
+                    background: Rectangle {
+                        x: 0
+                        y: (slider.height - height) / 2
+                        width: slider.width
+                        height: 6
+                        radius: 3
+                        color: "#e0e0e0"
+                        
+                        Rectangle {
+                            width: slider.visualPosition * parent.width
+                            height: parent.height
+                            color: "#FFA5D2"
+                            radius: 3
+                        }
+                    }
+
                     onValueChanged: {
                         var linearValue;
                         if (Math.exp(value) <= linearThreshold) {
@@ -872,8 +903,12 @@ Flickable {
             id: audioSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Audio Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">🎵 " + qsTr("Audio Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -965,8 +1000,12 @@ Flickable {
             id: hostSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Host Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">🖥️ " + qsTr("Host Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -1005,8 +1044,12 @@ Flickable {
             id: uiSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("UI Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">🎨 " + qsTr("UI Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -1291,8 +1334,12 @@ Flickable {
             id: inputSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Input Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">⌨️ " + qsTr("Input Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -1451,8 +1498,12 @@ Flickable {
             id: gamepadSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Gamepad Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">🎮 " + qsTr("Gamepad Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -1526,8 +1577,12 @@ Flickable {
             id: advancedSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Advanced Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">⚗️ " + qsTr("Advanced Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent

@@ -68,10 +68,6 @@ ApplicationWindow {
             unmappedGamepadDialog.open()
         }
     }
-  
-    // This configures the maximum width of the singleton attached QML ToolTip. If left unconstrained,
-    // it will never insert a line break and just extend on forever.
-    ToolTip.toolTip.contentWidth: ToolTip.toolTip.implicitContentWidth < 400 ? ToolTip.toolTip.implicitContentWidth : 400
 
     function goBack() {
         if (clearOnBack) {
@@ -88,6 +84,9 @@ ApplicationWindow {
         id: stackView
         anchors.fill: parent
         focus: true
+
+        // 将ToolTip配置移动到StackView内部
+        ToolTip.toolTip.contentWidth: ToolTip.toolTip.implicitContentWidth < 400 ? ToolTip.toolTip.implicitContentWidth : 400
 
         Component.onCompleted: {
             // Perform our early initialization before constructing
