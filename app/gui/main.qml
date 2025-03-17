@@ -85,8 +85,12 @@ ApplicationWindow {
         anchors.fill: parent
         focus: true
 
-        // 将ToolTip配置移动到StackView内部
         ToolTip.toolTip.contentWidth: ToolTip.toolTip.implicitContentWidth < 400 ? ToolTip.toolTip.implicitContentWidth : 400
+        ToolTip.toolTip.margins: 8
+
+        ToolTip.toolTip.onVisibleChanged: {
+            if (ToolTip.toolTip.visible) ToolTip.toolTip.y = toolBar.height - 5
+        }
 
         Component.onCompleted: {
             // Perform our early initialization before constructing
@@ -228,10 +232,10 @@ ApplicationWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.topMargin: 5
-        z: 1  // 确保工具栏在其他内容上方
+        z: 1
         
         background: Rectangle {
-            color: "transparent"  // 完全透明
+            color: "transparent"
         }
 
         Label {
