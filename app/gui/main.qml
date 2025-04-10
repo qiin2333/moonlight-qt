@@ -54,7 +54,7 @@ ApplicationWindow {
         if (SystemProperties.isWow64) {
             wow64Dialog.open()
         }
-        else if (!SystemProperties.hasHardwareAcceleration) {
+        else if (!SystemProperties.hasHardwareAcceleration && StreamingPreferences.videoDecoderSelection !== StreamingPreferences.VDS_FORCE_SOFTWARE) {
             if (SystemProperties.isRunningXWayland) {
                 xWaylandDialog.open()
             }
@@ -68,6 +68,20 @@ ApplicationWindow {
             unmappedGamepadDialog.open()
         }
     }
+  
+    // It would be better to use TextMetrics here, but it always lays out
+    // the text slightly more compactly than real Text does in ToolTip,
+    // causing unexpected line breaks to be inserted
+    Text {
+        id: tooltipTextLayoutHelper
+        visible: false
+        font: ToolTip.toolTip.font
+        text: ToolTip.toolTip.text
+    }
+
+    // This configures the maximum width of the singleton attached QML ToolTip. If left unconstrained,
+    // it will never insert a line break and just extend on forever.
+    ToolTip.toolTip.contentWidth: Math.min(tooltipTextLayoutHelper.width, 400)
 
     function goBack() {
         if (clearOnBack) {

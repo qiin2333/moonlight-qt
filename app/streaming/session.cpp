@@ -41,6 +41,7 @@
 #define SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS 102
 #define SDL_CODE_GAMECONTROLLER_SET_MOTION_EVENT_STATE 103
 #define SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED 104
+#define SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS 105
 
 #include <openssl/rand.h>
 
@@ -70,6 +71,7 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     Session::clRumbleTriggers,
     Session::clSetMotionEventState,
     Session::clSetControllerLED,
+    Session::clSetAdaptiveTriggers
 };
 
 Session* Session::s_ActiveSession;
@@ -259,6 +261,30 @@ void Session::clSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g
     setControllerLEDEvent.user.data2 = (void*)(uintptr_t)(r << 16 | g << 8 | b);
     SDL_PushEvent(&setControllerLEDEvent);
 }
+
+void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlags, uint8_t typeLeft, uint8_t typeRight, uint8_t *left, uint8_t *right){
+    // We push an event for the main thread to handle in order to properly synchronize
+    // with the removal of game controllers that could result in our game controller
+    // going away during this callback.
+    SDL_Event setControllerLEDEvent = {};
+    setControllerLEDEvent.type = SDL_USEREVENT;
+    setControllerLEDEvent.user.code = SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS;
+    setControllerLEDEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
+
+    // Based on the following SDL code:
+    // https://github.com/libsdl-org/SDL/blob/120c76c84bbce4c1bfed4e9eb74e10678bd83120/test/testgamecontroller.c#L286-L307
+    DualSenseOutputReport *state = (DualSenseOutputReport *) SDL_malloc(sizeof(DualSenseOutputReport));
+    SDL_zero(*state);
+    state->validFlag0 = (eventFlags & DS_EFFECT_RIGHT_TRIGGER) | (eventFlags & DS_EFFECT_LEFT_TRIGGER);
+    state->rightTriggerEffectType = typeRight;
+    SDL_memcpy(state->rightTriggerEffect, right, sizeof(state->rightTriggerEffect));
+    state->leftTriggerEffectType = typeLeft;
+    SDL_memcpy(state->leftTriggerEffect, left, sizeof(state->leftTriggerEffect));
+
+    setControllerLEDEvent.user.data2 = (void *) state;
+    SDL_PushEvent(&setControllerLEDEvent);
+}
+
 
 bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
                             SDL_Window* window, int videoFormat, int width, int height,
@@ -552,6 +578,7 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_InputHandler(nullptr),
       m_MouseEmulationRefCount(0),
       m_FlushingWindowEventsRef(0),
+      m_ShouldExitAfterQuit(false),
       m_AsyncConnectionSuccess(false),
       m_PortTestResults(0),
       m_OpusDecoder(nullptr),
@@ -1229,7 +1256,8 @@ private:
         // Only quit the running app if our session terminated gracefully
         bool shouldQuit =
                 !m_Session->m_UnexpectedTermination &&
-                m_Session->m_Preferences->quitAppAfter;
+                (m_Session->m_Preferences->quitAppAfter ||
+                 m_Session->m_ShouldExitAfterQuit);
 
         // Notify the UI
         if (shouldQuit) {
@@ -1256,6 +1284,11 @@ private:
                 http.quitApp();
             } catch (const GfeHttpResponseException&) {
             } catch (const QtNetworkReplyException&) {
+            }
+
+            // Exit the entire program if requested
+            if (m_Session->m_ShouldExitAfterQuit) {
+                QCoreApplication::instance()->quit();
             }
 
             // Session is finished now
@@ -1676,6 +1709,11 @@ void Session::flushWindowEvents()
     SDL_PushEvent(&flushEvent);
 }
 
+void Session::setShouldExitAfterQuit()
+{
+    m_ShouldExitAfterQuit = true;
+}
+
 class ExecThread : public QThread
 {
 public:
@@ -2044,6 +2082,10 @@ void Session::execInternal()
                                                  (uint8_t)((uintptr_t)event.user.data2 >> 16),
                                                  (uint8_t)((uintptr_t)event.user.data2 >> 8),
                                                  (uint8_t)((uintptr_t)event.user.data2));
+                break;
+            case SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS:
+                m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.user.data1,
+                                                    (DualSenseOutputReport *)event.user.data2);
                 break;
             default:
                 SDL_assert(false);

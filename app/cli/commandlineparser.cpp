@@ -59,13 +59,6 @@ public:
 
     void showMessage(QString message, MessageType type) const
     {
-    #if defined(Q_OS_WIN32)
-        UINT flags = MB_OK | MB_TOPMOST | MB_SETFOREGROUND;
-        flags |= (type == Info ? MB_ICONINFORMATION : MB_ICONERROR);
-        QString title = "Moonlight";
-        MessageBoxW(nullptr, reinterpret_cast<const wchar_t *>(message.utf16()),
-                    reinterpret_cast<const wchar_t *>(title.utf16()), flags);
-    #endif
         message = message.endsWith('\n') ? message : message + '\n';
         fputs(qPrintable(message), type == Info ? stdout : stderr);
     }
@@ -94,7 +87,7 @@ public:
 
     bool getToggleOptionValue(QString name, bool defaultValue) const
     {
-        QRegularExpression re(QString("^(%1|no-%1)$").arg(name));
+        static QRegularExpression re(QString("^(%1|no-%1)$").arg(name));
         QStringList options = optionNames().filter(re);
         if (options.isEmpty()) {
             return defaultValue;
@@ -113,7 +106,7 @@ public:
 
     QPair<int,int> getResolutionOptionValue(QString name) const
     {
-        QRegularExpression re("^(\\d+)x(\\d+)$", QRegularExpression::CaseInsensitiveOption);
+        static QRegularExpression re("^(\\d+)x(\\d+)$", QRegularExpression::CaseInsensitiveOption);
         auto match = re.match(value(name));
         if (!match.hasMatch()) {
             showError(QString("Invalid %1 format: %2").arg(name, value(name)));
@@ -387,7 +380,7 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     parser.handleUnknownOptions();
 
     // Resolve display's width and height
-    QRegularExpression resolutionRexExp("^(720|1080|1440|4K|resolution)$");
+    static QRegularExpression resolutionRexExp("^(720|1080|1440|4K|resolution)$");
     QStringList resoOptions = parser.optionNames().filter(resolutionRexExp);
     bool displaySet = !resoOptions.isEmpty();
     if (displaySet) {

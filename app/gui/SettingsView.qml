@@ -310,11 +310,13 @@ Flickable {
                                 StreamingPreferences.width = selectedWidth
                                 StreamingPreferences.height = selectedHeight
 
-                                StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
-                                                                                                          StreamingPreferences.height,
-                                                                                                          StreamingPreferences.fps,
-                                                                                                          StreamingPreferences.enableYUV444);
-                                slider.value = Math.log(StreamingPreferences.bitrateKbps)
+                                if (StreamingPreferences.autoAdjustBitrate) {
+                                    StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
+                                                                                                              StreamingPreferences.height,
+                                                                                                              StreamingPreferences.fps,
+                                                                                                              StreamingPreferences.enableYUV444);
+                                    slider.value = StreamingPreferences.bitrateKbps
+                                }
                             }
 
                             lastIndexValue = currentIndex
@@ -476,11 +478,13 @@ Flickable {
                             if (StreamingPreferences.fps !== selectedFps) {
                                 StreamingPreferences.fps = selectedFps
 
-                                StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
-                                                                                                          StreamingPreferences.height,
-                                                                                                          StreamingPreferences.fps,
-                                                                                                          StreamingPreferences.enableYUV444);
-                                slider.value = Math.log(StreamingPreferences.bitrateKbps)
+                                if (StreamingPreferences.autoAdjustBitrate) {
+                                    StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
+                                                                                                              StreamingPreferences.height,
+                                                                                                              StreamingPreferences.fps,
+                                                                                                              StreamingPreferences.enableYUV444);
+                                    slider.value = StreamingPreferences.bitrateKbps
+                                }
                             }
 
                             lastIndexValue = currentIndex
@@ -707,74 +711,97 @@ Flickable {
                     wrapMode: Text.Wrap
                 }
 
-                Slider {
-                    id: slider
+                Row {
+                    spacing: 5
+                    width: parent.width
 
-                    // 使用对数刻度来实现非线性调整
-                    property real logMin: Math.log(500)
-                    property real logMax: Math.log(800000)
-                    property real linearThreshold: 100000 // 100 Mbps 的线性调整阈值
+                    Slider {
+                        id: slider
 
-                    value: Math.log(StreamingPreferences.bitrateKbps)
-                    stepSize: (logMax - logMin) / 200
-                    from: logMin
-                    to: logMax
+                        // 使用对数刻度来实现非线性调整
+                        property real logMin: Math.log(500)
+                        property real logMax: Math.log(800000)
+                        property real linearThreshold: 100000 // 100 Mbps 的线性调整阈值
 
-                    snapMode: "SnapOnRelease"
-                    width: Math.min(bitrateDesc.implicitWidth, parent.width)
+                        value: Math.log(StreamingPreferences.bitrateKbps)
+                        stepSize: (logMax - logMin) / 200
+                        from: logMin
+                        to: logMax
 
-                    handle: Rectangle {
-                        x: slider.visualPosition * (slider.width - width)
-                        y: (slider.height - height) / 2
-                        width: 24
-                        height: 24
-                        radius: 12
-                        color: "#FFA5D2"
-                        border.color: "#ffffff"
-                        border.width: 2
+                        snapMode: "SnapOnRelease"
+                        width: Math.min(bitrateDesc.implicitWidth, parent.width)
+
+                        handle: Rectangle {
+                            x: slider.visualPosition * (slider.width - width)
+                            y: (slider.height - height) / 2
+                            width: 24
+                            height: 24
+                            radius: 12
+                            color: "#FFA5D2"
+                            border.color: "#ffffff"
+                            border.width: 2
+                        }
+
+                        background: Rectangle {
+                            x: 0
+                            y: (slider.height - height) / 2
+                            width: slider.width
+                            height: 6
+                            radius: 3
+                            color: "#e0e0e0"
+
+                            Rectangle {
+                                width: slider.visualPosition * parent.width
+                                height: parent.height
+                                color: "#FFA5D2"
+                                radius: 3
+                            }
+                        }
+
+                        onValueChanged: {
+                            var linearValue;
+                            if (Math.exp(value) <= linearThreshold) {
+                                // 在 100 Mbps 以下使用线性调整
+                                linearValue = Math.exp(value);
+                            } else {
+                                // 在 100 Mbps 以上使用对数调整
+                                linearValue = Math.exp(value);
+                            }
+
+                            // 根据条件格式化显示文本
+                            var displayValue = linearValue / 1000.0;
+                            if (displayValue < 100) {
+                                bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(displayValue.toFixed(1))
+                            } else {
+                                bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(Math.round(displayValue))
+                            }
+
+                            StreamingPreferences.bitrateKbps = linearValue
+                        }
+
+                        onMoved: {
+                            StreamingPreferences.autoAdjustBitrate = false
+                        }
+
+                        Component.onCompleted: {
+                            // Refresh the text after translations change
+                            languageChanged.connect(valueChanged)
+                        }
+                    }
+                }
+                
+                Button {
+                    id: resetBitrateButton
+                    text: qsTr("Use Default (%1 Mbps)").arg(StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444) / 1000.0)
+                    visible: StreamingPreferences.bitrateKbps !== StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
+                    onClicked: {
+                        var defaultBitrate = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
+                        StreamingPreferences.bitrateKbps = defaultBitrate
+                        StreamingPreferences.autoAdjustBitrate = true
+                        slider.value = Math.log(defaultBitrate)
                     }
                     
-                    background: Rectangle {
-                        x: 0
-                        y: (slider.height - height) / 2
-                        width: slider.width
-                        height: 6
-                        radius: 3
-                        color: "#e0e0e0"
-                        
-                        Rectangle {
-                            width: slider.visualPosition * parent.width
-                            height: parent.height
-                            color: "#FFA5D2"
-                            radius: 3
-                        }
-                    }
-
-                    onValueChanged: {
-                        var linearValue;
-                        if (Math.exp(value) <= linearThreshold) {
-                            // 在 100 Mbps 以下使用线性调整
-                            linearValue = Math.exp(value);
-                        } else {
-                            // 在 100 Mbps 以上使用对数调整
-                            linearValue = Math.exp(value);
-                        }
-                        
-                        // 根据条件格式化显示文本
-                        var displayValue = linearValue / 1000.0;
-                        if (displayValue < 100) {
-                            bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(displayValue.toFixed(1))
-                        } else {
-                            bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(Math.round(displayValue))
-                        }
-                        
-                        StreamingPreferences.bitrateKbps = linearValue
-                    }
-
-                    Component.onCompleted: {
-                        // Refresh the text after translations change
-                        languageChanged.connect(valueChanged)
-                    }
+                    hoverEnabled: true
                 }
 
                 Label {
@@ -1199,6 +1226,18 @@ Flickable {
                             text: "Eesti" // Estonian
                             val: StreamingPreferences.LANG_ET
                         } */
+                        ListElement {
+                            text: "Български" // Bulgarian
+                            val: StreamingPreferences.LANG_BG
+                        }
+                        /* ListElement {
+                            text: "Esperanto"
+                            val: StreamingPreferences.LANG_EO
+                        } */
+                        ListElement {
+                            text: "தமிழ்" // Tamil
+                            val: StreamingPreferences.LANG_TA
+                        }
                     }
                     // ::onActivated must be used, as it only listens for when the index is changed by a human
                     onActivated : {
@@ -1727,11 +1766,13 @@ Flickable {
                         // This is called on init, so only reset to default bitrate when checked state changes.
                         if (StreamingPreferences.enableYUV444 != checked) {
                             StreamingPreferences.enableYUV444 = checked
-                            StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
-                                                                                                      StreamingPreferences.height,
-                                                                                                      StreamingPreferences.fps,
-                                                                                                      StreamingPreferences.enableYUV444);
-                            slider.value = Math.log(StreamingPreferences.bitrateKbps)
+                            if (StreamingPreferences.autoAdjustBitrate) {
+                                StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
+                                                                                                          StreamingPreferences.height,
+                                                                                                          StreamingPreferences.fps,
+                                                                                                          StreamingPreferences.enableYUV444);
+                                slider.value = StreamingPreferences.bitrateKbps
+                            }
                         }
                     }
 
