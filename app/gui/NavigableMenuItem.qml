@@ -21,9 +21,10 @@ MenuItem {
     contentItem: Row {
         spacing: 8
         
-        // 替代 leftPadding 的空白项
+        // 替代 leftPadding 的空白项，仅在复选框时显示
         Item {
-            width: 8
+            visible: menuItem.checkable
+            width: 16
             height: 1
         }
         
