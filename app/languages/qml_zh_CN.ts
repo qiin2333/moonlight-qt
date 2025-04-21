@@ -1195,6 +1195,11 @@
         <source>Automatically detect blocked connections (Recommended)</source>
         <translation>自动检测被阻止的连接 (推荐)</translation>
     </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1909"/>
+        <source>Custom Screen Mode</source>
+        <translation>自定义屏幕模式</translation>
+    </message>
 </context>
 <context>
     <name>StreamSegue</name>

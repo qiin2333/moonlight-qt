@@ -1901,6 +1901,64 @@ Flickable {
                                   qsTr("You can toggle it at any time while streaming using Ctrl+Alt+Shift+S or Select+L1+R1+X.") + "\n\n" +
                                   qsTr("The performance overlay is not supported on Steam Link or Raspberry Pi.")
                 }
+
+                // 添加自定义屏幕模式选择器
+                Label {
+                    id: customScreenModeTitle
+                    width: parent.width
+                    text: qsTr("Custom Screen Mode")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                AutoResizingComboBox {
+                    // ignore setting the index at first, and actually set it when the component is loaded
+                    Component.onCompleted: {
+                        var saved_mode = StreamingPreferences.customScreenMode || -1
+                        currentIndex = 0
+                        for (var i = 0; i < customScreenModeListModel.count; i++) {
+                            var el_mode = customScreenModeListModel.get(i).val;
+                            if (saved_mode === el_mode) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                        activated(currentIndex)
+                    }
+
+                    id: customScreenModeComboBox
+                    textRole: "text"
+                    model: ListModel {
+                        id: customScreenModeListModel
+                        ListElement {
+                            text: "关闭"
+                            val: -1
+                        }
+                        ListElement {
+                            text: "无操作"
+                            val: 0
+                        }
+                        ListElement {
+                            text: "自动激活"
+                            val: 1
+                        }
+                        ListElement {
+                            text: "自动激活并设为主显示器"
+                            val: 2
+                        }
+                        ListElement {
+                            text: "禁用其他并只启用指定显示器"
+                            val: 3
+                        }
+                    }
+                    // ::onActivated must be used, as it only listens for when the index is changed by a human
+                    onActivated: {
+                        if (enabled) {
+                            StreamingPreferences.customScreenMode = customScreenModeListModel.get(currentIndex).val
+                        }
+                    }
+                }
+
             }
         }
     }
