@@ -1105,6 +1105,11 @@
         <translation>目标计算机设置</translation>
     </message>
     <message>
+        <location filename="../gui/SettingsView.qml" line="1089"/>
+        <source>Custom Screen Mode</source>
+        <translation>自定义屏幕模式</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="959"/>
         <source>Optimize game settings for streaming</source>
         <translation>优化游戏设置以进行流式传输</translation>
