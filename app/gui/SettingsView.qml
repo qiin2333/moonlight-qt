@@ -1105,23 +1105,23 @@ Flickable {
                     model: ListModel {
                         id: customScreenModeListModel
                         ListElement {
-                            text: "关闭"
+                            text: "关闭 (Close)"
                             val: -1
                         }
                         ListElement {
-                            text: "无操作"
+                            text: "无操作 (No Action)"
                             val: 0
                         }
                         ListElement {
-                            text: "自动激活"
+                            text: "自动激活 (Auto Activate)"
                             val: 1
                         }
                         ListElement {
-                            text: "自动激活并设为主显示器"
+                            text: "自动激活并设为主显示器 (Auto Activate and Set as Primary Display)"
                             val: 2
                         }
                         ListElement {
-                            text: "禁用其他并只启用指定显示器"
+                            text: "禁用其他并只启用指定显示器 (Disable Others and Enable Only the Specified Display)"
                             val: 3
                         }
                     }
