@@ -986,11 +986,6 @@
         <translation>为远程桌面而不是游戏优化鼠标</translation>
     </message>
     <message>
-        <location filename="../gui/SettingsView.qml" line="1507"/>
-        <source>Show local cursor</source>
-        <translation>显示本地鼠标</translation>
-    </message>
-    <message>
         <location filename="../gui/SettingsView.qml" line="1308"/>
         <source>This enables seamless mouse control without capturing the client&apos;s mouse cursor. It is ideal for remote desktop usage but will not work in most games.</source>
         <translation>这可以实现无缝鼠标控制，而无需捕获客户端的鼠标光标。这是理想的远程桌面使用方案，但不会在大多数游戏中工作。</translation>
@@ -1004,6 +999,21 @@
         <location filename="../gui/SettingsView.qml" line="1310"/>
         <source>NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.</source>
         <translation>注意：由于 GeForce Experience 的 Bug，如果你的目标计算机有多个显示器，则此选项可能无法正常工作。</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1507"/>
+        <source>Show local cursor</source>
+        <translation>显示本地鼠标</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1507"/>
+        <source>This makes the client&apos;s mouse cursor visible while streaming.</source>
+        <translation>这可以实现客户端的鼠标光标在流式传输时可见。</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1507"/>
+        <source>You can toggle this while streaming using Ctrl+Alt+Shift+C.</source>
+        <translation>你可以使用 Ctrl+Alt+Shift+C 切换显示本地鼠标模式。</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="1320"/>
