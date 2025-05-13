@@ -841,6 +841,41 @@
         <translation>通过延迟过早进入的帧来减少卡顿</translation>
     </message>
     <message>
+        <location filename="../gui/SettingsView.qml" line="846"/>
+        <source>Video AI-Enhancement</source>
+        <translation>视频 AI 增强</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Enhance video quality by utilizing the GPU&apos;s AI-Enhancement capabilities.</source>
+        <translation>使用 AI 增强视频质量</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>This feature effectively upscales, reduces compression artifacts and enhances the clarity of streamed content.</source>
+        <translation>此功能有效提高分辨率，减少压缩伪影并增强流式传输内容的质量。</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Note:</source>
+        <translation>注意：</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>If available, ensure that appropriate settings (i.e. RTX Video enhancement) are enabled in your GPU driver configuration.</source>
+        <translation>如果能够使用, 请确保在你的GPU驱动程序配置中启用了对应设置（例如 RTX Video 增强）</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
+        <translation>HDR渲染在不同的GPU上存在不同的问题，建议不配合HDR使用</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Be advised that using this feature on laptops running on battery power may lead to significant battery drain.</source>
+        <translation>请注意，在笔记本电脑上使用电池供电时，使用此功能可能会导致显著的电池消耗。</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="856"/>
         <source>Audio Settings</source>
         <translation>音频设置</translation>
@@ -1053,6 +1088,11 @@
         <location filename="../gui/SettingsView.qml" line="1409"/>
         <source>Swap left and right mouse buttons</source>
         <translation>交换鼠标左键和右键</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1629"/>
+        <source>Swap Alt and Win keys</source>
+        <translation>交换 Alt 和 Win</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="1421"/>
