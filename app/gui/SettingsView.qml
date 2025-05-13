@@ -315,7 +315,7 @@ Flickable {
                                                                                                               StreamingPreferences.height,
                                                                                                               StreamingPreferences.fps,
                                                                                                               StreamingPreferences.enableYUV444);
-                                    slider.value = StreamingPreferences.bitrateKbps
+                                    slider.value = Math.log(StreamingPreferences.bitrateKbps)
                                 }
                             }
 
@@ -483,7 +483,7 @@ Flickable {
                                                                                                               StreamingPreferences.height,
                                                                                                               StreamingPreferences.fps,
                                                                                                               StreamingPreferences.enableYUV444);
-                                    slider.value = StreamingPreferences.bitrateKbps
+                                    slider.value = Math.log(StreamingPreferences.bitrateKbps)
                                 }
                             }
 
@@ -1876,7 +1876,7 @@ Flickable {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                slider.value = StreamingPreferences.bitrateKbps
+                                slider.value = Math.log(StreamingPreferences.bitrateKbps)
                             }
                         }
                     }
