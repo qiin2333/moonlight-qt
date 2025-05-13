@@ -802,7 +802,7 @@
     <message>
         <location filename="../gui/SettingsView.qml" line="718"/>
         <source>Use Default (%1 Mbps)</source>
-        <translation type="unfinished"></translation>
+        <translation>使用默认值 (%1 Mbps)</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="748"/>
@@ -1105,9 +1105,34 @@
         <translation>目标计算机设置</translation>
     </message>
     <message>
-        <location filename="../gui/SettingsView.qml" line="1089"/>
+        <location filename="../gui/SettingsView.qml" line="1083"/>
         <source>Custom Screen Mode</source>
         <translation>自定义屏幕模式</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1108"/>
+        <source>Nothing</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1112"/>
+        <source>Disabled</source>
+        <translation>无操作</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1116"/>
+        <source>Activate the display automatically</source>
+        <translation>自动激活指定显示器</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1120"/>
+        <source>Activate the display automatically and make it a primary display</source>
+        <translation>自动激活指定显示器并设置为主显示器</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1124"/>
+        <source>Deactivate other displays and activate only the specified display</source>
+        <translation>禁用其他显示器，只启用指定显示器</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="959"/>
