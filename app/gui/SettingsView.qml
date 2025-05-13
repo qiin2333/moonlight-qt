@@ -1088,7 +1088,9 @@ Flickable {
                 AutoResizingComboBox {
                     // ignore setting the index at first, and actually set it when the component is loaded
                     Component.onCompleted: {
-                        var saved_mode = StreamingPreferences.customScreenMode || -1
+                        var saved_mode = (StreamingPreferences.customScreenMode !== undefined && 
+                                          StreamingPreferences.customScreenMode !== null) ? 
+                                          StreamingPreferences.customScreenMode : -1
                         currentIndex = 0
                         for (var i = 0; i < customScreenModeListModel.count; i++) {
                             var el_mode = customScreenModeListModel.get(i).val;
