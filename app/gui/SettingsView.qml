@@ -1500,6 +1500,24 @@ Flickable {
                                   qsTr("NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.")
                 }
 
+                CheckBox {
+                    id: showLocalCursorCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Show local cursor")
+                    font.pointSize:  12
+                    checked: StreamingPreferences.showLocalCursor
+                    onCheckedChanged: {
+                        StreamingPreferences.showLocalCursor = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("This makes the client's mouse cursor visible in the stream.") + " " +
+                                  qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.")
+                }
+
                 Row {
                     spacing: 5
                     width: parent.width
