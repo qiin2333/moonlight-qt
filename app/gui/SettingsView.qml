@@ -315,7 +315,7 @@ Flickable {
                                                                                                               StreamingPreferences.height,
                                                                                                               StreamingPreferences.fps,
                                                                                                               StreamingPreferences.enableYUV444);
-                                    slider.value = StreamingPreferences.bitrateKbps
+                                    slider.value = Math.log(StreamingPreferences.bitrateKbps)
                                 }
                             }
 
@@ -483,7 +483,7 @@ Flickable {
                                                                                                               StreamingPreferences.height,
                                                                                                               StreamingPreferences.fps,
                                                                                                               StreamingPreferences.enableYUV444);
-                                    slider.value = StreamingPreferences.bitrateKbps
+                                    slider.value = Math.log(StreamingPreferences.bitrateKbps)
                                 }
                             }
 
@@ -942,12 +942,12 @@ Flickable {
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
                     ToolTip.text:
-                        qsTr("Enhance video quality by utilizing the GPU's AI-Enhancement capabilities.")
-                        + qsTr("\nThis feature effectively upscales, reduces compression artifacts and enhances the clarity of streamed content.")
-                        + qsTr("\nNote:")
-                        + qsTr("\n  - If available, ensure that appropriate settings (i.e. RTX Video enhancement) are enabled in your GPU driver configuration.")
-                        + qsTr("\n  - HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.")
-                        + qsTr("\n  - Be advised that using this feature on laptops running on battery power may lead to significant battery drain.")
+                        qsTr("Enhance video quality by utilizing the GPU's AI-Enhancement capabilities.") + "\n" +
+                        qsTr("This feature effectively upscales, reduces compression artifacts and enhances the clarity of streamed content.")+ "\n" + 
+                        qsTr("Note:")+ "\n" + 
+                        qsTr("If available, ensure that appropriate settings (i.e. RTX Video enhancement) are enabled in your GPU driver configuration.")+ "\n" + 
+                        qsTr("HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.")+ "\n" + 
+                        qsTr("Be advised that using this feature on laptops running on battery power may lead to significant battery drain.")
 
                     Component.onCompleted: {
                         if (!SystemProperties.isVideoEnhancementCapable()){
@@ -1088,7 +1088,9 @@ Flickable {
                 AutoResizingComboBox {
                     // ignore setting the index at first, and actually set it when the component is loaded
                     Component.onCompleted: {
-                        var saved_mode = StreamingPreferences.customScreenMode || -1
+                        var saved_mode = (StreamingPreferences.customScreenMode !== undefined && 
+                                          StreamingPreferences.customScreenMode !== null) ? 
+                                          StreamingPreferences.customScreenMode : -1
                         currentIndex = 0
                         for (var i = 0; i < customScreenModeListModel.count; i++) {
                             var el_mode = customScreenModeListModel.get(i).val;
@@ -1105,23 +1107,23 @@ Flickable {
                     model: ListModel {
                         id: customScreenModeListModel
                         ListElement {
-                            text: "关闭"
+                            text: qsTr("Nothing")
                             val: -1
                         }
                         ListElement {
-                            text: "无操作"
+                            text: qsTr("Disabled")
                             val: 0
                         }
                         ListElement {
-                            text: "自动激活"
+                            text: qsTr("Activate the display automatically")
                             val: 1
                         }
                         ListElement {
-                            text: "自动激活并设为主显示器"
+                            text: qsTr("Activate the display automatically and make it a primary display")
                             val: 2
                         }
                         ListElement {
-                            text: "禁用其他并只启用指定显示器"
+                            text: qsTr("Deactivate other displays and activate only the specified display")
                             val: 3
                         }
                     }
@@ -1496,6 +1498,24 @@ Flickable {
                     ToolTip.text: qsTr("This enables seamless mouse control without capturing the client's mouse cursor. It is ideal for remote desktop usage but will not work in most games.") + " " +
                                   qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+M.") + "\n\n" +
                                   qsTr("NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.")
+                }
+
+                CheckBox {
+                    id: showLocalCursorCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Show local cursor")
+                    font.pointSize:  12
+                    checked: StreamingPreferences.showLocalCursor
+                    onCheckedChanged: {
+                        StreamingPreferences.showLocalCursor = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("This makes the client's mouse cursor visible in the stream.") + " " +
+                                  qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.")
                 }
 
                 Row {
@@ -1876,7 +1896,7 @@ Flickable {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                slider.value = StreamingPreferences.bitrateKbps
+                                slider.value = Math.log(StreamingPreferences.bitrateKbps)
                             }
                         }
                     }
