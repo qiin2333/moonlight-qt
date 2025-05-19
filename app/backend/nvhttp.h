@@ -3,6 +3,7 @@
 #include "identitymanager.h"
 #include "nvapp.h"
 #include "nvaddress.h"
+#include "remotecomputer.h"
 
 #include <Limelight.h>
 
@@ -171,7 +172,8 @@ public:
              int gamepadMask,
              bool persistGameControllersOnDisconnect,
              QString& rtspSessionUrl,
-             int customScreenMode);
+             int customScreenMode,
+             RemoteStreamConfig &remoteStreamConfig);
 
     QVector<NvApp>
     getAppList();

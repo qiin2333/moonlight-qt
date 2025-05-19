@@ -1588,6 +1588,13 @@ bool Session::startConnectionAsync()
 
     try {
         NvHTTP http(m_Computer);
+        RemoteStreamConfig remoteStreamConfig(
+            m_Preferences->remoteResolution,
+            m_Preferences->remoteResolutionWidth,
+            m_Preferences->remoteResolutionHeight,
+            m_Preferences->remoteFps,
+            m_Preferences->remoteFpsRate
+        );
         http.startApp(m_Computer->currentGameId != 0 ? "resume" : "launch",
                       m_Computer->isNvidiaServerSoftware,
                       m_App.id, &m_StreamConfig,
@@ -1596,7 +1603,8 @@ bool Session::startConnectionAsync()
                       m_InputHandler->getAttachedGamepadMask(),
                       !m_Preferences->multiController,
                       rtspSessionUrl,
-                      m_Preferences->customScreenMode);
+                      m_Preferences->customScreenMode,
+                      remoteStreamConfig);
     } catch (const GfeHttpResponseException& e) {
         emit displayLaunchError(tr("Host returned error: %1").arg(e.toQString()));
         return false;

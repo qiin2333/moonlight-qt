@@ -125,6 +125,11 @@ public:
     Q_PROPERTY(bool absoluteTouchMode MEMBER absoluteTouchMode NOTIFY absoluteTouchModeChanged)
     Q_PROPERTY(bool framePacing MEMBER framePacing NOTIFY framePacingChanged)
     Q_PROPERTY(bool videoEnhancement MEMBER videoEnhancement NOTIFY videoEnhancementChanged)
+    Q_PROPERTY(bool remoteResolution MEMBER remoteResolution NOTIFY remoteResolutionChanged)
+    Q_PROPERTY(int remoteResolutionWidth MEMBER remoteResolutionWidth NOTIFY remoteResolutionWidthChanged)
+    Q_PROPERTY(int remoteResolutionHeight MEMBER remoteResolutionHeight NOTIFY remoteResolutionHeightChanged)
+    Q_PROPERTY(bool remoteFps MEMBER remoteFps NOTIFY remoteFpsChanged)
+    Q_PROPERTY(int remoteFpsRate MEMBER remoteFpsRate NOTIFY remoteFpsRateChanged)
     Q_PROPERTY(bool connectionWarnings MEMBER connectionWarnings NOTIFY connectionWarningsChanged)
     Q_PROPERTY(bool richPresence MEMBER richPresence NOTIFY richPresenceChanged)
     Q_PROPERTY(bool gamepadMouse MEMBER gamepadMouse NOTIFY gamepadMouseChanged)
@@ -169,6 +174,11 @@ public:
     bool absoluteTouchMode;
     bool framePacing;
     bool videoEnhancement;
+    bool remoteResolution;
+    int remoteResolutionWidth;
+    int remoteResolutionHeight;
+    bool remoteFps;
+    int remoteFpsRate;
     bool connectionWarnings;
     bool richPresence;
     bool gamepadMouse;
@@ -218,6 +228,11 @@ signals:
     void windowModeChanged();
     void framePacingChanged();
     void videoEnhancementChanged();
+    void remoteResolutionChanged();
+    void remoteResolutionWidthChanged();
+    void remoteResolutionHeightChanged();
+    void remoteFpsChanged();
+    void remoteFpsRateChanged();
     void connectionWarningsChanged();
     void richPresenceChanged();
     void gamepadMouseChanged();
