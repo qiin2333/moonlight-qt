@@ -35,6 +35,11 @@
 #define SER_STARTWINDOWED "startwindowed"
 #define SER_FRAMEPACING "framepacing"
 #define SER_VIDEOENHANCEMENT "videoenhancement"
+#define SER_REMOTERESOLUTION "remoteresolution"
+#define SER_REMOTEWIDTH "remotewidth"
+#define SER_REMOTEHEIGHT "remoteheight"
+#define SER_REMOTEFPS "remotefps"
+#define SER_REMOTEFPSRATE "remotefpsrate"
 #define SER_CONNWARNINGS "connwarnings"
 #define SER_UIDISPLAYMODE "uidisplaymode"
 #define SER_RICHPRESENCE "richpresence"
@@ -139,6 +144,13 @@ void StreamingPreferences::reload()
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     videoEnhancement = settings.value(SER_VIDEOENHANCEMENT, false).toBool();
+
+    remoteResolution = settings.value(SER_REMOTERESOLUTION, false).toBool();
+    remoteResolutionWidth = settings.value(SER_REMOTEWIDTH, 1280).toInt();
+    remoteResolutionHeight = settings.value(SER_REMOTEHEIGHT, 720).toInt();
+    remoteFps = settings.value(SER_REMOTEFPS, false).toBool();
+    remoteFpsRate = settings.value(SER_REMOTEFPSRATE, 60).toInt();
+
     connectionWarnings = settings.value(SER_CONNWARNINGS, true).toBool();
     richPresence = settings.value(SER_RICHPRESENCE, true).toBool();
     gamepadMouse = settings.value(SER_GAMEPADMOUSE, true).toBool();
@@ -339,6 +351,11 @@ void StreamingPreferences::save()
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
     settings.setValue(SER_FRAMEPACING, framePacing);
     settings.setValue(SER_VIDEOENHANCEMENT, videoEnhancement);
+    settings.setValue(SER_REMOTERESOLUTION, remoteResolution);
+    settings.setValue(SER_REMOTEWIDTH, remoteResolutionWidth);
+    settings.setValue(SER_REMOTEHEIGHT, remoteResolutionHeight);
+    settings.setValue(SER_REMOTEFPS, remoteFps);
+    settings.setValue(SER_REMOTEFPSRATE, remoteFpsRate);
     settings.setValue(SER_CONNWARNINGS, connectionWarnings);
     settings.setValue(SER_RICHPRESENCE, richPresence);
     settings.setValue(SER_GAMEPADMOUSE, gamepadMouse);
