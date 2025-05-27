@@ -197,24 +197,43 @@ NvHTTP::startApp(QString verb,
                  int gamepadMask,
                  bool persistGameControllersOnDisconnect,
                  QString& rtspSessionUrl,
-                 int customScreenMode)
+                 int customScreenMode,
+                 RemoteStreamConfig &remoteStreamConfig)
 {
     int riKeyId;
 
     memcpy(&riKeyId, streamConfig->remoteInputAesIv, sizeof(riKeyId));
     riKeyId = qFromBigEndian(riKeyId);
+    // Using an FPS value over 60 causes SOPS to default to 720p60,
+    // so force it to 0 to ensure the correct resolution is set. We
+    // used to use 60 here but that locked the frame rate to 60 FPS
+    // on GFE 3.20.3. We don't need this hack for Sunshine.
+    QString appWidth = QString::number(streamConfig->width);
+    QString appHeight = QString::number(streamConfig->height);
+    QString appFps = QString::number((streamConfig->fps > 60 && isGfe) ? 0 : streamConfig->fps);
+    // 远程分辨率覆盖
+    if (remoteStreamConfig.remoteResolution) {
+        if (remoteStreamConfig.remoteResolutionWidth > 0) {
+            appWidth = QString::number(remoteStreamConfig.remoteResolutionWidth);
+        }
+        if (remoteStreamConfig.remoteResolutionHeight > 0) {
+            appHeight = QString::number(remoteStreamConfig.remoteResolutionHeight);
+        }
+    }
+    // 远程帧率覆盖
+    if (remoteStreamConfig.remoteFps) {
+        if (remoteStreamConfig.remoteFpsRate > 0) {
+            appFps = QString::number(remoteStreamConfig.remoteFpsRate);
+        }
+    }
 
     QString response =
             openConnectionToString(m_BaseUrlHttps,
                                    verb,
                                    "appid="+QString::number(appId)+
-                                   "&mode="+QString::number(streamConfig->width)+"x"+
-                                   QString::number(streamConfig->height)+"x"+
-                                   // Using an FPS value over 60 causes SOPS to default to 720p60,
-                                   // so force it to 0 to ensure the correct resolution is set. We
-                                   // used to use 60 here but that locked the frame rate to 60 FPS
-                                   // on GFE 3.20.3. We don't need this hack for Sunshine.
-                                   QString::number((streamConfig->fps > 60 && isGfe) ? 0 : streamConfig->fps)+
+                                   "&mode="+appWidth+"x"+
+                                   appHeight+"x"+
+                                   appFps +
                                    "&additionalStates=1&sops="+QString::number(sops ? 1 : 0)+
                                    "&rikey="+QByteArray(streamConfig->remoteInputAesKey, sizeof(streamConfig->remoteInputAesKey)).toHex()+
                                    "&rikeyid="+QString::number(riKeyId)+

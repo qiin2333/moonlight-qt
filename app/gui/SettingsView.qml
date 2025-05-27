@@ -720,7 +720,7 @@ Flickable {
 
                         // 使用对数刻度来实现非线性调整
                         property real logMin: Math.log(500)
-                        property real logMax: Math.log(800000)
+                        property real logMax: Math.log(2000000)
                         property real linearThreshold: 100000 // 100 Mbps 的线性调整阈值
 
                         value: Math.log(StreamingPreferences.bitrateKbps)
@@ -959,6 +959,98 @@ Flickable {
                             // Indicate if the feature is available but not officially deployed by the Vendor
                             text = qsTr("Video AI-Enhancement (Experimental)")
                         }
+                    }
+                }
+
+                // Remote Resolution
+                RowLayout {
+                    CheckBox {
+                        id: remoteResolutionCheck
+                        width: parent.width
+                        text: qsTr("Remote Resolution")
+                        font.pointSize: 12
+                        checked: StreamingPreferences.remoteResolution
+                        onCheckedChanged: {
+                            StreamingPreferences.remoteResolution = checked
+                        }
+                    }
+
+                    TextField {
+                        id: remoteResolutionWidthField
+                        maximumLength: 4
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        placeholderText: "1280"
+                        validator: IntValidator{bottom:256; top:8192}
+                        width: 120
+                        visible: remoteResolutionCheck.checked
+                        text: StreamingPreferences.remoteResolutionWidth > 0 ? StreamingPreferences.remoteResolutionWidth.toString() : "800"
+                        onTextChanged: {
+                            let value = parseInt(text);
+                            if (!isNaN(value)) {
+                                StreamingPreferences.remoteResolutionWidth = value;
+                            }
+                        }
+                    }
+                    
+                    Label {
+                        text: "x"
+                        font.bold: true
+                        visible: remoteResolutionCheck.checked
+                        anchors.verticalCenter: remoteResolutionCheck.verticalCenter
+                    }
+                    
+                    TextField {
+                        id: remoteResolutionHeightField
+                        maximumLength: 4
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        placeholderText: "720"
+                        validator: IntValidator{bottom:256; top:8192}
+                        width: 120
+                        visible: remoteResolutionCheck.checked
+                        text: StreamingPreferences.remoteResolutionHeight > 0 ? StreamingPreferences.remoteResolutionHeight.toString() : "600"
+                        onTextChanged: {
+                            let value = parseInt(text);
+                            if (!isNaN(value)) {
+                                StreamingPreferences.remoteResolutionHeight = value;
+                            }
+                        }
+                    }
+                }
+
+                // Remote Frame Rate
+                RowLayout {
+                    CheckBox {
+                        id: remoteFpsCheck
+                        text: qsTr("Remote Frame Rate")
+                        font.pointSize: 12
+                        checked: StreamingPreferences.remoteFps
+                        onCheckedChanged: {
+                            StreamingPreferences.remoteFps = checked
+                        }
+                    }
+                    
+                    TextField {
+                        id: remoteFpsRateField
+                        maximumLength: 3
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        validator: IntValidator{bottom:1; top:512}
+                        width: 80
+                        visible: remoteFpsCheck.checked
+                        text: StreamingPreferences.remoteFpsRate > 0 ? StreamingPreferences.remoteFpsRate.toString() : "60"
+                        onTextChanged: {
+                            let value = parseInt(text);
+                            if (!isNaN(value)) {
+                                StreamingPreferences.remoteFpsRate = value;
+                            }
+                        }
+                    }
+                    
+                    Label {
+                        id: fpsLabel
+                        text: qsTr("FPS")
+                        font.bold: true
+                        visible: remoteFpsCheck.checked
+                        anchors.verticalCenter: remoteFpsCheck.verticalCenter
                     }
                 }
             }
