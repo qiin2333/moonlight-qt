@@ -121,8 +121,10 @@ public:
     Q_PROPERTY(bool enableMdns MEMBER enableMdns NOTIFY enableMdnsChanged)
     Q_PROPERTY(bool quitAppAfter MEMBER quitAppAfter NOTIFY quitAppAfterChanged)
     Q_PROPERTY(bool absoluteMouseMode MEMBER absoluteMouseMode NOTIFY absoluteMouseModeChanged)
+    Q_PROPERTY(bool showLocalCursor MEMBER showLocalCursor NOTIFY showLocalCursorChanged)
     Q_PROPERTY(bool absoluteTouchMode MEMBER absoluteTouchMode NOTIFY absoluteTouchModeChanged)
     Q_PROPERTY(bool framePacing MEMBER framePacing NOTIFY framePacingChanged)
+    Q_PROPERTY(bool videoEnhancement MEMBER videoEnhancement NOTIFY videoEnhancementChanged)
     Q_PROPERTY(bool connectionWarnings MEMBER connectionWarnings NOTIFY connectionWarningsChanged)
     Q_PROPERTY(bool richPresence MEMBER richPresence NOTIFY richPresenceChanged)
     Q_PROPERTY(bool gamepadMouse MEMBER gamepadMouse NOTIFY gamepadMouseChanged)
@@ -137,13 +139,15 @@ public:
     Q_PROPERTY(WindowMode recommendedFullScreenMode MEMBER recommendedFullScreenMode CONSTANT)
     Q_PROPERTY(UIDisplayMode uiDisplayMode MEMBER uiDisplayMode NOTIFY uiDisplayModeChanged)
     Q_PROPERTY(bool swapMouseButtons MEMBER swapMouseButtons NOTIFY mouseButtonsChanged)
+    Q_PROPERTY(bool swapWinAltKeys MEMBER swapWinAltKeys NOTIFY swapWinAltKeysChanged)
     Q_PROPERTY(bool muteOnFocusLoss MEMBER muteOnFocusLoss NOTIFY muteOnFocusLossChanged)
     Q_PROPERTY(bool backgroundGamepad MEMBER backgroundGamepad NOTIFY backgroundGamepadChanged)
     Q_PROPERTY(bool reverseScrollDirection MEMBER reverseScrollDirection NOTIFY reverseScrollDirectionChanged)
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
     Q_PROPERTY(bool keepAwake MEMBER keepAwake NOTIFY keepAwakeChanged)
     Q_PROPERTY(CaptureSysKeysMode captureSysKeysMode MEMBER captureSysKeysMode NOTIFY captureSysKeysModeChanged)
-    Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged);
+    Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged)
+    Q_PROPERTY(int customScreenMode MEMBER customScreenMode NOTIFY customScreenModeChanged)
 
     Q_INVOKABLE bool retranslate();
 
@@ -161,14 +165,17 @@ public:
     bool enableMdns;
     bool quitAppAfter;
     bool absoluteMouseMode;
+    bool showLocalCursor;
     bool absoluteTouchMode;
     bool framePacing;
+    bool videoEnhancement;
     bool connectionWarnings;
     bool richPresence;
     bool gamepadMouse;
     bool detectNetworkBlocking;
     bool showPerformanceOverlay;
     bool swapMouseButtons;
+    bool swapWinAltKeys;
     bool muteOnFocusLoss;
     bool backgroundGamepad;
     bool reverseScrollDirection;
@@ -185,6 +192,7 @@ public:
     UIDisplayMode uiDisplayMode;
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
+    int customScreenMode;
 
 signals:
     void displayModeChanged();
@@ -199,6 +207,7 @@ signals:
     void enableMdnsChanged();
     void quitAppAfterChanged();
     void absoluteMouseModeChanged();
+    void showLocalCursorChanged();
     void absoluteTouchModeChanged();
     void audioConfigChanged();
     void videoCodecConfigChanged();
@@ -208,12 +217,14 @@ signals:
     void uiDisplayModeChanged();
     void windowModeChanged();
     void framePacingChanged();
+    void videoEnhancementChanged();
     void connectionWarningsChanged();
     void richPresenceChanged();
     void gamepadMouseChanged();
     void detectNetworkBlockingChanged();
     void showPerformanceOverlayChanged();
     void mouseButtonsChanged();
+    void swapWinAltKeysChanged();
     void muteOnFocusLossChanged();
     void backgroundGamepadChanged();
     void reverseScrollDirectionChanged();
@@ -221,6 +232,7 @@ signals:
     void captureSysKeysModeChanged();
     void keepAwakeChanged();
     void languageChanged();
+    void customScreenModeChanged();
 
 private:
     explicit StreamingPreferences(QQmlEngine *qmlEngine);

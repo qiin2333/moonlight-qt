@@ -802,7 +802,7 @@
     <message>
         <location filename="../gui/SettingsView.qml" line="718"/>
         <source>Use Default (%1 Mbps)</source>
-        <translation type="unfinished"></translation>
+        <translation>使用默认值 (%1 Mbps)</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="748"/>
@@ -839,6 +839,41 @@
         <location filename="../gui/SettingsView.qml" line="846"/>
         <source>Frame pacing reduces micro-stutter by delaying frames that come in too early</source>
         <translation>通过延迟过早进入的帧来减少卡顿</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="846"/>
+        <source>Video AI-Enhancement</source>
+        <translation>视频 AI 增强</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Enhance video quality by utilizing the GPU&apos;s AI-Enhancement capabilities.</source>
+        <translation>使用 AI 增强视频质量</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>This feature effectively upscales, reduces compression artifacts and enhances the clarity of streamed content.</source>
+        <translation>此功能有效提高分辨率，减少压缩伪影并增强流式传输内容的质量。</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Note:</source>
+        <translation>注意：</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>If available, ensure that appropriate settings (i.e. RTX Video enhancement) are enabled in your GPU driver configuration.</source>
+        <translation>如果能够使用, 请确保在你的GPU驱动程序配置中启用了对应设置（例如 RTX Video 增强）</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
+        <translation>HDR渲染在不同的GPU上存在不同的问题，建议不配合HDR使用</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Be advised that using this feature on laptops running on battery power may lead to significant battery drain.</source>
+        <translation>请注意，在笔记本电脑上使用电池供电时，使用此功能可能会导致显著的电池消耗。</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="856"/>
@@ -966,6 +1001,21 @@
         <translation>注意：由于 GeForce Experience 的 Bug，如果你的目标计算机有多个显示器，则此选项可能无法正常工作。</translation>
     </message>
     <message>
+        <location filename="../gui/SettingsView.qml" line="1507"/>
+        <source>Show local cursor</source>
+        <translation>显示本地鼠标</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1507"/>
+        <source>This makes the client&apos;s mouse cursor visible while streaming.</source>
+        <translation>这可以实现客户端的鼠标光标在流式传输时可见。</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1507"/>
+        <source>You can toggle this while streaming using Ctrl+Alt+Shift+C.</source>
+        <translation>你可以使用 Ctrl+Alt+Shift+C 切换显示本地鼠标模式。</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="1320"/>
         <source>Capture system keyboard shortcuts</source>
         <translation>捕获系统快捷键</translation>
@@ -1050,6 +1100,11 @@
         <translation>交换鼠标左键和右键</translation>
     </message>
     <message>
+        <location filename="../gui/SettingsView.qml" line="1629"/>
+        <source>Swap Alt and Win keys</source>
+        <translation>交换 Alt 和 Win</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="1421"/>
         <source>Reverse mouse scrolling direction</source>
         <translation>反转鼠标滚动方向</translation>
@@ -1103,6 +1158,36 @@
         <location filename="../gui/SettingsView.qml" line="949"/>
         <source>Host Settings</source>
         <translation>目标计算机设置</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1083"/>
+        <source>Custom Screen Mode</source>
+        <translation>自定义屏幕模式</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1108"/>
+        <source>Nothing</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1112"/>
+        <source>Disabled</source>
+        <translation>无操作</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1116"/>
+        <source>Activate the display automatically</source>
+        <translation>自动激活指定显示器</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1120"/>
+        <source>Activate the display automatically and make it a primary display</source>
+        <translation>自动激活指定显示器并设置为主显示器</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1124"/>
+        <source>Deactivate other displays and activate only the specified display</source>
+        <translation>禁用其他显示器，只启用指定显示器</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="959"/>

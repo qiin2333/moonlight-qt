@@ -11,7 +11,7 @@ import SystemProperties 1.0
 Flickable {
     id: settingsPage
     objectName: qsTr("Settings")
-
+    topMargin: 60
     signal languageChanged()
 
     boundsBehavior: Flickable.OvershootBounds
@@ -93,18 +93,47 @@ Flickable {
         StreamingPreferences.save()
     }
 
+    PcView {
+        id: pcViewPage
+    }
+
+    Rectangle {
+        parent: settingsPage
+        anchors.fill: parent
+        z: -2
+
+        Image {
+            anchors.fill: parent
+            source: pcViewPage.currentBgUrl || "qrc:/res/gura.png"
+            opacity: 0.35
+            fillMode: Image.PreserveAspectCrop
+        }
+    }
+
+    Rectangle {
+        parent: settingsPage
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.55)
+        z: -1
+    }
+
     Column {
         padding: 10
         id: settingsColumn1
         width: settingsPage.width / 2
         spacing: 15
+        z: 1
 
         GroupBox {
             id: basicSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Basic Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">⚙ " + qsTr("Basic Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -286,7 +315,7 @@ Flickable {
                                                                                                               StreamingPreferences.height,
                                                                                                               StreamingPreferences.fps,
                                                                                                               StreamingPreferences.enableYUV444);
-                                    slider.value = StreamingPreferences.bitrateKbps
+                                    slider.value = Math.log(StreamingPreferences.bitrateKbps)
                                 }
                             }
 
@@ -454,7 +483,7 @@ Flickable {
                                                                                                               StreamingPreferences.height,
                                                                                                               StreamingPreferences.fps,
                                                                                                               StreamingPreferences.enableYUV444);
-                                    slider.value = StreamingPreferences.bitrateKbps
+                                    slider.value = Math.log(StreamingPreferences.bitrateKbps)
                                 }
                             }
 
@@ -683,24 +712,71 @@ Flickable {
                 }
 
                 Row {
-                    width: parent.width
                     spacing: 5
+                    width: parent.width
 
                     Slider {
                         id: slider
 
-                        value: StreamingPreferences.bitrateKbps
+                        // 使用对数刻度来实现非线性调整
+                        property real logMin: Math.log(500)
+                        property real logMax: Math.log(800000)
+                        property real linearThreshold: 100000 // 100 Mbps 的线性调整阈值
 
-                        stepSize: 500
-                        from : 500
-                        to: StreamingPreferences.unlockBitrate ? 500000 : 150000
+                        value: Math.log(StreamingPreferences.bitrateKbps)
+                        stepSize: (logMax - logMin) / 200
+                        from: logMin
+                        to: logMax
 
                         snapMode: "SnapOnRelease"
-                        width: Math.min(bitrateDesc.implicitWidth, parent.width - (resetBitrateButton.visible ? resetBitrateButton.width + parent.spacing : 0))
+                        width: Math.min(bitrateDesc.implicitWidth, parent.width)
+
+                        handle: Rectangle {
+                            x: slider.visualPosition * (slider.width - width)
+                            y: (slider.height - height) / 2
+                            width: 24
+                            height: 24
+                            radius: 12
+                            color: "#FFA5D2"
+                            border.color: "#ffffff"
+                            border.width: 2
+                        }
+
+                        background: Rectangle {
+                            x: 0
+                            y: (slider.height - height) / 2
+                            width: slider.width
+                            height: 6
+                            radius: 3
+                            color: "#e0e0e0"
+
+                            Rectangle {
+                                width: slider.visualPosition * parent.width
+                                height: parent.height
+                                color: "#FFA5D2"
+                                radius: 3
+                            }
+                        }
 
                         onValueChanged: {
-                            bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(value / 1000.0)
-                            StreamingPreferences.bitrateKbps = value
+                            var linearValue;
+                            if (Math.exp(value) <= linearThreshold) {
+                                // 在 100 Mbps 以下使用线性调整
+                                linearValue = Math.exp(value);
+                            } else {
+                                // 在 100 Mbps 以上使用对数调整
+                                linearValue = Math.exp(value);
+                            }
+
+                            // 根据条件格式化显示文本
+                            var displayValue = linearValue / 1000.0;
+                            if (displayValue < 100) {
+                                bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(displayValue.toFixed(1))
+                            } else {
+                                bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(Math.round(displayValue))
+                            }
+
+                            StreamingPreferences.bitrateKbps = linearValue
                         }
 
                         onMoved: {
@@ -712,18 +788,20 @@ Flickable {
                             languageChanged.connect(valueChanged)
                         }
                     }
-
-                    Button {
-                        id: resetBitrateButton
-                        text: qsTr("Use Default (%1 Mbps)").arg(StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444) / 1000.0)
-                        visible: StreamingPreferences.bitrateKbps !== StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
-                        onClicked: {
-                            var defaultBitrate = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
-                            StreamingPreferences.bitrateKbps = defaultBitrate
-                            StreamingPreferences.autoAdjustBitrate = true
-                            slider.value = defaultBitrate
-                        }
+                }
+                
+                Button {
+                    id: resetBitrateButton
+                    text: qsTr("Use Default (%1 Mbps)").arg(StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444) / 1000.0)
+                    visible: StreamingPreferences.bitrateKbps !== StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
+                    onClicked: {
+                        var defaultBitrate = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
+                        StreamingPreferences.bitrateKbps = defaultBitrate
+                        StreamingPreferences.autoAdjustBitrate = true
+                        slider.value = Math.log(defaultBitrate)
                     }
+                    
+                    hoverEnabled: true
                 }
 
                 Label {
@@ -845,16 +923,57 @@ Flickable {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Frame pacing reduces micro-stutter by delaying frames that come in too early")
                 }
+
+                CheckBox {
+                    id: videoEnhancementCheck
+                    width: parent.width
+                    hoverEnabled: true
+                    text: qsTr("Video AI-Enhancement")
+                    font.pointSize:  12
+                    enabled: SystemProperties.isVideoEnhancementCapable()
+                    checked: {
+                        return SystemProperties.isVideoEnhancementCapable() && StreamingPreferences.videoEnhancement
+                    }
+                    property bool keepValue: checked;
+                    onCheckedChanged: {
+                        StreamingPreferences.videoEnhancement = checked
+                    }
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text:
+                        qsTr("Enhance video quality by utilizing the GPU's AI-Enhancement capabilities.") + "\n" +
+                        qsTr("This feature effectively upscales, reduces compression artifacts and enhances the clarity of streamed content.")+ "\n" + 
+                        qsTr("Note:")+ "\n" + 
+                        qsTr("If available, ensure that appropriate settings (i.e. RTX Video enhancement) are enabled in your GPU driver configuration.")+ "\n" + 
+                        qsTr("HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.")+ "\n" + 
+                        qsTr("Be advised that using this feature on laptops running on battery power may lead to significant battery drain.")
+
+                    Component.onCompleted: {
+                        if (!SystemProperties.isVideoEnhancementCapable()){
+                            // VSR or SDR->HDR feature could not be initialized by any GPU available
+                            text = qsTr("Video AI-Enhancement (Not supported by the GPU)")
+                            enabled = false;
+                            checked = false;
+                        } else if(SystemProperties.isVideoEnhancementExperimental()){
+                            // Indicate if the feature is available but not officially deployed by the Vendor
+                            text = qsTr("Video AI-Enhancement (Experimental)")
+                        }
+                    }
+                }
             }
         }
 
         GroupBox {
-
             id: audioSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Audio Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">🎵 " + qsTr("Audio Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -946,12 +1065,75 @@ Flickable {
             id: hostSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Host Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">🖥️ " + qsTr("Host Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
                 spacing: 5
+
+                // 添加自定义屏幕模式选择器
+                Label {
+                    id: customScreenModeTitle
+                    width: parent.width
+                    text: qsTr("Custom Screen Mode")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                AutoResizingComboBox {
+                    // ignore setting the index at first, and actually set it when the component is loaded
+                    Component.onCompleted: {
+                        var saved_mode = (StreamingPreferences.customScreenMode !== undefined && 
+                                          StreamingPreferences.customScreenMode !== null) ? 
+                                          StreamingPreferences.customScreenMode : -1
+                        currentIndex = 0
+                        for (var i = 0; i < customScreenModeListModel.count; i++) {
+                            var el_mode = customScreenModeListModel.get(i).val;
+                            if (saved_mode === el_mode) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                        activated(currentIndex)
+                    }
+
+                    id: customScreenModeComboBox
+                    textRole: "text"
+                    model: ListModel {
+                        id: customScreenModeListModel
+                        ListElement {
+                            text: qsTr("Nothing")
+                            val: -1
+                        }
+                        ListElement {
+                            text: qsTr("Disabled")
+                            val: 0
+                        }
+                        ListElement {
+                            text: qsTr("Activate the display automatically")
+                            val: 1
+                        }
+                        ListElement {
+                            text: qsTr("Activate the display automatically and make it a primary display")
+                            val: 2
+                        }
+                        ListElement {
+                            text: qsTr("Deactivate other displays and activate only the specified display")
+                            val: 3
+                        }
+                    }
+                    // ::onActivated must be used, as it only listens for when the index is changed by a human
+                    onActivated: {
+                        if (enabled) {
+                            StreamingPreferences.customScreenMode = customScreenModeListModel.get(currentIndex).val
+                        }
+                    }
+                }
 
                 CheckBox {
                     id: optimizeGameSettingsCheck
@@ -986,8 +1168,12 @@ Flickable {
             id: uiSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("UI Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">🎨 " + qsTr("UI Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -1284,8 +1470,12 @@ Flickable {
             id: inputSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Input Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">⌨️ " + qsTr("Input Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -1308,6 +1498,24 @@ Flickable {
                     ToolTip.text: qsTr("This enables seamless mouse control without capturing the client's mouse cursor. It is ideal for remote desktop usage but will not work in most games.") + " " +
                                   qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+M.") + "\n\n" +
                                   qsTr("NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.")
+                }
+
+                CheckBox {
+                    id: showLocalCursorCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Show local cursor")
+                    font.pointSize:  12
+                    checked: StreamingPreferences.showLocalCursor
+                    onCheckedChanged: {
+                        StreamingPreferences.showLocalCursor = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("This makes the client's mouse cursor visible in the stream.") + " " +
+                                  qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.")
                 }
 
                 Row {
@@ -1413,6 +1621,18 @@ Flickable {
                         StreamingPreferences.swapMouseButtons = checked
                     }
                 }
+                
+                CheckBox {
+                    id: swapWinAltKeysCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Swap Alt and Win keys")
+                    font.pointSize:  12
+                    checked: StreamingPreferences.swapWinAltKeys
+                    onCheckedChanged: {
+                        StreamingPreferences.swapWinAltKeys = checked
+                    }
+                }
 
                 CheckBox {
                     id: reverseScrollButtonsCheck
@@ -1432,8 +1652,12 @@ Flickable {
             id: gamepadSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Gamepad Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">🎮 " + qsTr("Gamepad Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -1507,8 +1731,12 @@ Flickable {
             id: advancedSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
-            title: "<font color=\"skyblue\">" + qsTr("Advanced Settings") + "</font>"
-            font.pointSize: 12
+            title: "<b><font color=\"#FFA5D2\">⚗️ " + qsTr("Advanced Settings") + "</font></b>"
+            font {
+                family: "YouYuan"
+                bold: true
+                pointSize: 13
+            }
 
             Column {
                 anchors.fill: parent
@@ -1558,6 +1786,16 @@ Flickable {
                     onActivated: {
                         if (enabled) {
                             StreamingPreferences.videoDecoderSelection = decoderListModel.get(currentIndex).val
+                        }
+                    }
+                    onCurrentIndexChanged: {
+                        if(decoderListModel.get(currentIndex).val === StreamingPreferences.VDS_FORCE_SOFTWARE){
+                            videoEnhancementCheck.enabled = false;
+                            videoEnhancementCheck.keepValue = videoEnhancementCheck.checked;
+                            videoEnhancementCheck.checked = false;
+                        } else {
+                            videoEnhancementCheck.enabled = true;
+                            videoEnhancementCheck.checked = videoEnhancementCheck.keepValue;
                         }
                     }
                 }
@@ -1658,7 +1896,7 @@ Flickable {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                slider.value = StreamingPreferences.bitrateKbps
+                                slider.value = Math.log(StreamingPreferences.bitrateKbps)
                             }
                         }
                     }
@@ -1682,7 +1920,7 @@ Flickable {
                     onCheckedChanged: {
                         StreamingPreferences.unlockBitrate = checked
                         StreamingPreferences.bitrateKbps = Math.min(StreamingPreferences.bitrateKbps, slider.to)
-                        slider.value = StreamingPreferences.bitrateKbps
+                        slider.value = Math.log(StreamingPreferences.bitrateKbps)
                     }
 
                     ToolTip.delay: 1000

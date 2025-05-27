@@ -20,7 +20,7 @@ ApplicationWindow {
 
     id: window
     width: 1280
-    height: 600
+    height: 640
 
     // This function runs prior to creation of the initial StackView item
     function doEarlyInit() {
@@ -98,6 +98,13 @@ ApplicationWindow {
         id: stackView
         anchors.fill: parent
         focus: true
+
+        ToolTip.toolTip.contentWidth: ToolTip.toolTip.implicitContentWidth < 400 ? ToolTip.toolTip.implicitContentWidth : 400
+        ToolTip.toolTip.margins: 8
+
+        ToolTip.toolTip.onVisibleChanged: {
+            if (ToolTip.toolTip.visible) ToolTip.toolTip.y = toolBar.height - 5
+        }
 
         Component.onCompleted: {
             // Perform our early initialization before constructing
@@ -231,11 +238,19 @@ ApplicationWindow {
         }
     }
 
-    header: ToolBar {
+    // 添加工具栏作为浮动元素
+    ToolBar {
         id: toolBar
         height: 60
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.topMargin: 5
-        anchors.bottomMargin: 5
+        z: 1
+        
+        background: Rectangle {
+            color: "transparent"
+        }
 
         Label {
             id: titleLabel
@@ -293,19 +308,19 @@ ApplicationWindow {
             }
 
             NavigableToolButton {
-                id: discordButton
+                id: qqButton
                 visible: SystemProperties.hasBrowser &&
                          qmltypeof(stackView.currentItem, "SettingsView")
 
-                iconSource: "qrc:/res/discord.svg"
+                iconSource: "qrc:/res/qq-2.svg"
 
                 ToolTip.delay: 1000
                 ToolTip.timeout: 3000
                 ToolTip.visible: hovered
-                ToolTip.text: qsTr("Join our community on Discord")
+                ToolTip.text: qsTr("来裙里丸")
 
                 // TODO need to make sure browser is brought to foreground.
-                onClicked: Qt.openUrlExternally("https://moonlight-stream.org/discord");
+                onClicked: Qt.openUrlExternally("https://qm.qq.com/cgi-bin/qm/qr?k=wI7aTvDQdd900n1L_wjjJw3qNP0yOgUa&jump_from=webapi&authKey=CDBn7sGy7HpCKYTcFmoEdNuG/zmkrBWUC/W5A/oZZycKzXwuO/XFCA97IpJRktj3");
 
                 Keys.onDownPressed: {
                     stackView.currentItem.forceActiveFocus(Qt.TabFocus)

@@ -1,4 +1,4 @@
-QT += core quick network quickcontrols2 svg
+QT += core quick network quickcontrols2 svg gui-private
 CONFIG += c++11
 
 unix:!macx {
@@ -165,7 +165,7 @@ macx {
         CONFIG += discord-rpc
     }
 
-    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework Metal -framework QuartzCore
+    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework Metal -framework MetalFx -framework QuartzCore
 
     # For libsoundio
     LIBS += -framework CoreAudio -framework AudioUnit
@@ -202,6 +202,7 @@ SOURCES += \
     streaming/session.cpp \
     streaming/audio/audio.cpp \
     streaming/audio/renderers/sdlaud.cpp \
+    streaming/network/bandwidth.cpp \
     gui/computermodel.cpp \
     gui/appmodel.cpp \
     streaming/streamutils.cpp \
@@ -211,7 +212,9 @@ SOURCES += \
     gui/sdlgamepadkeynavigation.cpp \
     streaming/video/overlaymanager.cpp \
     backend/systemproperties.cpp \
-    wm.cpp
+    wm.cpp \
+    imageutils.cpp \
+    streaming/video/videoenhancement.cpp
 
 HEADERS += \
     SDL_compat.h \
@@ -220,6 +223,7 @@ HEADERS += \
     cli/pair.h \
     settings/compatfetcher.h \
     settings/mappingfetcher.h \
+    streaming/video/videoenhancement.h \
     utils.h \
     backend/computerseeker.h \
     backend/identitymanager.h \
@@ -241,13 +245,15 @@ HEADERS += \
     gui/computermodel.h \
     gui/appmodel.h \
     streaming/video/decoder.h \
+    streaming/network/bandwidth.h \
     streaming/streamutils.h \
     backend/autoupdatechecker.h \
     path.h \
     settings/mappingmanager.h \
     gui/sdlgamepadkeynavigation.h \
     streaming/video/overlaymanager.h \
-    backend/systemproperties.h
+    backend/systemproperties.h \
+    imageutils.h
 
 # Platform-specific renderers and decoders
 ffmpeg {
@@ -389,6 +395,7 @@ config_SL {
 }
 win32 {
     HEADERS += streaming/video/ffmpeg-renderers/dxutil.h
+    LIBS += -liphlpapi
 }
 win32:!winrt {
     message(DXVA2 and D3D11VA renderers selected)
@@ -402,6 +409,18 @@ win32:!winrt {
         streaming/video/ffmpeg-renderers/dxva2.h \
         streaming/video/ffmpeg-renderers/d3d11va.h \
         streaming/video/ffmpeg-renderers/pacer/dxvsyncsource.h
+}
+win32:!winrt {
+    message(AMF enabled for AMD Drivers)
+
+    SOURCES += \
+        ../third-party/AMF/amf/public/common/AMFFactory.cpp \
+        ../third-party/AMF/amf/public/common/AMFSTL.cpp \
+        ../third-party/AMF/amf/public/common/Thread.cpp \
+        ../third-party/AMF/amf/public/common/TraceAdapter.cpp \
+        ../third-party/AMF/amf/public/common/Windows/ThreadWindows.cpp
+
+    INCLUDEPATH += $$PWD/../third-party/AMF/amf
 }
 macx {
     message(VideoToolbox renderer selected)

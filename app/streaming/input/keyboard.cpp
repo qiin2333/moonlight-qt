@@ -77,6 +77,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
                     "Detected show mouse combo");
 
         if (!SDL_GetRelativeMouseMode()) {
+            // 切换本地鼠标光标可见性状态
             m_MouseCursorCapturedVisibilityState = !m_MouseCursorCapturedVisibilityState;
             SDL_ShowCursor(m_MouseCursorCapturedVisibilityState);
         }
@@ -207,14 +208,14 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         modifiers |= MODIFIER_CTRL;
     }
     if (event->keysym.mod & KMOD_ALT) {
-        modifiers |= MODIFIER_ALT;
+        modifiers |= m_SwapWinAltKeys ? MODIFIER_META : MODIFIER_ALT;
     }
     if (event->keysym.mod & KMOD_SHIFT) {
         modifiers |= MODIFIER_SHIFT;
     }
     if (event->keysym.mod & KMOD_GUI) {
         if (isSystemKeyCaptureActive()) {
-            modifiers |= MODIFIER_META;
+            modifiers |= m_SwapWinAltKeys ? MODIFIER_ALT : MODIFIER_META;
         }
     }
 
@@ -352,22 +353,22 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 keyCode = 0xA3;
                 break;
             case SDL_SCANCODE_LALT:
-                keyCode = 0xA4;
+                keyCode = m_SwapWinAltKeys ? 0x5B : 0xA4;
                 break;
             case SDL_SCANCODE_RALT:
-                keyCode = 0xA5;
+                keyCode = m_SwapWinAltKeys ? 0x5C : 0xA5;
                 break;
             case SDL_SCANCODE_LGUI:
                 if (!isSystemKeyCaptureActive()) {
                     return;
                 }
-                keyCode = 0x5B;
+                keyCode = m_SwapWinAltKeys ? 0xA4 : 0x5B;
                 break;
             case SDL_SCANCODE_RGUI:
                 if (!isSystemKeyCaptureActive()) {
                     return;
                 }
-                keyCode = 0x5C;
+                keyCode = m_SwapWinAltKeys ? 0xA5 : 0x5C;
                 break;
             case SDL_SCANCODE_APPLICATION:
                 keyCode = 0x5D;

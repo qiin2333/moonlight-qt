@@ -1,6 +1,7 @@
 #include "nvcomputer.h"
 #include <Limelight.h>
 
+#include <QHostInfo>
 #include <QDebug>
 #include <QUuid>
 #include <QtNetwork/QNetworkReply>
@@ -195,7 +196,8 @@ NvHTTP::startApp(QString verb,
                  bool localAudio,
                  int gamepadMask,
                  bool persistGameControllersOnDisconnect,
-                 QString& rtspSessionUrl)
+                 QString& rtspSessionUrl,
+                 int customScreenMode)
 {
     int riKeyId;
 
@@ -224,6 +226,7 @@ NvHTTP::startApp(QString verb,
                                    "&remoteControllersBitmap="+QString::number(gamepadMask)+
                                    "&gcmap="+QString::number(gamepadMask)+
                                    "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0)+
+                                   "&customScreenMode="+QString::number(customScreenMode)+
                                    LiGetLaunchUrlQueryParameters(),
                                    LAUNCH_TIMEOUT_MS);
 
@@ -481,6 +484,7 @@ NvHTTP::openConnection(QUrl baseUrl,
     // manual intervention to solve).
     url.setQuery("uniqueid=0123456789ABCDEF&uuid=" +
                  QUuid::createUuid().toRfc4122().toHex() +
+                 "&clientname="+QHostInfo::localHostName().toUtf8() +
                  ((arguments != nullptr) ? ("&" + arguments) : ""));
 
     QNetworkRequest request(url);

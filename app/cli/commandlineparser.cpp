@@ -356,10 +356,12 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     parser.addToggleOption("quit-after", "quit app after session");
     parser.addToggleOption("absolute-mouse", "remote desktop optimized mouse control");
     parser.addToggleOption("mouse-buttons-swap", "left and right mouse buttons swap");
+    parser.addToggleOption("win-alt-swap", "win and alt keys swap");
     parser.addToggleOption("touchscreen-trackpad", "touchscreen in trackpad mode");
     parser.addToggleOption("game-optimization", "game optimizations");
     parser.addToggleOption("audio-on-host", "audio on host PC");
     parser.addToggleOption("frame-pacing", "frame pacing");
+    parser.addToggleOption("video-enhancement", "Enhance video with AI");
     parser.addToggleOption("mute-on-focus-loss", "mute audio when Moonlight window loses focus");
     parser.addToggleOption("background-gamepad", "background gamepad input");
     parser.addToggleOption("reverse-scroll-direction", "inverted scroll direction");
@@ -414,8 +416,8 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     // Resolve --bitrate option
     if (parser.isSet("bitrate")) {
         preferences->bitrateKbps = parser.getIntOption("bitrate");
-        if (!inRange(preferences->bitrateKbps, 500, 500000)) {
-            fprintf(stderr, "Warning: Bitrate is out of the supported range (500 - 500000 Kbps). Performance may suffer!\n");
+        if (!inRange(preferences->bitrateKbps, 500, 800000)) {
+            parser.showError("Bitrate must be in range: 500 - 800000");
         }
     } else if (displaySet || parser.isSet("fps")) {
         preferences->bitrateKbps = preferences->getDefaultBitrate(
@@ -452,8 +454,14 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     // Resolve --absolute-mouse and --no-absolute-mouse options
     preferences->absoluteMouseMode = parser.getToggleOptionValue("absolute-mouse", preferences->absoluteMouseMode);
 
+    // Resolve --show-local-cursor and --no-show-local-cursor options
+    preferences->showLocalCursor = parser.getToggleOptionValue("show-local-cursor", preferences->showLocalCursor);
+
     // Resolve --mouse-buttons-swap and --no-mouse-buttons-swap options
     preferences->swapMouseButtons = parser.getToggleOptionValue("mouse-buttons-swap", preferences->swapMouseButtons);
+    
+    // Resolve --win-alt-swap and --no-win-alt-swap options
+    preferences->swapWinAltKeys = parser.getToggleOptionValue("win-alt-swap", preferences->swapWinAltKeys);
 
     // Resolve --touchscreen-trackpad and --no-touchscreen-trackpad options
     preferences->absoluteTouchMode = !parser.getToggleOptionValue("touchscreen-trackpad", !preferences->absoluteTouchMode);
@@ -466,6 +474,9 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
 
     // Resolve --frame-pacing and --no-frame-pacing options
     preferences->framePacing = parser.getToggleOptionValue("frame-pacing", preferences->framePacing);
+
+    // Resolve --video-enhancement and --no-video-enhancement options
+    preferences->videoEnhancement = parser.getToggleOptionValue("video-enhancement", preferences->videoEnhancement);
 
     // Resolve --mute-on-focus-loss and --no-mute-on-focus-loss options
     preferences->muteOnFocusLoss = parser.getToggleOptionValue("mute-on-focus-loss", preferences->muteOnFocusLoss);

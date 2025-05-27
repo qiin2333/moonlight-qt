@@ -34,6 +34,7 @@
 #define SER_ABSTOUCHMODE "abstouchmode"
 #define SER_STARTWINDOWED "startwindowed"
 #define SER_FRAMEPACING "framepacing"
+#define SER_VIDEOENHANCEMENT "videoenhancement"
 #define SER_CONNWARNINGS "connwarnings"
 #define SER_UIDISPLAYMODE "uidisplaymode"
 #define SER_RICHPRESENCE "richpresence"
@@ -43,6 +44,7 @@
 #define SER_DETECTNETBLOCKING "detectnetblocking"
 #define SER_SHOWPERFOVERLAY "showperfoverlay"
 #define SER_SWAPMOUSEBUTTONS "swapmousebuttons"
+#define SER_SWAPWINALTKEYS "swapwinaltkeys"
 #define SER_MUTEONFOCUSLOSS "muteonfocusloss"
 #define SER_BACKGROUNDGAMEPAD "backgroundgamepad"
 #define SER_REVERSESCROLL "reversescroll"
@@ -50,6 +52,8 @@
 #define SER_CAPTURESYSKEYS "capturesyskeys"
 #define SER_KEEPAWAKE "keepawake"
 #define SER_LANGUAGE "language"
+#define SER_CUSTOMSCREENMODE "customscreenmode"
+#define SER_SHOWLOCALCURSOR "showLocalCursor"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -131,8 +135,10 @@ void StreamingPreferences::reload()
     enableMdns = settings.value(SER_MDNS, true).toBool();
     quitAppAfter = settings.value(SER_QUITAPPAFTER, false).toBool();
     absoluteMouseMode = settings.value(SER_ABSMOUSEMODE, false).toBool();
+    showLocalCursor = settings.value(SER_SHOWLOCALCURSOR, false).toBool();
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
+    videoEnhancement = settings.value(SER_VIDEOENHANCEMENT, false).toBool();
     connectionWarnings = settings.value(SER_CONNWARNINGS, true).toBool();
     richPresence = settings.value(SER_RICHPRESENCE, true).toBool();
     gamepadMouse = settings.value(SER_GAMEPADMOUSE, true).toBool();
@@ -140,6 +146,7 @@ void StreamingPreferences::reload()
     showPerformanceOverlay = settings.value(SER_SHOWPERFOVERLAY, false).toBool();
     packetSize = settings.value(SER_PACKETSIZE, 0).toInt();
     swapMouseButtons = settings.value(SER_SWAPMOUSEBUTTONS, false).toBool();
+    swapWinAltKeys = settings.value(SER_SWAPWINALTKEYS, false).toBool();
     muteOnFocusLoss = settings.value(SER_MUTEONFOCUSLOSS, false).toBool();
     backgroundGamepad = settings.value(SER_BACKGROUNDGAMEPAD, false).toBool();
     reverseScrollDirection = settings.value(SER_REVERSESCROLL, false).toBool();
@@ -163,7 +170,7 @@ void StreamingPreferences::reload()
                                                                                                                  : UIDisplayMode::UI_MAXIMIZED)).toInt());
     language = static_cast<Language>(settings.value(SER_LANGUAGE,
                                                     static_cast<int>(Language::LANG_AUTO)).toInt());
-
+    customScreenMode = settings.value(SER_CUSTOMSCREENMODE, -1).toInt();
 
     // Perform default settings updates as required based on last default version
     if (defaultVer < 1) {
@@ -328,8 +335,10 @@ void StreamingPreferences::save()
     settings.setValue(SER_MDNS, enableMdns);
     settings.setValue(SER_QUITAPPAFTER, quitAppAfter);
     settings.setValue(SER_ABSMOUSEMODE, absoluteMouseMode);
+    settings.setValue(SER_SHOWLOCALCURSOR, showLocalCursor);
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
     settings.setValue(SER_FRAMEPACING, framePacing);
+    settings.setValue(SER_VIDEOENHANCEMENT, videoEnhancement);
     settings.setValue(SER_CONNWARNINGS, connectionWarnings);
     settings.setValue(SER_RICHPRESENCE, richPresence);
     settings.setValue(SER_GAMEPADMOUSE, gamepadMouse);
@@ -346,12 +355,14 @@ void StreamingPreferences::save()
     settings.setValue(SER_LANGUAGE, static_cast<int>(language));
     settings.setValue(SER_DEFAULTVER, CURRENT_DEFAULT_VER);
     settings.setValue(SER_SWAPMOUSEBUTTONS, swapMouseButtons);
+    settings.setValue(SER_SWAPWINALTKEYS, swapWinAltKeys);
     settings.setValue(SER_MUTEONFOCUSLOSS, muteOnFocusLoss);
     settings.setValue(SER_BACKGROUNDGAMEPAD, backgroundGamepad);
     settings.setValue(SER_REVERSESCROLL, reverseScrollDirection);
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
+    settings.setValue(SER_CUSTOMSCREENMODE, customScreenMode);
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)
