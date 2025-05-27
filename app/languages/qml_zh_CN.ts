@@ -876,6 +876,21 @@
         <translation>请注意，在笔记本电脑上使用电池供电时，使用此功能可能会导致显著的电池消耗。</translation>
     </message>
     <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Remote Resolution</source>
+        <translation>远程分辨率</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Remote Frame Rate</source>
+        <translation>远程帧率</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>FPS</source>
+        <translation>帧</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="856"/>
         <source>Audio Settings</source>
         <translation>音频设置</translation>
