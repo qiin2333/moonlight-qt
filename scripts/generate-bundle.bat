@@ -46,11 +46,11 @@ if not exist "%BUILD_ROOT%\build-x64-%BUILD_CONFIG%\Moonlight.msi" (
     echo You must run 'build-arch.bat %BUILD_CONFIG% x64' first
     exit /b 1
 )
-if not exist "%BUILD_ROOT%\build-arm64-%BUILD_CONFIG%\Moonlight.msi" (
-    echo Unable to build bundle - missing binaries for %BUILD_CONFIG% arm64
-    echo You must run 'build-arch.bat %BUILD_CONFIG% arm64' first
-    exit /b 1
-)
+@REM if not exist "%BUILD_ROOT%\build-arm64-%BUILD_CONFIG%\Moonlight.msi" (
+@REM     echo Unable to build bundle - missing binaries for %BUILD_CONFIG% arm64
+@REM     echo You must run 'build-arch.bat %BUILD_CONFIG% arm64' first
+@REM     exit /b 1
+@REM )
 
 echo Cleaning output directories
 rmdir /s /q %BUILD_FOLDER%
