@@ -23,11 +23,6 @@ env:
 jobs:
   build-windows:
     runs-on: windows-2022
-    timeout-minutes: 120
-    strategy:
-      matrix:
-        arch: [x64]
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -38,20 +33,9 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.8.0'
+        version: '6.8.3'
         arch: 'win64_msvc2022_64'
         cache: true
-
-    - name: Setup MSVC
-      uses: microsoft/setup-msbuild@v2
-
-    - name: Copy Qt tools for ARM64
-      if: matrix.arch == 'arm64'
-      shell: cmd
-      run: |
-        copy /y scripts\appveyor\qmake.bat %Qt6_DIR%\bin\
-        copy /y scripts\appveyor\qtpaths.bat %Qt6_DIR%\bin\
-        copy /y scripts\appveyor\target_qt.conf %Qt6_DIR%\bin\
 
     - name: Get version
       shell: cmd
@@ -94,7 +78,7 @@ jobs:
         echo MOONLIGHT_CI_BUILD=1 >> %GITHUB_ENV%
         echo CI build environment prepared
 
-    - name: Build with CI
+    - name: Build Windows x64
       shell: cmd
       run: |
         echo Starting CI-optimized build...
@@ -105,29 +89,55 @@ jobs:
         
         rem Build with standard configuration and correct architecture
         echo Building with CI optimizations...
-        scripts\build-arch.bat release ${{ matrix.arch }}
+        scripts\build-arch.bat release x64
         if !ERRORLEVEL! NEQ 0 (
           echo Build failed with error !ERRORLEVEL!
           exit /b !ERRORLEVEL!
         )
         
-        echo Build completed successfully!
+        echo Build Windows x64 completed successfully!
 
-    - name: Generate bundle
+    - name: Install Qt arm64
+      uses: jdpurcell/install-qt-action@v5
+      with:
+        arch: win64_msvc2022_arm64_cross_compiled
+        dir: ${{ github.workspace }}\arm64\
+        host: windows
+        target: desktop
+        version: '6.8.3'
+        use-naqt: true
+
+    - name: Build Windows arm64
       shell: cmd
       run: |
-        scripts\generate-bundle.bat release ${{ matrix.arch }}
+        copy /y scripts\appveyor\qmake.bat %Qt6_DIR%\bin\
+        copy /y scripts\appveyor\qtpaths.bat %Qt6_DIR%\bin\
+        copy /y scripts\appveyor\target_qt.conf %Qt6_DIR%\bin\
+        scripts\build-arch.bat release arm64
+        copy /y build\installer-arm64-release\MoonlightPortable-arm64-$($env:VERSION).zip artifacts\MoonlightPortable-arm64.zip
+        copy /y build\symbols-arm64-Release\MoonlightDebuggingSymbols-arm64-$($env:VERSION).zip artifacts\MoonlightDebuggingSymbols-arm64.zip
+
+    - name: Generate universal installer
+      shell: cmd
+      run: |
+        scripts\generate-bundle.bat release
 
     - name: Upload portable artifact
       uses: actions/upload-artifact@v4
       with:
-        name: MoonlightPortable-${{ matrix.arch }}-r${{ env.BUILD_NUMBER }}
-        path: build/installer-${{ matrix.arch }}-release/MoonlightPortable-${{ matrix.arch }}-*.zip
+        name: MoonlightPortable-x64-r${{ env.BUILD_NUMBER }}
+        path: build/installer-x64-release/MoonlightPortable-x64-*.zip
+
+    - name: Upload portable artifact arm64
+      uses: actions/upload-artifact@v4
+      with:
+        name: MoonlightPortable-arm64-r${{ env.BUILD_NUMBER }}
+        path: build/installer-arm64-release/MoonlightPortable-arm64-*.zip
 
     - name: Upload executable artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Moonlight-${{ matrix.arch }}-r${{ env.BUILD_NUMBER }}.exe
+        name: moonlight-universal-setup-r${{ env.BUILD_NUMBER }}.exe
         path: build/installer-Release/MoonlightSetup-*.exe
 
   build-macos:
@@ -238,22 +248,22 @@ jobs:
         
         sudo pip3 install meson
 
-    - name: Verify Wayland installation
-      run: |
-        echo "Checking Wayland package availability..."
-        pkg-config --exists wayland-client && echo "✅ wayland-client found" || echo "❌ wayland-client not found"
-        pkg-config --exists wayland-server && echo "✅ wayland-server found" || echo "❌ wayland-server not found"
-        pkg-config --exists wayland-cursor && echo "✅ wayland-cursor found" || echo "❌ wayland-cursor not found"
-        pkg-config --exists wayland-egl && echo "✅ wayland-egl found" || echo "❌ wayland-egl not found"
+    # - name: Verify Wayland installation
+    #   run: |
+    #     echo "Checking Wayland package availability..."
+    #     pkg-config --exists wayland-client && echo "✅ wayland-client found" || echo "❌ wayland-client not found"
+    #     pkg-config --exists wayland-server && echo "✅ wayland-server found" || echo "❌ wayland-server not found"
+    #     pkg-config --exists wayland-cursor && echo "✅ wayland-cursor found" || echo "❌ wayland-cursor not found"
+    #     pkg-config --exists wayland-egl && echo "✅ wayland-egl found" || echo "❌ wayland-egl not found"
         
-        echo "Installed Wayland packages:"
-        dpkg -l | grep wayland || echo "No Wayland packages found"
+    #     echo "Installed Wayland packages:"
+    #     dpkg -l | grep wayland || echo "No Wayland packages found"
         
-        echo "Available .pc files for wayland:"
-        find /usr -name "*wayland*.pc" 2>/dev/null | head -10 || echo "No wayland .pc files found"
+    #     echo "Available .pc files for wayland:"
+    #     find /usr -name "*wayland*.pc" 2>/dev/null | head -10 || echo "No wayland .pc files found"
         
-        echo "Wayland library files:"
-        find /usr/lib -name "*wayland*" 2>/dev/null | head -10 || echo "No wayland library files found"
+    #     echo "Wayland library files:"
+    #     find /usr/lib -name "*wayland*" 2>/dev/null | head -10 || echo "No wayland library files found"
 
     - name: Build SDL2
       run: |

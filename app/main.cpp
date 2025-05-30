@@ -12,6 +12,7 @@
 #include <QElapsedTimer>
 #include <QTemporaryFile>
 #include <QRegularExpression>
+#include <QFontDatabase>
 
 // Don't let SDL hook our main function, since Qt is already
 // doing the same thing. This needs to be before any headers
@@ -668,6 +669,16 @@ int main(int argc, char *argv[])
     // Move the mouse to the bottom right so it's invisible when using
     // gamepad-only navigation.
     QCursor().setPos(0xFFFF, 0xFFFF);
+#elif defined(Q_OS_WIN32)
+    // Set Microsoft YaHei as the default font for Windows to improve Chinese text rendering
+    QFont defaultFont("Microsoft YaHei", 9);
+    if (QFontDatabase::families().contains("Microsoft YaHei")) {
+        app.setFont(defaultFont);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Set default font to Microsoft YaHei");
+    } else {
+        // Fallback to system default if Microsoft YaHei is not available
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Microsoft YaHei font not found, using system default");
+    }
 #elif !SDL_VERSION_ATLEAST(2, 0, 11) && defined(Q_OS_LINUX) && (defined(__arm__) || defined(__aarch64__))
     if (qgetenv("SDL_VIDEO_GL_DRIVER").isEmpty() && QGuiApplication::platformName() == "eglfs") {
         // Look for Raspberry Pi GLES libraries. SDL 2.0.10 and earlier needs some help finding
