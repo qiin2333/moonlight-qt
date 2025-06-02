@@ -288,7 +288,7 @@ void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlag
 
 bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
                             SDL_Window* window, int videoFormat, int width, int height,
-                            int frameRate, bool enableVsync, bool enableFramePacing, bool enableVideoEnhancement, bool testOnly, IVideoDecoder*& chosenDecoder)
+                            int frameRate, bool enableVsync, bool enableFramePacing, bool enableVideoEnhancement, bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder)
 {
     DECODER_PARAMETERS params;
 
@@ -305,6 +305,7 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
     params.enableVsync = enableVsync;
     params.enableFramePacing = enableFramePacing;
     params.enableVideoEnhancement = enableVideoEnhancement;
+    params.ignoreAspectRatio = ignoreAspectRatio;
     params.testOnly = testOnly;
     params.vds = vds;
 
@@ -2276,6 +2277,7 @@ void Session::execInternal()
                                    enableVsync,
                                    enableVsync && m_Preferences->framePacing,
                                    m_Preferences->videoEnhancement,
+                                   m_Preferences->ignoreAspectRatio,
                                    false,
                                    s_ActiveSession->m_VideoDecoder)) {
                     SDL_AtomicUnlock(&m_DecoderLock);
