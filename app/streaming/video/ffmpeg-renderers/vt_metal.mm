@@ -146,7 +146,7 @@ public:
           m_LumaUpscaler(nullptr),
           m_ChromaTexture(nullptr),
           m_ChromaUpscaledTexture(nullptr),
-          m_ChromaUpscaler(nullptr)
+          m_ChromaUpscaler(nullptr),
           m_IgnoreAspectRatio(false)
     {
         m_VideoEnhancement = &VideoEnhancement::getInstance();
