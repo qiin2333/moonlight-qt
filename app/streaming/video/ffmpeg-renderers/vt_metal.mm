@@ -146,7 +146,8 @@ public:
           m_LumaUpscaler(nullptr),
           m_ChromaTexture(nullptr),
           m_ChromaUpscaledTexture(nullptr),
-          m_ChromaUpscaler(nullptr)
+          m_ChromaUpscaler(nullptr),
+          m_IgnoreAspectRatio(false)
     {
         m_VideoEnhancement = &VideoEnhancement::getInstance();
     }
@@ -295,7 +296,10 @@ public:
         dst.x = dst.y = 0;
         dst.w = drawableWidth;
         dst.h = drawableHeight;
-        StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
+
+        if (!m_IgnoreAspectRatio) {
+            StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
+        }
 
         // Convert screen space to normalized device coordinates
         SDL_FRect renderRect;
@@ -890,6 +894,9 @@ public:
         // Allow tearing if V-Sync is off (also requires direct display path)
         m_MetalLayer.displaySyncEnabled = params->enableVsync;
 
+        // Ignores aspect ratio to fill the entire screen
+        m_IgnoreAspectRatio = params->ignoreAspectRatio;
+
         // Create the Metal texture cache for our CVPixelBuffers
         CFStringRef keys[1] = { kCVMetalTextureUsage };
         NSUInteger values[1] = { MTLTextureUsageShaderRead };
@@ -1096,6 +1103,7 @@ private:
     MTLPixelFormat m_ChromaPixelFormart;
     CVMetalTextureRef m_cvLumaTexture;
     CVMetalTextureRef m_cvChromaTexture;
+    bool m_IgnoreAspectRatio;
 };
 
 IFFmpegRenderer* VTMetalRendererFactory::createRenderer(bool hwAccel) {
