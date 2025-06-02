@@ -842,7 +842,7 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
         {
             ret = snprintf(&output[offset],
                            length - offset,
-                           " %dx%d@%.0f %s %s %s %s",
+                           " {18}%dx%d@%.0f %s %s %s %s",
                            m_VideoDecoderCtx->width,
                            m_VideoDecoderCtx->height,
                            stats.totalFps,
@@ -861,7 +861,7 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
 
         ret = snprintf(&output[offset],
                        length - offset,
-                       " Frames Rx %.1f/ De %.1f/ Rd %.1f FPS \n",
+                       " {18}FPS  %.1f {14}Rx{18} · %.1f {14}De{18} · %.1f {14}Rd{18} \n",
                        stats.receivedFps,
                        stats.decodedFps,
                        stats.renderedFps);
@@ -882,7 +882,7 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
 
         if (stats.lastRtt != 0)
         {
-            snprintf(rttString, sizeof(rttString), "%u ± %ums", stats.lastRtt, stats.lastRttVariance);
+            snprintf(rttString, sizeof(rttString), "**%u** ± %ums", stats.lastRtt, stats.lastRttVariance);
         }
         else
         {
@@ -894,11 +894,11 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
             if (bandwidthKbps >= 1000)
             {
                 float mbps = bandwidthKbps / 1000.0f;
-                snprintf(bandwidthString, sizeof(bandwidthString), "%.2f Mbps", mbps);
+                snprintf(bandwidthString, sizeof(bandwidthString), "**%.2f** {16}Mbps{18}", mbps);
             }
             else
             {
-                snprintf(bandwidthString, sizeof(bandwidthString), "%d Kbps", bandwidthKbps);
+                snprintf(bandwidthString, sizeof(bandwidthString), "**%d** {16}Kbps{18}", bandwidthKbps);
             }
         }
         else
@@ -912,8 +912,8 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
                        " Loss %.2f%% "
                        " Bandwidth %s "
                     //    " Queue %.2fms "
-                       "| Render %.2fms "
-                       "· Decode %.2fms ",
+                       " {16}|  {18}Render **%.2f**ms "
+                       "· Decode **%.2f**ms ",
                        rttString,
                        (float)stats.networkDroppedFrames / stats.totalFrames * 100,
                        bandwidthString,
@@ -933,7 +933,7 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
     {
         ret = snprintf(&output[offset],
                        length - offset,
-                       "· Encode %.1fms ",
+                       "· Encode **%.1f**ms ",
                        //    (float)stats.minHostProcessingLatency / 10,
                        //    (float)stats.maxHostProcessingLatency / 10,
                        (float)stats.totalHostProcessingLatency / 10 / stats.framesWithHostProcessingLatency);
