@@ -42,6 +42,7 @@
 #define SER_REMOTEFPS "remotefps"
 #define SER_REMOTEFPSRATE "remotefpsrate"
 #define SER_CONNWARNINGS "connwarnings"
+#define SER_CONFWARNINGS "confwarnings"
 #define SER_UIDISPLAYMODE "uidisplaymode"
 #define SER_RICHPRESENCE "richpresence"
 #define SER_GAMEPADMOUSE "gamepadmouse"
@@ -154,6 +155,7 @@ void StreamingPreferences::reload()
     remoteFpsRate = settings.value(SER_REMOTEFPSRATE, 60).toInt();
 
     connectionWarnings = settings.value(SER_CONNWARNINGS, true).toBool();
+    configurationWarnings = settings.value(SER_CONFWARNINGS, true).toBool();
     richPresence = settings.value(SER_RICHPRESENCE, true).toBool();
     gamepadMouse = settings.value(SER_GAMEPADMOUSE, true).toBool();
     detectNetworkBlocking = settings.value(SER_DETECTNETBLOCKING, true).toBool();
@@ -360,6 +362,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_REMOTEFPS, remoteFps);
     settings.setValue(SER_REMOTEFPSRATE, remoteFpsRate);
     settings.setValue(SER_CONNWARNINGS, connectionWarnings);
+    settings.setValue(SER_CONFWARNINGS, configurationWarnings);
     settings.setValue(SER_RICHPRESENCE, richPresence);
     settings.setValue(SER_GAMEPADMOUSE, gamepadMouse);
     settings.setValue(SER_PACKETSIZE, packetSize);

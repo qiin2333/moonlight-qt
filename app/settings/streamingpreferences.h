@@ -132,6 +132,7 @@ public:
     Q_PROPERTY(bool remoteFps MEMBER remoteFps NOTIFY remoteFpsChanged)
     Q_PROPERTY(int remoteFpsRate MEMBER remoteFpsRate NOTIFY remoteFpsRateChanged)
     Q_PROPERTY(bool connectionWarnings MEMBER connectionWarnings NOTIFY connectionWarningsChanged)
+    Q_PROPERTY(bool configurationWarnings MEMBER configurationWarnings NOTIFY configurationWarningsChanged)
     Q_PROPERTY(bool richPresence MEMBER richPresence NOTIFY richPresenceChanged)
     Q_PROPERTY(bool gamepadMouse MEMBER gamepadMouse NOTIFY gamepadMouseChanged)
     Q_PROPERTY(bool detectNetworkBlocking MEMBER detectNetworkBlocking NOTIFY detectNetworkBlockingChanged)
@@ -182,6 +183,7 @@ public:
     bool remoteFps;
     int remoteFpsRate;
     bool connectionWarnings;
+    bool configurationWarnings;
     bool richPresence;
     bool gamepadMouse;
     bool detectNetworkBlocking;
@@ -237,6 +239,7 @@ signals:
     void remoteFpsChanged();
     void remoteFpsRateChanged();
     void connectionWarningsChanged();
+    void configurationWarningsChanged();
     void richPresenceChanged();
     void gamepadMouseChanged();
     void detectNetworkBlockingChanged();

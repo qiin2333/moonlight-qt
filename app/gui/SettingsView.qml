@@ -1532,6 +1532,17 @@ Flickable {
                 }
 
                 CheckBox {
+                    id: configurationWarningsCheck
+                    width: parent.width
+                    text: qsTr("Show configuration warnings")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.configurationWarnings
+                    onCheckedChanged: {
+                        StreamingPreferences.configurationWarnings = checked
+                    }
+                }
+
+                CheckBox {
                     visible: SystemProperties.hasDiscordIntegration
                     id: discordPresenceCheck
                     width: parent.width
