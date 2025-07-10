@@ -116,6 +116,7 @@ public:
     Q_PROPERTY(bool autoAdjustBitrate MEMBER autoAdjustBitrate NOTIFY autoAdjustBitrateChanged)
     Q_PROPERTY(bool ignoreAspectRatio MEMBER ignoreAspectRatio NOTIFY ignoreAspectRatioChanged)
     Q_PROPERTY(bool enableVsync MEMBER enableVsync NOTIFY enableVsyncChanged)
+    Q_PROPERTY(bool enableVrr MEMBER enableVrr NOTIFY enableVrrChanged)
     Q_PROPERTY(bool gameOptimizations MEMBER gameOptimizations NOTIFY gameOptimizationsChanged)
     Q_PROPERTY(bool playAudioOnHost MEMBER playAudioOnHost NOTIFY playAudioOnHostChanged)
     Q_PROPERTY(bool multiController MEMBER multiController NOTIFY multiControllerChanged)
@@ -167,6 +168,7 @@ public:
     bool autoAdjustBitrate;
     bool ignoreAspectRatio;
     bool enableVsync;
+    bool enableVrr;
     bool gameOptimizations;
     bool playAudioOnHost;
     bool multiController;
@@ -215,6 +217,7 @@ signals:
     void autoAdjustBitrateChanged();
     void ignoreAspectRatioChanged();
     void enableVsyncChanged();
+    void enableVrrChanged();
     void gameOptimizationsChanged();
     void playAudioOnHostChanged();
     void multiControllerChanged();

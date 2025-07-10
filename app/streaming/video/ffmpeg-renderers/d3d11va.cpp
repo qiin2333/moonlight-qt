@@ -1179,7 +1179,8 @@ bool D3D11VARenderer::initialize(PDECODER_PARAMETERS params)
 
     // Use DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING with flip mode for non-vsync case, if possible.
     // NOTE: This is only possible in windowed or borderless windowed mode.
-    if (!params->enableVsync) {
+    // For VRR support, we also enable tearing even when V-sync is enabled.
+    if (!params->enableVsync || Session::get()->getPreferences()->enableVrr) {
         BOOL allowTearing = FALSE;
         hr = m_Factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING,
                                             &allowTearing,
@@ -1189,10 +1190,20 @@ bool D3D11VARenderer::initialize(PDECODER_PARAMETERS params)
                 // Use flip discard with allow tearing mode if possible.
                 swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
                 m_AllowTearing = true;
+                
+                if (Session::get()->getPreferences()->enableVrr) {
+                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                                "VRR mode enabled with DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING");
+                }
             }
             else {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "OS/GPU doesn't support DXGI_FEATURE_PRESENT_ALLOW_TEARING");
+                
+                if (Session::get()->getPreferences()->enableVrr) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                                "VRR mode may not work optimally without tearing support");
+                }
             }
         }
         else {
@@ -1205,7 +1216,8 @@ bool D3D11VARenderer::initialize(PDECODER_PARAMETERS params)
         // DXVA2 may let us take over for FSE V-sync off cases. However, if we don't have DXGI_FEATURE_PRESENT_ALLOW_TEARING
         // then we should not attempt to do this unless there's no other option (HDR, DXVA2 failed in pass 1, etc).
         if (!m_AllowTearing && m_DecoderSelectionPass == 0 && !(params->videoFormat & VIDEO_FORMAT_MASK_10BIT) &&
-                (SDL_GetWindowFlags(params->window) & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN) {
+                (SDL_GetWindowFlags(params->window) & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN &&
+                !Session::get()->getPreferences()->enableVrr) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Defaulting to DXVA2 for FSE without DXGI_FEATURE_PRESENT_ALLOW_TEARING support");
             return false;
@@ -1418,7 +1430,9 @@ void D3D11VARenderer::renderFrame(AVFrame* frame)
     UINT flags;
 
     if (m_AllowTearing) {
-        SDL_assert(!m_DecoderParams.enableVsync);
+        // For VRR mode, we allow tearing even with V-sync enabled
+        // For normal non-VRR mode, we only allow tearing when V-sync is disabled
+        SDL_assert(!m_DecoderParams.enableVsync || Session::get()->getPreferences()->enableVrr);
 
         // If tearing is allowed, use DXGI_PRESENT_ALLOW_TEARING with syncInterval 0.
         // It is not valid to use any other syncInterval values in tearing mode.
@@ -1457,7 +1471,14 @@ void D3D11VARenderer::renderFrame(AVFrame* frame)
     }
 
     // Present according to the decoder parameters
-    hr = m_SwapChain->Present(0, flags);
+    // For VRR mode, use syncInterval 0 to allow variable refresh rates
+    UINT syncInterval = 0;
+    if (m_DecoderParams.enableVsync && !Session::get()->getPreferences()->enableVrr) {
+        // Traditional V-sync mode uses syncInterval 1
+        syncInterval = 1;
+    }
+    
+    hr = m_SwapChain->Present(syncInterval, flags);
 
     // Release the context lock
     unlockContext(this);
