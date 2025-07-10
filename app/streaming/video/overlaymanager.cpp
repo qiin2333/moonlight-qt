@@ -50,8 +50,8 @@ OverlayManager::OverlayManager() :
     // 启用高质量字体缩放（如果支持）
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");  // 使用高质量线性过滤
     
-    // 为更好的字体渲染启用垂直同步（减少闪烁）
-    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+    // 为更好的字体渲染启用垂直同步（减少闪烁），但可能与VRR冲突
+    // SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 }
 
 OverlayManager::~OverlayManager()

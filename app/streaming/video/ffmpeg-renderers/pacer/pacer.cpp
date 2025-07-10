@@ -1,5 +1,6 @@
 #include "pacer.h"
 #include "streaming/streamutils.h"
+#include "streaming/session.h"
 
 #ifdef Q_OS_WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -13,6 +14,9 @@
 #endif
 
 #include <SDL_syswm.h>
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 
 // Limit the number of queued frames to prevent excessive memory consumption
 // if the V-Sync source or renderer is blocked for a while. It's important
@@ -36,7 +40,9 @@ Pacer::Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats) :
     m_VsyncRenderer(renderer),
     m_MaxVideoFps(0),
     m_DisplayFps(0),
-    m_VideoStats(videoStats)
+    m_VideoStats(videoStats),
+    m_VrrScheduler(nullptr),
+    m_VrrModeEnabled(false)
 {
 
 }
@@ -55,6 +61,10 @@ Pacer::~Pacer()
     // Stop V-sync callbacks
     delete m_VsyncSource;
     m_VsyncSource = nullptr;
+
+    // Clean up VRR scheduler
+    delete m_VrrScheduler;
+    m_VrrScheduler = nullptr;
 
     // Stop the render thread
     if (m_RenderThread != nullptr) {
@@ -262,7 +272,10 @@ bool Pacer::initialize(SDL_Window* window, int maxVideoFps, bool enablePacing)
     m_DisplayFps = StreamUtils::getDisplayRefreshRate(window);
     m_RendererAttributes = m_VsyncRenderer->getRendererAttributes();
 
-    if (enablePacing) {
+    // Check if VRR is enabled
+    bool vrrEnabled = Session::get()->getPreferences()->enableVrr;
+    
+    if (enablePacing && !vrrEnabled) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Frame pacing: target %d Hz with %d FPS stream",
                     m_DisplayFps, m_MaxVideoFps);
@@ -307,6 +320,13 @@ bool Pacer::initialize(SDL_Window* window, int maxVideoFps, bool enablePacing)
             delete m_VsyncSource;
             m_VsyncSource = nullptr;
         }
+    }
+    else if (vrrEnabled) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "VRR mode enabled: frame pacing disabled to allow variable refresh rates (%d FPS stream)",
+                    m_MaxVideoFps);
+        m_VrrModeEnabled = true;
+        m_VrrScheduler = new VrrFrameScheduler(m_MaxVideoFps);
     }
     else {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
@@ -401,7 +421,13 @@ void Pacer::submitFrame(AVFrame* frame)
     // Make sure initialize() has been called
     SDL_assert(m_MaxVideoFps != 0);
 
-    // Queue the frame and possibly wake up the render thread
+    // Handle VRR mode with stable timing
+    if (m_VrrModeEnabled && m_VrrScheduler != nullptr) {
+        submitFrameForVrr(frame);
+        return;
+    }
+
+    // Traditional frame pacing mode
     m_FrameQueueLock.lock();
     if (m_VsyncSource != nullptr) {
         dropFrameForEnqueue(m_PacingQueue);
@@ -411,5 +437,196 @@ void Pacer::submitFrame(AVFrame* frame)
     }
     else {
         enqueueFrameForRenderingAndUnlock(frame);
+    }
+}
+
+void Pacer::submitFrameForVrr(AVFrame* frame)
+{
+    // Schedule the frame for optimal VRR timing
+    m_VrrScheduler->scheduleFrame();
+    
+    // Wait for the optimal submission time
+    m_VrrScheduler->waitForOptimalSubmissionTime();
+    
+    // Submit the frame for rendering
+    m_FrameQueueLock.lock();
+    enqueueFrameForRenderingAndUnlock(frame);
+    
+    // Record the actual submission time for timing statistics
+    m_VrrScheduler->recordFrameSubmission();
+}
+
+void Pacer::scheduleVrrFrame(AVFrame* frame)
+{
+    if (m_VrrScheduler != nullptr) {
+        m_VrrScheduler->scheduleFrame();
+    }
+}
+
+// Get high-precision time in nanoseconds
+static Uint64 getHighPrecisionTimeNs() {
+    auto now = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+}
+
+// VrrFrameScheduler implementation
+VrrFrameScheduler::VrrFrameScheduler(int targetFps)
+    : m_TargetFps(targetFps)
+    , m_TargetFrameIntervalNs(1000000000ULL / targetFps)  // Convert to nanoseconds
+    , m_LastFrameTimeNs(0)
+    , m_NextFrameTimeNs(0)
+    , m_AverageFrameInterval(1000000000.0 / targetFps)
+    , m_FrameIntervalVariance(0.0)
+    , m_TimingAdjustmentFactor(0.1)  // 10% adjustment factor
+    , m_HistorySize(targetFps / 2)   // Track half second of frames
+{
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "VRR Frame Scheduler initialized: target %d FPS (%.3f ms interval)",
+                m_TargetFps, m_TargetFrameIntervalNs / 1000000.0);
+    reset();
+}
+
+VrrFrameScheduler::~VrrFrameScheduler()
+{
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "VRR Frame Scheduler destroyed");
+}
+
+void VrrFrameScheduler::scheduleFrame()
+{
+    QMutexLocker locker(&m_TimingMutex);
+    
+    Uint64 currentTime = getHighPrecisionTimeNs();
+    
+    if (m_LastFrameTimeNs == 0) {
+        // First frame - initialize timing
+        m_LastFrameTimeNs = currentTime;
+        m_NextFrameTimeNs = currentTime + m_TargetFrameIntervalNs;
+    } else {
+        // Calculate next frame time based on target interval and timing adjustments
+        Uint64 idealNextTime = m_LastFrameTimeNs + m_TargetFrameIntervalNs;
+        
+        // Apply adaptive timing adjustment based on recent performance
+        if (!m_FrameTimeHistory.isEmpty()) {
+            double adjustmentNs = (m_AverageFrameInterval - m_TargetFrameIntervalNs) * m_TimingAdjustmentFactor;
+            idealNextTime += static_cast<Uint64>(adjustmentNs);
+        }
+        
+        // Ensure we don't schedule frames in the past
+        m_NextFrameTimeNs = SDL_max(idealNextTime, currentTime + 100000ULL); // Minimum 0.1ms ahead
+    }
+}
+
+void VrrFrameScheduler::waitForOptimalSubmissionTime()
+{
+    QMutexLocker locker(&m_TimingMutex);
+    
+    Uint64 currentTime = getHighPrecisionTimeNs();
+    
+    if (m_NextFrameTimeNs > currentTime) {
+        Uint64 waitTimeNs = m_NextFrameTimeNs - currentTime;
+        
+        // Only wait if the delay is reasonable (< 50ms)
+        if (waitTimeNs < 50000000ULL) {
+            locker.unlock();
+            
+            // Convert to milliseconds for SDL_Delay
+            Uint32 waitTimeMs = static_cast<Uint32>(waitTimeNs / 1000000ULL);
+            if (waitTimeMs > 0) {
+                SDL_Delay(waitTimeMs);
+            }
+            
+            // Use high-precision spin wait for sub-millisecond accuracy
+            Uint64 targetTime = getHighPrecisionTimeNs() + (waitTimeNs % 1000000ULL);
+            while (getHighPrecisionTimeNs() < targetTime) {
+                // Spin wait for final precision
+                SDL_Delay(0);  // Yield CPU briefly
+            }
+        }
+    }
+}
+
+void VrrFrameScheduler::recordFrameSubmission()
+{
+    QMutexLocker locker(&m_TimingMutex);
+    
+    Uint64 currentTime = getHighPrecisionTimeNs();
+    
+    if (m_LastFrameTimeNs != 0) {
+        // Record the actual frame interval
+        Uint64 actualInterval = currentTime - m_LastFrameTimeNs;
+        
+        // Update frame time history
+        m_FrameTimeHistory.enqueue(actualInterval);
+        while (m_FrameTimeHistory.size() > m_HistorySize) {
+            m_FrameTimeHistory.dequeue();
+        }
+        
+        // Update statistics
+        updateTimingStatistics();
+        
+        // Adjust scheduling parameters if needed
+        adjustSchedulingParameters();
+    }
+    
+    m_LastFrameTimeNs = currentTime;
+}
+
+void VrrFrameScheduler::reset()
+{
+    QMutexLocker locker(&m_TimingMutex);
+    
+    m_LastFrameTimeNs = 0;
+    m_NextFrameTimeNs = 0;
+    m_FrameTimeHistory.clear();
+    m_AverageFrameInterval = 1000000000.0 / m_TargetFps;
+    m_FrameIntervalVariance = 0.0;
+    
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "VRR Frame Scheduler timing reset");
+}
+
+void VrrFrameScheduler::updateTimingStatistics()
+{
+    if (m_FrameTimeHistory.isEmpty()) {
+        return;
+    }
+    
+    // Calculate rolling average
+    double sum = 0.0;
+    for (Uint64 interval : m_FrameTimeHistory) {
+        sum += interval;
+    }
+    m_AverageFrameInterval = sum / m_FrameTimeHistory.size();
+    
+    // Calculate variance
+    double varianceSum = 0.0;
+    for (Uint64 interval : m_FrameTimeHistory) {
+        double diff = interval - m_AverageFrameInterval;
+        varianceSum += diff * diff;
+    }
+    m_FrameIntervalVariance = varianceSum / m_FrameTimeHistory.size();
+}
+
+void VrrFrameScheduler::adjustSchedulingParameters()
+{
+    // If variance is high, reduce adjustment factor for more stable timing
+    double varianceThreshold = m_TargetFrameIntervalNs * 0.1; // 10% of target interval
+    
+    if (m_FrameIntervalVariance > varianceThreshold * varianceThreshold) {
+        m_TimingAdjustmentFactor = SDL_max(0.05, m_TimingAdjustmentFactor * 0.9);
+    } else {
+        m_TimingAdjustmentFactor = SDL_min(0.2, m_TimingAdjustmentFactor * 1.05);
+    }
+    
+    // Log statistics periodically (every 2 seconds worth of frames)
+    static int logCounter = 0;
+    if (++logCounter >= (m_TargetFps * 2)) {
+        logCounter = 0;
+        double avgMs = m_AverageFrameInterval / 1000000.0;
+        double targetMs = m_TargetFrameIntervalNs / 1000000.0;
+        double varianceMs = sqrt(m_FrameIntervalVariance) / 1000000.0;
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "VRR timing stats: avg %.3fms (target %.3fms), variance %.3fms, adjust factor %.3f",
+                    avgMs, targetMs, varianceMs, m_TimingAdjustmentFactor);
     }
 }

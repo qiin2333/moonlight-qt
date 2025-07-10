@@ -22,6 +22,45 @@ public:
     }
 };
 
+// VRR frame timing scheduler for stable frame submission
+class VrrFrameScheduler {
+public:
+    VrrFrameScheduler(int targetFps);
+    ~VrrFrameScheduler();
+    
+    // Calculate optimal frame submission timing
+    void scheduleFrame();
+    
+    // Wait until the optimal time to submit the next frame
+    void waitForOptimalSubmissionTime();
+    
+    // Update timing statistics and adjust scheduling
+    void recordFrameSubmission();
+    
+    // Reset timing state (e.g., after decoder recreation)
+    void reset();
+    
+private:
+    void updateTimingStatistics();
+    void adjustSchedulingParameters();
+    
+    int m_TargetFps;
+    Uint64 m_TargetFrameIntervalNs;  // Target frame interval in nanoseconds
+    Uint64 m_LastFrameTimeNs;        // Last frame submission time
+    Uint64 m_NextFrameTimeNs;        // Next optimal frame submission time
+    
+    // Timing statistics for adaptive adjustment
+    QQueue<Uint64> m_FrameTimeHistory;  // Recent frame submission times
+    double m_AverageFrameInterval;       // Rolling average frame interval
+    double m_FrameIntervalVariance;      // Frame timing variance
+    
+    // Adaptive parameters
+    double m_TimingAdjustmentFactor;     // Factor for timing corrections
+    int m_HistorySize;                   // Number of frames to track for statistics
+    
+    mutable QMutex m_TimingMutex;
+};
+
 class Pacer
 {
 public:
@@ -49,6 +88,10 @@ private:
     void renderFrame(AVFrame* frame);
 
     void dropFrameForEnqueue(QQueue<AVFrame*>& queue);
+    
+    // VRR-specific methods
+    void submitFrameForVrr(AVFrame* frame);
+    void scheduleVrrFrame(AVFrame* frame);
 
     QQueue<AVFrame*> m_RenderQueue;
     QQueue<AVFrame*> m_PacingQueue;
@@ -68,4 +111,8 @@ private:
     int m_DisplayFps;
     PVIDEO_STATS m_VideoStats;
     int m_RendererAttributes;
+    
+    // VRR timing control
+    VrrFrameScheduler* m_VrrScheduler;
+    bool m_VrrModeEnabled;
 };
