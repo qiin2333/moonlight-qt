@@ -189,82 +189,47 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
-    - name: Install dependencies
+    - name: Install Qt 6.8.3
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.8.3'
+        cache: true
+
+    - name: Setup local env and metadata
       run: |
-        # Update package lists
-        sudo apt update
-        
-        # Install FUSE for AppImage support
-        echo "Installing FUSE for AppImage support..."
-        sudo apt install -y fuse libfuse2
-        
-        # Show available Qt packages for debugging
-        echo "Available Qt packages:"
-        apt list --installed | grep qt5 || echo "No Qt5 packages currently installed"
-        
-        # Install core Qt 5.15 packages from Ubuntu repositories
-        echo "Installing core Qt packages..."
-        sudo apt install -y qtbase5-dev qtdeclarative5-dev qtquickcontrols2-5-dev libqt5svg5-dev
-        
-        # Install additional Qt packages (some may not be available)
-        echo "Installing additional Qt packages..."
-        sudo apt install -y qtwayland5-dev-tools qttools5-dev-tools qtmultimedia5-dev || echo "Some additional Qt packages failed to install, continuing..."
-        
-        # Verify Qt installation
-        echo "Verifying Qt installation..."
-        qmake --version || echo "qmake not found in PATH"
-        ls -la /usr/lib/qt5/bin/ || echo "Qt5 bin directory not found"
-        
-        # Install build dependencies
-        sudo apt install -y python3-pip nasm build-essential cmake ninja-build
-        sudo apt install -y libgbm-dev libdrm-dev libfreetype6-dev libasound2-dev libdbus-1-dev 
-        sudo apt install -y libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev 
-        sudo apt install -y libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev 
-        sudo apt install -y libxext-dev libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev 
-        sudo apt install -y libxss-dev libxt-dev libxv-dev libxxf86vm-dev libxcb-dri3-dev 
-        sudo apt install -y libx11-xcb-dev wayland-protocols libopus-dev libvdpau-dev
-        
-        # Install Wayland development libraries for SDL2
-        echo "Installing Wayland development libraries..."
-        # Install core Wayland packages that should be available in Ubuntu 22.04
-        sudo apt install -y libwayland-dev || echo "libwayland-dev not available"
-        sudo apt install -y libwayland-client0 || echo "libwayland-client0 not available"
-        sudo apt install -y libwayland-server0 || echo "libwayland-server0 not available"
-        sudo apt install -y libwayland-cursor0 || echo "libwayland-cursor0 not available"
-        sudo apt install -y libwayland-egl1-mesa || echo "libwayland-egl1-mesa not available"
-        
-        # Install additional packages if available
-        sudo apt install -y libxkbcommon-dev || echo "libxkbcommon-dev not available"
-        
-        # Show what we actually got
-        echo "Installed Wayland-related packages:"
-        dpkg -l | grep -E "(wayland|xkbcommon)" || echo "No Wayland packages installed"
-        
-        # Install Vulkan SDK
+        mkdir -p $HOME/local/{bin,include,lib}
+        echo "$HOME/local/bin" >> $GITHUB_PATH
+        echo "PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$HOME/local/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+        echo "VERSION=$(cat app/version.txt)" >> $GITHUB_ENV
+        echo "UBUNTU_RELEASE=$(lsb_release -rs)" >> $GITHUB_ENV
+
+    # This may still install various Qt packages, but the later install step will override them
+    - name: Install packaged deps
+      run: |
         wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
-        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.280-jammy.list https://packages.lunarg.com/vulkan/1.3.280/lunarg-vulkan-1.3.280-jammy.list
+        if [[ $UBUNTU_RELEASE == "20.04" ]]; then
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.280-focal.list https://packages.lunarg.com/vulkan/1.3.280/lunarg-vulkan-1.3.280-focal.list
+        else
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.280-jammy.list https://packages.lunarg.com/vulkan/1.3.280/lunarg-vulkan-1.3.280-jammy.list
+        fi
         sudo apt update || true
-        sudo apt install -y vulkan-sdk || echo "Vulkan SDK installation failed, continuing..."
+        sudo apt install -y \
+          python3-pip nasm libgbm-dev libdrm-dev libfreetype6-dev libasound2-dev \
+          libdbus-1-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev \
+          libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev \
+          libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev \
+          libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev libwayland-dev wayland-protocols \
+          libopus-dev libvdpau-dev vulkan-sdk
         
+        # Install XCB runtime libraries for Qt6 XCB platform plugin
+        echo "Installing XCB runtime libraries..."
+        sudo apt install -y libxcb1 libxcb-cursor0 libxcb-keysyms1 libxcb-image0 libxcb-shm0 libxcb-icccm4 libxcb-sync1 libxcb-xfixes0 libxcb-shape0 libxcb-randr0 libxcb-render0 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxcb-util1
         sudo pip3 install meson
 
-    # - name: Verify Wayland installation
-    #   run: |
-    #     echo "Checking Wayland package availability..."
-    #     pkg-config --exists wayland-client && echo "✅ wayland-client found" || echo "❌ wayland-client not found"
-    #     pkg-config --exists wayland-server && echo "✅ wayland-server found" || echo "❌ wayland-server not found"
-    #     pkg-config --exists wayland-cursor && echo "✅ wayland-cursor found" || echo "❌ wayland-cursor not found"
-    #     pkg-config --exists wayland-egl && echo "✅ wayland-egl found" || echo "❌ wayland-egl not found"
-        
-    #     echo "Installed Wayland packages:"
-    #     dpkg -l | grep wayland || echo "No Wayland packages found"
-        
-    #     echo "Available .pc files for wayland:"
-    #     find /usr -name "*wayland*.pc" 2>/dev/null | head -10 || echo "No wayland .pc files found"
-        
-    #     echo "Wayland library files:"
-    #     find /usr/lib -name "*wayland*" 2>/dev/null | head -10 || echo "No wayland library files found"
-
+        if [[ $UBUNTU_RELEASE == "22.04" ]]; then
+          # Needed for AppImage
+          sudo apt install libfuse2
+        fi
     - name: Build SDL2
       run: |
         export SDL2_REV=86fd4ed83cdcf71fef6a57766b126e88f923acd3
@@ -395,10 +360,10 @@ jobs:
       env:
         APPIMAGE_EXTRACT_AND_RUN: 1
       run: |
-        # Set Qt environment for system Qt 5.15
-        export QT_SELECT=5
-        export PATH=/usr/lib/qt5/bin:$PATH
-        export QT_QPA_PLATFORM_PLUGIN_PATH=/usr/lib/x86_64-linux-gnu/qt5/plugins
+        # Qt5 环境变量已废弃，使用 Qt6 环境
+        # export QT_SELECT=5
+        # export PATH=/usr/lib/qt5/bin:$PATH
+        # export QT_QPA_PLATFORM_PLUGIN_PATH=/usr/lib/x86_64-linux-gnu/qt5/plugins
         
         # Add linuxdeployqt to PATH
         export PATH=$PATH:$HOME/bin
