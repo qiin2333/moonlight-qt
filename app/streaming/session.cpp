@@ -586,7 +586,8 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_OpusDecoder(nullptr),
       m_AudioRenderer(nullptr),
       m_AudioSampleCount(0),
-      m_DropAudioEndTime(0)
+      m_DropAudioEndTime(0),
+      m_MicStream(nullptr)
 {
 }
 
@@ -710,6 +711,8 @@ bool Session::initialize()
         m_StreamConfig.audioConfiguration = AUDIO_CONFIGURATION_71_SURROUND;
         break;
     }
+
+    m_StreamConfig.enableMic = m_Preferences->enableMicrophone;
 
     LiInitializeAudioCallbacks(&m_AudioCallbacks);
     m_AudioCallbacks.init = arInit;
@@ -1277,6 +1280,7 @@ private:
         SDL_assert(m_Session->m_VideoDecoder == nullptr);
 
         // Finish cleanup of the connection state
+        QMetaObject::invokeMethod(m_Session, &Session::stopMicrophone, Qt::BlockingQueuedConnection);
         LiStopConnection();
 
         // Perform a best-effort app quit
@@ -1702,6 +1706,9 @@ bool Session::startConnectionAsync()
     }
 
     emit connectionStarted();
+    if (m_Preferences->enableMicrophone) {
+        QMetaObject::invokeMethod(this, &Session::startMicrophone, Qt::QueuedConnection);
+    }
     return true;
 }
 
@@ -2435,4 +2442,24 @@ DispatchDeferredCleanup:
 
     // 停止带宽计算
     BandwidthCalculator::instance()->stop();
+}
+
+void Session::startMicrophone()
+{
+    if (!m_MicStream) {
+        m_MicStream = new MicStream(this);
+        if (!m_MicStream->start()) {
+            delete m_MicStream;
+            m_MicStream = nullptr;
+        }
+    }
+}
+
+void Session::stopMicrophone()
+{
+    if (m_MicStream) {
+        m_MicStream->stop();
+        delete m_MicStream;
+        m_MicStream = nullptr;
+    }
 }

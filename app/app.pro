@@ -1,4 +1,4 @@
-QT += core quick network quickcontrols2 svg gui-private
+QT += core quick network quickcontrols2 svg gui-private multimedia
 CONFIG += c++11
 
 unix:!macx {
@@ -199,6 +199,7 @@ SOURCES += \
     streaming/input/keyboard.cpp \
     streaming/input/mouse.cpp \
     streaming/input/reltouch.cpp \
+    streaming/micstream.cpp \
     streaming/session.cpp \
     streaming/audio/audio.cpp \
     streaming/audio/renderers/sdlaud.cpp \
@@ -223,6 +224,7 @@ HEADERS += \
     cli/pair.h \
     settings/compatfetcher.h \
     settings/mappingfetcher.h \
+    streaming/micstream.h \
     streaming/video/videoenhancement.h \
     utils.h \
     backend/computerseeker.h \
