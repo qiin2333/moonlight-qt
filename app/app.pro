@@ -1,4 +1,5 @@
 QT += core quick network quickcontrols2 svg gui-private
+!config_SL: QT += multimedia
 CONFIG += c++11
 
 unix:!macx {
@@ -254,6 +255,10 @@ HEADERS += \
     streaming/video/overlaymanager.h \
     backend/systemproperties.h \
     imageutils.h
+
+# Conditional files for non-Steam Link builds
+!config_SL: SOURCES += streaming/micstream.cpp
+!config_SL: HEADERS += streaming/micstream.h
 
 # Platform-specific renderers and decoders
 ffmpeg {

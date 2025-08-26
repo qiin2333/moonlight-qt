@@ -61,6 +61,7 @@
 #define SER_LANGUAGE "language"
 #define SER_CUSTOMSCREENMODE "customscreenmode"
 #define SER_SHOWLOCALCURSOR "showLocalCursor"
+#define SER_MICROPHONE "microphone"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -147,6 +148,7 @@ void StreamingPreferences::reload()
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     videoEnhancement = settings.value(SER_VIDEOENHANCEMENT, false).toBool();
+    enableMicrophone = settings.value(SER_MICROPHONE, false).toBool();
 
     remoteResolution = settings.value(SER_REMOTERESOLUTION, false).toBool();
     remoteResolutionWidth = settings.value(SER_REMOTEWIDTH, 1280).toInt();
@@ -386,6 +388,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
     settings.setValue(SER_CUSTOMSCREENMODE, customScreenMode);
+    settings.setValue(SER_MICROPHONE, enableMicrophone);
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

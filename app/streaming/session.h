@@ -10,6 +10,9 @@
 #include "video/decoder.h"
 #include "audio/renderers/renderer.h"
 #include "video/overlaymanager.h"
+#ifndef STEAM_LINK
+#include "micstream.h"
+#endif
 
 class SupportedVideoFormatList : public QList<int>
 {
@@ -242,6 +245,9 @@ private:
     static
     void drCleanup();
 
+    void startMicrophone();
+    void stopMicrophone();
+
     static
     int drSubmitDecodeUnit(PDECODE_UNIT du);
 
@@ -288,4 +294,9 @@ private:
     static CONNECTION_LISTENER_CALLBACKS k_ConnCallbacks;
     static Session* s_ActiveSession;
     static QSemaphore s_ActiveSessionSemaphore;
+#ifndef STEAM_LINK
+    MicStream* m_MicStream;
+#else
+    void* m_MicStream;
+#endif
 };

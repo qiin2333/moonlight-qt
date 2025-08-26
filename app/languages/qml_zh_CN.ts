@@ -936,6 +936,11 @@
         <translation>当你用 Alt+Tab 键离开流式传输或者点击其他窗口时，Moonlight 将静音。</translation>
     </message>
     <message>
+        <location filename="../gui/SettingsView.qml" line="1173"/>
+        <source>Enable microphone streaming(test)</source>
+        <translation>启用麦克风流式传输（测试）</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="989"/>
         <source>UI Settings</source>
         <translation>界面设置</translation>

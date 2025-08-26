@@ -35,6 +35,7 @@ jobs:
       with:
         version: '6.8.3'
         arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
         cache: true
 
     - name: Get version
@@ -105,6 +106,7 @@ jobs:
         host: windows
         target: desktop
         version: '6.8.3'
+        modules: 'qtmultimedia'
         use-naqt: true
 
     - name: Build Windows arm64
@@ -154,6 +156,7 @@ jobs:
       uses: jurplel/install-qt-action@v3
       with:
         version: '6.6.0'
+        modules: 'qtmultimedia'
         cache: true
 
     - name: Install Node.js
@@ -193,6 +196,7 @@ jobs:
       uses: jurplel/install-qt-action@v3
       with:
         version: '6.8.3'
+        modules: 'qtmultimedia'
         cache: true
 
     - name: Setup local env and metadata
@@ -219,7 +223,7 @@ jobs:
           libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev \
           libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev \
           libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev libwayland-dev wayland-protocols \
-          libopus-dev libvdpau-dev vulkan-sdk
+          libopus-dev libvdpau-dev vulkan-sdk qt6-multimedia-dev
         
         # Install XCB runtime libraries for Qt6 XCB platform plugin
         echo "Installing XCB runtime libraries..."
