@@ -2444,6 +2444,7 @@ DispatchDeferredCleanup:
     BandwidthCalculator::instance()->stop();
 }
 
+#ifndef STEAM_LINK
 void Session::startMicrophone()
 {
     if (!m_MicStream) {
@@ -2463,3 +2464,14 @@ void Session::stopMicrophone()
         m_MicStream = nullptr;
     }
 }
+#else
+void Session::startMicrophone()
+{
+    // Microphone not supported on Steam Link
+}
+
+void Session::stopMicrophone()
+{
+    // Microphone not supported on Steam Link
+}
+#endif
