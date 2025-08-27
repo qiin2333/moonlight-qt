@@ -4,6 +4,7 @@
 #include "backend/richpresencemanager.h"
 
 #include <Limelight.h>
+#include <Limelight-internal.h>
 #include "SDL_compat.h"
 #include "network/bandwidth.h"
 #include "utils.h"
@@ -748,6 +749,8 @@ bool Session::initialize()
         break;
     }
 
+    m_StreamConfig.enableMic = m_Preferences->enableMicrophone;
+
     LiInitializeAudioCallbacks(&m_AudioCallbacks);
     m_AudioCallbacks.init = arInit;
     m_AudioCallbacks.cleanup = arCleanup;
@@ -1382,6 +1385,7 @@ private:
         SDL_assert(m_Session->m_VideoDecoder == nullptr);
 
         // Finish cleanup of the connection state
+        QMetaObject::invokeMethod(m_Session, &Session::stopMicrophone, Qt::BlockingQueuedConnection);
         LiStopConnection();
 
         // Perform a best-effort app quit
@@ -1858,6 +1862,9 @@ bool Session::startConnectionAsync()
     }
 
     emit connectionStarted();
+    if (m_Preferences->enableMicrophone) {
+        QMetaObject::invokeMethod(this, &Session::startMicrophone, Qt::QueuedConnection);
+    }
     return true;
 }
 
@@ -2689,9 +2696,10 @@ bool Session::initializeMicrophoneCapture()
     // Create microphone capture instance
     m_MicrophoneCapture = new MicrophoneCapture(this);
 
-    // Calculate microphone stream port (base port + 13)
+    // Calculate microphone stream port: prefer RTSP-negotiated MicPortNumber, fallback to previous default (48000)
     QString serverAddress = m_Computer->activeAddress.address();
-    int micPort = 47987 + 13; // Port 48000 by default
+    const int defaultMicPort = 47987 + 13; // Port 48000 by default
+    int micPort = (MicPortNumber != 0) ? MicPortNumber : defaultMicPort;
 
     // Initialize microphone with stream configuration
     if (!m_MicrophoneCapture->initialize(serverAddress, micPort, m_StreamConfig))

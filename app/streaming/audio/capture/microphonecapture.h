@@ -6,8 +6,9 @@
 #include <QTimer>
 #include <opus.h>
 
+#include <Limelight.h>
+
 // Forward declarations
-struct STREAM_CONFIGURATION;
 class NvComputer;
 
 /**
