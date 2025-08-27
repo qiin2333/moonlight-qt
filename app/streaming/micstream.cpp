@@ -58,6 +58,30 @@ bool MicStream::start()
     fmt.setChannelCount(1);
     fmt.setSampleFormat(QAudioFormat::Int16);
 
+    // macOS/Qt sometimes returns devices that do not support requested format.
+    // Query supported formats and fall back if needed to avoid silent failures.
+    QAudioDevice deviceTest = QMediaDevices::defaultAudioInput();
+    if (!deviceTest.isFormatSupported(fmt)) {
+        qWarning() << "[MicStream] Requested audio format not supported by default device, attempting fallbacks";
+        // try common fallbacks
+        QAudioFormat fmt2 = fmt;
+        fmt2.setSampleRate(44100);
+        if (deviceTest.isFormatSupported(fmt2)) {
+            fmt = fmt2;
+            qInfo() << "[MicStream] Falling back to 44100 Hz";
+        } else {
+            // try stereo 48000 then
+            QAudioFormat fmt3 = fmt;
+            fmt3.setChannelCount(2);
+            if (deviceTest.isFormatSupported(fmt3)) {
+                fmt = fmt3;
+                qInfo() << "[MicStream] Falling back to stereo 48000";
+            } else {
+                qWarning() << "[MicStream] No compatible fallback format found; will still attempt start and log errors";
+            }
+        }
+    }
+
     const QList<QAudioDevice> devices = QMediaDevices::audioInputs();
     if (devices.isEmpty()) {
         qWarning() << "[MicStream] No audio input devices available";
@@ -72,7 +96,8 @@ bool MicStream::start()
     qInfo() << "[MicStream] Using audio input device:" << device.description();
 
     m_audioInput = new QAudioSource(device, fmt, this);
-    m_audioInput->setBufferSize(PCM_FRAME_SIZE);
+    // make buffer at least one PCM frame or a few frames to smooth reads
+    m_audioInput->setBufferSize(PCM_FRAME_SIZE * 4);
     m_audioDevice = m_audioInput->start();
     if (!m_audioDevice || m_audioInput->error() != QAudio::NoError) {
         qWarning() << "[MicStream] Failed to start audio device error=" << m_audioInput->error();
@@ -135,11 +160,22 @@ void MicStream::stop()
 
 void MicStream::onAudio()
 {
-    while (m_audioDevice && m_audioDevice->bytesAvailable() >= PCM_FRAME_SIZE) {
-        QByteArray pcm = m_audioDevice->read(PCM_FRAME_SIZE);
+    // accumulate partial reads to form complete PCM frames
+    if (!m_audioDevice)
+        return;
+
+    QByteArray chunk = m_audioDevice->readAll();
+    if (chunk.isEmpty()) {
+        return;
+    }
+    // append to partial buffer
+    m_partialBuffer.append(chunk);
+    while (m_partialBuffer.size() >= PCM_FRAME_SIZE) {
+        QByteArray pcm = m_partialBuffer.left(PCM_FRAME_SIZE);
+        m_partialBuffer.remove(0, PCM_FRAME_SIZE);
         if (pcm.size() < PCM_FRAME_SIZE) {
-            qWarning() << "[MicStream] PCM underrun read=" << pcm.size() << " expected=" << PCM_FRAME_SIZE;
-            return;
+            qWarning() << "[MicStream] PCM underrun after assembly read=" << pcm.size() << " expected=" << PCM_FRAME_SIZE;
+            break;
         }
         m_pcmBytes += pcm.size();
 
@@ -149,7 +185,7 @@ void MicStream::onAudio()
                               PCM_FRAME_SAMPLES,
                               encoded,
                               MAX_OPUS_SIZE);
-        if (len > 0) {
+    if (len > 0) {
             m_queue.enqueue(QByteArray(reinterpret_cast<char*>(encoded), len));
             m_opusBytes += len;
         } else {

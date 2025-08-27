@@ -38,6 +38,8 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Moonlight uses the local network to connect to your gaming PC for streaming.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Moonlight needs access to the microphone to support microphone redirection to the host.</string>
 	<key>CFBundleVersion</key>
 	<string>VERSION</string>
 	<key>CFBundleShortVersionString</key>

@@ -39,4 +39,5 @@ private:
     quint64 m_sentBytes;
     int m_sentPackets;
     int m_idleLoops;
+    QByteArray m_partialBuffer;
 };
