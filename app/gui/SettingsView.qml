@@ -1177,7 +1177,6 @@ Flickable {
                     onCheckedChanged: {
                         StreamingPreferences.enableMicrophone = checked
                     }
-
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
