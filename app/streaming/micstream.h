@@ -24,6 +24,9 @@ private slots:
     void logSummary();
 
 private:
+    bool checkMicrophonePermission();
+    bool requestMicrophonePermission();
+
     QAudioSource *m_audioInput;
     QIODevice *m_audioDevice;
     OpusEncoder *m_encoder;
@@ -40,4 +43,7 @@ private:
     int m_sentPackets;
     int m_idleLoops;
     QByteArray m_partialBuffer;
+
+    // Static variable to track microphone permission status across all instances
+    static bool s_MicrophonePermissionGranted;
 };

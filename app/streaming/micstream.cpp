@@ -18,6 +18,9 @@ static const int PCM_FRAME_SAMPLES = 960; // 20 ms at 48 kHz
 static const int PCM_FRAME_SIZE = PCM_FRAME_SAMPLES * 2; // mono 16-bit
 static const int MAX_OPUS_SIZE = 4000;
 
+// Initialize static variable
+bool MicStream::s_MicrophonePermissionGranted = false;
+
 MicStream::MicStream(QObject *parent)
     : QObject(parent),
     m_audioInput(nullptr),
@@ -42,10 +45,79 @@ MicStream::~MicStream()
     stop();
 }
 
+bool MicStream::checkMicrophonePermission()
+{
+    // If we've already successfully granted permission in this session, don't check again
+    if (s_MicrophonePermissionGranted) {
+        return true;
+    }
+
+    // On macOS, we can't directly check microphone permission status with Qt APIs
+    // We'll attempt to request permission and handle the result
+#ifdef Q_OS_DARWIN
+    return requestMicrophonePermission();
+#else
+    // On other platforms, assume permission is granted if we can create audio devices
+    return true;
+#endif
+}
+
+bool MicStream::requestMicrophonePermission()
+{
+    // If permission was already granted, return true
+    if (s_MicrophonePermissionGranted) {
+        return true;
+    }
+
+    qInfo() << "[MicStream] Requesting microphone permission";
+
+    // Try to create a temporary audio source to trigger permission request
+    QAudioFormat testFormat;
+    testFormat.setSampleRate(48000);
+    testFormat.setChannelCount(1);
+    testFormat.setSampleFormat(QAudioFormat::Int16);
+
+    QAudioDevice device = QMediaDevices::defaultAudioInput();
+    if (!device.isNull()) {
+        // Create a temporary QAudioSource to trigger permission request
+        QAudioSource *tempAudioInput = new QAudioSource(device, testFormat, nullptr);
+
+        // On macOS, we need to be careful about multiple permission requests
+        // Try to start the audio source and immediately stop it to test permission
+        QIODevice *tempDevice = tempAudioInput->start();
+
+        if (tempDevice && tempAudioInput->error() == QAudio::NoError) {
+            // Permission granted successfully
+            s_MicrophonePermissionGranted = true;
+            qInfo() << "[MicStream] Microphone permission granted";
+
+            // Clean up temporary resources immediately
+            tempAudioInput->stop();
+            delete tempAudioInput;
+
+            return true;
+        } else {
+            // Permission denied or error
+            qWarning() << "[MicStream] Microphone permission denied or error:" << tempAudioInput->error();
+            delete tempAudioInput;
+            return false;
+        }
+    }
+
+    qWarning() << "[MicStream] No audio input device available";
+    return false;
+}
+
 bool MicStream::start()
 {
     if (m_audioInput)
         return false;
+
+    // Check microphone permission before proceeding
+    if (!checkMicrophonePermission()) {
+        qWarning() << "[MicStream] Cannot start microphone stream: permission not granted";
+        return false;
+    }
 
     int err;
     m_encoder = opus_encoder_create(48000, 1, OPUS_APPLICATION_VOIP, &err);
@@ -95,9 +167,12 @@ bool MicStream::start()
     QAudioDevice device = QMediaDevices::defaultAudioInput();
     qInfo() << "[MicStream] Using audio input device:" << device.description();
 
+    // Since we've already checked permission, create the actual audio source
     m_audioInput = new QAudioSource(device, fmt, this);
     // make buffer at least one PCM frame or a few frames to smooth reads
     m_audioInput->setBufferSize(PCM_FRAME_SIZE * 4);
+
+    // Since permission is already granted, this should not trigger another permission request
     m_audioDevice = m_audioInput->start();
     if (!m_audioDevice || m_audioInput->error() != QAudio::NoError) {
         qWarning() << "[MicStream] Failed to start audio device error=" << m_audioInput->error();
