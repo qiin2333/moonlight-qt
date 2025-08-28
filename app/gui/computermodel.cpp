@@ -1,4 +1,5 @@
 #include "computermodel.h"
+#include "backend/nvcomputer.h"
 
 #include <QThreadPool>
 
@@ -69,10 +70,14 @@ QVariant ComputerModel::data(const QModelIndex& index, int role) const
             break;
         }
 
+        QString pairname = NvComputer::getPairname(computer->uuid);
+        QString pairnameInfo = pairname.isEmpty() ? tr("Unknown") : pairname;
+        
         return tr("Name: %1").arg(computer->name) + '\n' +
                tr("Status: %1").arg(state) + '\n' +
                tr("Active Address: %1").arg(computer->activeAddress.toString()) + '\n' +
                tr("UUID: %1").arg(computer->uuid) + '\n' +
+               tr("Pair Name: %1").arg(pairnameInfo) + '\n' +
                tr("Local Address: %1").arg(computer->localAddress.toString()) + '\n' +
                tr("Remote Address: %1").arg(computer->remoteAddress.toString()) + '\n' +
                tr("IPv6 Address: %1").arg(computer->ipv6Address.toString()) + '\n' +

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "identitymanager.h"
+#include "nvcomputer.h"
 #include "nvhttp.h"
 
 #include <openssl/x509.h>
@@ -49,4 +50,5 @@ private:
     NvHTTP m_Http;
     X509* m_Cert;
     EVP_PKEY* m_PrivateKey;
+    NvComputer* m_Computer;
 };

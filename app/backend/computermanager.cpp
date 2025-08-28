@@ -1,5 +1,6 @@
 #include "computermanager.h"
 #include "boxartmanager.h"
+#include "nvcomputer.h"
 #include "nvhttp.h"
 #include "nvpairingmanager.h"
 
@@ -508,6 +509,9 @@ public:
 
         // Delete cached box art
         BoxArtManager::deleteBoxArt(m_Computer);
+
+        // Delete pairname mapping
+        NvComputer::savePairname(m_Computer->uuid, QString());
 
         // Finally, delete the computer itself. This must be done
         // last because the polling thread might be using it.

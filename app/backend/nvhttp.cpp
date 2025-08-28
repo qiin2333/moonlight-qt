@@ -19,8 +19,9 @@
 #define RESUME_TIMEOUT_MS 30000
 #define QUIT_TIMEOUT_MS 30000
 
-NvHTTP::NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert) :
-    m_ServerCert(serverCert)
+NvHTTP::NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert, QString uuid) :
+    m_ServerCert(serverCert),
+    m_Uuid(uuid)
 {
     m_BaseUrlHttp.setScheme("http");
     m_BaseUrlHttps.setScheme("https");
@@ -35,8 +36,15 @@ NvHTTP::NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert
     connect(&m_Nam, &QNetworkAccessManager::sslErrors, this, &NvHTTP::handleSslErrors);
 }
 
+NvHTTP::NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert) :
+    NvHTTP(address, httpsPort, serverCert, "")
+{
+
+}
+
+
 NvHTTP::NvHTTP(NvComputer* computer) :
-    NvHTTP(computer->activeAddress, computer->activeHttpsPort, computer->serverCert)
+    NvHTTP(computer->activeAddress, computer->activeHttpsPort, computer->serverCert, computer->uuid)
 {
 
 }
@@ -500,9 +508,21 @@ NvHTTP::openConnection(QUrl baseUrl,
     // Use a common UID for Moonlight clients to allow them to quit
     // games for each other (otherwise GFE gets screwed up and it requires
     // manual intervention to solve).
+    
+    // Get clientname - prefer pairname if available, otherwise use local hostname
+    QString clientname = QHostInfo::localHostName().toUtf8();
+    if (!m_Uuid.isEmpty()) {
+        QString pairname = NvComputer::getPairname(m_Uuid);
+        if (!pairname.isEmpty()) {
+            clientname = pairname;
+        }
+    }
+
+    qInfo() << "clientname:" << clientname;
+    
     url.setQuery("uniqueid=0123456789ABCDEF&uuid=" +
                  QUuid::createUuid().toRfc4122().toHex() +
-                 "&clientname="+QHostInfo::localHostName().toUtf8() +
+                 "&clientname=" + clientname +
                  ((arguments != nullptr) ? ("&" + arguments) : ""));
 
     QNetworkRequest request(url);

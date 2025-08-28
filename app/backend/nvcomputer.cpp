@@ -473,7 +473,10 @@ bool NvComputer::updateAppList(QVector<NvApp> newAppList) {
     }
 
     appList = newAppList;
-    sortAppList();
+    // Preserve the order returned by the server. Client-side alphabetical
+    // sorting was causing the displayed app list to differ from the
+    // server-provided ordering.
+    // If alphabetical sorting is desired later, call sortAppList() explicitly.
     return true;
 }
 
@@ -573,4 +576,21 @@ bool NvComputer::update(const NvComputer& that)
     }
 
     return changed;
+}
+
+void NvComputer::savePairname(const QString& uuid, const QString& pairname)
+{
+    QSettings settings;
+    settings.beginGroup("Pairnames");
+    settings.setValue(uuid, pairname);
+    settings.endGroup();
+}
+
+QString NvComputer::getPairname(const QString& uuid)
+{
+    QSettings settings;
+    settings.beginGroup("Pairnames");
+    QString pairname = settings.value(uuid).toString();
+    settings.endGroup();
+    return pairname;
 }

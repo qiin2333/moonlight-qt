@@ -118,6 +118,10 @@ public:
     // Synchronization
     mutable CopySafeReadWriteLock lock;
 
+    // Static methods for pairname management
+    static void savePairname(const QString& uuid, const QString& pairname);
+    static QString getPairname(const QString& uuid);
+
 private:
     uint16_t externalPort;
 };

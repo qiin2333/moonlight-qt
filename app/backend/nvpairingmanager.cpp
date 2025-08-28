@@ -1,4 +1,5 @@
 #include "nvpairingmanager.h"
+#include "nvcomputer.h"
 #include "utils.h"
 
 #include <stdexcept>
@@ -12,7 +13,8 @@
 #define REQUEST_TIMEOUT_MS 5000
 
 NvPairingManager::NvPairingManager(NvComputer* computer) :
-    m_Http(computer)
+    m_Http(computer),
+    m_Computer(computer)
 {
     QByteArray cert = IdentityManager::get()->getCertificate();
     BIO *bio = BIO_new_mem_buf(cert.data(), -1);
@@ -225,6 +227,7 @@ NvPairingManager::pair(QString appVersion, QString pin, QSslCertificate& serverC
         qCritical() << "Failed pairing at stage #1";
         return PairState::FAILED;
     }
+    
 
     QByteArray serverCertStr = NvHTTP::getXmlStringFromHex(getCert, "plaincert");
     if (serverCertStr == nullptr)
@@ -241,6 +244,13 @@ NvPairingManager::pair(QString appVersion, QString pin, QSslCertificate& serverC
         qCritical() << "Failed to parse plaincert";
         m_Http.openConnectionToString(m_Http.m_BaseUrlHttp, "unpair", nullptr, REQUEST_TIMEOUT_MS);
         return PairState::FAILED;
+    }
+
+    // Extract and save pairname if available
+    QString pairname = NvHTTP::getXmlString(getCert, "pairname");
+    if (!pairname.isEmpty()) {
+        NvComputer::savePairname(m_Computer->uuid, pairname);
+        qInfo() << "Saved pairname" << pairname << "for host" << m_Computer->uuid;
     }
 
     // Pin this cert for TLS until pairing is complete. If successful, we will propagate
