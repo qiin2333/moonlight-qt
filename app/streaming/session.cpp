@@ -646,6 +646,10 @@ bool Session::initialize()
     m_StreamConfig.width = m_Preferences->width;
     m_StreamConfig.height = m_Preferences->height;
 
+    // 保存缩放前的原始分辨率
+    int originalWidth = m_StreamConfig.width;
+    int originalHeight = m_StreamConfig.height;
+
     // 应用分辨率缩放
     if (m_Preferences->streamResolutionScale && m_Preferences->streamResolutionScaleRatio != 100) {
         int scaledWidth = m_StreamConfig.width * m_Preferences->streamResolutionScaleRatio / 100;
@@ -1606,7 +1610,9 @@ bool Session::startConnectionAsync()
             m_Preferences->remoteResolutionWidth,
             m_Preferences->remoteResolutionHeight,
             m_Preferences->remoteFps,
-            m_Preferences->remoteFpsRate
+            m_Preferences->remoteFpsRate,
+            originalWidth,
+            originalHeight
         );
         http.startApp(m_Computer->currentGameId != 0 ? "resume" : "launch",
                       m_Computer->isNvidiaServerSoftware,
