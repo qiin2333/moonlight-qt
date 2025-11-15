@@ -282,6 +282,9 @@ private:
     int m_ActiveVideoHeight;
     int m_ActiveVideoFrameRate;
 
+    int m_OriginalStreamWidth;
+    int m_OriginalStreamHeight;
+
     OpusMSDecoder* m_OpusDecoder;
     IAudioRenderer* m_AudioRenderer;
     OPUS_MULTISTREAM_CONFIGURATION m_ActiveAudioConfig;
