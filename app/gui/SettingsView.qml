@@ -981,30 +981,28 @@ Flickable {
 
                 // Stream Resolution Scale
                 RowLayout {
-                    Slider {
-                        id: streamResolutionScaleSlider
-                        from: 20
-                        to: 100
-                        stepSize: 5
-                        value: StreamingPreferences.streamResolutionScale
-                        Layout.fillWidth: true
-                        onValueChanged: {
-                            StreamingPreferences.streamResolutionScale = value
+                    CheckBox {
+                        id: streamResolutionScaleCheck
+                        text: qsTr("Stream Resolution Scale")
+                        font.pointSize: 12
+                        checked: StreamingPreferences.streamResolutionScale
+                        onCheckedChanged: {
+                            StreamingPreferences.streamResolutionScale = checked
                         }
                     }
 
                     TextField {
-                        id: streamResolutionScaleField
+                        id: streamResolutionScaleRatioField
                         maximumLength: 3
                         inputMethodHints: Qt.ImhDigitsOnly
                         validator: IntValidator{bottom:20; top:100}
                         width: 60
-                        text: StreamingPreferences.streamResolutionScale.toString()
+                        visible: streamResolutionScaleCheck.checked
+                        text: StreamingPreferences.streamResolutionScaleRatio.toString()
                         onTextChanged: {
                             let value = parseInt(text);
                             if (!isNaN(value) && value >= 20 && value <= 100) {
-                                StreamingPreferences.streamResolutionScale = value;
-                                streamResolutionScaleSlider.value = value;
+                                StreamingPreferences.streamResolutionScaleRatio = value;
                             }
                         }
                     }
@@ -1012,11 +1010,7 @@ Flickable {
                     Label {
                         text: "%"
                         font.bold: true
-                    }
-
-                    Label {
-                        text: qsTr("Remote Resolution Scale")
-                        font.pointSize: 12
+                        visible: streamResolutionScaleCheck.checked
                     }
                 }
 

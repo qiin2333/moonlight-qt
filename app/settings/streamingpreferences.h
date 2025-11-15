@@ -126,7 +126,8 @@ public:
     Q_PROPERTY(bool absoluteTouchMode MEMBER absoluteTouchMode NOTIFY absoluteTouchModeChanged)
     Q_PROPERTY(bool framePacing MEMBER framePacing NOTIFY framePacingChanged)
     Q_PROPERTY(bool videoEnhancement MEMBER videoEnhancement NOTIFY videoEnhancementChanged)
-    Q_PROPERTY(int streamResolutionScale MEMBER streamResolutionScale NOTIFY streamResolutionScaleChanged)
+    Q_PROPERTY(bool streamResolutionScale MEMBER streamResolutionScale NOTIFY streamResolutionScaleChanged)
+    Q_PROPERTY(int streamResolutionScaleRatio MEMBER streamResolutionScaleRatio NOTIFY streamResolutionScaleRatioChanged)
     Q_PROPERTY(bool remoteResolution MEMBER remoteResolution NOTIFY remoteResolutionChanged)
     Q_PROPERTY(int remoteResolutionWidth MEMBER remoteResolutionWidth NOTIFY remoteResolutionWidthChanged)
     Q_PROPERTY(int remoteResolutionHeight MEMBER remoteResolutionHeight NOTIFY remoteResolutionHeightChanged)
@@ -179,7 +180,8 @@ public:
     bool absoluteTouchMode;
     bool framePacing;
     bool videoEnhancement;
-    int streamResolutionScale;
+    bool streamResolutionScale;
+    int streamResolutionScaleRatio;
     bool remoteResolution;
     int remoteResolutionWidth;
     int remoteResolutionHeight;
@@ -238,6 +240,7 @@ signals:
     void framePacingChanged();
     void videoEnhancementChanged();
     void streamResolutionScaleChanged();
+    void streamResolutionScaleRatioChanged();
     void remoteResolutionChanged();
     void remoteResolutionWidthChanged();
     void remoteResolutionHeightChanged();
