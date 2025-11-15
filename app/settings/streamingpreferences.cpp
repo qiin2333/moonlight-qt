@@ -36,6 +36,7 @@
 #define SER_STARTWINDOWED "startwindowed"
 #define SER_FRAMEPACING "framepacing"
 #define SER_VIDEOENHANCEMENT "videoenhancement"
+#define SER_REMOTERESOLUTIONSCALE "remoteresolutionscale"
 #define SER_REMOTERESOLUTION "remoteresolution"
 #define SER_REMOTEWIDTH "remotewidth"
 #define SER_REMOTEHEIGHT "remoteheight"
@@ -153,6 +154,7 @@ void StreamingPreferences::reload()
     remoteResolution = settings.value(SER_REMOTERESOLUTION, false).toBool();
     remoteResolutionWidth = settings.value(SER_REMOTEWIDTH, 1280).toInt();
     remoteResolutionHeight = settings.value(SER_REMOTEHEIGHT, 720).toInt();
+    remoteResolutionScale = settings.value(SER_REMOTERESOLUTIONSCALE, 100).toInt();
     remoteFps = settings.value(SER_REMOTEFPS, false).toBool();
     remoteFpsRate = settings.value(SER_REMOTEFPSRATE, 60).toInt();
 
@@ -361,6 +363,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_REMOTERESOLUTION, remoteResolution);
     settings.setValue(SER_REMOTEWIDTH, remoteResolutionWidth);
     settings.setValue(SER_REMOTEHEIGHT, remoteResolutionHeight);
+    settings.setValue(SER_REMOTERESOLUTIONSCALE, remoteResolutionScale);
     settings.setValue(SER_REMOTEFPS, remoteFps);
     settings.setValue(SER_REMOTEFPSRATE, remoteFpsRate);
     settings.setValue(SER_CONNWARNINGS, connectionWarnings);

@@ -877,6 +877,11 @@
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Remote Resolution Scale</source>
+        <translation>远程分辨率缩放</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
         <source>Remote Resolution</source>
         <translation>远程分辨率</translation>
     </message>

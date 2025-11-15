@@ -979,6 +979,48 @@ Flickable {
                     }
                 }
 
+                // Remote Resolution Scale
+                RowLayout {
+                    Label {
+                        text: qsTr("Remote Resolution Scale")
+                        font.pointSize: 12
+                        Layout.preferredWidth: parent.width * 0.5
+                    }
+
+                    Slider {
+                        id: remoteResolutionScaleSlider
+                        from: 40
+                        to: 300
+                        stepSize: 5
+                        value: StreamingPreferences.remoteResolutionScale
+                        Layout.fillWidth: true
+                        onValueChanged: {
+                            StreamingPreferences.remoteResolutionScale = value
+                        }
+                    }
+
+                    TextField {
+                        id: remoteResolutionScaleField
+                        maximumLength: 3
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        validator: IntValidator{bottom:40; top:300}
+                        width: 60
+                        text: StreamingPreferences.remoteResolutionScale.toString()
+                        onTextChanged: {
+                            let value = parseInt(text);
+                            if (!isNaN(value) && value >= 40 && value <= 300) {
+                                StreamingPreferences.remoteResolutionScale = value;
+                                remoteResolutionScaleSlider.value = value;
+                            }
+                        }
+                    }
+
+                    Label {
+                        text: "%"
+                        font.bold: true
+                    }
+                }
+
                 // Remote Resolution
                 RowLayout {
                     CheckBox {

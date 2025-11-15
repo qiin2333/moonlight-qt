@@ -1593,6 +1593,7 @@ bool Session::startConnectionAsync()
     try {
         NvHTTP http(m_Computer);
         RemoteStreamConfig remoteStreamConfig(
+            m_Preferences->remoteResolutionScale,
             m_Preferences->remoteResolution,
             m_Preferences->remoteResolutionWidth,
             m_Preferences->remoteResolutionHeight,

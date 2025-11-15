@@ -228,6 +228,16 @@ NvHTTP::startApp(QString verb,
             appHeight = QString::number(remoteStreamConfig.remoteResolutionHeight);
         }
     }
+    // 远程分辨率缩放
+    if (remoteStreamConfig.remoteResolutionScale != 100) {
+        int scaledWidth = appWidth.toInt() * remoteStreamConfig.remoteResolutionScale / 100;
+        int scaledHeight = appHeight.toInt() * remoteStreamConfig.remoteResolutionScale / 100;
+        // 确保缩放后的分辨率是4的倍数
+        scaledWidth = (scaledWidth / 4) * 4;
+        scaledHeight = (scaledHeight / 4) * 4;
+        appWidth = QString::number(scaledWidth);
+        appHeight = QString::number(scaledHeight);
+    }
     // 远程帧率覆盖
     if (remoteStreamConfig.remoteFps) {
         if (remoteStreamConfig.remoteFpsRate > 0) {
