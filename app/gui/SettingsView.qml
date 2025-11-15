@@ -981,16 +981,10 @@ Flickable {
 
                 // Remote Resolution Scale
                 RowLayout {
-                    Label {
-                        text: qsTr("Remote Resolution Scale")
-                        font.pointSize: 12
-                        Layout.preferredWidth: parent.width * 0.5
-                    }
-
                     Slider {
                         id: remoteResolutionScaleSlider
-                        from: 40
-                        to: 300
+                        from: 20
+                        to: 100
                         stepSize: 5
                         value: StreamingPreferences.remoteResolutionScale
                         Layout.fillWidth: true
@@ -1003,12 +997,12 @@ Flickable {
                         id: remoteResolutionScaleField
                         maximumLength: 3
                         inputMethodHints: Qt.ImhDigitsOnly
-                        validator: IntValidator{bottom:40; top:300}
+                        validator: IntValidator{bottom:20; top:100}
                         width: 60
                         text: StreamingPreferences.remoteResolutionScale.toString()
                         onTextChanged: {
                             let value = parseInt(text);
-                            if (!isNaN(value) && value >= 40 && value <= 300) {
+                            if (!isNaN(value) && value >= 20 && value <= 100) {
                                 StreamingPreferences.remoteResolutionScale = value;
                                 remoteResolutionScaleSlider.value = value;
                             }
@@ -1018,6 +1012,11 @@ Flickable {
                     Label {
                         text: "%"
                         font.bold: true
+                    }
+
+                    Label {
+                        text: qsTr("Remote Resolution Scale")
+                        font.pointSize: 12
                     }
                 }
 
