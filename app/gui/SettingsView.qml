@@ -979,32 +979,32 @@ Flickable {
                     }
                 }
 
-                // Remote Resolution Scale
+                // Stream Resolution Scale
                 RowLayout {
                     Slider {
-                        id: remoteResolutionScaleSlider
+                        id: streamResolutionScaleSlider
                         from: 20
                         to: 100
                         stepSize: 5
-                        value: StreamingPreferences.remoteResolutionScale
+                        value: StreamingPreferences.streamResolutionScale
                         Layout.fillWidth: true
                         onValueChanged: {
-                            StreamingPreferences.remoteResolutionScale = value
+                            StreamingPreferences.streamResolutionScale = value
                         }
                     }
 
                     TextField {
-                        id: remoteResolutionScaleField
+                        id: streamResolutionScaleField
                         maximumLength: 3
                         inputMethodHints: Qt.ImhDigitsOnly
                         validator: IntValidator{bottom:20; top:100}
                         width: 60
-                        text: StreamingPreferences.remoteResolutionScale.toString()
+                        text: StreamingPreferences.streamResolutionScale.toString()
                         onTextChanged: {
                             let value = parseInt(text);
                             if (!isNaN(value) && value >= 20 && value <= 100) {
-                                StreamingPreferences.remoteResolutionScale = value;
-                                remoteResolutionScaleSlider.value = value;
+                                StreamingPreferences.streamResolutionScale = value;
+                                streamResolutionScaleSlider.value = value;
                             }
                         }
                     }
