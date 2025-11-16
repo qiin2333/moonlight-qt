@@ -583,8 +583,6 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_ShouldExitAfterQuit(false),
       m_AsyncConnectionSuccess(false),
       m_PortTestResults(0),
-      m_OriginalStreamWidth(0),
-      m_OriginalStreamHeight(0),
       m_OpusDecoder(nullptr),
       m_AudioRenderer(nullptr),
       m_AudioSampleCount(0),
@@ -647,10 +645,6 @@ bool Session::initialize()
     LiInitializeStreamConfiguration(&m_StreamConfig);
     m_StreamConfig.width = m_Preferences->width;
     m_StreamConfig.height = m_Preferences->height;
-
-    // 保存缩放前的原始分辨率
-    m_OriginalStreamWidth = m_StreamConfig.width;
-    m_OriginalStreamHeight = m_StreamConfig.height;
 
     // 应用分辨率缩放
     if (m_Preferences->streamResolutionScale && m_Preferences->streamResolutionScaleRatio != 100) {
@@ -1613,8 +1607,8 @@ bool Session::startConnectionAsync()
             m_Preferences->remoteResolutionHeight,
             m_Preferences->remoteFps,
             m_Preferences->remoteFpsRate,
-            m_OriginalStreamWidth,
-            m_OriginalStreamHeight
+            m_Preferences->width,
+            m_Preferences->height
         );
         http.startApp(m_Computer->currentGameId != 0 ? "resume" : "launch",
                       m_Computer->isNvidiaServerSoftware,

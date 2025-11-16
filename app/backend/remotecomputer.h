@@ -13,7 +13,7 @@ public:
     RemoteStreamConfig(
         bool remoteResolution, int remoteResolutionWidth, int remoteResolutionHeight,
         bool remoteFps, int remoteFpsRate,
-        int originalStreamWidth = 0, int originalStreamHeight = 0)
+        int originalStreamWidth, int originalStreamHeight)
     {
         this->remoteResolution = remoteResolution;
         this->remoteResolutionWidth = remoteResolutionWidth;
