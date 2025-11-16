@@ -1,0 +1,87 @@
+name: Build Translate Resources
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-running-resources:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.8.3'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+        cache: true
+
+    - name: Get version
+      shell: cmd
+      run: |
+        set /p VERSION=<app\version.txt
+        echo VERSION=%VERSION% >> %GITHUB_ENV%
+
+    - name: Setup build environment
+      shell: cmd
+      run: |
+        echo Setting up optimized build environment...
+        set NUMBER_OF_PROCESSORS=2
+        set JOM_MAX_CPUS=%NUMBER_OF_PROCESSORS%
+        echo JOM_MAX_CPUS=%JOM_MAX_CPUS% >> %GITHUB_ENV%
+        rem Increase virtual memory to prevent out-of-memory issues
+        wmic pagefileset where name="C:\\pagefile.sys" set InitialSize=4096,MaximumSize=8192
+        wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False
+
+    - name: Configure build environment
+      shell: cmd
+      run: |
+        echo Configuring build environment for stability...
+        rem Set environment variables for stable build
+        set CL=/MP2 /Zm500
+        set LINKER=/OPT:REF,ICF=5
+        rem Disable incremental linking to reduce memory usage
+        set LINK=/INCREMENTAL:NO
+        rem Disable problematic features during configure
+        set QMAKE_CXXFLAGS=-DWIN32_LEAN_AND_MEAN
+        echo CL=%CL% >> %GITHUB_ENV%
+        echo LINK=%LINK% >> %GITHUB_ENV%
+        echo QMAKE_CXXFLAGS=%QMAKE_CXXFLAGS% >> %GITHUB_ENV%
+        rem Don't set MAKEFLAGS as it interferes with jom
+
+    - name: Prepare CI build environment
+      shell: cmd
+      run: |
+        echo Preparing CI-specific build configuration...
+        rem Create a CI-specific environment variable
+        echo MOONLIGHT_CI_BUILD=1 >> %GITHUB_ENV%
+        echo CI build environment prepared
+
+    - name: Build Translate Resources
+      shell: bash
+      run: |
+        ./scripts/update_translate.sh
+
+    - name: Commit and Push Changes
+      shell: pwsh
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        $modifiedFiles = $(git status --porcelain)
+        if ($modifiedMoFiles) {
+          git add .
+          $date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          git commit -m "chore: 自动构建翻译文件 $date"
+          git push
+        } else {
+          Write-Host "No changes to commit."
+        }
