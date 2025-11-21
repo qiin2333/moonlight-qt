@@ -822,6 +822,16 @@
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="819"/>
+        <source>Stretch presentation</source>
+        <translation>拉伸画面</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="819"/>
+        <source>Ignores both client and host PC aspect ratios, which is required for displaying Half-SBS (Side-By-Side) 3D signals to AR/XR devices that only support Full-SBS (usually 1920x1080 per eye, meaning a total resolution of 3840x1080)</source>
+        <translation>忽略客户端和主机电脑的纵横比，用于在只支持 Full-SBS 的 AR/XR 设备上显示 Half-SBS（左右并排）3D 信号（通常为每只眼 1920×1080，总分辨率 3840×1080）。</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="819"/>
         <source>V-Sync</source>
         <translation>垂直同步</translation>
     </message>
