@@ -979,6 +979,41 @@ Flickable {
                     }
                 }
 
+                // Stream Resolution Scale
+                RowLayout {
+                    CheckBox {
+                        id: streamResolutionScaleCheck
+                        text: qsTr("Stream Resolution Scale")
+                        font.pointSize: 12
+                        checked: StreamingPreferences.streamResolutionScale
+                        onCheckedChanged: {
+                            StreamingPreferences.streamResolutionScale = checked
+                        }
+                    }
+
+                    TextField {
+                        id: streamResolutionScaleRatioField
+                        maximumLength: 3
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        validator: IntValidator{bottom:20; top:100}
+                        width: 60
+                        visible: streamResolutionScaleCheck.checked
+                        text: StreamingPreferences.streamResolutionScaleRatio.toString()
+                        onTextChanged: {
+                            let value = parseInt(text);
+                            if (!isNaN(value) && value >= 20 && value <= 100) {
+                                StreamingPreferences.streamResolutionScaleRatio = value;
+                            }
+                        }
+                    }
+
+                    Label {
+                        text: "%"
+                        font.bold: true
+                        visible: streamResolutionScaleCheck.checked
+                    }
+                }
+
                 // Remote Resolution
                 RowLayout {
                     CheckBox {

@@ -887,6 +887,11 @@
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="847"/>
+        <source>Stream Resolution Scale</source>
+        <translation>流分辨率缩放</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="847"/>
         <source>Remote Resolution</source>
         <translation>远程分辨率</translation>
     </message>

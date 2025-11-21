@@ -219,6 +219,13 @@ NvHTTP::startApp(QString verb,
     QString appWidth = QString::number(streamConfig->width);
     QString appHeight = QString::number(streamConfig->height);
     QString appFps = QString::number((streamConfig->fps > 60 && isGfe) ? 0 : streamConfig->fps);
+
+    // 流分辨率缩放覆盖
+    if (remoteStreamConfig.originalStreamWidth > 0 && remoteStreamConfig.originalStreamHeight > 0) {
+        appWidth = QString::number(remoteStreamConfig.originalStreamWidth);
+        appHeight = QString::number(remoteStreamConfig.originalStreamHeight);
+    }
+
     // 远程分辨率覆盖
     if (remoteStreamConfig.remoteResolution) {
         if (remoteStreamConfig.remoteResolutionWidth > 0) {
