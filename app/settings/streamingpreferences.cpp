@@ -36,6 +36,8 @@
 #define SER_STARTWINDOWED "startwindowed"
 #define SER_FRAMEPACING "framepacing"
 #define SER_VIDEOENHANCEMENT "videoenhancement"
+#define SER_STREAMRESOLUTIONSCALE "streamresolutionscale"
+#define SER_STREAMRESOLUTIONSCALERATIO "streamresolutionscaleratio"
 #define SER_REMOTERESOLUTION "remoteresolution"
 #define SER_REMOTEWIDTH "remotewidth"
 #define SER_REMOTEHEIGHT "remoteheight"
@@ -150,6 +152,8 @@ void StreamingPreferences::reload()
     videoEnhancement = settings.value(SER_VIDEOENHANCEMENT, false).toBool();
     enableMicrophone = settings.value(SER_MICROPHONE, false).toBool();
 
+    streamResolutionScale = settings.value(SER_STREAMRESOLUTIONSCALE, false).toBool();
+    streamResolutionScaleRatio = settings.value(SER_STREAMRESOLUTIONSCALERATIO, 100).toInt();
     remoteResolution = settings.value(SER_REMOTERESOLUTION, false).toBool();
     remoteResolutionWidth = settings.value(SER_REMOTEWIDTH, 1280).toInt();
     remoteResolutionHeight = settings.value(SER_REMOTEHEIGHT, 720).toInt();
@@ -358,6 +362,8 @@ void StreamingPreferences::save()
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
     settings.setValue(SER_FRAMEPACING, framePacing);
     settings.setValue(SER_VIDEOENHANCEMENT, videoEnhancement);
+    settings.setValue(SER_STREAMRESOLUTIONSCALE, streamResolutionScale);
+    settings.setValue(SER_STREAMRESOLUTIONSCALERATIO, streamResolutionScaleRatio);
     settings.setValue(SER_REMOTERESOLUTION, remoteResolution);
     settings.setValue(SER_REMOTEWIDTH, remoteResolutionWidth);
     settings.setValue(SER_REMOTEHEIGHT, remoteResolutionHeight);

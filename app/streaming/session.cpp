@@ -646,6 +646,15 @@ bool Session::initialize()
     m_StreamConfig.width = m_Preferences->width;
     m_StreamConfig.height = m_Preferences->height;
 
+    // 应用分辨率缩放
+    if (m_Preferences->streamResolutionScale && m_Preferences->streamResolutionScaleRatio != 100) {
+        int scaledWidth = m_StreamConfig.width * m_Preferences->streamResolutionScaleRatio / 100;
+        int scaledHeight = m_StreamConfig.height * m_Preferences->streamResolutionScaleRatio / 100;
+        // 确保缩放后的分辨率是8的倍数
+        m_StreamConfig.width = (scaledWidth / 8) * 8;
+        m_StreamConfig.height = (scaledHeight / 8) * 8;
+    }
+
     int x, y, width, height;
     getWindowDimensions(x, y, width, height);
 
@@ -1597,7 +1606,9 @@ bool Session::startConnectionAsync()
             m_Preferences->remoteResolutionWidth,
             m_Preferences->remoteResolutionHeight,
             m_Preferences->remoteFps,
-            m_Preferences->remoteFpsRate
+            m_Preferences->remoteFpsRate,
+            m_Preferences->width,
+            m_Preferences->height
         );
         http.startApp(m_Computer->currentGameId != 0 ? "resume" : "launch",
                       m_Computer->isNvidiaServerSoftware,
