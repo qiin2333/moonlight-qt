@@ -32,6 +32,7 @@ NavigableDialog {
         BusyIndicator {
             id: dialogSpinner
             visible: false
+            running: visible
         }
 
         Image {
