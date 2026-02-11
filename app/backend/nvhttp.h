@@ -175,6 +175,7 @@ public:
              bool persistGameControllersOnDisconnect,
              QString& rtspSessionUrl,
              int customScreenMode,
+             int customVddScreenMode,
              RemoteStreamConfig &remoteStreamConfig);
 
     QVector<NvApp>

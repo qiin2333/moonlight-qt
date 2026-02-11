@@ -157,6 +157,7 @@ public:
     Q_PROPERTY(CaptureSysKeysMode captureSysKeysMode MEMBER captureSysKeysMode NOTIFY captureSysKeysModeChanged)
     Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged)
     Q_PROPERTY(int customScreenMode MEMBER customScreenMode NOTIFY customScreenModeChanged)
+    Q_PROPERTY(int customVddScreenMode MEMBER customVddScreenMode NOTIFY customVddScreenModeChanged)
     Q_PROPERTY(bool enableMicrophone MEMBER enableMicrophone NOTIFY enableMicrophoneChanged)
 
     Q_INVOKABLE bool retranslate();
@@ -212,6 +213,7 @@ public:
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
     int customScreenMode;
+    int customVddScreenMode;
     bool enableMicrophone;
 
 signals:
@@ -262,6 +264,7 @@ signals:
     void keepAwakeChanged();
     void languageChanged();
     void customScreenModeChanged();
+    void customVddScreenModeChanged();
     void enableMicrophoneChanged();
 
 private:

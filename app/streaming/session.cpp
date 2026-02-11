@@ -1619,6 +1619,7 @@ bool Session::startConnectionAsync()
                       !m_Preferences->multiController,
                       rtspSessionUrl,
                       m_Preferences->customScreenMode,
+                      m_Preferences->customVddScreenMode,
                       remoteStreamConfig);
     } catch (const GfeHttpResponseException& e) {
         emit displayLaunchError(tr("Host returned error: %1").arg(e.toQString()));

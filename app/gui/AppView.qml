@@ -5,6 +5,7 @@ import QtQuick.Controls.Material 2.2
 import AppModel 1.0
 import ComputerManager 1.0
 import SdlGamepadKeyNavigation 1.0
+import StreamingPreferences 1.0
 
 CenteredGridView {
     readonly property int nameRole: AppModel.NameRole
@@ -24,9 +25,181 @@ CenteredGridView {
     id: appGrid
     focus: true
     activeFocusOnTab: true
-    topMargin: 80
+    topMargin: 120
     bottomMargin: 5
     cellWidth: 230; cellHeight: 297;
+
+    // 当前选中的显示器类型: "physical" 或 "vdd"
+    property string selectedDisplayType: "physical"
+
+    // 顶部屏幕选择栏（仿 Android RadioGroup + Spinner 联动）
+    header: Item {
+        width: appGrid.width
+        height: 60
+        z: 10
+
+        Rectangle {
+            anchors.fill: parent
+            color: "#CC333333"
+            radius: 4
+        }
+
+        Row {
+            anchors.centerIn: parent
+            spacing: 12
+
+            // 显示器类型选择（仿 RadioButton）
+            Label {
+                text: qsTr("Display:")
+                color: "#AAFFFFFF"
+                font.pointSize: 10
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            // Physical Display 按钮
+            Rectangle {
+                id: physicalBtn
+                width: physicalBtnLabel.implicitWidth + 24
+                height: 32
+                radius: 16
+                color: selectedDisplayType === "physical" ? "#4CAF50" : "#55FFFFFF"
+                border.color: selectedDisplayType === "physical" ? "#66BB6A" : "#33FFFFFF"
+                border.width: 1
+                anchors.verticalCenter: parent.verticalCenter
+
+                Label {
+                    id: physicalBtnLabel
+                    anchors.centerIn: parent
+                    text: qsTr("Physical Display")
+                    color: selectedDisplayType === "physical" ? "#FFFFFF" : "#AAFFFFFF"
+                    font.pointSize: 9
+                    font.bold: selectedDisplayType === "physical"
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        selectedDisplayType = "physical"
+                        // 恢复保存的物理屏幕模式
+                        var saved = StreamingPreferences.customScreenMode
+                        for (var i = 0; i < physicalModeModel.count; i++) {
+                            if (physicalModeModel.get(i).val === saved) {
+                                combinationModeCombo.currentIndex = i
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+
+            // VDD Display 按钮
+            Rectangle {
+                id: vddBtn
+                width: vddBtnLabel.implicitWidth + 24
+                height: 32
+                radius: 16
+                color: selectedDisplayType === "vdd" ? "#2196F3" : "#55FFFFFF"
+                border.color: selectedDisplayType === "vdd" ? "#42A5F5" : "#33FFFFFF"
+                border.width: 1
+                anchors.verticalCenter: parent.verticalCenter
+
+                Label {
+                    id: vddBtnLabel
+                    anchors.centerIn: parent
+                    text: qsTr("VDD Display")
+                    color: selectedDisplayType === "vdd" ? "#FFFFFF" : "#AAFFFFFF"
+                    font.pointSize: 9
+                    font.bold: selectedDisplayType === "vdd"
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        selectedDisplayType = "vdd"
+                        // 恢复保存的 VDD 模式
+                        var saved = StreamingPreferences.customVddScreenMode
+                        for (var i = 0; i < vddModeModel.count; i++) {
+                            if (vddModeModel.get(i).val === saved) {
+                                combinationModeCombo.currentIndex = i
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 分隔线
+            Rectangle {
+                width: 1
+                height: 28
+                color: "#44FFFFFF"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            // 组合模式选择标签
+            Label {
+                text: qsTr("Mode:")
+                color: "#AAFFFFFF"
+                font.pointSize: 10
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            // 组合模式下拉框（根据显示器类型联动切换）
+            ComboBox {
+                id: combinationModeCombo
+                width: 260
+                font.pointSize: 9
+                textRole: "text"
+                model: selectedDisplayType === "vdd" ? vddModeModel : physicalModeModel
+                anchors.verticalCenter: parent.verticalCenter
+
+                Component.onCompleted: {
+                    // 初始加载物理模式
+                    var saved = StreamingPreferences.customScreenMode
+                    for (var i = 0; i < physicalModeModel.count; i++) {
+                        if (physicalModeModel.get(i).val === saved) {
+                            currentIndex = i
+                            break
+                        }
+                    }
+                }
+
+                onActivated: {
+                    var val = combinationModeCombo.model.get(currentIndex).val
+                    if (selectedDisplayType === "vdd") {
+                        StreamingPreferences.customVddScreenMode = val
+                    } else {
+                        StreamingPreferences.customScreenMode = val
+                    }
+                    StreamingPreferences.save()
+                }
+
+                Material.foreground: "#CCFFFFFF"
+            }
+        }
+    }
+
+    // 物理显示器组合模式
+    ListModel {
+        id: physicalModeModel
+        ListElement { text: qsTr("Use host config (default)"); val: -1 }
+        ListElement { text: qsTr("Do not change"); val: 0 }
+        ListElement { text: qsTr("Ensure active"); val: 1 }
+        ListElement { text: qsTr("Ensure primary"); val: 2 }
+        ListElement { text: qsTr("Only display"); val: 3 }
+    }
+
+    // VDD 显示器组合模式
+    ListModel {
+        id: vddModeModel
+        ListElement { text: qsTr("Use host config (default)"); val: -1 }
+        ListElement { text: qsTr("Keep current layout"); val: 0 }
+        ListElement { text: qsTr("VDD primary + Physical extended"); val: 1 }
+        ListElement { text: qsTr("Physical primary + VDD extended"); val: 2 }
+        ListElement { text: qsTr("VDD only (disable physical)"); val: 3 }
+    }
 
     function computerLost()
     {

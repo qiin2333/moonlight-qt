@@ -206,6 +206,7 @@ NvHTTP::startApp(QString verb,
                  bool persistGameControllersOnDisconnect,
                  QString& rtspSessionUrl,
                  int customScreenMode,
+                 int customVddScreenMode,
                  RemoteStreamConfig &remoteStreamConfig)
 {
     int riKeyId;
@@ -261,6 +262,7 @@ NvHTTP::startApp(QString verb,
                                    "&gcmap="+QString::number(gamepadMask)+
                                    "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0)+
                                    "&customScreenMode="+QString::number(customScreenMode)+
+                                   "&customVddScreenMode="+QString::number(customVddScreenMode)+
                                    LiGetLaunchUrlQueryParameters(),
                                    LAUNCH_TIMEOUT_MS);
 
