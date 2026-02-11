@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QVariant>
 
 class NvComputer;
 
@@ -180,6 +181,9 @@ public:
 
     QVector<NvApp>
     getAppList();
+
+    QVariantList
+    getDisplays();
 
     QImage
     getBoxArt(int appId);

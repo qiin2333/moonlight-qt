@@ -29,13 +29,31 @@ CenteredGridView {
     bottomMargin: 5
     cellWidth: 230; cellHeight: 297;
 
-    // 当前选中的显示器类型: "physical" 或 "vdd"
-    property string selectedDisplayType: "physical"
+    // 当前选中显示器: "" = 未选, "vdd" = VDD, 其他 = 物理显示器 guid
+    property string selectedDisplayId: ""
+    // 当前选中是否 VDD
+    property bool isVddSelected: selectedDisplayId === "vdd"
+    // 物理显示器列表
+    property var displayList: []
 
-    // 顶部屏幕选择栏（仿 Android RadioGroup + Spinner 联动）
+    // 加载显示器列表
+    function loadDisplays() {
+        var displays = appModel.getDisplayList()
+        displayList = displays
+        displayListModel.clear()
+        for (var i = 0; i < displays.length; i++) {
+            displayListModel.append({
+                "displayName": displays[i].name,
+                "displayGuid": displays[i].guid,
+                "displayIndex": displays[i].index
+            })
+        }
+    }
+
+    // 顶部屏幕选择栏（仿 Android 平铺所有显示器 + Spinner 联动）
     header: Item {
         width: appGrid.width
-        height: 60
+        height: headerColumn.implicitHeight + 8
         z: 10
 
         Rectangle {
@@ -44,139 +62,146 @@ CenteredGridView {
             radius: 4
         }
 
-        Row {
-            anchors.centerIn: parent
-            spacing: 12
+        Column {
+            id: headerColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: 8
+            spacing: 6
 
-            // 显示器类型选择（仿 RadioButton）
-            Label {
-                text: qsTr("Display:")
-                color: "#AAFFFFFF"
-                font.pointSize: 10
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            // Physical Display 按钮
-            Rectangle {
-                id: physicalBtn
-                width: physicalBtnLabel.implicitWidth + 24
-                height: 32
-                radius: 16
-                color: selectedDisplayType === "physical" ? "#4CAF50" : "#55FFFFFF"
-                border.color: selectedDisplayType === "physical" ? "#66BB6A" : "#33FFFFFF"
-                border.width: 1
-                anchors.verticalCenter: parent.verticalCenter
+            // 显示器选择行
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 8
 
                 Label {
-                    id: physicalBtnLabel
-                    anchors.centerIn: parent
-                    text: qsTr("Physical Display")
-                    color: selectedDisplayType === "physical" ? "#FFFFFF" : "#AAFFFFFF"
-                    font.pointSize: 9
-                    font.bold: selectedDisplayType === "physical"
+                    text: qsTr("Display:")
+                    color: "#AAFFFFFF"
+                    font.pointSize: 10
+                    anchors.verticalCenter: parent.verticalCenter
                 }
 
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        selectedDisplayType = "physical"
-                        // 恢复保存的物理屏幕模式
+                // 动态物理显示器按钮
+                Repeater {
+                    model: ListModel { id: displayListModel }
+
+                    Rectangle {
+                        width: displayBtnLabel.implicitWidth + 20
+                        height: 28
+                        radius: 14
+                        color: selectedDisplayId === model.displayGuid ? "#4CAF50" : "#44FFFFFF"
+                        border.color: selectedDisplayId === model.displayGuid ? "#66BB6A" : "#33FFFFFF"
+                        border.width: 1
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Label {
+                            id: displayBtnLabel
+                            anchors.centerIn: parent
+                            text: model.displayName
+                            color: selectedDisplayId === model.displayGuid ? "#FFFFFF" : "#AAFFFFFF"
+                            font.pointSize: 9
+                            font.bold: selectedDisplayId === model.displayGuid
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                selectedDisplayId = model.displayGuid
+                                // 恢复物理屏幕组合模式
+                                var saved = StreamingPreferences.customScreenMode
+                                for (var i = 0; i < physicalModeModel.count; i++) {
+                                    if (physicalModeModel.get(i).val === saved) {
+                                        combinationModeCombo.currentIndex = i
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // VDD 按钮
+                Rectangle {
+                    width: vddBtnLabel.implicitWidth + 20
+                    height: 28
+                    radius: 14
+                    color: isVddSelected ? "#2196F3" : "#44FFFFFF"
+                    border.color: isVddSelected ? "#42A5F5" : "#33FFFFFF"
+                    border.width: 1
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Label {
+                        id: vddBtnLabel
+                        anchors.centerIn: parent
+                        text: qsTr("VDD Display")
+                        color: isVddSelected ? "#FFFFFF" : "#AAFFFFFF"
+                        font.pointSize: 9
+                        font.bold: isVddSelected
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            selectedDisplayId = "vdd"
+                            // 恢复 VDD 组合模式
+                            var saved = StreamingPreferences.customVddScreenMode
+                            for (var i = 0; i < vddModeModel.count; i++) {
+                                if (vddModeModel.get(i).val === saved) {
+                                    combinationModeCombo.currentIndex = i
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 组合模式行（选中显示器后显示）
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 8
+                visible: selectedDisplayId !== ""
+
+                Label {
+                    text: isVddSelected ? qsTr("VDD Combination Mode:") : qsTr("Screen Combination Mode:")
+                    color: "#AAFFFFFF"
+                    font.pointSize: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                ComboBox {
+                    id: combinationModeCombo
+                    width: 280
+                    font.pointSize: 9
+                    textRole: "text"
+                    model: isVddSelected ? vddModeModel : physicalModeModel
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Component.onCompleted: {
                         var saved = StreamingPreferences.customScreenMode
                         for (var i = 0; i < physicalModeModel.count; i++) {
                             if (physicalModeModel.get(i).val === saved) {
-                                combinationModeCombo.currentIndex = i
+                                currentIndex = i
                                 break
                             }
                         }
                     }
-                }
-            }
 
-            // VDD Display 按钮
-            Rectangle {
-                id: vddBtn
-                width: vddBtnLabel.implicitWidth + 24
-                height: 32
-                radius: 16
-                color: selectedDisplayType === "vdd" ? "#2196F3" : "#55FFFFFF"
-                border.color: selectedDisplayType === "vdd" ? "#42A5F5" : "#33FFFFFF"
-                border.width: 1
-                anchors.verticalCenter: parent.verticalCenter
-
-                Label {
-                    id: vddBtnLabel
-                    anchors.centerIn: parent
-                    text: qsTr("VDD Display")
-                    color: selectedDisplayType === "vdd" ? "#FFFFFF" : "#AAFFFFFF"
-                    font.pointSize: 9
-                    font.bold: selectedDisplayType === "vdd"
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        selectedDisplayType = "vdd"
-                        // 恢复保存的 VDD 模式
-                        var saved = StreamingPreferences.customVddScreenMode
-                        for (var i = 0; i < vddModeModel.count; i++) {
-                            if (vddModeModel.get(i).val === saved) {
-                                combinationModeCombo.currentIndex = i
-                                break
-                            }
+                    onActivated: {
+                        var val = combinationModeCombo.model.get(currentIndex).val
+                        if (isVddSelected) {
+                            StreamingPreferences.customVddScreenMode = val
+                        } else {
+                            StreamingPreferences.customScreenMode = val
                         }
+                        StreamingPreferences.save()
                     }
+
+                    Material.foreground: "#CCFFFFFF"
                 }
-            }
-
-            // 分隔线
-            Rectangle {
-                width: 1
-                height: 28
-                color: "#44FFFFFF"
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            // 组合模式选择标签
-            Label {
-                text: qsTr("Mode:")
-                color: "#AAFFFFFF"
-                font.pointSize: 10
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            // 组合模式下拉框（根据显示器类型联动切换）
-            ComboBox {
-                id: combinationModeCombo
-                width: 260
-                font.pointSize: 9
-                textRole: "text"
-                model: selectedDisplayType === "vdd" ? vddModeModel : physicalModeModel
-                anchors.verticalCenter: parent.verticalCenter
-
-                Component.onCompleted: {
-                    // 初始加载物理模式
-                    var saved = StreamingPreferences.customScreenMode
-                    for (var i = 0; i < physicalModeModel.count; i++) {
-                        if (physicalModeModel.get(i).val === saved) {
-                            currentIndex = i
-                            break
-                        }
-                    }
-                }
-
-                onActivated: {
-                    var val = combinationModeCombo.model.get(currentIndex).val
-                    if (selectedDisplayType === "vdd") {
-                        StreamingPreferences.customVddScreenMode = val
-                    } else {
-                        StreamingPreferences.customScreenMode = val
-                    }
-                    StreamingPreferences.save()
-                }
-
-                Material.foreground: "#CCFFFFFF"
             }
         }
     }
@@ -217,6 +242,9 @@ CenteredGridView {
     StackView.onActivated: {
         appModel.computerLost.connect(computerLost)
         activated = true
+
+        // 从服务端加载显示器列表
+        loadDisplays()
 
         // Highlight the first item if a gamepad is connected
         if (currentIndex == -1 && SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
