@@ -234,25 +234,27 @@ jobs:
           # Needed for AppImage
           sudo apt install libfuse2
         fi
-    - name: Build SDL2
+    - name: Build SDL3
       run: |
-        export SDL2_REV=86fd4ed83cdcf71fef6a57766b126e88f923acd3
-        git clone https://github.com/libsdl-org/SDL.git SDL2
-        cd SDL2
-        git checkout $SDL2_REV
-        
-        # Check if Wayland is available and configure accordingly
-        echo "Checking Wayland availability..."
-        if pkg-config --exists wayland-client; then
-          echo "Wayland found, enabling Wayland support"
-          ./configure --enable-wayland --enable-wayland-shared
-        else
-          echo "Wayland not found, disabling Wayland support"
-          ./configure --disable-wayland
-        fi
-        
-        make -j$(nproc)
-        sudo make install
+        export SDL3_REV=3bde3e24069db59133bc1e8dbe3c693008821a93
+        git clone https://github.com/libsdl-org/SDL.git SDL3
+        cd SDL3
+        git checkout $SDL3_REV
+        cmake -DSDL_KMSDRM=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_INSTALL_DOCS=OFF -S . -B build
+        cmake --build build -j$(nproc)
+        sudo cmake --install build
+        sudo ldconfig
+        cd ..
+
+    - name: Build sdl2-compat
+      run: |
+        export SDL2_COMPAT_REV=1c8ece4de9db96d01f99296c26a87a4cabb72f54
+        git clone https://github.com/libsdl-org/sdl2-compat.git sdl2-compat
+        cd sdl2-compat
+        git checkout $SDL2_COMPAT_REV
+        cmake -DSDL2COMPAT_TESTS=OFF -S . -B build
+        cmake --build build -j$(nproc)
+        sudo cmake --install build
         sudo ldconfig
         cd ..
 
