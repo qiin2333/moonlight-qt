@@ -437,6 +437,28 @@ ApplicationWindow {
             }
 
             NavigableToolButton {
+                id: displaySettingsButton
+                visible: stackView.currentItem instanceof AppView
+
+                iconSource: "qrc:/res/desktop_windows-48px.svg"
+
+                ToolTip.delay: 1000
+                ToolTip.timeout: 3000
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Display Settings")
+
+                onClicked: {
+                    if (stackView.currentItem.openDisplayDialog) {
+                        stackView.currentItem.openDisplayDialog()
+                    }
+                }
+
+                Keys.onDownPressed: {
+                    stackView.currentItem.forceActiveFocus(Qt.TabFocus)
+                }
+            }
+
+            NavigableToolButton {
                 id: settingsButton
 
                 iconSource:  "qrc:/res/settings.svg"
