@@ -47,6 +47,7 @@ jobs:
           set-env: ${{ runner.os != 'Windows' }}
           add-tools-to-path: ${{ runner.os != 'Windows' }}
           version: ${{ matrix.qt_version }}
+          modules: 'qtimageformats'
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@9edeb24ae65361fd032a063a0b0148764eff09c5'
 
       - name: Install Qt ARM64 (Windows)
@@ -58,6 +59,7 @@ jobs:
           add-tools-to-path: false
           arch: win64_msvc2022_arm64_cross_compiled
           version: ${{ matrix.qt_version }}
+          modules: 'qtimageformats'
 
       - name: Build x64 binaries (Windows)
         if: runner.os == 'Windows'

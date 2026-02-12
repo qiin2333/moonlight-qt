@@ -35,7 +35,7 @@ jobs:
       with:
         version: '6.8.3'
         arch: 'win64_msvc2022_64'
-        modules: 'qtmultimedia'
+        modules: 'qtmultimedia qtimageformats'
         cache: true
 
     - name: Get version
@@ -106,7 +106,7 @@ jobs:
         host: windows
         target: desktop
         version: '6.8.3'
-        modules: 'qtmultimedia'
+        modules: 'qtmultimedia qtimageformats'
         use-naqt: true
 
     - name: Build Windows arm64
@@ -156,7 +156,7 @@ jobs:
       uses: jurplel/install-qt-action@v3
       with:
         version: '6.6.0'
-        modules: 'qtmultimedia'
+        modules: 'qtmultimedia qtimageformats'
         cache: true
 
     - name: Install Node.js
@@ -196,7 +196,7 @@ jobs:
       uses: jurplel/install-qt-action@v3
       with:
         version: '6.8.3'
-        modules: 'qtmultimedia'
+        modules: 'qtmultimedia qtimageformats'
         cache: true
 
     - name: Setup local env and metadata
