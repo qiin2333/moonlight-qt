@@ -2133,25 +2133,6 @@ Flickable {
                 }
 
                 CheckBox {
-                    id: unlockBitrate
-                    width: parent.width
-                    text: qsTr("Unlock bitrate limit (Experimental)")
-                    font.pointSize: 12
-
-                    checked: StreamingPreferences.unlockBitrate
-                    onCheckedChanged: {
-                        StreamingPreferences.unlockBitrate = checked
-                        StreamingPreferences.bitrateKbps = Math.min(StreamingPreferences.bitrateKbps, slider.to)
-                        slider.value = Math.log(StreamingPreferences.bitrateKbps)
-                    }
-
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 5000
-                    ToolTip.visible: hovered
-                    ToolTip.text: qsTr("This unlocks extremely high video bitrates for use with Sunshine hosts. It should only be used when streaming over an Ethernet LAN connection.")
-                }
-
-                CheckBox {
                     id: enableMdns
                     width: parent.width
                     text: qsTr("Automatically find PCs on the local network (Recommended)")
