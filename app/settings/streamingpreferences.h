@@ -112,7 +112,6 @@ public:
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
     Q_PROPERTY(int bitrateKbps MEMBER bitrateKbps NOTIFY bitrateChanged)
-    Q_PROPERTY(bool unlockBitrate MEMBER unlockBitrate NOTIFY unlockBitrateChanged)
     Q_PROPERTY(bool autoAdjustBitrate MEMBER autoAdjustBitrate NOTIFY autoAdjustBitrateChanged)
     Q_PROPERTY(bool ignoreAspectRatio MEMBER ignoreAspectRatio NOTIFY ignoreAspectRatioChanged)
     Q_PROPERTY(bool enableVsync MEMBER enableVsync NOTIFY enableVsyncChanged)
@@ -167,7 +166,6 @@ public:
     int height;
     int fps;
     int bitrateKbps;
-    bool unlockBitrate;
     bool autoAdjustBitrate;
     bool ignoreAspectRatio;
     bool enableVsync;
@@ -219,7 +217,6 @@ public:
 signals:
     void displayModeChanged();
     void bitrateChanged();
-    void unlockBitrateChanged();
     void autoAdjustBitrateChanged();
     void ignoreAspectRatioChanged();
     void enableVsyncChanged();
