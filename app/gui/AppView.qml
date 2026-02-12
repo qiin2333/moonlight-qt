@@ -25,7 +25,7 @@ CenteredGridView {
     id: appGrid
     focus: true
     activeFocusOnTab: true
-    topMargin: 120
+    topMargin: 70
     bottomMargin: 5
     cellWidth: 230; cellHeight: 297;
 
@@ -50,57 +50,78 @@ CenteredGridView {
         }
     }
 
-    // 顶部屏幕选择栏（仿 Android 平铺所有显示器 + Spinner 联动）
-    header: Item {
-        width: appGrid.width
-        height: headerColumn.implicitHeight + 8
-        z: 10
+    // 屏幕选择弹窗
+    function openDisplayDialog() {
+        loadDisplays()
+        displayDialog.open()
+    }
 
-        Rectangle {
-            anchors.fill: parent
-            color: "#CC333333"
-            radius: 4
+    Popup {
+        id: displayDialog
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        anchors.centerIn: parent
+        width: Math.min(500, appGrid.width - 40)
+        padding: 20
+
+        background: Rectangle {
+            color: "#EE333333"
+            radius: 12
+            border.color: "#55FFFFFF"
+            border.width: 1
         }
 
         Column {
-            id: headerColumn
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.margins: 8
-            spacing: 6
+            spacing: 16
 
-            // 显示器选择行
-            Row {
+            // 标题
+            Label {
+                text: qsTr("Display Settings")
+                color: "#FFFFFF"
+                font.pointSize: 14
+                font.bold: true
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 8
+            }
 
-                Label {
-                    text: qsTr("Display:")
-                    color: "#AAFFFFFF"
-                    font.pointSize: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+            // 分隔线
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: "#44FFFFFF"
+            }
+
+            // 显示器选择区
+            Label {
+                text: qsTr("Select Display:")
+                color: "#AAFFFFFF"
+                font.pointSize: 11
+            }
+
+            Flow {
+                width: parent.width
+                spacing: 8
 
                 // 动态物理显示器按钮
                 Repeater {
                     model: ListModel { id: displayListModel }
 
                     Rectangle {
-                        width: displayBtnLabel.implicitWidth + 20
-                        height: 28
-                        radius: 14
+                        width: displayBtnLabel.implicitWidth + 24
+                        height: 32
+                        radius: 16
                         color: selectedDisplayId === model.displayGuid ? "#4CAF50" : "#44FFFFFF"
                         border.color: selectedDisplayId === model.displayGuid ? "#66BB6A" : "#33FFFFFF"
                         border.width: 1
-                        anchors.verticalCenter: parent.verticalCenter
 
                         Label {
                             id: displayBtnLabel
                             anchors.centerIn: parent
                             text: model.displayName
-                            color: selectedDisplayId === model.displayGuid ? "#FFFFFF" : "#AAFFFFFF"
-                            font.pointSize: 9
+                            color: selectedDisplayId === model.displayGuid ? "#FFFFFF" : "#CCFFFFFF"
+                            font.pointSize: 10
                             font.bold: selectedDisplayId === model.displayGuid
                         }
 
@@ -109,7 +130,6 @@ CenteredGridView {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 selectedDisplayId = model.displayGuid
-                                // 恢复物理屏幕组合模式
                                 var saved = StreamingPreferences.customScreenMode
                                 for (var i = 0; i < physicalModeModel.count; i++) {
                                     if (physicalModeModel.get(i).val === saved) {
@@ -124,20 +144,19 @@ CenteredGridView {
 
                 // VDD 按钮
                 Rectangle {
-                    width: vddBtnLabel.implicitWidth + 20
-                    height: 28
-                    radius: 14
+                    width: vddBtnLabel.implicitWidth + 24
+                    height: 32
+                    radius: 16
                     color: isVddSelected ? "#2196F3" : "#44FFFFFF"
                     border.color: isVddSelected ? "#42A5F5" : "#33FFFFFF"
                     border.width: 1
-                    anchors.verticalCenter: parent.verticalCenter
 
                     Label {
                         id: vddBtnLabel
                         anchors.centerIn: parent
                         text: qsTr("VDD Display")
-                        color: isVddSelected ? "#FFFFFF" : "#AAFFFFFF"
-                        font.pointSize: 9
+                        color: isVddSelected ? "#FFFFFF" : "#CCFFFFFF"
+                        font.pointSize: 10
                         font.bold: isVddSelected
                     }
 
@@ -146,7 +165,6 @@ CenteredGridView {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             selectedDisplayId = "vdd"
-                            // 恢复 VDD 组合模式
                             var saved = StreamingPreferences.customVddScreenMode
                             for (var i = 0; i < vddModeModel.count; i++) {
                                 if (vddModeModel.get(i).val === saved) {
@@ -159,26 +177,30 @@ CenteredGridView {
                 }
             }
 
-            // 组合模式行（选中显示器后显示）
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
+            // 组合模式区（选中显示器后显示）
+            Column {
+                width: parent.width
                 spacing: 8
                 visible: selectedDisplayId !== ""
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: "#44FFFFFF"
+                }
 
                 Label {
                     text: isVddSelected ? qsTr("VDD Combination Mode:") : qsTr("Screen Combination Mode:")
                     color: "#AAFFFFFF"
-                    font.pointSize: 10
-                    anchors.verticalCenter: parent.verticalCenter
+                    font.pointSize: 11
                 }
 
                 ComboBox {
                     id: combinationModeCombo
-                    width: 280
-                    font.pointSize: 9
+                    width: parent.width
+                    font.pointSize: 10
                     textRole: "text"
                     model: isVddSelected ? vddModeModel : physicalModeModel
-                    anchors.verticalCenter: parent.verticalCenter
 
                     Component.onCompleted: {
                         var saved = StreamingPreferences.customScreenMode
