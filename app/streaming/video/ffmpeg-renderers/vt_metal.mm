@@ -25,27 +25,34 @@ extern "C" {
     #include <libavutil/pixdesc.h>
 }
 
+// Apple's simd_half* types are not available in all macOS SDK/Xcode
+// versions. Define our own compatible half-precision types using __fp16
+// and Clang ext_vector_type. These have identical memory layout to
+// Metal Shading Language's half/half2/half3/half3x3 types.
+typedef __fp16                                           metal_half1;
+typedef __attribute__((__ext_vector_type__(2))) __fp16   metal_half2;
+typedef __attribute__((__ext_vector_type__(3))) __fp16   metal_half3;
+typedef struct { metal_half3 columns[3]; }               metal_half3x3;
+
 struct CscParams
 {
-    simd_half3x3 matrix;
-    simd_half3 offsets;
+    metal_half3x3 matrix;
+    metal_half3 offsets;
 };
 
 struct ParamBuffer
 {
     CscParams cscParams;
-    simd_half2 chromaOffset;
-    simd_half1 bitnessScaleFactor;
+    metal_half2 chromaOffset;
+    metal_half1 bitnessScaleFactor;
 };
 
-// simd_make_half3/half2 are only available in macOS 15+ SDK.
-// Use compound literals to support older SDKs.
-static inline simd_half3 compat_make_half3(float x, float y, float z) {
-    return (simd_half3){(__fp16)x, (__fp16)y, (__fp16)z};
+static inline metal_half3 compat_make_half3(float x, float y, float z) {
+    return (metal_half3){(__fp16)x, (__fp16)y, (__fp16)z};
 }
 
-static inline simd_half2 compat_make_half2(float x, float y) {
-    return (simd_half2){(__fp16)x, (__fp16)y};
+static inline metal_half2 compat_make_half2(float x, float y) {
+    return (metal_half2){(__fp16)x, (__fp16)y};
 }
 
 struct Vertex

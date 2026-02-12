@@ -70,6 +70,13 @@ mkdir -p $DEPLOY_FOLDER/usr/lib
 cp /usr/local/lib/libSDL3.so.0 $DEPLOY_FOLDER/usr/lib/
 
 echo Creating AppImage
+# Remove SQL driver plugins that depend on unavailable system libraries
+# (e.g. libqsqlmimer.so → libmimerapi.so) to prevent linuxdeployqt failures
+QT_PLUGIN_PATH=$(qmake6 -query QT_INSTALL_PLUGINS 2>/dev/null)
+if [ -n "$QT_PLUGIN_PATH" ] && [ -d "$QT_PLUGIN_PATH/sqldrivers" ]; then
+  echo "Removing problematic SQL driver plugins..."
+  rm -f "$QT_PLUGIN_PATH/sqldrivers/libqsqlmimer.so"
+fi
 pushd $INSTALLER_FOLDER
 VERSION=$VERSION linuxdeployqt $DEPLOY_FOLDER/usr/share/applications/com.moonlight_stream.Moonlight.desktop \
   -qmake=qmake6 -qmldir=$SOURCE_ROOT/app/gui -appimage -extra-plugins=tls \
