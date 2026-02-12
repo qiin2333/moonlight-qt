@@ -1300,14 +1300,16 @@ bool D3D11VARenderer::createOverlayVertexBuffer(Overlay::OverlayType type, int w
 {
     SDL_FRect renderRect = {};
 
+    // Note: In this coordinate system, screen y=0 maps to NDC y=-1 (bottom of screen),
+    // and screen y=displayHeight maps to NDC y=1 (top of screen).
     if (type == Overlay::OverlayStatusUpdate) {
-        // Bottom Left
-        renderRect.x = 0;
+        // Bottom center
+        renderRect.x = (m_DisplayWidth - width) / 2.0f;
         renderRect.y = 0;
     }
     else if (type == Overlay::OverlayDebug) {
-        // Top left
-        renderRect.x = 0;
+        // Top center
+        renderRect.x = (m_DisplayWidth - width) / 2.0f;
         renderRect.y = m_DisplayHeight - height;
     }
 
