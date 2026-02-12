@@ -4,7 +4,7 @@
 #include <QQueue>
 #include <set>
 
-#include "../bandwidth.h"
+#include "../bwtracker.h"
 #include "decoder.h"
 #include "ffmpeg-renderers/renderer.h"
 #include "ffmpeg-renderers/pacer/pacer.h"

@@ -194,7 +194,7 @@ SOURCES += \
     streaming/network/bandwidth.cpp \
     gui/computermodel.cpp \
     gui/appmodel.cpp \
-    streaming/bandwidth.cpp \
+    streaming/bwtracker.cpp \
     streaming/streamutils.cpp \
     backend/autoupdatechecker.cpp \
     path.cpp \
@@ -236,6 +236,7 @@ HEADERS += \
     gui/appmodel.h \
     streaming/video/decoder.h \
     streaming/network/bandwidth.h \
+    streaming/bwtracker.h \
     streaming/streamutils.h \
     backend/autoupdatechecker.h \
     path.h \

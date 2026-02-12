@@ -17,6 +17,9 @@
 #import <dispatch/dispatch.h>
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
+#import <MetalFX/MetalFX.h>
+
+#include "streaming/video/videoenhancement.h"
 
 extern "C" {
     #include <libavutil/pixdesc.h>
@@ -78,8 +81,15 @@ public:
           m_LastFrameWidth(-1),
           m_LastFrameHeight(-1),
           m_LastDrawableWidth(-1),
-          m_LastDrawableHeight(-1)
+          m_LastDrawableHeight(-1),
+          m_LumaTexture(nullptr),
+          m_LumaUpscaledTexture(nullptr),
+          m_LumaUpscaler(nullptr),
+          m_ChromaTexture(nullptr),
+          m_ChromaUpscaledTexture(nullptr),
+          m_ChromaUpscaler(nullptr)
     {
+        m_VideoEnhancement = &VideoEnhancement::getInstance();
     }
 
     virtual ~VTMetalRenderer() override
@@ -448,6 +458,76 @@ public:
             }
         }
 
+        // Prepare MetalFX upscaler if VideoEnhancement is enabled
+        if (frame->format == AV_PIX_FMT_VIDEOTOOLBOX && m_VideoEnhancement->isVideoEnhancementEnabled()) {
+            CVPixelBufferRef pixBuf = reinterpret_cast<CVPixelBufferRef>(frame->data[3]);
+            size_t lumaWidth = CVPixelBufferGetWidthOfPlane(pixBuf, 0);
+            size_t lumaHeight = CVPixelBufferGetHeightOfPlane(pixBuf, 0);
+            size_t chromaWidth = CVPixelBufferGetWidthOfPlane(pixBuf, 1);
+            size_t chromaHeight = CVPixelBufferGetHeightOfPlane(pixBuf, 1);
+
+            MTLPixelFormat lumaFmt, chromaFmt;
+            switch (CVPixelBufferGetPixelFormatType(pixBuf)) {
+            case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
+            case kCVPixelFormatType_444YpCbCr8BiPlanarVideoRange:
+            case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
+            case kCVPixelFormatType_444YpCbCr8BiPlanarFullRange:
+                lumaFmt = MTLPixelFormatR8Unorm;
+                chromaFmt = MTLPixelFormatRG8Unorm;
+                break;
+            default:
+                lumaFmt = MTLPixelFormatR16Unorm;
+                chromaFmt = MTLPixelFormatRG16Unorm;
+                break;
+            }
+
+            // Setup the Spatial scaler for Luma texture
+            if (m_LumaUpscaler == nullptr) {
+                MTLFXSpatialScalerDescriptor* Ldescriptor = [MTLFXSpatialScalerDescriptor new];
+                Ldescriptor.inputWidth = lumaWidth;
+                Ldescriptor.inputHeight = lumaHeight;
+                Ldescriptor.outputWidth = m_LastDrawableWidth;
+                Ldescriptor.outputHeight = m_LastDrawableHeight;
+                Ldescriptor.colorTextureFormat = lumaFmt;
+                Ldescriptor.outputTextureFormat = lumaFmt;
+                Ldescriptor.colorProcessingMode = MTLFXSpatialScalerColorProcessingModeLinear;
+                m_LumaUpscaler = [Ldescriptor newSpatialScalerWithDevice:m_MetalLayer.device];
+
+                MTLTextureDescriptor *LtextureDescriptor = [[MTLTextureDescriptor alloc] init];
+                LtextureDescriptor.pixelFormat = lumaFmt;
+                LtextureDescriptor.width = m_LastDrawableWidth;
+                LtextureDescriptor.height = m_LastDrawableHeight;
+                LtextureDescriptor.storageMode = MTLStorageModePrivate;
+                LtextureDescriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
+                m_LumaUpscaledTexture = [m_MetalLayer.device newTextureWithDescriptor:LtextureDescriptor];
+            }
+
+            // Setup the Spatial scaler for Chroma texture
+            if (m_ChromaUpscaler == nullptr) {
+                MTLFXSpatialScalerDescriptor* Cdescriptor = [MTLFXSpatialScalerDescriptor new];
+                Cdescriptor.inputWidth = chromaWidth;
+                Cdescriptor.inputHeight = chromaHeight;
+                Cdescriptor.outputWidth = m_LastDrawableWidth;
+                Cdescriptor.outputHeight = m_LastDrawableHeight;
+                Cdescriptor.colorTextureFormat = chromaFmt;
+                Cdescriptor.outputTextureFormat = chromaFmt;
+                Cdescriptor.colorProcessingMode = MTLFXSpatialScalerColorProcessingModeLinear;
+                m_ChromaUpscaler = [Cdescriptor newSpatialScalerWithDevice:m_MetalLayer.device];
+
+                MTLTextureDescriptor* CtextureDescriptor = [[MTLTextureDescriptor alloc] init];
+                CtextureDescriptor.pixelFormat = chromaFmt;
+                CtextureDescriptor.width = m_LastDrawableWidth;
+                CtextureDescriptor.height = m_LastDrawableHeight;
+                CtextureDescriptor.storageMode = MTLStorageModePrivate;
+                CtextureDescriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
+                m_ChromaUpscaledTexture = [m_MetalLayer.device newTextureWithDescriptor:CtextureDescriptor];
+            }
+
+            // Capture raw textures for upscaling
+            m_LumaTexture = CVMetalTextureGetTexture(cvMetalTextures[0]);
+            m_ChromaTexture = CVMetalTextureGetTexture(cvMetalTextures[1]);
+        }
+
         // Prepare a render pass to render into the next drawable
         auto renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
         renderPassDescriptor.colorAttachments[0].texture = drawable.texture;
@@ -460,8 +540,14 @@ public:
         // Bind textures and buffers then draw the video region
         [renderEncoder setRenderPipelineState:m_VideoPipelineState];
         if (frame->format == AV_PIX_FMT_VIDEOTOOLBOX) {
-            for (size_t i = 0; i < planes; i++) {
-                [renderEncoder setFragmentTexture:CVMetalTextureGetTexture(cvMetalTextures[i]) atIndex:i];
+            if (m_VideoEnhancement->isVideoEnhancementEnabled()) {
+                // Use upscaled textures
+                [renderEncoder setFragmentTexture:m_LumaUpscaledTexture atIndex:0];
+                [renderEncoder setFragmentTexture:m_ChromaUpscaledTexture atIndex:1];
+            } else {
+                for (size_t i = 0; i < planes; i++) {
+                    [renderEncoder setFragmentTexture:CVMetalTextureGetTexture(cvMetalTextures[i]) atIndex:i];
+                }
             }
             [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer>) {
                 // Free textures after completion of rendering per CVMetalTextureCache requirements
@@ -525,6 +611,17 @@ public:
         }
 
         [renderEncoder endEncoding];
+
+        // Execute MetalFX upscaling if VideoEnhancement is enabled
+        if (frame->format == AV_PIX_FMT_VIDEOTOOLBOX && m_VideoEnhancement->isVideoEnhancementEnabled()) {
+            m_LumaUpscaler.colorTexture = m_LumaTexture;
+            m_LumaUpscaler.outputTexture = m_LumaUpscaledTexture;
+            m_ChromaUpscaler.colorTexture = m_ChromaTexture;
+            m_ChromaUpscaler.outputTexture = m_ChromaUpscaledTexture;
+
+            [m_LumaUpscaler encodeToCommandBuffer:commandBuffer];
+            [m_ChromaUpscaler encodeToCommandBuffer:commandBuffer];
+        }
 
         // Flip to the newly rendered buffer
         [commandBuffer presentDrawable:drawable];
@@ -643,6 +740,19 @@ public:
 
         if (m_HwAccel && !checkDecoderCapabilities(device, params)) {
             return false;
+        }
+
+        if (@available(macOS 13.0, *)) {
+            // Video Super Resolution from MetalFX is available starting from MacOS 13+
+            m_VideoEnhancement->setVSRcapable(true);
+            m_VideoEnhancement->setHDRcapable(false);
+            // Enable the visibility of Video enhancement feature in the settings of the User interface
+            m_VideoEnhancement->enableUIvisible();
+        }
+
+        if (m_VideoEnhancement->isEnhancementCapable()) {
+            // Check if the user has enabled Video enhancement
+            m_VideoEnhancement->enableVideoEnhancement(params->enableVideoEnhancement);
         }
 
         err = av_hwdevice_ctx_create(&m_HwContext,
@@ -928,6 +1038,15 @@ private:
     int m_LastFrameHeight;
     int m_LastDrawableWidth;
     int m_LastDrawableHeight;
+
+    // VideoEnhancement / MetalFX members
+    VideoEnhancement* m_VideoEnhancement;
+    id<MTLTexture> m_LumaTexture;
+    id<MTLTexture> m_LumaUpscaledTexture;
+    id<MTLFXSpatialScaler> m_LumaUpscaler;
+    id<MTLTexture> m_ChromaTexture;
+    id<MTLTexture> m_ChromaUpscaledTexture;
+    id<MTLFXSpatialScaler> m_ChromaUpscaler;
 };
 
 @implementation DisplayLinkDelegate {

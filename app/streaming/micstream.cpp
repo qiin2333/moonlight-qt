@@ -12,6 +12,11 @@
 
 extern "C" {
 #include <Input.h>
+
+// Internal moonlight-common-c functions for microphone streaming
+int initializeMicrophoneStream(void);
+void destroyMicrophoneStream(void);
+int sendMicrophoneOpusData(const unsigned char* opusData, int opusLength);
 }
 
 static const int PCM_FRAME_SAMPLES = 960; // 20 ms at 48 kHz
@@ -203,20 +208,10 @@ void MicStream::sendLoop()
 
     while (!m_queue.isEmpty()) {
         QByteArray opus = m_queue.dequeue();
-        QByteArray pkt;
-        pkt.resize(12 + opus.size());
-        pkt[0] = 0x00;
-        pkt[1] = 0x61;
-        quint16 seqle = qToLittleEndian(m_seq++);
-        quint32 tsle = qToLittleEndian(m_timestamp);
-        quint32 ssrcle = qToLittleEndian(m_ssrc);
-        memcpy(pkt.data() + 2, &seqle, 2);
-        memcpy(pkt.data() + 4, &tsle, 4);
-        memcpy(pkt.data() + 8, &ssrcle, 4);
-        memcpy(pkt.data() + 12, opus.constData(), opus.size());
-        int rc = sendMicrophoneData(pkt.constData(), pkt.size());
+        // sendMicrophoneOpusData handles RTP header and encryption internally
+        int rc = sendMicrophoneOpusData(reinterpret_cast<const unsigned char*>(opus.constData()), opus.size());
         if (rc < 0) {
-            qWarning() << "[MicStream] sendMicrophoneData failed rc=" << rc;
+            qWarning() << "[MicStream] sendMicrophoneOpusData failed rc=" << rc;
             continue;
         }
         m_sentPackets++;

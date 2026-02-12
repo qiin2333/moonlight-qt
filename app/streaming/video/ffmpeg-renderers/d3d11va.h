@@ -4,6 +4,10 @@
 
 #include <d3d11_4.h>
 #include <dxgi1_6.h>
+#include <CGuid.h>
+#include <atlbase.h>
+#include "streaming/video/videoenhancement.h"
+#include "public/common/AMFFactory.h"
 
 extern "C" {
 #include <libavutil/hwcontext_d3d11va.h>
@@ -25,6 +29,8 @@ public:
     virtual bool notifyWindowChanged(PWINDOW_STATE_CHANGE_INFO stateInfo) override;
     virtual int getRendererAttributes() override;
     virtual int getDecoderCapabilities() override;
+    virtual bool needsTestFrame();
+    virtual void setHdrMode(bool enabled) override;
     virtual InitFailureReason getInitFailureReason() override;
 
     enum PixelShaders {
@@ -49,6 +55,18 @@ private:
     void bindColorConversion(bool frameChanged, AVFrame* frame);
     void bindVideoVertexBuffer(bool frameChanged, AVFrame* frame);
     void renderVideo(AVFrame* frame);
+    bool createVideoProcessor(ID3D11Device* device = nullptr, ID3D11DeviceContext* context = nullptr);
+    bool initializeVideoProcessor();
+    bool enableAMDVideoSuperResolution(bool activate = true, bool logInfo = true, ID3D11Device* device = nullptr);
+    bool enableIntelVideoSuperResolution(bool activate = true, bool logInfo = true);
+    bool enableNvidiaVideoSuperResolution(bool activate = true, bool logInfo = true);
+    bool enableAMDHDR(bool activate = true, bool logInfo = true);
+    bool enableIntelHDR(bool activate = true, bool logInfo = true);
+    bool enableNvidiaHDR(bool activate = true, bool logInfo = true);
+    void prepareEnhancedOutput(AVFrame* frame);
+    bool setupAmfTexture();
+    bool setupEnhancedTexture();
+    int getAdapterIndexByEnhancementCapabilities();
     bool checkDecoderSupport(IDXGIAdapter* adapter);
     bool createDeviceByAdapterIndex(int adapterIndex, bool* adapterNotFound = nullptr);
     bool setupSharedDevice(IDXGIAdapter1* adapter);
@@ -84,12 +102,36 @@ private:
     UINT64 m_R2DFenceValue;
     SDL_mutex* m_ContextLock;
     bool m_BindDecoderOutputTextures;
+    bool m_UseFenceHack;
+
+    Microsoft::WRL::ComPtr<ID3D11VideoDevice> m_VideoDevice;
+    Microsoft::WRL::ComPtr<ID3D11VideoContext2> m_VideoContext;
+    Microsoft::WRL::ComPtr<ID3D11VideoProcessor> m_VideoProcessor;
+    Microsoft::WRL::ComPtr<ID3D11VideoProcessorEnumerator> m_VideoProcessorEnumerator;
+    D3D11_VIDEO_PROCESSOR_CAPS m_VideoProcessorCapabilities;
+    D3D11_VIDEO_PROCESSOR_STREAM m_StreamData;
+    Microsoft::WRL::ComPtr<ID3D11VideoProcessorOutputView> m_OutputView;
+    Microsoft::WRL::ComPtr<ID3D11VideoProcessorInputView> m_InputView;
+    Microsoft::WRL::ComPtr<ID3D11Resource> m_BackBufferResource;
+    VideoEnhancement* m_VideoEnhancement;
+    bool m_AutoStreamSuperResolution = false;
 
     DECODER_PARAMETERS m_DecoderParams;
     DXGI_FORMAT m_TextureFormat;
     int m_DisplayWidth;
     int m_DisplayHeight;
+    int m_OutputIndex;
     AVColorTransferCharacteristic m_LastColorTrc;
+    int m_LastColorSpace;
+    bool m_LastFullRange;
+
+    struct {
+        int width;
+        int height;
+        int left;
+        int top;
+    } m_OutputTexture;
+    D3D11_BOX m_SrcBox;
 
     bool m_AllowTearing;
 
@@ -98,6 +140,8 @@ private:
 
     // Only valid if !m_BindDecoderOutputTextures
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_VideoTexture;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_AmfTexture;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_EnhancedTexture;
 
     // Only index 0 is valid if !m_BindDecoderOutputTextures
     std::vector<std::array<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>, 2>> m_VideoTextureResourceViews;
@@ -109,5 +153,14 @@ private:
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_OverlayPixelShader;
 
     AVBufferRef* m_HwDeviceContext;
+
+    // AMD (AMF)
+    amf::AMFContextPtr m_AmfContext;
+    amf::AMFSurfacePtr m_AmfSurface;
+    amf::AMFDataPtr m_AmfData;
+    amf::AMFComponent* m_AmfUpScaler;
+    bool m_AmfInitialized = false;
+    bool m_AmfUpScalerSharpness = false;
+    amf::AMF_SURFACE_FORMAT m_AmfUpScalerSurfaceFormat;
 };
 
