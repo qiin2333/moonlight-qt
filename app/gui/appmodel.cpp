@@ -1,4 +1,5 @@
 #include "appmodel.h"
+#include "../backend/nvhttp.h"
 
 AppModel::AppModel(QObject *parent)
     : QAbstractListModel(parent)
@@ -45,6 +46,24 @@ Session* AppModel::createSessionForApp(int appIndex)
     NvApp app = m_VisibleApps.at(appIndex);
 
     return new Session(m_Computer, app);
+}
+
+QVariantList AppModel::getDisplayList()
+{
+    QVariantList displays;
+
+    if (!m_Computer || m_Computer->activeAddress.isNull()) {
+        return displays;
+    }
+
+    try {
+        NvHTTP http(m_Computer);
+        displays = http.getDisplays();
+    } catch (...) {
+        qWarning() << "Failed to get display list";
+    }
+
+    return displays;
 }
 
 int AppModel::getDirectLaunchAppIndex()

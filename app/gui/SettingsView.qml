@@ -1289,6 +1289,63 @@ Flickable {
                     }
                 }
 
+                // VDD 屏幕模式选择器
+                Label {
+                    id: customVddScreenModeTitle
+                    width: parent.width
+                    text: qsTr("VDD Screen Mode")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                AutoResizingComboBox {
+                    Component.onCompleted: {
+                        var saved_mode = (StreamingPreferences.customVddScreenMode !== undefined &&
+                                          StreamingPreferences.customVddScreenMode !== null) ?
+                                          StreamingPreferences.customVddScreenMode : -1
+                        currentIndex = 0
+                        for (var i = 0; i < customVddScreenModeListModel.count; i++) {
+                            var el_mode = customVddScreenModeListModel.get(i).val;
+                            if (saved_mode === el_mode) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                        activated(currentIndex)
+                    }
+
+                    id: customVddScreenModeComboBox
+                    textRole: "text"
+                    model: ListModel {
+                        id: customVddScreenModeListModel
+                        ListElement {
+                            text: qsTr("Use Sunshine host configuration (default)")
+                            val: -1
+                        }
+                        ListElement {
+                            text: qsTr("Keep current layout")
+                            val: 0
+                        }
+                        ListElement {
+                            text: qsTr("VDD primary + Physical extended")
+                            val: 1
+                        }
+                        ListElement {
+                            text: qsTr("Physical primary + VDD extended")
+                            val: 2
+                        }
+                        ListElement {
+                            text: qsTr("VDD only (disable physical displays)")
+                            val: 3
+                        }
+                    }
+                    onActivated: {
+                        if (enabled) {
+                            StreamingPreferences.customVddScreenMode = customVddScreenModeListModel.get(currentIndex).val
+                        }
+                    }
+                }
+
                 CheckBox {
                     id: optimizeGameSettingsCheck
                     width: parent.width

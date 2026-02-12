@@ -12,6 +12,9 @@
 #include <QImageReader>
 #include <QtEndian>
 #include <QNetworkProxy>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 #define FAST_FAIL_TIMEOUT_MS 2000
 #define REQUEST_TIMEOUT_MS 5000
@@ -206,6 +209,7 @@ NvHTTP::startApp(QString verb,
                  bool persistGameControllersOnDisconnect,
                  QString& rtspSessionUrl,
                  int customScreenMode,
+                 int customVddScreenMode,
                  RemoteStreamConfig &remoteStreamConfig)
 {
     int riKeyId;
@@ -261,6 +265,7 @@ NvHTTP::startApp(QString verb,
                                    "&gcmap="+QString::number(gamepadMask)+
                                    "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0)+
                                    "&customScreenMode="+QString::number(customScreenMode)+
+                                   "&customVddScreenMode="+QString::number(customVddScreenMode)+
                                    LiGetLaunchUrlQueryParameters(),
                                    LAUNCH_TIMEOUT_MS);
 
@@ -361,6 +366,59 @@ NvHTTP::getAppList()
     }
 
     return apps;
+}
+
+QVariantList
+NvHTTP::getDisplays()
+{
+    QVariantList displays;
+
+    try {
+        QString response = openConnectionToString(m_BaseUrlHttps,
+                                                   "displays",
+                                                   nullptr,
+                                                   REQUEST_TIMEOUT_MS,
+                                                   NvLogLevel::NVLL_VERBOSE);
+
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(response.toUtf8(), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+            qWarning() << "Failed to parse displays JSON:" << parseError.errorString();
+            return displays;
+        }
+
+        QJsonObject root = doc.object();
+        int statusCode = root.value("status_code").toInt(0);
+        if (statusCode != 200) {
+            qWarning() << "getDisplays failed:" << root.value("status_message").toString();
+            return displays;
+        }
+
+        QJsonArray displaysArray = root.value("displays").toArray();
+        for (int i = 0; i < displaysArray.size(); i++) {
+            QJsonObject displayObj = displaysArray[i].toObject();
+
+            QString friendlyName = displayObj.value("friendly_name").toString();
+            if (friendlyName.isEmpty()) {
+                friendlyName = displayObj.value("display_name").toString();
+            }
+            if (friendlyName.isEmpty()) {
+                friendlyName = QString("Display %1").arg(i + 1);
+            }
+
+            QString guid = displayObj.value("device_id").toString();
+
+            QVariantMap display;
+            display["name"] = friendlyName;
+            display["guid"] = guid;
+            display["index"] = i;
+            displays.append(display);
+        }
+    } catch (...) {
+        qWarning() << "Exception in getDisplays()";
+    }
+
+    return displays;
 }
 
 void

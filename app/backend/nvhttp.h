@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QVariant>
 
 class NvComputer;
 
@@ -175,10 +176,14 @@ public:
              bool persistGameControllersOnDisconnect,
              QString& rtspSessionUrl,
              int customScreenMode,
+             int customVddScreenMode,
              RemoteStreamConfig &remoteStreamConfig);
 
     QVector<NvApp>
     getAppList();
+
+    QVariantList
+    getDisplays();
 
     QImage
     getBoxArt(int appId);

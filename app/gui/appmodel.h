@@ -30,6 +30,8 @@ public:
 
     Q_INVOKABLE Session* createSessionForApp(int appIndex);
 
+    Q_INVOKABLE QVariantList getDisplayList();
+
     Q_INVOKABLE int getDirectLaunchAppIndex();
 
     Q_INVOKABLE int getRunningAppId();

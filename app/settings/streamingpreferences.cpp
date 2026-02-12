@@ -62,6 +62,7 @@
 #define SER_KEEPAWAKE "keepawake"
 #define SER_LANGUAGE "language"
 #define SER_CUSTOMSCREENMODE "customscreenmode"
+#define SER_CUSTOMVDDSCREENMODE "customvddscreenmode"
 #define SER_SHOWLOCALCURSOR "showLocalCursor"
 #define SER_MICROPHONE "microphone"
 
@@ -193,6 +194,7 @@ void StreamingPreferences::reload()
     language = static_cast<Language>(settings.value(SER_LANGUAGE,
                                                     static_cast<int>(Language::LANG_AUTO)).toInt());
     customScreenMode = settings.value(SER_CUSTOMSCREENMODE, -1).toInt();
+    customVddScreenMode = settings.value(SER_CUSTOMVDDSCREENMODE, -1).toInt();
 
     // Perform default settings updates as required based on last default version
     if (defaultVer < 1) {
@@ -394,6 +396,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
     settings.setValue(SER_CUSTOMSCREENMODE, customScreenMode);
+    settings.setValue(SER_CUSTOMVDDSCREENMODE, customVddScreenMode);
     settings.setValue(SER_MICROPHONE, enableMicrophone);
 }
 
