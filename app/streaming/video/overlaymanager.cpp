@@ -159,6 +159,28 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
         return;
     }
 
+    // Construct the required font to render the overlay
+    if (m_Overlays[type].font == nullptr) {
+        if (m_FontData.isEmpty()) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "SDL overlay font failed to load");
+            return;
+        }
+
+        // m_FontData must stay around until the font is closed
+        m_Overlays[type].font = TTF_OpenFontRW(SDL_RWFromConstMem(m_FontData.constData(), m_FontData.size()),
+                                               1,
+                                               m_Overlays[type].fontSize);
+        if (m_Overlays[type].font == nullptr) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "TTF_OpenFont() failed: %s",
+                        TTF_GetError());
+
+            // Can't proceed without a font
+            return;
+        }
+    }
+
     SDL_Surface* oldSurface = (SDL_Surface*)SDL_AtomicSetPtr((void**)&m_Overlays[type].surface, nullptr);
 
     // Free the old surface
@@ -416,13 +438,13 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
     // 使用精确的高度计算（考虑ascent和descent）
     int surfaceHeight = maxAscent + maxDescent;
     
-    // 创建组合表面 - 使用32位RGBA格式以支持更好的混合
+    // 创建组合表面 - 使用ARGB8888格式（所有渲染器都期望此格式）
     SDL_Surface* combinedSurface = SDL_CreateRGBSurfaceWithFormat(
         0,
         totalWidth + padding * 2,
         surfaceHeight + padding * 2,
         32,
-        SDL_PIXELFORMAT_RGBA32
+        SDL_PIXELFORMAT_ARGB8888
     );
     
     if (combinedSurface == nullptr) {

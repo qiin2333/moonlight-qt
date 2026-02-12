@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QSemaphore>
-#include <QWindow>
+#include <QQuickWindow>
 
 #include <Limelight.h>
 #include <opus_multistream.h>
@@ -21,7 +21,7 @@ public:
     {
         int value = 0;
 
-        for (const int & v : *this) {
+        for (const int v : *this) {
             value |= v;
         }
 
@@ -99,16 +99,15 @@ class Session : public QObject
     friend class SdlInputHandler;
     friend class DeferredSessionCleanupTask;
     friend class AsyncConnectionStartThread;
-    friend class ExecThread;
 
 public:
     explicit Session(NvComputer* computer, NvApp& app, StreamingPreferences *preferences = nullptr);
+    virtual ~Session();
 
-    // NB: This may not get destroyed for a long time! Don't put any cleanup here.
-    // Use Session::exec() or DeferredSessionCleanupTask instead.
-    virtual ~Session() {};
-
-    Q_INVOKABLE void exec(QWindow* qtWindow);
+    Q_INVOKABLE bool initialize(QQuickWindow* qtWindow);
+    Q_INVOKABLE void start();
+    Q_INVOKABLE void interrupt();
+    Q_PROPERTY(QStringList launchWarnings MEMBER m_LaunchWarnings NOTIFY launchWarningsChanged);
 
     static
     void getDecoderInfo(SDL_Window* window,
@@ -127,7 +126,7 @@ public:
 
     void flushWindowEvents();
 
-    void setShouldExitAfterQuit();
+    void setShouldExit(bool quitHostApp = false);
 
 signals:
     void stageStarting(QString stage);
@@ -138,8 +137,6 @@ signals:
 
     void displayLaunchError(QString text);
 
-    void displayLaunchWarning(QString text);
-
     void quitStarting();
 
     void sessionFinished(int portTestResult);
@@ -147,10 +144,10 @@ signals:
     // Emitted after sessionFinished() when the session is ready to be destroyed
     void readyForDeletion();
 
-private:
-    void execInternal();
+    void launchWarningsChanged();
 
-    bool initialize();
+private:
+    void exec();
 
     bool startConnectionAsync();
 
@@ -261,18 +258,17 @@ private:
     NvApp m_App;
     SDL_Window* m_Window;
     IVideoDecoder* m_VideoDecoder;
-    SDL_SpinLock m_DecoderLock;
+    SDL_mutex* m_DecoderLock;
     bool m_AudioDisabled;
     bool m_AudioMuted;
     Uint32 m_FullScreenFlag;
-    QWindow* m_QtWindow;
-    bool m_ThreadedExec;
+    QQuickWindow* m_QtWindow;
     bool m_UnexpectedTermination;
     SdlInputHandler* m_InputHandler;
     int m_MouseEmulationRefCount;
     int m_FlushingWindowEventsRef;
-    QList<QString> m_LaunchWarnings;
-    bool m_ShouldExitAfterQuit;
+    QStringList m_LaunchWarnings;
+    bool m_ShouldExit;
 
     bool m_AsyncConnectionSuccess;
     int m_PortTestResults;

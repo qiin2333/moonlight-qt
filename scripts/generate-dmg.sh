@@ -15,7 +15,12 @@ BUILD_ROOT=$PWD/build
 SOURCE_ROOT=$PWD
 BUILD_FOLDER=$BUILD_ROOT/build-$BUILD_CONFIG
 INSTALLER_FOLDER=$BUILD_ROOT/installer-$BUILD_CONFIG
-VERSION=`cat $SOURCE_ROOT/app/version.txt`
+
+if [ -n "$CI_VERSION" ]; then
+  VERSION=$CI_VERSION
+else
+  VERSION=`cat $SOURCE_ROOT/app/version.txt`
+fi
 
 if [ "$SIGNING_PROVIDER_SHORTNAME" == "" ]; then
   SIGNING_PROVIDER_SHORTNAME=$SIGNING_IDENTITY
@@ -33,9 +38,24 @@ mkdir $BUILD_ROOT
 mkdir $BUILD_FOLDER
 mkdir $INSTALLER_FOLDER
 
-echo Configuring the project
+# Determine target architecture.
+# If MOONLIGHT_ARCH is set (e.g. by CI), build only that arch.
+# Otherwise detect the native arch to avoid universal binaries,
+# which cause multiple macOS TCC permission dialogs due to each
+# architecture slice having a different CDHash.
+if [ -z "$MOONLIGHT_ARCH" ]; then
+  MOONLIGHT_ARCH=$(uname -m)
+  # Normalise: Apple Silicon reports arm64, Rosetta reports x86_64
+  if [ "$MOONLIGHT_ARCH" = "arm64" ]; then
+    MOONLIGHT_ARCH="arm64"
+  else
+    MOONLIGHT_ARCH="x86_64"
+  fi
+fi
+
+echo "Configuring the project for architecture: $MOONLIGHT_ARCH"
 pushd $BUILD_FOLDER
-qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64" || fail "Qmake failed!"
+qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="$MOONLIGHT_ARCH" || fail "Qmake failed!"
 popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration
@@ -65,9 +85,9 @@ fi
 
 echo Creating DMG
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
+  create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --identity="$SIGNING_IDENTITY" --no-version-in-filename || fail "create-dmg failed!"
 else
-  create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER
+  create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --no-version-in-filename
   case $? in
     0) ;;
     2) ;;
@@ -77,11 +97,11 @@ fi
 
 if [ "$NOTARY_KEYCHAIN_PROFILE" != "" ]; then
   echo Uploading to App Notary service
-  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Moonlight\ $VERSION.dmg || fail "Notary submission failed"
+  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Moonlight.dmg || fail "Notary submission failed"
 
   echo Stapling notary ticket to DMG
-  xcrun stapler staple -v $INSTALLER_FOLDER/Moonlight\ $VERSION.dmg || fail "Notary ticket stapling failed!"
+  xcrun stapler staple -v $INSTALLER_FOLDER/Moonlight.dmg || fail "Notary ticket stapling failed!"
 fi
 
-mv $INSTALLER_FOLDER/Moonlight\ $VERSION.dmg $INSTALLER_FOLDER/Moonlight-$VERSION.dmg
+mv $INSTALLER_FOLDER/Moonlight.dmg $INSTALLER_FOLDER/Moonlight-$VERSION.dmg
 echo Build successful

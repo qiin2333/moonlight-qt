@@ -7,6 +7,12 @@
 #include <QMutex>
 #include <QWaitCondition>
 
+// The maximum number of frames pacer will ever hold is:
+// - 3 frames in the pacing queue
+// - 1 frame removed from the render queue in the process of rendering
+// - 1 frame for deferred free
+#define PACER_MAX_OUTSTANDING_FRAMES (3 + 1 + 1)
+
 class IVsyncSource {
 public:
     virtual ~IVsyncSource() {}
@@ -60,6 +66,7 @@ private:
     QWaitCondition m_VsyncSignalled;
     SDL_Thread* m_RenderThread;
     SDL_Thread* m_VsyncThread;
+    AVFrame* m_DeferredFreeFrame;
     bool m_Stopping;
 
     IVsyncSource* m_VsyncSource;

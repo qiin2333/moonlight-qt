@@ -39,7 +39,7 @@ CenteredGridView {
         ComputerManager.computerAddCompleted.connect(addComplete)
 
         // Highlight the first item if a gamepad is connected
-        if (currentIndex == -1 && SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
+        if (currentIndex === -1 && SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
             currentIndex = 0
         }
     }
@@ -94,6 +94,7 @@ CenteredGridView {
         BusyIndicator {
             id: searchSpinner
             visible: StreamingPreferences.enableMdns
+            running: visible
         }
 
         Label {
@@ -231,13 +232,13 @@ CenteredGridView {
             asynchronous: true
             sourceComponent: NavigableMenu {
                 id: pcContextMenu
+                initiator: pcContextMenuLoader.parent
                 MenuItem {
                     text: qsTr("PC Status: %1").arg(model.online ? qsTr("Online") : qsTr("Offline"))
                     font.bold: true
                     enabled: false
                 }
                 NavigableMenuItem {
-                    parentMenu: pcContextMenu
                     text: qsTr("View All Apps")
                     onTriggered: {
                         var component = Qt.createComponent("AppView.qml")
@@ -247,13 +248,11 @@ CenteredGridView {
                     visible: model.online && model.paired
                 }
                 NavigableMenuItem {
-                    parentMenu: pcContextMenu
                     text: qsTr("Wake PC")
                     onTriggered: computerModel.wakeComputer(index)
                     visible: !model.online && model.wakeable
                 }
                 NavigableMenuItem {
-                    parentMenu: pcContextMenu
                     text: qsTr("Test Network")
                     onTriggered: {
                         computerModel.testConnectionForComputer(index)
@@ -262,7 +261,6 @@ CenteredGridView {
                 }
 
                 NavigableMenuItem {
-                    parentMenu: pcContextMenu
                     text: qsTr("Rename PC")
                     onTriggered: {
                         renamePcDialog.pcIndex = index
@@ -271,7 +269,6 @@ CenteredGridView {
                     }
                 }
                 NavigableMenuItem {
-                    parentMenu: pcContextMenu
                     text: qsTr("Delete PC")
                     onTriggered: {
                         deletePcDialog.pcIndex = index
@@ -280,7 +277,6 @@ CenteredGridView {
                     }
                 }
                 NavigableMenuItem {
-                    parentMenu: pcContextMenu
                     text: qsTr("View Details")
                     onTriggered: {
                         showPcDetailsDialog.pcDetails = model.details
@@ -361,10 +357,6 @@ CenteredGridView {
 
     NavigableMessageDialog {
         id: pairDialog
-
-        // Pairing dialog must be modal to prevent double-clicks from triggering
-        // pairing twice
-        modal: true
         closePolicy: Popup.CloseOnEscape
 
         // don't allow edits to the rest of the window while open
@@ -505,35 +497,25 @@ CenteredGridView {
         function getBackgroundImage() {
             loadingIndicator.visible = true
             
-            var request = new XMLHttpRequest();
-            request.open("GET", "https://imgapi.lie.moe/random?sort=pc", true);
-            request.timeout = 10000;
-
-            request.onreadystatechange = function() {
-                if (request.readyState === XMLHttpRequest.DONE) {
-                    loadingIndicator.visible = false
-                    if (request.status === 200) {
-                        handleImageResponse(request.responseURL)
-                    } else {
-                        handleImageError(request.status)
-                    }
-                }
+            var cachePath = imageUtils.fetchAndSaveRandomBackground("https://img-api.pipw.top/")
+            loadingIndicator.visible = false
+            
+            if (cachePath) {
+                handleImageResponse(cachePath)
+            } else {
+                handleImageError("fetchAndSaveRandomBackground returned empty")
             }
-
-            request.send()
         }
 
-        function handleImageResponse(url) {
-            currentImageUrl = url
-            pcGrid.currentBgUrl = url  // 同步更新根组件属性
-            var cachePath = imageUtils.saveImageFromUrl(url)
-            if (cachePath) {
-                settings.cachedImagePath = cachePath
-                console.log("handleImageResponse: " + cachePath)
-                source = "";
-                source = "file:///" + encodeURIComponent(cachePath);
-                settings.lastRefreshTime = Date.now()
-            }
+        function handleImageResponse(cachePath) {
+            settings.cachedImagePath = cachePath
+            console.log("handleImageResponse: " + cachePath)
+            var fileUrl = "file:///" + cachePath.replace(/\\/g, "/").replace(/^\/+/, "")
+            source = ""
+            source = fileUrl
+            currentImageUrl = fileUrl
+            pcGrid.currentBgUrl = fileUrl
+            settings.lastRefreshTime = Date.now()
         }
 
         function handleImageError(status) {
@@ -597,13 +579,8 @@ CenteredGridView {
                     settings.cachedImagePath = filePath.toString().substring(8)
                     settings.lastRefreshTime = Date.now()
                     
-                    // 更新背景图 - 处理包含空格的路径
-                    if (filePath.toString().startsWith("file:///")) {
-                        var pathPart = filePath.toString().substring(8);
-                        backgroundImage.source = "file:///" + encodeURIComponent(pathPart).replace(/%2F/g, "/");
-                    } else {
-                        backgroundImage.source = filePath;
-                    }
+                    // 更新背景图
+                    backgroundImage.source = filePath;
                     currentImageUrl = filePath;
                     pcGrid.currentBgUrl = filePath;  // 拖放时同步属性
                 } else {

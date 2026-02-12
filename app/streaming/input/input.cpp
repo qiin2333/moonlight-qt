@@ -262,7 +262,7 @@ void SdlInputHandler::raiseAllKeys()
                 "Raising %d keys",
                 (int)m_KeysDown.count());
 
-    for (auto keyDown : m_KeysDown) {
+    for (auto keyDown : std::as_const(m_KeysDown)) {
         LiSendKeyboardEvent(keyDown, KEY_ACTION_UP, 0);
     }
 
@@ -303,7 +303,7 @@ void SdlInputHandler::notifyFocusLost()
     // used in shortcuts that cause focus loss (such as Alt+Tab) may get stuck down.
     raiseAllKeys();
 
-    // Re-enable text input when window loses focus
+    // Re-enable text input when window loses focus to prevent IME popup interference
     SDL_StartTextInput();
 }
 

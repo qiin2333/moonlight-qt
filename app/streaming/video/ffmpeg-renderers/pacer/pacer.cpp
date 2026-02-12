@@ -4,7 +4,6 @@
 #ifdef Q_OS_WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <VersionHelpers.h>
 #include "dxvsyncsource.h"
 #endif
 
@@ -19,7 +18,9 @@
 // that the sum of all queued frames between both pacing and rendering queues
 // must not exceed the number buffer pool size to avoid running the decoder
 // out of available decoding surfaces.
-#define MAX_QUEUED_FRAMES 4
+#define MAX_QUEUED_FRAMES 3
+static_assert(PACER_MAX_OUTSTANDING_FRAMES == MAX_QUEUED_FRAMES + 2,
+              "PACER_MAX_OUTSTANDING_FRAMES and MAX_QUEUED_FRAMES must agree");
 
 // We may be woken up slightly late so don't go all the way
 // up to the next V-sync since we may accidentally step into
@@ -31,6 +32,7 @@
 Pacer::Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats) :
     m_RenderThread(nullptr),
     m_VsyncThread(nullptr),
+    m_DeferredFreeFrame(nullptr),
     m_Stopping(false),
     m_VsyncSource(nullptr),
     m_VsyncRenderer(renderer),
@@ -76,6 +78,7 @@ Pacer::~Pacer()
         AVFrame* frame = m_PacingQueue.dequeue();
         av_frame_free(&frame);
     }
+    av_frame_free(&m_DeferredFreeFrame);
 }
 
 void Pacer::renderOnMainThread()
@@ -210,7 +213,7 @@ void Pacer::handleVsync(int timeUntilNextVsyncMillis)
     // frame history to drop frames only if consistently above the
     // one queued frame mark.
     if (m_MaxVideoFps >= m_DisplayFps) {
-        for (int queueHistoryEntry : m_PacingQueueHistory) {
+        for (int queueHistoryEntry : std::as_const(m_PacingQueueHistory)) {
             if (queueHistoryEntry <= 1) {
                 // Be lenient as long as the queue length
                 // resolves before the end of frame history
@@ -279,11 +282,7 @@ bool Pacer::initialize(SDL_Window* window, int maxVideoFps, bool enablePacing)
         switch (info.subsystem) {
     #ifdef Q_OS_WIN32
         case SDL_SYSWM_WINDOWS:
-            // Don't use D3DKMTWaitForVerticalBlankEvent() on Windows 7, because
-            // it blocks during other concurrent DX operations (like actually rendering).
-            if (IsWindows8OrGreater()) {
-                m_VsyncSource = new DxVsyncSource(this);
-            }
+            m_VsyncSource = new DxVsyncSource(this);
             break;
     #endif
 
@@ -333,15 +332,20 @@ void Pacer::signalVsync()
 void Pacer::renderFrame(AVFrame* frame)
 {
     // Count time spent in Pacer's queues
-    Uint32 beforeRender = SDL_GetTicks();
-    m_VideoStats->totalPacerTime += beforeRender - frame->pkt_dts;
+    uint64_t beforeRender = LiGetMicroseconds();
+    m_VideoStats->totalPacerTimeUs += (beforeRender - (uint64_t)frame->pkt_dts);
 
     // Render it
     m_VsyncRenderer->renderFrame(frame);
-    Uint32 afterRender = SDL_GetTicks();
+    uint64_t afterRender = LiGetMicroseconds();
 
-    m_VideoStats->totalRenderTime += afterRender - beforeRender;
+    m_VideoStats->totalRenderTimeUs += (afterRender - beforeRender);
     m_VideoStats->renderedFrames++;
+
+    // Wait until after next frame to free this one to ensure the GPU
+    // doesn't stall or read garbage if the backing buffer gets returned
+    // to the pool and the decoder tries to write a new frame into it
+    std::swap(frame, m_DeferredFreeFrame);
     av_frame_free(&frame);
 
     // Drop frames if we have too many queued up for a while
@@ -356,7 +360,7 @@ void Pacer::renderFrame(AVFrame* frame)
     }
     else {
         frameDropTarget = 0;
-        for (int queueHistoryEntry : m_RenderQueueHistory) {
+        for (int queueHistoryEntry : std::as_const(m_RenderQueueHistory)) {
             if (queueHistoryEntry == 0) {
                 // Be lenient as long as the queue length
                 // resolves before the end of frame history
