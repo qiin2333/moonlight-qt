@@ -438,13 +438,13 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
     // 使用精确的高度计算（考虑ascent和descent）
     int surfaceHeight = maxAscent + maxDescent;
     
-    // 创建组合表面 - 使用32位RGBA格式以支持更好的混合
+    // 创建组合表面 - 使用ARGB8888格式（所有渲染器都期望此格式）
     SDL_Surface* combinedSurface = SDL_CreateRGBSurfaceWithFormat(
         0,
         totalWidth + padding * 2,
         surfaceHeight + padding * 2,
         32,
-        SDL_PIXELFORMAT_RGBA32
+        SDL_PIXELFORMAT_ARGB8888
     );
     
     if (combinedSurface == nullptr) {
