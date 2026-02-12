@@ -249,6 +249,9 @@ HEADERS += \
 # Conditional files for non-Steam Link builds
 !config_SL: SOURCES += streaming/micstream.cpp
 !config_SL: HEADERS += streaming/micstream.h
+!config_SL: HEADERS += streaming/macpermissions.h
+!config_SL:macx: SOURCES += streaming/macpermissions.mm
+!config_SL:!macx: SOURCES += streaming/macpermissions_stub.cpp
 
 # Platform-specific renderers and decoders
 ffmpeg {

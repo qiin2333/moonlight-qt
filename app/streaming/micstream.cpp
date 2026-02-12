@@ -1,4 +1,5 @@
 #include "micstream.h"
+#include "macpermissions.h"
 
 #include <opus.h>
 #include <QtEndian>
@@ -52,6 +53,14 @@ bool MicStream::start()
     if (m_audioInput)
         return false;
 
+    // On macOS, request microphone permission once via AVCaptureDevice
+    // *before* touching QMediaDevices / CoreAudio to avoid multiple
+    // TCC dialogs (especially with universal binaries).
+    if (!checkAndRequestMicrophonePermission()) {
+        qWarning() << "[MicStream] Microphone permission denied";
+        return false;
+    }
+
     int err;
     m_encoder = opus_encoder_create(48000, 1, OPUS_APPLICATION_VOIP, &err);
     if (err != OPUS_OK)
@@ -63,22 +72,30 @@ bool MicStream::start()
     fmt.setChannelCount(1);
     fmt.setSampleFormat(QAudioFormat::Int16);
 
-    // macOS/Qt sometimes returns devices that do not support requested format.
-    // Query supported formats and fall back if needed to avoid silent failures.
-    QAudioDevice deviceTest = QMediaDevices::defaultAudioInput();
-    if (!deviceTest.isFormatSupported(fmt)) {
+    // Obtain the default input device once and reuse it for format
+    // checks, logging, and the actual QAudioSource to avoid redundant
+    // QMediaDevices calls that can each trigger a macOS TCC prompt.
+    QAudioDevice device = QMediaDevices::defaultAudioInput();
+    if (device.isNull()) {
+        qWarning() << "[MicStream] No default audio input device available";
+        opus_encoder_destroy(m_encoder);
+        m_encoder = nullptr;
+        return false;
+    }
+
+    if (!device.isFormatSupported(fmt)) {
         qWarning() << "[MicStream] Requested audio format not supported by default device, attempting fallbacks";
         // try common fallbacks
         QAudioFormat fmt2 = fmt;
         fmt2.setSampleRate(44100);
-        if (deviceTest.isFormatSupported(fmt2)) {
+        if (device.isFormatSupported(fmt2)) {
             fmt = fmt2;
             qInfo() << "[MicStream] Falling back to 44100 Hz";
         } else {
             // try stereo 48000 then
             QAudioFormat fmt3 = fmt;
             fmt3.setChannelCount(2);
-            if (deviceTest.isFormatSupported(fmt3)) {
+            if (device.isFormatSupported(fmt3)) {
                 fmt = fmt3;
                 qInfo() << "[MicStream] Falling back to stereo 48000";
             } else {
@@ -87,17 +104,6 @@ bool MicStream::start()
         }
     }
 
-    const QList<QAudioDevice> devices = QMediaDevices::audioInputs();
-    if (devices.isEmpty()) {
-        qWarning() << "[MicStream] No audio input devices available";
-    } else {
-        qInfo() << "[MicStream] Available audio input devices:";
-        for (const QAudioDevice &dev : devices) {
-            qInfo() << "  " << dev.description();
-        }
-    }
-
-    QAudioDevice device = QMediaDevices::defaultAudioInput();
     qInfo() << "[MicStream] Using audio input device:" << device.description();
 
     m_audioInput = new QAudioSource(device, fmt, this);
