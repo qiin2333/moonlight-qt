@@ -38,6 +38,16 @@ struct ParamBuffer
     simd_half1 bitnessScaleFactor;
 };
 
+// simd_make_half3/half2 are only available in macOS 15+ SDK.
+// Use compound literals to support older SDKs.
+static inline simd_half3 compat_make_half3(float x, float y, float z) {
+    return (simd_half3){(__fp16)x, (__fp16)y, (__fp16)z};
+}
+
+static inline simd_half2 compat_make_half2(float x, float y) {
+    return (simd_half2){(__fp16)x, (__fp16)y};
+}
+
 struct Vertex
 {
     simd_float4 position;
@@ -272,14 +282,14 @@ public:
         getFramePremultipliedCscConstants(frame, cscMatrix, yuvOffsets);
         getFrameChromaCositingOffsets(frame, chromaOffset);
 
-        paramBuffer.cscParams.matrix = simd_matrix(simd_make_half3(cscMatrix[0], cscMatrix[3], cscMatrix[6]),
-                                                   simd_make_half3(cscMatrix[1], cscMatrix[4], cscMatrix[7]),
-                                                   simd_make_half3(cscMatrix[2], cscMatrix[5], cscMatrix[8]));
-        paramBuffer.cscParams.offsets = simd_make_half3(yuvOffsets[0],
-                                                        yuvOffsets[1],
-                                                        yuvOffsets[2]);
-        paramBuffer.chromaOffset = simd_make_half2(chromaOffset[0],
-                                                   chromaOffset[1]);
+        paramBuffer.cscParams.matrix.columns[0] = compat_make_half3(cscMatrix[0], cscMatrix[3], cscMatrix[6]);
+        paramBuffer.cscParams.matrix.columns[1] = compat_make_half3(cscMatrix[1], cscMatrix[4], cscMatrix[7]);
+        paramBuffer.cscParams.matrix.columns[2] = compat_make_half3(cscMatrix[2], cscMatrix[5], cscMatrix[8]);
+        paramBuffer.cscParams.offsets = compat_make_half3(yuvOffsets[0],
+                                                          yuvOffsets[1],
+                                                          yuvOffsets[2]);
+        paramBuffer.chromaOffset = compat_make_half2(chromaOffset[0],
+                                                     chromaOffset[1]);
 
         // Set the EDR metadata for HDR10 to enable OS tonemapping
         if (frame->color_trc == AVCOL_TRC_SMPTE2084 && m_MasteringDisplayColorVolume != nullptr) {
