@@ -30,8 +30,9 @@ VAAPIRenderer::VAAPIRenderer(int decoderSelectionPass)
       m_EglImageFactory(this)
 #endif
 {
-#ifdef HAVE_EGL
-    SDL_zero(m_PrimeDescriptor);
+#ifdef HAVE_LIBVA_X11
+    m_XDisplay = nullptr;
+    m_XWindow = None;
 #endif
 
 #ifdef HAVE_LIBVA_DRM
@@ -74,6 +75,12 @@ VAAPIRenderer::~VAAPIRenderer()
     }
 #endif
 
+#ifdef HAVE_LIBVA_X11
+    if (m_XDisplay != nullptr) {
+        XCloseDisplay(m_XDisplay);
+    }
+#endif
+
     if (m_OverlayMutex != nullptr) {
         SDL_DestroyMutex(m_OverlayMutex);
     }
@@ -98,7 +105,19 @@ VAAPIRenderer::openDisplay(SDL_Window* window)
     if (info.subsystem == SDL_SYSWM_X11) {
 #ifdef HAVE_LIBVA_X11
         m_XWindow = info.info.x11.window;
-        display = vaGetDisplay(info.info.x11.display);
+
+        // It's possible to enter this function several times as we're probing VA drivers.
+        // Only open the new Display object the first time through.
+        if (m_XDisplay == nullptr) {
+            m_XDisplay = XOpenDisplay(XDisplayString(info.info.x11.display));
+            if (m_XDisplay == nullptr) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                             "Unable to clone SDL X11 display for VAAPI");
+                return nullptr;
+            }
+        }
+
+        display = vaGetDisplay(m_XDisplay);
         if (display == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                          "Unable to open X11 display for VAAPI");
@@ -395,7 +414,11 @@ VAAPIRenderer::initialize(PDECODER_PARAMETERS params)
     // The Snap (core22) and Focal/Jammy Mesa drivers have a bug that causes
     // a large amount of video latency when using more than one reference frame
     // and severe rendering glitches on my Ryzen 3300U system.
-    m_HasRfiLatencyBug = vendorStr.contains("Gallium", Qt::CaseInsensitive) && qgetenv("IGNORE_RFI_LATENCY_BUG") != "1";
+    //
+    // This seems to no longer be a problem on Ubuntu 24.04 (even using core22),
+    // so let's disable this workaround by default in preparation for permanent
+    // removal if nobody encounters this again for a while.
+    m_HasRfiLatencyBug = vendorStr.contains("Gallium", Qt::CaseInsensitive) && qgetenv("HAS_RFI_LATENCY_BUG") == "1";
     if (m_HasRfiLatencyBug) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "VAAPI driver is affected by RFI latency bug");
@@ -415,10 +438,19 @@ VAAPIRenderer::initialize(PDECODER_PARAMETERS params)
             return false;
         }
 
-        // Prefer CUDA for XWayland and VDPAU for regular X11.
-        if (m_WindowSystem == SDL_SYSWM_X11 && vendorStr.contains("VA-API NVDEC", Qt::CaseInsensitive)) {
+        // Prefer Vulkan Video for Nvidia GPUs (and VDPAU for regular X11).
+        //
+        // We avoid the Nvidia VAAPI driver because:
+        // - It can hang in vaSyncSurface() during buffer import (older versions in particular)
+        // - The 16-bpc planar types cannot be imported into Vulkan due to incompatible DRM modifiers
+        // - EGL is broken in their driver, so we're stuck using the slow copy path in SDL renderer
+        if (
+#if !defined(HAVE_LIBPLACEBO_VULKAN) && !defined(HAVE_CUDA)
+            m_WindowSystem == SDL_SYSWM_X11 &&
+#endif
+            vendorStr.contains("VA-API NVDEC", Qt::CaseInsensitive)) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Deprioritizing VAAPI for NVIDIA driver on X11/XWayland. Set FORCE_VAAPI=1 to override.");
+                        "Deprioritizing VAAPI for NVIDIA driver. Set FORCE_VAAPI=1 to override.");
             return false;
         }
     }
@@ -539,10 +571,12 @@ VAAPIRenderer::prepareDecoderContext(AVCodecContext* context, AVDictionary**)
 }
 
 bool
-VAAPIRenderer::needsTestFrame()
+VAAPIRenderer::prepareDecoderContextInGetFormat(AVCodecContext*, AVPixelFormat)
 {
-    // We need a test frame to see if this VAAPI driver
-    // supports the profile used for streaming
+#ifdef HAVE_EGL
+    // The surface pool is being reset, so clear the cached EGLImages
+    m_EglImageFactory.resetCache();
+#endif
     return true;
 }
 
@@ -576,6 +610,15 @@ VAAPIRenderer::isDirectRenderingSupported()
                     "Using indirect rendering for YUV 4:4:4 video");
         return false;
     }
+    else if (m_OverlayFormat.fourcc == 0) {
+        // We ordinarily wouldn't consider lack of overlay support to be a
+        // dealbreaker for picking a renderer, however the only cases I've
+        // ever seen overlay format selection fail is on systems that will
+        // also silently fail in vaPutSurface() too.
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Using indirect rendering due to lack of overlay support");
+        return false;
+    }
 
     AVHWDeviceContext* deviceContext = (AVHWDeviceContext*)m_HwContext->data;
     AVVAAPIDeviceContext* vaDeviceContext = (AVVAAPIDeviceContext*)deviceContext->hwctx;
@@ -588,12 +631,6 @@ VAAPIRenderer::isDirectRenderingSupported()
             if (entrypoints[i] == VAEntrypointVideoProc) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                             "Using direct rendering with VAEntrypointVideoProc");
-
-                if (m_OverlayFormat.fourcc == 0) {
-                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                                "Unable to find supported subpicture format. Overlays will be unavailable!");
-                }
-
                 return true;
             }
         }
@@ -1065,15 +1102,15 @@ VAAPIRenderer::initializeEGL(EGLDisplay dpy,
     }
     else if (!m_EglImageFactory.supportsImportingModifier(dpy, descriptor.layers[0].drm_format, descriptor.objects[0].drm_format_modifier)) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Exporting separate layers due to lack of support for importing format and modifier: %08x %016" PRIx64,
-                    descriptor.layers[0].drm_format,
+                    "Exporting separate layers due to lack of support for importing format and modifier: " FOURCC_FMT " %016" PRIx64,
+                    FOURCC_FMT_ARGS(descriptor.layers[0].drm_format),
                     descriptor.objects[0].drm_format_modifier);
         m_EglExportType = EglExportType::Separate;
     }
     else {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Exporting composed layers with format and modifier: %08x %016" PRIx64,
-                    descriptor.layers[0].drm_format,
+                    "Exporting composed layers with format and modifier: " FOURCC_FMT " %016" PRIx64,
+                    FOURCC_FMT_ARGS(descriptor.layers[0].drm_format),
                     descriptor.objects[0].drm_format_modifier);
         m_EglExportType = EglExportType::Composed;
     }
@@ -1089,13 +1126,14 @@ VAAPIRenderer::initializeEGL(EGLDisplay dpy,
         for (uint32_t i = 0; i < descriptor.num_layers; i++) {
             if (!m_EglImageFactory.supportsImportingFormat(dpy, descriptor.layers[i].drm_format)) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                            "EGL implementation lacks support for importing format: %08x", descriptor.layers[0].drm_format);
+                            "EGL implementation lacks support for importing format: " FOURCC_FMT,
+                            FOURCC_FMT_ARGS(descriptor.layers[i].drm_format));
             }
             else if (!m_EglImageFactory.supportsImportingModifier(dpy, descriptor.layers[i].drm_format,
                                                                   descriptor.objects[descriptor.layers[i].object_index[0]].drm_format_modifier)) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                            "EGL implementation lacks support for importing format and modifier: %08x %016" PRIx64,
-                            descriptor.layers[i].drm_format,
+                            "EGL implementation lacks support for importing format and modifier: " FOURCC_FMT " %016" PRIx64,
+                            FOURCC_FMT_ARGS(descriptor.layers[i].drm_format),
                             descriptor.objects[descriptor.layers[i].object_index[0]].drm_format_modifier);
             }
         }
@@ -1107,7 +1145,6 @@ VAAPIRenderer::initializeEGL(EGLDisplay dpy,
 ssize_t
 VAAPIRenderer::exportEGLImages(AVFrame *frame, EGLDisplay dpy,
                                EGLImage images[EGL_MAX_PLANES]) {
-    ssize_t count;
     uint32_t exportFlags = VA_EXPORT_SURFACE_READ_ONLY;
 
     switch (m_EglExportType) {
@@ -1122,52 +1159,7 @@ VAAPIRenderer::exportEGLImages(AVFrame *frame, EGLDisplay dpy,
         return -1;
     }
 
-    auto hwFrameCtx = (AVHWFramesContext*)frame->hw_frames_ctx->data;
-    AVVAAPIDeviceContext* vaDeviceContext = (AVVAAPIDeviceContext*)hwFrameCtx->device_ctx->hwctx;
-    VASurfaceID surface_id = (VASurfaceID)(uintptr_t)frame->data[3];
-
-    VAStatus st = vaExportSurfaceHandle(vaDeviceContext->display,
-                                        surface_id,
-                                        VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2,
-                                        exportFlags,
-                                        &m_PrimeDescriptor);
-    if (st != VA_STATUS_SUCCESS) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "vaExportSurfaceHandle failed: %d", st);
-        return -1;
-    }
-
-    st = vaSyncSurface(vaDeviceContext->display, surface_id);
-    if (st != VA_STATUS_SUCCESS) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "vaSyncSurface() failed: %d", st);
-        goto fail;
-    }
-
-    count = m_EglImageFactory.exportVAImages(frame, &m_PrimeDescriptor, dpy, images);
-    if (count < 0) {
-        goto fail;
-    }
-
-    return count;
-
-fail:
-    for (size_t i = 0; i < m_PrimeDescriptor.num_objects; ++i) {
-        close(m_PrimeDescriptor.objects[i].fd);
-    }
-    m_PrimeDescriptor.num_layers = 0;
-    m_PrimeDescriptor.num_objects = 0;
-    return -1;
-}
-
-void
-VAAPIRenderer::freeEGLImages(EGLDisplay dpy, EGLImage images[EGL_MAX_PLANES]) {
-    m_EglImageFactory.freeEGLImages(dpy, images);
-    for (size_t i = 0; i < m_PrimeDescriptor.num_objects; ++i) {
-        close(m_PrimeDescriptor.objects[i].fd);
-    }
-    m_PrimeDescriptor.num_layers = 0;
-    m_PrimeDescriptor.num_objects = 0;
+    return m_EglImageFactory.exportVAImages(frame, exportFlags, dpy, images);
 }
 
 #endif
@@ -1227,14 +1219,28 @@ bool VAAPIRenderer::mapDrmPrimeFrame(AVFrame* frame, AVDRMFrameDescriptor* drmDe
         }
     }
 
+    // Add a buffer reference to the frame to automatically close the
+    // mapped FDs when the frame is no longer referenced.
+    frame->opaque_ref = av_buffer_create((uint8_t*)(new AVDRMFrameDescriptor(*drmDescriptor)),
+                                         sizeof(*drmDescriptor),
+                                         freeDrmDescriptorBuffer,
+                                         frame->opaque_ref, // Chain any existing buffer
+                                         AV_BUFFER_FLAG_READONLY);
+
     return true;
 }
 
-void VAAPIRenderer::unmapDrmPrimeFrame(AVDRMFrameDescriptor* drmDescriptor)
+void VAAPIRenderer::freeDrmDescriptorBuffer(void* opaque, uint8_t* data)
 {
+    auto drmDescriptor = (AVDRMFrameDescriptor*)data;
+
     for (int i = 0; i < drmDescriptor->nb_objects; i++) {
         close(drmDescriptor->objects[i].fd);
     }
+    delete drmDescriptor;
+
+    // Free any chained buffers
+    av_buffer_unref((AVBufferRef**)&opaque);
 }
 
 #endif

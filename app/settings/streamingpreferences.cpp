@@ -66,7 +66,8 @@
 #define CURRENT_DEFAULT_VER 2
 
 static StreamingPreferences* s_GlobalPrefs;
-static QReadWriteLock s_GlobalPrefsLock;
+
+Q_GLOBAL_STATIC(QReadWriteLock, s_GlobalPrefsLock)
 
 StreamingPreferences::StreamingPreferences(QQmlEngine *qmlEngine)
     : m_QmlEngine(qmlEngine)
@@ -77,7 +78,7 @@ StreamingPreferences::StreamingPreferences(QQmlEngine *qmlEngine)
 StreamingPreferences* StreamingPreferences::get(QQmlEngine *qmlEngine)
 {
     {
-        QReadLocker readGuard(&s_GlobalPrefsLock);
+        QReadLocker readGuard(s_GlobalPrefsLock);
 
         // If we have a preference object and it's associated with a QML engine or
         // if the caller didn't specify a QML engine, return the existing object.
@@ -89,7 +90,7 @@ StreamingPreferences* StreamingPreferences::get(QQmlEngine *qmlEngine)
     }
 
     {
-        QWriteLocker writeGuard(&s_GlobalPrefsLock);
+        QWriteLocker writeGuard(s_GlobalPrefsLock);
 
         // If we already have an preference object but the QML engine is now available,
         // associate the QML engine with the preferences.
@@ -120,8 +121,10 @@ void StreamingPreferences::reload()
 #ifdef Q_OS_DARWIN
     recommendedFullScreenMode = WindowMode::WM_FULLSCREEN_DESKTOP;
 #else
-    // Wayland doesn't support modesetting, so use fullscreen desktop mode.
-    if (WMUtils::isRunningWayland()) {
+    // Wayland doesn't support modesetting, so use fullscreen desktop mode
+    // unless we have a slow GPU (which can take advantage of wp_viewporter
+    // to reduce GPU load with lower resolution video streams).
+    if (WMUtils::isRunningWayland() && !WMUtils::isGpuSlow()) {
         recommendedFullScreenMode = WindowMode::WM_FULLSCREEN_DESKTOP;
     }
     else {

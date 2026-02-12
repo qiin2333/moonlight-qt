@@ -76,7 +76,7 @@ private:
         int fontSize;
         SDL_Color color;
         SDL_Color bgcolor;
-        char text[512];
+        char text[1024];
         TextAlignment textAlignment;  // 文本对齐方式
 
         TTF_Font* font;          // 普通字体

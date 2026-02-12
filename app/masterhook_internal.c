@@ -7,7 +7,6 @@
 #endif
 
 #include "SDL_compat.h"
-#include <dlfcn.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -32,6 +31,7 @@
 
 extern int g_QtDrmMasterFd;
 extern struct stat g_DrmMasterStat;
+extern bool g_DisableDrmHooks;
 
 #define MAX_SDL_FD_COUNT 8
 int g_SdlDrmMasterFds[MAX_SDL_FD_COUNT];
@@ -100,7 +100,7 @@ int takeMasterFromSdlFd()
     }
 }
 
-int openHook(const char *funcname, const char *pathname, int flags, va_list va)
+int openHook(typeof(open) *real_open, typeof(close) *real_close, const char *pathname, int flags, va_list va)
 {
     int fd;
     mode_t mode;
@@ -108,11 +108,15 @@ int openHook(const char *funcname, const char *pathname, int flags, va_list va)
     // Call the real thing to do the open operation
     if (__OPEN_NEEDS_MODE(flags)) {
         mode = va_arg(va, mode_t);
-        fd = ((typeof(open)*)dlsym(RTLD_NEXT, funcname))(pathname, flags, mode);
+        fd = real_open(pathname, flags, mode);
     }
     else {
         mode = 0;
-        fd = ((typeof(open)*)dlsym(RTLD_NEXT, funcname))(pathname, flags);
+        fd = real_open(pathname, flags);
+    }
+
+    if (g_DisableDrmHooks) {
+        return fd;
     }
 
     // If the file was successfully opened and we have a DRM master FD,
@@ -146,7 +150,7 @@ int openHook(const char *funcname, const char *pathname, int flags, va_list va)
                 allocatedFdIndex = getSdlFdEntryIndex(false);
                 if (allocatedFdIndex >= 0) {
                     // Close fd that we opened earlier (skipping our close() hook)
-                    ((typeof(close)*)dlsym(RTLD_NEXT, "close"))(fd);
+                    real_close(fd);
 
                     // dup() an existing FD into the unused slot
                     fd = dup(g_SdlDrmMasterFds[allocatedFdIndex]);
@@ -163,16 +167,16 @@ int openHook(const char *funcname, const char *pathname, int flags, va_list va)
                     }
 
                     // Close fd that we opened earlier (skipping our close() hook)
-                    ((typeof(close)*)dlsym(RTLD_NEXT, "close"))(fd);
+                    real_close(fd);
 
                     // We are not allowed to call drmSetMaster() without CAP_SYS_ADMIN,
                     // but since we just dropped the master, we can become master by
                     // simply creating a new FD. Let's do it.
                     if (__OPEN_NEEDS_MODE(flags)) {
-                        fd = ((typeof(open)*)dlsym(RTLD_NEXT, funcname))(pathname, flags, mode);
+                        fd = real_open(pathname, flags, mode);
                     }
                     else {
-                        fd = ((typeof(open)*)dlsym(RTLD_NEXT, funcname))(pathname, flags);
+                        fd = real_open(pathname, flags);
                     }
                 }
 

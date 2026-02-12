@@ -2,16 +2,31 @@
 
 #include "SDL_compat.h"
 
+#include <array>
+
 #include "streaming/video/decoder.h"
 #include "streaming/video/overlaymanager.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
+#include <libavutil/pixdesc.h>
 
 #ifdef HAVE_DRM
 #include <libavutil/hwcontext_drm.h>
 #endif
 }
+
+#ifndef FOURCC_FMT
+#define FOURCC_FMT "%c%c%c%c"
+#endif
+
+#ifndef FOURCC_FMT_ARGS
+#define FOURCC_FMT_ARGS(f)      \
+    (char)((f) & 0xFF),         \
+    (char)(((f) >> 8) & 0xFF),  \
+    (char)(((f) >> 16) & 0xFF), \
+    (char)(((f) >> 24) & 0xFF)
+#endif
 
 #ifdef HAVE_EGL
 #define MESA_EGL_NO_X11_HEADERS
@@ -187,13 +202,10 @@ public:
         // If the renderer doesn't provide an explicit test routine,
         // we will always assume that any returned AVFrame can be
         // rendered successfully.
+        //
+        // NB: The test frame passed to this callback may differ in
+        // dimensions from the actual video stream.
         return true;
-    }
-
-    // NOTE: This can be called BEFORE initialize()!
-    virtual bool needsTestFrame() {
-        // No test frame required by default
-        return false;
     }
 
     virtual int getDecoderCapabilities() {
@@ -325,6 +337,156 @@ public:
         }
     }
 
+    AVPixelFormat getFrameSwPixelFormat(const AVFrame* frame) {
+        // For hwaccel formats, we want to get the real underlying format
+        if (frame->hw_frames_ctx) {
+            return ((AVHWFramesContext*)frame->hw_frames_ctx->data)->sw_format;
+        }
+        else {
+            return (AVPixelFormat)frame->format;
+        }
+    }
+
+    int getFrameBitsPerChannel(const AVFrame* frame) {
+        const AVPixFmtDescriptor* formatDesc = av_pix_fmt_desc_get(getFrameSwPixelFormat(frame));
+        if (!formatDesc) {
+            // This shouldn't be possible but handle it anyway
+            SDL_assert(formatDesc);
+            return 8;
+        }
+
+        // This assumes plane 0 is exclusively the Y component
+        return formatDesc->comp[0].depth;
+    }
+
+    void getFramePremultipliedCscConstants(const AVFrame* frame, std::array<float, 9> &cscMatrix, std::array<float, 3> &offsets) {
+        static const std::array<float, 9> k_CscMatrix_Bt601 = {
+            1.0f, 1.0f, 1.0f,
+            0.0f, -0.3441f, 1.7720f,
+            1.4020f, -0.7141f, 0.0f,
+        };
+        static const std::array<float, 9> k_CscMatrix_Bt709 = {
+            1.0f, 1.0f, 1.0f,
+            0.0f, -0.1873f, 1.8556f,
+            1.5748f, -0.4681f, 0.0f,
+        };
+        static const std::array<float, 9> k_CscMatrix_Bt2020 = {
+            1.0f, 1.0f, 1.0f,
+            0.0f, -0.1646f, 1.8814f,
+            1.4746f, -0.5714f, 0.0f,
+        };
+
+        bool fullRange = isFrameFullRange(frame);
+        int bitsPerChannel = getFrameBitsPerChannel(frame);
+        int channelRange = (1 << bitsPerChannel);
+        double yMin = (fullRange ? 0 : (16 << (bitsPerChannel - 8)));
+        double yMax = (fullRange ? (channelRange - 1) : (235 << (bitsPerChannel - 8)));
+        double yScale = (channelRange - 1) / (yMax - yMin);
+        double uvMin = (fullRange ? 0 : (16 << (bitsPerChannel - 8)));
+        double uvMax = (fullRange ? (channelRange - 1) : (240 << (bitsPerChannel - 8)));
+        double uvScale = (channelRange - 1) / (uvMax - uvMin);
+
+        // Calculate YUV offsets
+        offsets[0] = yMin / (double)(channelRange - 1);
+        offsets[1] = (channelRange / 2) / (double)(channelRange - 1);
+        offsets[2] = (channelRange / 2) / (double)(channelRange - 1);
+
+        // Start with the standard full range color matrix
+        switch (getFrameColorspace(frame)) {
+        default:
+        case COLORSPACE_REC_601:
+            cscMatrix = k_CscMatrix_Bt601;
+            break;
+        case COLORSPACE_REC_709:
+            cscMatrix = k_CscMatrix_Bt709;
+            break;
+        case COLORSPACE_REC_2020:
+            cscMatrix = k_CscMatrix_Bt2020;
+            break;
+        }
+
+        // Scale the color matrix according to the color range
+        for (int i = 0; i < 3; i++) {
+            cscMatrix[i] *= yScale;
+        }
+        for (int i = 3; i < 9; i++) {
+            cscMatrix[i] *= uvScale;
+        }
+    }
+
+    void getFrameChromaCositingOffsets(const AVFrame* frame, std::array<float, 2> &chromaOffsets) {
+        const AVPixFmtDescriptor* formatDesc = av_pix_fmt_desc_get(getFrameSwPixelFormat(frame));
+        if (!formatDesc) {
+            SDL_assert(formatDesc);
+            chromaOffsets.fill(0);
+            return;
+        }
+
+        SDL_assert(formatDesc->log2_chroma_w <= 1);
+        SDL_assert(formatDesc->log2_chroma_h <= 1);
+
+        switch (frame->chroma_location) {
+        default:
+        case AVCHROMA_LOC_LEFT:
+            chromaOffsets[0] = 0.5;
+            chromaOffsets[1] = 0;
+            break;
+        case AVCHROMA_LOC_CENTER:
+            chromaOffsets[0] = 0;
+            chromaOffsets[1] = 0;
+            break;
+        case AVCHROMA_LOC_TOPLEFT:
+            chromaOffsets[0] = 0.5;
+            chromaOffsets[1] = 0.5;
+            break;
+        case AVCHROMA_LOC_TOP:
+            chromaOffsets[0] = 0;
+            chromaOffsets[1] = 0.5;
+            break;
+        case AVCHROMA_LOC_BOTTOMLEFT:
+            chromaOffsets[0] = 0.5;
+            chromaOffsets[1] = -0.5;
+            break;
+        case AVCHROMA_LOC_BOTTOM:
+            chromaOffsets[0] = 0;
+            chromaOffsets[1] = -0.5;
+            break;
+        }
+
+        // Force the offsets to 0 if chroma is not subsampled in that dimension
+        if (formatDesc->log2_chroma_w == 0) {
+            chromaOffsets[0] = 0;
+        }
+        if (formatDesc->log2_chroma_h == 0) {
+            chromaOffsets[1] = 0;
+        }
+    }
+
+    // Returns if the frame format has changed since the last call to this function
+    bool hasFrameFormatChanged(const AVFrame* frame) {
+        AVPixelFormat format = getFrameSwPixelFormat(frame);
+        if (frame->width == m_LastFrameWidth &&
+            frame->height == m_LastFrameHeight &&
+            format == m_LastFramePixelFormat &&
+            frame->color_range == m_LastColorRange &&
+            frame->color_primaries == m_LastColorPrimaries &&
+            frame->color_trc == m_LastColorTrc &&
+            frame->colorspace == m_LastColorSpace &&
+            frame->chroma_location == m_LastChromaLocation) {
+            return false;
+        }
+
+        m_LastFrameWidth = frame->width;
+        m_LastFrameHeight = frame->height;
+        m_LastFramePixelFormat = format;
+        m_LastColorRange = frame->color_range;
+        m_LastColorPrimaries = frame->color_primaries;
+        m_LastColorTrc = frame->color_trc;
+        m_LastColorSpace = frame->colorspace;
+        m_LastChromaLocation = frame->chroma_location;
+        return true;
+    }
+
     // IOverlayRenderer
     virtual void notifyOverlayUpdated(Overlay::OverlayType) override {
         // Nothing
@@ -350,9 +512,6 @@ public:
                                     EGLImage[EGL_MAX_PLANES]) {
         return -1;
     }
-
-    // Free the resources allocated during the last `exportEGLImages` call
-    virtual void freeEGLImages(EGLDisplay, EGLImage[EGL_MAX_PLANES]) {}
 #endif
 
 #ifdef HAVE_DRM
@@ -364,8 +523,6 @@ public:
     virtual bool mapDrmPrimeFrame(AVFrame*, AVDRMFrameDescriptor*) {
         return false;
     }
-
-    virtual void unmapDrmPrimeFrame(AVDRMFrameDescriptor*) {}
 #endif
 
 protected:
@@ -373,4 +530,14 @@ protected:
 
 private:
     RendererType m_Type;
+
+    // Properties watched by hasFrameFormatChanged()
+    int m_LastFrameWidth = 0;
+    int m_LastFrameHeight = 0;
+    AVPixelFormat m_LastFramePixelFormat = AV_PIX_FMT_NONE;
+    AVColorRange m_LastColorRange = AVCOL_RANGE_UNSPECIFIED;
+    AVColorPrimaries m_LastColorPrimaries = AVCOL_PRI_UNSPECIFIED;
+    AVColorTransferCharacteristic m_LastColorTrc = AVCOL_TRC_UNSPECIFIED;
+    AVColorSpace m_LastColorSpace = AVCOL_SPC_UNSPECIFIED;
+    AVChromaLocation m_LastChromaLocation = AVCHROMA_LOC_UNSPECIFIED;
 };

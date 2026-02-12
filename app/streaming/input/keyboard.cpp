@@ -145,7 +145,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
                     "Detected quitAndExit key combo");
 
         // Indicate that we want to exit afterwards
-        Session::get()->setShouldExitAfterQuit();
+        Session::get()->setShouldExit(true);
 
         // Push a quit event to the main loop
         SDL_Event quitExitEvent;
@@ -420,6 +420,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 break;
             case SDL_SCANCODE_INTERNATIONAL3:
                 shouldNotConvertToScanCodeOnServer = true;
+                Q_FALLTHROUGH();
             case SDL_SCANCODE_BACKSLASH:
                 keyCode = 0xDC;
                 break;
@@ -431,6 +432,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 break;
             case SDL_SCANCODE_INTERNATIONAL1:
                 shouldNotConvertToScanCodeOnServer = true;
+                Q_FALLTHROUGH();
             case SDL_SCANCODE_NONUSBACKSLASH:
                 keyCode = 0xE2;
                 break;

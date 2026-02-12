@@ -159,6 +159,28 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
         return;
     }
 
+    // Construct the required font to render the overlay
+    if (m_Overlays[type].font == nullptr) {
+        if (m_FontData.isEmpty()) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "SDL overlay font failed to load");
+            return;
+        }
+
+        // m_FontData must stay around until the font is closed
+        m_Overlays[type].font = TTF_OpenFontRW(SDL_RWFromConstMem(m_FontData.constData(), m_FontData.size()),
+                                               1,
+                                               m_Overlays[type].fontSize);
+        if (m_Overlays[type].font == nullptr) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "TTF_OpenFont() failed: %s",
+                        TTF_GetError());
+
+            // Can't proceed without a font
+            return;
+        }
+    }
+
     SDL_Surface* oldSurface = (SDL_Surface*)SDL_AtomicSetPtr((void**)&m_Overlays[type].surface, nullptr);
 
     // Free the old surface

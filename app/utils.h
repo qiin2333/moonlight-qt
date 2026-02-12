@@ -7,8 +7,20 @@
 
 namespace WMUtils {
     bool isRunningX11();
+    bool isRunningNvidiaProprietaryDriverX11();
+    bool supportsDesktopGLWithEGL();
     bool isRunningWayland();
     bool isRunningWindowManager();
     bool isRunningDesktopEnvironment();
     QString getDrmCardOverride();
+    bool isGpuSlow();
+}
+
+namespace Utils {
+    template <typename T>
+    bool getEnvironmentVariableOverride(const char* name, T* value) {
+        bool ok;
+        *value = (T)qEnvironmentVariableIntValue(name, &ok);
+        return ok;
+    }
 }

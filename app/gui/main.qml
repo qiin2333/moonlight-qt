@@ -51,10 +51,20 @@ ApplicationWindow {
         }
 
         // Display any modal dialogs for configuration warnings
-        if (SystemProperties.isWow64) {
-            wow64Dialog.open()
+        if (runConfigChecks) {
+            if (SystemProperties.isWow64) {
+                wow64Dialog.open()
+            }
+
+            // Hardware acceleration and unmapped gamepads are checked asynchronously
+            SystemProperties.hasHardwareAccelerationChanged.connect(hasHardwareAccelerationChanged)
+            SystemProperties.unmappedGamepadsChanged.connect(hasUnmappedGamepadsChanged)
+            SystemProperties.startAsyncLoad()
         }
-        else if (!SystemProperties.hasHardwareAcceleration && StreamingPreferences.videoDecoderSelection !== StreamingPreferences.VDS_FORCE_SOFTWARE) {
+    }
+
+    function hasHardwareAccelerationChanged() {
+        if (!SystemProperties.hasHardwareAcceleration && StreamingPreferences.videoDecoderSelection !== StreamingPreferences.VDS_FORCE_SOFTWARE) {
             if (SystemProperties.isRunningXWayland) {
                 xWaylandDialog.open()
             }
@@ -62,13 +72,15 @@ ApplicationWindow {
                 noHwDecoderDialog.open()
             }
         }
+    }
 
+    function hasUnmappedGamepadsChanged() {
         if (SystemProperties.unmappedGamepads) {
             unmappedGamepadDialog.unmappedGamepads = SystemProperties.unmappedGamepads
             unmappedGamepadDialog.open()
         }
     }
-  
+
     // It would be better to use TextMetrics here, but it always lays out
     // the text slightly more compactly than real Text does in ToolTip,
     // causing unexpected line breaks to be inserted

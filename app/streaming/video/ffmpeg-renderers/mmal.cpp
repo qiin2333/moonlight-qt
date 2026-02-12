@@ -77,17 +77,8 @@ void MmalRenderer::prepareToRender()
     // can get spurious SDL_WINDOWEVENT events that will cause us to (again) recreate our
     // renderer. This can lead to an infinite to renderer recreation, so discard all
     // SDL_WINDOWEVENT events after SDL_CreateRenderer().
-    Session* session = Session::get();
-    if (session != nullptr) {
-        // If we get here during a session, we need to synchronize with the event loop
-        // to ensure we don't drop any important events.
-        session->flushWindowEvents();
-    }
-    else {
-        // If we get here prior to the start of a session, just pump and flush ourselves.
-        SDL_PumpEvents();
-        SDL_FlushEvent(SDL_WINDOWEVENT);
-    }
+    SDL_assert(Session::get());
+    Session::get()->flushWindowEvents();
 
     SDL_SetRenderDrawColor(m_BackgroundRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(m_BackgroundRenderer);
@@ -338,13 +329,6 @@ int MmalRenderer::getRendererAttributes()
 {
     // This renderer maxes out at 1080p
     return RENDERER_ATTRIBUTE_1080P_MAX;
-}
-
-bool MmalRenderer::needsTestFrame()
-{
-    // We won't be able to decode if the GPU memory is 64 MB or lower,
-    // so we must test before allowing the decoder to be used.
-    return true;
 }
 
 void MmalRenderer::renderFrame(AVFrame* frame)

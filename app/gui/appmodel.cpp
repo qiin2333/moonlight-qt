@@ -120,7 +120,7 @@ void AppModel::quitRunningApp()
 
 bool AppModel::isAppCurrentlyVisible(const NvApp& app)
 {
-    for (const NvApp& visibleApp : m_VisibleApps) {
+    for (const NvApp& visibleApp : std::as_const(m_VisibleApps)) {
         if (app.id == visibleApp.id) {
             return true;
         }
@@ -151,17 +151,58 @@ void AppModel::updateAppList(QVector<NvApp> newList)
 
     QVector<NvApp> newVisibleList = getVisibleApps(newList);
 
-    // If the visible list differs from our current visible apps, perform a
-    // full model reset to ensure the order matches the server-provided order.
-    // Previously this code assumed alphabetical ordering and performed
-    // incremental inserts/removals; with server-driven ordering that
-    // assumption no longer holds and can trigger assertions. A reset is a
-    // simpler and safer approach here.
-    if (newVisibleList != m_VisibleApps) {
-        beginResetModel();
-        m_VisibleApps = newVisibleList;
-        endResetModel();
+    // Process removals and updates first
+    for (int i = 0; i < m_VisibleApps.count(); i++) {
+        const NvApp& existingApp = m_VisibleApps.at(i);
+
+        bool found = false;
+        for (const NvApp& newApp : std::as_const(newVisibleList)) {
+            if (existingApp.id == newApp.id) {
+                // If the data changed, update it in our list
+                if (existingApp != newApp) {
+                    m_VisibleApps.replace(i, newApp);
+                    emit dataChanged(createIndex(i, 0), createIndex(i, 0));
+                }
+
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            beginRemoveRows(QModelIndex(), i, i);
+            m_VisibleApps.removeAt(i);
+            endRemoveRows();
+            i--;
+        }
     }
+
+    // Process additions now
+    for (const NvApp& newApp : std::as_const(newVisibleList)) {
+        int insertionIndex = m_VisibleApps.size();
+        bool found = false;
+
+        for (int i = 0; i < m_VisibleApps.count(); i++) {
+            const NvApp& existingApp = m_VisibleApps.at(i);
+
+            if (existingApp.id == newApp.id) {
+                found = true;
+                break;
+            }
+            else if (existingApp.name.toLower() > newApp.name.toLower()) {
+                insertionIndex = i;
+                break;
+            }
+        }
+
+        if (!found) {
+            beginInsertRows(QModelIndex(), insertionIndex, insertionIndex);
+            m_VisibleApps.insert(insertionIndex, newApp);
+            endInsertRows();
+        }
+    }
+
+    Q_ASSERT(newVisibleList == m_VisibleApps);
 }
 
 void AppModel::setAppHidden(int appIndex, bool hidden)
