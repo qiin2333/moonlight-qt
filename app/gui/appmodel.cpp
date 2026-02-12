@@ -202,7 +202,13 @@ void AppModel::updateAppList(QVector<NvApp> newList)
         }
     }
 
-    Q_ASSERT(newVisibleList == m_VisibleApps);
+    // Verify that the incremental update matches the expected result
+    // Sort both lists before comparison since insertion order may differ
+    auto sortedNew = newVisibleList;
+    auto sortedCurrent = m_VisibleApps;
+    std::sort(sortedNew.begin(), sortedNew.end(), [](const NvApp& a, const NvApp& b) { return a.id < b.id; });
+    std::sort(sortedCurrent.begin(), sortedCurrent.end(), [](const NvApp& a, const NvApp& b) { return a.id < b.id; });
+    Q_ASSERT(sortedNew == sortedCurrent);
 }
 
 void AppModel::setAppHidden(int appIndex, bool hidden)

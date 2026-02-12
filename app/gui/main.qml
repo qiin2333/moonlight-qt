@@ -258,7 +258,7 @@ ApplicationWindow {
             id: titleLabel
             visible: toolBar.width > 700
             anchors.fill: parent
-            text: stackView.currentItem.objectName
+            text: stackView.currentItem ? stackView.currentItem.objectName : ""
             font.pointSize: 20
             elide: Label.ElideRight
             horizontalAlignment: Qt.AlignHCenter

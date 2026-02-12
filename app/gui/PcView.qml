@@ -193,7 +193,6 @@ CenteredGridView {
             height: 160
             color: "transparent"
             visible: model.statusUnknown
-            running: visible
             
             Image {
                 id: spinnerImage
