@@ -38,9 +38,24 @@ mkdir $BUILD_ROOT
 mkdir $BUILD_FOLDER
 mkdir $INSTALLER_FOLDER
 
-echo Configuring the project
+# Determine target architecture.
+# If MOONLIGHT_ARCH is set (e.g. by CI), build only that arch.
+# Otherwise detect the native arch to avoid universal binaries,
+# which cause multiple macOS TCC permission dialogs due to each
+# architecture slice having a different CDHash.
+if [ -z "$MOONLIGHT_ARCH" ]; then
+  MOONLIGHT_ARCH=$(uname -m)
+  # Normalise: Apple Silicon reports arm64, Rosetta reports x86_64
+  if [ "$MOONLIGHT_ARCH" = "arm64" ]; then
+    MOONLIGHT_ARCH="arm64"
+  else
+    MOONLIGHT_ARCH="x86_64"
+  fi
+fi
+
+echo "Configuring the project for architecture: $MOONLIGHT_ARCH"
 pushd $BUILD_FOLDER
-qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64" || fail "Qmake failed!"
+qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="$MOONLIGHT_ARCH" || fail "Qmake failed!"
 popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration

@@ -54,6 +54,7 @@
 #include "settings/streamingpreferences.h"
 #include "gui/sdlgamepadkeynavigation.h"
 #include "imageutils.h"
+#include "streaming/macpermissions.h"
 
 #if defined(Q_OS_WIN32)
 #define IS_UNSPECIFIED_HANDLE(x) ((x) == INVALID_HANDLE_VALUE || (x) == NULL)
@@ -855,7 +856,15 @@ int main(int argc, char *argv[])
     }
 #endif
 
-#ifndef Q_OS_DARWIN
+#ifdef Q_OS_DARWIN
+    // Pre-request microphone permission at startup via AVCaptureDevice so that
+    // only a single TCC dialog is shown. Universal (fat) binaries have distinct
+    // CDHashes per architecture slice, and each QMediaDevices / CoreAudio call
+    // can trigger a separate prompt. By requesting permission once through
+    // AVCaptureDevice before any CoreAudio usage, macOS caches the grant for
+    // the whole app.
+    checkAndRequestMicrophonePermission();
+#else
     // Set the window icon except on macOS where we want to keep the
     // modified macOS 11 style rounded corner icon.
     app.setWindowIcon(QIcon(":/res/moonlight.svg"));
