@@ -1,0 +1,712 @@
+#include "overlaymenupanel.h"
+
+#include <QScreen>
+#include <QGuiApplication>
+#include <QPainterPath>
+#include <QCursor>
+#include <QFontDatabase>
+
+OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
+    : QRasterWindow(parent),
+      m_CurrentLevel(0),
+      m_HoveredIndex(-1),
+      m_Visible(false),
+      m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
+      m_ContentOffset(0),
+      m_Closing(false),
+      m_TargetX(0)
+{
+    setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
+             | Qt::WindowDoesNotAcceptFocus);
+
+    QSurfaceFormat fmt;
+    fmt.setAlphaBufferSize(8);
+    setFormat(fmt);
+
+    // Logical (unscaled) values — Qt 6 handles DPI automatically
+    // Win11 dark context menu style
+    m_ItemHeight   = 38;
+    m_Padding      = 4;
+    m_MenuWidth    = 280;
+    m_BorderRadius = 8;
+    m_ShadowMargin = 8;
+    m_TitleHeight  = 32;
+    m_IconAreaWidth = 24;
+
+    // Load ModeSeven.ttf (same font as performance stats overlay)
+    int fontId = QFontDatabase::addApplicationFont(QStringLiteral(":/data/ModeSeven.ttf"));
+    QString modeSeven;
+    if (fontId >= 0) {
+        QStringList families = QFontDatabase::applicationFontFamilies(fontId);
+        if (!families.isEmpty())
+            modeSeven = families.first();
+    }
+
+    // Primary: ModeSeven, fallback: Microsoft YaHei UI for elegant Chinese rendering
+    if (!modeSeven.isEmpty()) {
+        m_LabelFont = QFont(modeSeven, 9);
+        m_LabelFont.setFamilies({modeSeven, QStringLiteral("Microsoft YaHei UI"), QStringLiteral("Microsoft YaHei")});
+    } else {
+        // Fallback if ModeSeven fails to load
+        m_LabelFont = QFont(QStringLiteral("Microsoft YaHei UI"), 9);
+        if (!QFontInfo(m_LabelFont).exactMatch())
+            m_LabelFont = QFont(QStringLiteral("Microsoft YaHei"), 9);
+    }
+    m_LabelFont.setWeight(QFont::Normal);
+
+    m_DetailFont = QFont(m_LabelFont);
+    m_DetailFont.setPointSize(8);
+    m_DetailFont.setWeight(QFont::Normal);
+
+    m_TitleFont = QFont(m_LabelFont);
+    m_TitleFont.setPointSize(8);
+    m_TitleFont.setWeight(QFont::DemiBold);
+
+    // Icon font (Segoe MDL2 Assets — available on Windows 10/11)
+    m_IconFont = QFont(QStringLiteral("Segoe MDL2 Assets"), 10);
+    m_IconFont.setWeight(QFont::Normal);
+
+    // --- Animations ---
+    m_OpacityAnim = new QPropertyAnimation(this, "opacity", this);
+    m_SlideAnim   = new QPropertyAnimation(this, "x", this);
+
+    m_ContentSlideAnim = new QVariantAnimation(this);
+    m_ContentSlideAnim->setDuration(150);
+    m_ContentSlideAnim->setEasingCurve(QEasingCurve::OutCubic);
+    connect(m_ContentSlideAnim, &QVariantAnimation::valueChanged, this, [this](const QVariant& val) {
+        m_ContentOffset = val.toReal();
+        requestUpdate();
+    });
+    connect(m_ContentSlideAnim, &QVariantAnimation::finished, this, [this]() {
+        m_ContentOffset = 0;
+        requestUpdate();
+    });
+
+    buildMenuLevels();
+}
+
+OverlayMenuPanel::~OverlayMenuPanel()
+{
+}
+
+// ---------------------------------------------------------------------------
+// Menu structure
+// ---------------------------------------------------------------------------
+
+void OverlayMenuPanel::buildMenuLevels()
+{
+    m_MenuLevels.clear();
+
+    // === Level 0: Top-level categories ===
+    MenuLevel top;
+    top.title = QString::fromUtf8("\xe6\x9d\x82\xe9\xb1\xbc\xe2\x99\xa1");  // 杂鱼♡
+    top.items.push_back({tr("Quick Actions"), QString(),  MenuItemType::SubMenu,
+                         MenuAction::MenuActionMax, 1, true, false, false});
+    top.items.push_back({tr("Bitrate"),       QString(),  MenuItemType::SubMenu,
+                         MenuAction::MenuActionMax, 2, true, false, true});   // separator
+    top.items.push_back({tr("Toggle Fullscreen"), QString(), MenuItemType::Action,
+                         MenuAction::ToggleFullScreen, 0, true, false, false});
+    top.items.push_back({tr("Microphone"),    QString(),  MenuItemType::Toggle,
+                         MenuAction::ToggleMicrophone, 0, true, false, true}); // separator
+    top.items.push_back({tr("Disconnect"),    QString(),  MenuItemType::Action,
+                         MenuAction::Quit, 0, true, false, false});
+    m_MenuLevels.push_back(top);
+
+    // === Level 1: Quick Actions (keyboard shortcuts) ===
+    MenuLevel shortcuts;
+    shortcuts.title = tr("Quick Actions");
+    shortcuts.items.push_back({tr("Quit Moonlight"),      "Ctrl+Alt+Shift+E", MenuItemType::Action,
+                               MenuAction::QuitAndExit,           0, true, false, true});
+    shortcuts.items.push_back({tr("Performance Stats"),   "Ctrl+Alt+Shift+S", MenuItemType::Action,
+                               MenuAction::ToggleStatsOverlay,    0, true, false, true});
+    shortcuts.items.push_back({tr("Mouse Mode"),          "Ctrl+Alt+Shift+M", MenuItemType::Action,
+                               MenuAction::ToggleMouseMode,       0, true, false, false});
+    shortcuts.items.push_back({tr("Show/Hide Cursor"),    "Ctrl+Alt+Shift+C", MenuItemType::Action,
+                               MenuAction::ToggleCursorHide,      0, true, false, false});
+    shortcuts.items.push_back({tr("Minimize"),            "Ctrl+Alt+Shift+D", MenuItemType::Action,
+                               MenuAction::ToggleMinimize,        0, true, false, true});
+    shortcuts.items.push_back({tr("Ungrab Mouse"),        "Ctrl+Alt+Shift+Z", MenuItemType::Action,
+                               MenuAction::UngrabInput,           0, true, false, false});
+    shortcuts.items.push_back({tr("Paste Clipboard"),     "Ctrl+Alt+Shift+V", MenuItemType::Action,
+                               MenuAction::PasteText,             0, true, false, false});
+    shortcuts.items.push_back({tr("Pointer Region Lock"), "Ctrl+Alt+Shift+L", MenuItemType::Action,
+                               MenuAction::TogglePointerRegionLock, 0, true, false, false});
+    m_MenuLevels.push_back(shortcuts);
+
+    // === Level 2: Bitrate presets ===
+    MenuLevel bitrate;
+    bitrate.title = tr("Bitrate");
+    bitrate.items.push_back({tr("1 Mbps"),    QString(), MenuItemType::Action,
+                             MenuAction::SetBitrate1000,   0, true, false, false});
+    bitrate.items.push_back({tr("2 Mbps"),    QString(), MenuItemType::Action,
+                             MenuAction::SetBitrate2000,   0, true, false, false});
+    bitrate.items.push_back({tr("5 Mbps"),    QString(), MenuItemType::Action,
+                             MenuAction::SetBitrate5000,   0, true, false, false});
+    bitrate.items.push_back({tr("10 Mbps"),   QString(), MenuItemType::Action,
+                             MenuAction::SetBitrate10000,  0, true, false, false});
+    bitrate.items.push_back({tr("20 Mbps"),   QString(), MenuItemType::Action,
+                             MenuAction::SetBitrate20000,  0, true, false, false});
+    bitrate.items.push_back({tr("30 Mbps"),   QString(), MenuItemType::Action,
+                             MenuAction::SetBitrate30000,  0, true, false, false});
+    bitrate.items.push_back({tr("50 Mbps"),   QString(), MenuItemType::Action,
+                             MenuAction::SetBitrate50000,  0, true, false, false});
+    bitrate.items.push_back({tr("100 Mbps"),  QString(), MenuItemType::Action,
+                             MenuAction::SetBitrate100000, 0, true, false, false});
+    m_MenuLevels.push_back(bitrate);
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic state updates
+// ---------------------------------------------------------------------------
+
+void OverlayMenuPanel::updateMicrophoneState(bool enabled)
+{
+    if (m_MenuLevels.empty()) return;
+    for (auto& item : m_MenuLevels[0].items) {
+        if (item.action == MenuAction::ToggleMicrophone) {
+            item.toggleState = enabled;
+            break;
+        }
+    }
+}
+
+void OverlayMenuPanel::updateBitrateState(int bitrateKbps)
+{
+    if (m_MenuLevels.empty()) return;
+
+    // Show current bitrate as detail text on the Bitrate category (level 0)
+    for (auto& item : m_MenuLevels[0].items) {
+        if (item.type == MenuItemType::SubMenu && item.targetLevel == 2) {
+            if (bitrateKbps >= 1000) {
+                item.detail = QString("%1 Mbps").arg(bitrateKbps / 1000);
+            } else {
+                item.detail = QString("%1 kbps").arg(bitrateKbps);
+            }
+            break;
+        }
+    }
+
+    // Mark the active bitrate preset in level 2
+    if ((int)m_MenuLevels.size() > 2) {
+        auto actionToKbps = [](MenuAction a) -> int {
+            switch (a) {
+            case MenuAction::SetBitrate1000:   return 1000;
+            case MenuAction::SetBitrate2000:   return 2000;
+            case MenuAction::SetBitrate5000:   return 5000;
+            case MenuAction::SetBitrate10000:  return 10000;
+            case MenuAction::SetBitrate20000:  return 20000;
+            case MenuAction::SetBitrate30000:  return 30000;
+            case MenuAction::SetBitrate50000:  return 50000;
+            case MenuAction::SetBitrate100000: return 100000;
+            default: return -1;
+            }
+        };
+        for (auto& item : m_MenuLevels[2].items) {
+            if (item.type == MenuItemType::Action) {
+                int kbps = actionToKbps(item.action);
+                item.detail = (kbps == bitrateKbps) ? QString::fromUtf8("\342\234\223") : QString();
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Show / hide / navigate
+// ---------------------------------------------------------------------------
+
+void OverlayMenuPanel::showAtRightEdge(int parentX, int parentY, int parentW, int parentH)
+{
+    m_ParentX = parentX;
+    m_ParentY = parentY;
+    m_ParentW = parentW;
+    m_ParentH = parentH;
+
+    m_CurrentLevel = 0;
+    m_HoveredIndex = -1;
+    m_ContentOffset = 0;
+
+    // If closing animation is in progress, cancel it
+    if (m_Closing) {
+        m_OpacityAnim->stop();
+        m_SlideAnim->stop();
+        m_Closing = false;
+    }
+
+    m_Visible = true;
+    m_ShowTimer.start();
+
+    // Calculate target geometry
+    repositionWindow();
+    m_TargetX = x();
+
+    // Start from an offset position (slide distance in Qt DIP)
+    int slideDistance = 40;
+    setPosition(m_TargetX + slideDistance, y());
+    setOpacity(0.0);
+
+    show();
+    raise();
+
+    // Animate slide: right → target
+    m_SlideAnim->setDuration(220);
+    m_SlideAnim->setStartValue(m_TargetX + slideDistance);
+    m_SlideAnim->setEndValue(m_TargetX);
+    m_SlideAnim->setEasingCurve(QEasingCurve::OutCubic);
+
+    // Animate opacity: 0 → 1
+    m_OpacityAnim->setDuration(220);
+    m_OpacityAnim->setStartValue(0.0);
+    m_OpacityAnim->setEndValue(1.0);
+    m_OpacityAnim->setEasingCurve(QEasingCurve::OutCubic);
+
+    m_SlideAnim->start();
+    m_OpacityAnim->start();
+
+    // Warp cursor into center of the content area (excluding shadow)
+    QRect contentRect(m_TargetX + m_ShadowMargin, y() + m_ShadowMargin,
+                       m_MenuWidth, height() - 2 * m_ShadowMargin);
+    QCursor::setPos(contentRect.center());
+
+    requestUpdate();
+}
+
+void OverlayMenuPanel::repositionWindow()
+{
+    qreal dpr = screen() ? screen()->devicePixelRatio() : 1.0;
+    int qpX = qRound(m_ParentX / dpr);
+    int qpY = qRound(m_ParentY / dpr);
+    int qpW = qRound(m_ParentW / dpr);
+    int qpH = qRound(m_ParentH / dpr);
+
+    int itemCount  = (int)m_MenuLevels[m_CurrentLevel].items.size();
+    int titleH     = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
+    int menuHeight = titleH + itemCount * m_ItemHeight + m_Padding * 2;
+
+    // Content area position (right-aligned to parent edge)
+    int cx = qpX + qpW - m_MenuWidth;
+    int cy = qpY + (qpH - menuHeight) / 2;
+
+    if (cy < qpY) cy = qpY;
+    if (cy + menuHeight > qpY + qpH) cy = qpY + qpH - menuHeight;
+
+    // Window includes shadow margin around content
+    setGeometry(cx - m_ShadowMargin, cy - m_ShadowMargin,
+                m_MenuWidth + 2 * m_ShadowMargin, menuHeight + 2 * m_ShadowMargin);
+}
+
+void OverlayMenuPanel::navigateToLevel(int level)
+{
+    if (level < 0 || level >= (int)m_MenuLevels.size()) return;
+
+    bool goingForward = level > m_CurrentLevel;
+    m_ContentSlideAnim->stop();
+    m_ContentOffset = 0;
+
+    m_CurrentLevel = level;
+    m_HoveredIndex = -1;
+    repositionWindow();
+
+    // Reset grace period so Leave event won't close the menu immediately
+    // (the mouse may be outside the resized window after navigation)
+    m_ShowTimer.start();
+
+    // Warp cursor into the new menu if it's now outside
+    QPoint globalPos = QCursor::pos();
+    if (!geometry().contains(globalPos)) {
+        QCursor::setPos(geometry().center());
+    }
+
+    if (goingForward) {
+        // Forward: content slides in from right
+        m_ContentSlideAnim->setStartValue(30.0);
+        m_ContentSlideAnim->setEndValue(0.0);
+        m_ContentSlideAnim->start();
+    } else {
+        // Back: instant switch, no animation (avoids jarring resize + slide combo)
+        requestUpdate();
+    }
+}
+
+void OverlayMenuPanel::closeMenu()
+{
+    if (!m_Visible) return;
+    if (m_Closing) return;  // already animating close
+
+    m_Visible = false;
+    m_Closing = true;
+    m_HoveredIndex = -1;
+
+    // Stop any show/level animations
+    m_SlideAnim->stop();
+    m_OpacityAnim->stop();
+    m_ContentSlideAnim->stop();
+    m_ContentOffset = 0;
+
+    // Animate slide out: current x → +30px right
+    int slideDistance = 30;
+    m_SlideAnim->setDuration(160);
+    m_SlideAnim->setStartValue(x());
+    m_SlideAnim->setEndValue(x() + slideDistance);
+    m_SlideAnim->setEasingCurve(QEasingCurve::InCubic);
+
+    // Animate opacity: current → 0
+    m_OpacityAnim->setDuration(160);
+    m_OpacityAnim->setStartValue(opacity());
+    m_OpacityAnim->setEndValue(0.0);
+    m_OpacityAnim->setEasingCurve(QEasingCurve::InCubic);
+
+    // When fade-out completes, finalize
+    connect(m_OpacityAnim, &QPropertyAnimation::finished, this, [this]() {
+        m_Closing = false;
+        m_CurrentLevel = 0;
+        hide();
+        setOpacity(1.0);   // reset for next show
+        if (m_CloseCallback) {
+            m_CloseCallback();
+        }
+    }, Qt::SingleShotConnection);
+
+    m_SlideAnim->start();
+    m_OpacityAnim->start();
+}
+
+int OverlayMenuPanel::itemAtPos(const QPoint& pos) const
+{
+    // Adjust for shadow margin
+    int lx = pos.x() - m_ShadowMargin;
+    int ly = pos.y() - m_ShadowMargin;
+    if (lx < 0 || lx >= m_MenuWidth || ly < 0) return -1;
+
+    int titleH = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
+
+    // Title bar area — used as back button on sub-levels
+    if (m_CurrentLevel > 0 && ly < titleH) {
+        return -2;
+    }
+    int localY = ly - titleH - m_Padding;
+    if (localY < 0) return -1;
+    int idx = localY / m_ItemHeight;
+    const auto& items = m_MenuLevels[m_CurrentLevel].items;
+    if (idx < 0 || idx >= (int)items.size()) return -1;
+    return idx;
+}
+
+// ---------------------------------------------------------------------------
+// Painting
+// ---------------------------------------------------------------------------
+
+void OverlayMenuPanel::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::TextAntialiasing);
+
+    int w = width();
+    int h = height();
+    int sm = m_ShadowMargin;
+    int cw = w - 2 * sm;   // content width
+    int ch = h - 2 * sm;   // content height
+
+    // Clear to transparent
+    p.setCompositionMode(QPainter::CompositionMode_Source);
+    p.fillRect(0, 0, w, h, Qt::transparent);
+    p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+
+    // === Soft drop shadow ===
+    for (int i = sm; i >= 1; i--) {
+        qreal t = 1.0 - (qreal)i / sm;
+        int alpha = qRound(28.0 * t * t);
+        QPainterPath sp;
+        sp.addRoundedRect(QRectF(sm - i, sm - i + 1, cw + 2 * i, ch + 2 * i),
+                          m_BorderRadius + i, m_BorderRadius + i);
+        p.fillPath(sp, QColor(0, 0, 0, alpha));
+    }
+
+    // Move to content area
+    p.save();
+    p.translate(sm, sm);
+
+    // === Win11 dark background ===
+    QPainterPath bgPath;
+    bgPath.addRoundedRect(QRectF(0, 0, cw, ch), m_BorderRadius, m_BorderRadius);
+    p.fillPath(bgPath, QColor(44, 44, 44, 242));
+
+    // Subtle border (Win11 style: thin light outline)
+    p.setPen(QPen(QColor(255, 255, 255, 20), 1.0));
+    p.drawPath(bgPath);
+
+    // Clip content
+    p.setClipPath(bgPath);
+
+    // --- Title bar (only on sub-levels, serves as back button) ---
+    const auto& level = m_MenuLevels[m_CurrentLevel];
+    int textPad = (m_CurrentLevel == 0) ? 16 : 8;
+    int titleH = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
+
+    if (m_CurrentLevel > 0) {
+        p.setFont(m_TitleFont);
+        bool titleHovered = (m_HoveredIndex == -2);
+        if (titleHovered) {
+            QPainterPath hlPath;
+            hlPath.addRoundedRect(QRectF(4, 2, cw - 8, m_TitleHeight - 4), 4, 4);
+            p.fillPath(hlPath, QColor(255, 255, 255, 15));
+        }
+        p.setPen(titleHovered ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 140));
+        QRect titleRect(textPad, 0, cw - 2 * textPad, m_TitleHeight);
+        p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+                   QString::fromUtf8("\xe2\x97\x82 ") + level.title);
+    }
+
+    // Apply content offset for level navigation animation
+    if (m_ContentSlideAnim->state() != QAbstractAnimation::Running) {
+        m_ContentOffset = 0;
+    }
+    p.save();
+    if (m_ContentOffset != 0) {
+        p.translate(m_ContentOffset, 0);
+    }
+
+    const auto& items = level.items;
+    int contentTop = titleH + m_Padding;
+
+    // Icon mapping for menu items (Segoe MDL2 Assets code points)
+    auto iconForItem = [](const MenuItem& item) -> QChar {
+        if (item.type == MenuItemType::SubMenu) {
+            if (item.targetLevel == 1) return QChar(0xE713); // Settings gear
+            if (item.targetLevel == 2) return QChar(0xE9D9); // Diagnostic/chart
+        }
+        switch (item.action) {
+        case MenuAction::ToggleFullScreen:  return QChar(0xE740); // FullScreen
+        case MenuAction::ToggleMicrophone:  return QChar(0xE720); // Microphone
+        case MenuAction::Quit:              return QChar(0xE711); // Close/X
+        case MenuAction::QuitAndExit:       return QChar(0xE711); // Close/X
+        case MenuAction::ToggleStatsOverlay:return QChar(0xE9D9); // Diagnostic
+        case MenuAction::ToggleMouseMode:   return QChar(0xE962); // Handwriting/pointer
+        case MenuAction::ToggleCursorHide:  return QChar(0xEDE3); // Cursor
+        case MenuAction::ToggleMinimize:    return QChar(0xE921); // Minimize
+        case MenuAction::UngrabInput:       return QChar(0xE785); // Mouse back
+        case MenuAction::PasteText:         return QChar(0xE77F); // Paste
+        case MenuAction::TogglePointerRegionLock: return QChar(0xE72E); // Lock
+        default: return QChar();
+        }
+    };
+
+    // Icon column: only on top-level menu
+    bool hasIcons = (m_CurrentLevel == 0);
+    int iconW = hasIcons ? m_IconAreaWidth : 0;
+    int labelX = textPad + iconW;
+
+    for (int i = 0; i < (int)items.size(); i++) {
+        int itemY = contentTop + i * m_ItemHeight;
+        const auto& item = items[i];
+
+        // Hover highlight — Win11 style: subtle rounded rect
+        if (i == m_HoveredIndex && item.enabled) {
+            QPainterPath hlPath;
+            hlPath.addRoundedRect(QRectF(4, itemY + 1, cw - 8, m_ItemHeight - 2), 4, 4);
+            p.fillPath(hlPath, QColor(255, 255, 255, 20));
+        }
+
+        // Icon (drawn in left area if this level has icons)
+        if (hasIcons) {
+            QChar icon = iconForItem(item);
+            if (!icon.isNull()) {
+                p.setFont(m_IconFont);
+                p.setPen(item.enabled ? QColor(255, 255, 255, 180) : QColor(255, 255, 255, 60));
+                QRect iconRect(textPad, itemY, m_IconAreaWidth, m_ItemHeight);
+                p.drawText(iconRect, Qt::AlignCenter, QString(icon));
+            }
+        }
+
+        // --- SubMenu item ---
+        if (item.type == MenuItemType::SubMenu) {
+            p.setFont(m_LabelFont);
+            p.setPen(item.enabled ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 80));
+            QRect lr(labelX, itemY, cw - labelX - 36, m_ItemHeight);
+            p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
+
+            // Detail text (e.g., "20 Mbps")
+            if (!item.detail.isEmpty()) {
+                p.setFont(m_DetailFont);
+                p.setPen(QColor(255, 255, 255, 100));
+                QRect dr(cw / 2, itemY, cw / 2 - textPad - 20, m_ItemHeight);
+                p.drawText(dr, Qt::AlignRight | Qt::AlignVCenter, item.detail);
+            }
+
+            // Chevron ›
+            p.setFont(m_LabelFont);
+            p.setPen(QColor(255, 255, 255, 100));
+            QRect ar(cw - textPad - 10, itemY, 10, m_ItemHeight);
+            p.drawText(ar, Qt::AlignCenter, QString::fromUtf8("\xe2\x80\xba"));
+        }
+        // --- Toggle item ---
+        else if (item.type == MenuItemType::Toggle) {
+            p.setFont(m_LabelFont);
+            p.setPen(item.enabled ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 80));
+            QRect lr(labelX, itemY, cw - labelX - 52, m_ItemHeight);
+            p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
+
+            // Win11-style toggle switch
+            int trackW = 40, trackH = 20;
+            int trackX = cw - textPad - trackW;
+            int trackY = itemY + (m_ItemHeight - trackH) / 2;
+
+            QPainterPath trackPath;
+            trackPath.addRoundedRect(QRectF(trackX, trackY, trackW, trackH),
+                                     trackH / 2, trackH / 2);
+
+            int knobR = 6;
+            if (item.toggleState) {
+                // On: accent fill (Win11 system accent blue)
+                p.fillPath(trackPath, QColor(110, 192, 232));
+                p.setPen(QPen(QColor(110, 192, 232), 1));
+                p.drawPath(trackPath);
+                p.setBrush(Qt::white);
+                p.setPen(Qt::NoPen);
+                p.drawEllipse(QPoint(trackX + trackW - trackH / 2,
+                                     trackY + trackH / 2), knobR, knobR);
+            } else {
+                // Off: transparent with white border
+                p.fillPath(trackPath, QColor(255, 255, 255, 0));
+                p.setPen(QPen(QColor(255, 255, 255, 120), 1.5));
+                p.drawPath(trackPath);
+                p.setBrush(QColor(255, 255, 255, 160));
+                p.setPen(Qt::NoPen);
+                p.drawEllipse(QPoint(trackX + trackH / 2,
+                                     trackY + trackH / 2), knobR - 1, knobR - 1);
+            }
+        }
+        // --- Action item ---
+        else if (item.type == MenuItemType::Action) {
+            p.setFont(m_LabelFont);
+            p.setPen(item.enabled ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 80));
+
+            bool hasLongDetail = !item.detail.isEmpty() && item.detail.length() > 3;
+            bool hasShortDetail = !item.detail.isEmpty() && item.detail.length() <= 3;
+
+            if (hasLongDetail) {
+                int topH = qRound(m_ItemHeight * 0.58);
+                QRect lb(labelX, itemY, cw - labelX - textPad, topH);
+                p.drawText(lb, Qt::AlignLeft | Qt::AlignBottom, item.label);
+
+                p.setFont(m_DetailFont);
+                p.setPen(QColor(255, 255, 255, 90));
+                QRect sr(labelX, itemY + topH, cw - labelX - textPad, m_ItemHeight - topH);
+                p.drawText(sr, Qt::AlignLeft | Qt::AlignTop, item.detail);
+            } else {
+                QRect lr(labelX, itemY, cw - labelX - textPad, m_ItemHeight);
+                p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
+
+                if (hasShortDetail) {
+                    // Checkmark — Win11 accent color
+                    p.setPen(QColor(110, 192, 232));
+                    QRect cr(cw - textPad - 20, itemY, 20, m_ItemHeight);
+                    p.drawText(cr, Qt::AlignRight | Qt::AlignVCenter, item.detail);
+                }
+            }
+        }
+        // --- Back item (fallback, normally handled by title bar) ---
+        else if (item.type == MenuItemType::Back) {
+            p.setFont(m_DetailFont);
+            p.setPen(QColor(255, 255, 255, 120));
+            QRect lr(labelX, itemY, cw - labelX - textPad, m_ItemHeight);
+            p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
+        }
+
+        // Group separator — only where explicitly flagged
+        if (item.separatorAfter && i < (int)items.size() - 1) {
+            p.setPen(QPen(QColor(255, 255, 255, 18), 1));
+            int sepY = itemY + m_ItemHeight - 1;
+            p.drawLine(labelX, sepY, cw - textPad, sepY);
+        }
+    }
+
+    p.restore();  // content offset
+    p.restore();  // shadow margin translate
+}
+
+// ---------------------------------------------------------------------------
+// Mouse input
+// ---------------------------------------------------------------------------
+
+void OverlayMenuPanel::mouseMoveEvent(QMouseEvent* event)
+{
+    int newIdx = itemAtPos(event->position().toPoint());
+    if (newIdx != m_HoveredIndex) {
+        m_HoveredIndex = newIdx;
+        setCursor((m_HoveredIndex >= 0 || m_HoveredIndex == -2) ? Qt::PointingHandCursor : Qt::ArrowCursor);
+        requestUpdate();
+    }
+}
+
+void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() != Qt::LeftButton) return;
+
+    int idx = itemAtPos(event->position().toPoint());
+
+    // Title bar click → navigate back
+    if (idx == -2) {
+        navigateToLevel(0);
+        return;
+    }
+
+    if (idx < 0) return;
+
+    const auto& items = m_MenuLevels[m_CurrentLevel].items;
+    if (idx >= (int)items.size() || !items[idx].enabled) return;
+
+    const auto& item = items[idx];
+
+    switch (item.type) {
+    case MenuItemType::Back:
+        navigateToLevel(0);
+        break;
+
+    case MenuItemType::SubMenu:
+        navigateToLevel(item.targetLevel);
+        break;
+
+    case MenuItemType::Action:
+    {
+        MenuAction action = item.action;
+        closeMenu();
+        if (m_ActionCallback) {
+            m_ActionCallback(action);
+        }
+        break;
+    }
+
+    case MenuItemType::Toggle:
+    {
+        // Toggle visual state and dispatch
+        auto& mutableItem = m_MenuLevels[m_CurrentLevel].items[idx];
+        mutableItem.toggleState = !mutableItem.toggleState;
+        requestUpdate();
+        if (m_ActionCallback) {
+            m_ActionCallback(item.action);
+        }
+        break;
+    }
+    }
+}
+
+bool OverlayMenuPanel::event(QEvent* ev)
+{
+    if (ev->type() == QEvent::Leave) {
+        if (m_Visible) {
+            // Grace period: ignore Leave within 300ms of showing
+            if (m_ShowTimer.elapsed() < 300) {
+                return true;
+            }
+            // Verify cursor is actually outside (cursor warp may lag)
+            QPoint globalPos = QCursor::pos();
+            if (geometry().contains(globalPos)) {
+                return true;
+            }
+            closeMenu();
+        }
+        return true;
+    }
+    return QRasterWindow::event(ev);
+}

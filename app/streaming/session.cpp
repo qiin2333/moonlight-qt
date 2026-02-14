@@ -2,11 +2,15 @@
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
+#include "backend/nvhttp.h"
+#include "backend/identitymanager.h"
 
 #include <Limelight.h>
 #include "SDL_compat.h"
 #include "network/bandwidth.h"
 #include "utils.h"
+#include <QCoreApplication>
+#include <QHostInfo>
 
 #ifdef HAVE_FFMPEG
 #include "video/ffmpeg.h"
@@ -19,6 +23,8 @@
 #ifdef Q_OS_WIN32
 // Scaling the icon down on Win32 looks dreadful, so render at lower res
 #define ICON_SIZE 32
+#include <dxgi1_6.h>
+#include <wrl/client.h>
 #else
 #define ICON_SIZE 64
 #endif
@@ -571,6 +577,11 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_AudioRenderer(nullptr),
       m_AudioSampleCount(0),
       m_DropAudioEndTime(0),
+      m_MenuPanel(nullptr),
+      m_DeferCaptureRestore(false),
+      m_PendingMicToggle(false),
+      m_Toast(nullptr),
+      m_MenuCloseTicks(0),
       m_MicStream(nullptr)
 {
 }
@@ -1555,6 +1566,223 @@ void Session::toggleFullscreen()
     m_InputHandler->updatePointerRegionLock();
 }
 
+// ---- Qt-based overlay menu methods ----
+
+void Session::showQtOverlayMenu()
+{
+    if (!m_MenuPanel || m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) return;
+
+    // Save capture state and release mouse
+    m_WasCapturedBeforeMenu = m_InputHandler->isCaptureActive();
+    if (m_WasCapturedBeforeMenu) {
+        SDL_SetRelativeMouseMode(SDL_FALSE);
+        SDL_ShowCursor(SDL_ENABLE);
+    }
+
+    // Flush stale mouse motion events from relative mode
+    SDL_FlushEvent(SDL_MOUSEMOTION);
+
+    // Get SDL window position and size in screen coordinates
+    int wx, wy, ww, wh;
+    SDL_GetWindowPosition(m_Window, &wx, &wy);
+    SDL_GetWindowSize(m_Window, &ww, &wh);
+
+    // Update dynamic state before showing
+    m_MenuPanel->updateMicrophoneState(m_MicStream != nullptr);
+    m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
+
+    m_MenuPanel->showAtRightEdge(wx, wy, ww, wh);
+
+    // Pump Qt events immediately to trigger first paint
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Qt overlay menu shown at (%d,%d) %dx%d", wx, wy, ww, wh);
+}
+
+void Session::hideQtOverlayMenu()
+{
+    if (!m_MenuPanel || !m_MenuPanel->isMenuVisible()) return;
+    m_MenuPanel->closeMenu();
+    // Note: close callback handles mouse capture restore
+}
+
+void Session::toggleQtOverlayMenu()
+{
+    if (!m_MenuPanel) return;
+
+    if (m_MenuPanel->isMenuVisible()) {
+        hideQtOverlayMenu();
+    } else {
+        showQtOverlayMenu();
+    }
+}
+
+void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
+{
+    // Map OverlayMenuPanel::MenuAction to SdlInputHandler::KeyCombo
+    SdlInputHandler::KeyCombo combo;
+    switch (action) {
+    case OverlayMenuPanel::MenuAction::Quit:
+        combo = SdlInputHandler::KeyComboQuit;
+        break;
+    case OverlayMenuPanel::MenuAction::QuitAndExit:
+        combo = SdlInputHandler::KeyComboQuitAndExit;
+        break;
+    case OverlayMenuPanel::MenuAction::ToggleFullScreen:
+        combo = SdlInputHandler::KeyComboToggleFullScreen;
+        // Defer capture restore until after fullscreen toggle completes
+        m_DeferCaptureRestore = true;
+        break;
+    case OverlayMenuPanel::MenuAction::ToggleStatsOverlay:
+        combo = SdlInputHandler::KeyComboToggleStatsOverlay;
+        break;
+    case OverlayMenuPanel::MenuAction::ToggleMouseMode:
+        combo = SdlInputHandler::KeyComboToggleMouseMode;
+        break;
+    case OverlayMenuPanel::MenuAction::ToggleCursorHide:
+        combo = SdlInputHandler::KeyComboToggleCursorHide;
+        break;
+    case OverlayMenuPanel::MenuAction::ToggleMinimize:
+        combo = SdlInputHandler::KeyComboToggleMinimize;
+        break;
+    case OverlayMenuPanel::MenuAction::UngrabInput:
+        combo = SdlInputHandler::KeyComboUngrabInput;
+        break;
+    case OverlayMenuPanel::MenuAction::PasteText:
+        combo = SdlInputHandler::KeyComboPasteText;
+        break;
+    case OverlayMenuPanel::MenuAction::TogglePointerRegionLock:
+        combo = SdlInputHandler::KeyComboTogglePointerRegionLock;
+        break;
+
+    // --- Microphone toggle ---
+    // Deferred: toggle mic outside processEvents() to avoid QAudioSource heap corruption
+    case OverlayMenuPanel::MenuAction::ToggleMicrophone:
+        m_PendingMicToggle = true;
+        return;
+
+    // --- Bitrate presets ---
+    case OverlayMenuPanel::MenuAction::SetBitrate1000:
+    case OverlayMenuPanel::MenuAction::SetBitrate2000:
+    case OverlayMenuPanel::MenuAction::SetBitrate5000:
+    case OverlayMenuPanel::MenuAction::SetBitrate10000:
+    case OverlayMenuPanel::MenuAction::SetBitrate20000:
+    case OverlayMenuPanel::MenuAction::SetBitrate30000:
+    case OverlayMenuPanel::MenuAction::SetBitrate50000:
+    case OverlayMenuPanel::MenuAction::SetBitrate100000:
+    {
+        static const int kBitrateMap[] = {
+            1000, 2000, 5000, 10000, 20000, 30000, 50000, 100000
+        };
+        int idx = (int)action - (int)OverlayMenuPanel::MenuAction::SetBitrate1000;
+        if (idx >= 0 && idx < 8) {
+            int newBitrate = kBitrateMap[idx];
+            // Save preference for future sessions
+            m_Preferences->bitrateKbps = newBitrate;
+            m_Preferences->save();
+            // Try to change bitrate in the current session via Sunshine API
+            requestRuntimeBitrateChange(newBitrate);
+            // Show toast notification
+            if (newBitrate >= 1000) {
+                showStreamingToast(QString("Bitrate: %1 Mbps").arg(newBitrate / 1000));
+            } else {
+                showStreamingToast(QString("Bitrate: %1 Kbps").arg(newBitrate));
+            }
+        }
+        return;
+    }
+
+    default:
+        return;
+    }
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Qt overlay menu action: %d", (int)action);
+    m_InputHandler->performSpecialKeyCombo(combo);
+
+    // Restore mouse capture after window-state-changing actions complete
+    if (m_DeferCaptureRestore) {
+        m_DeferCaptureRestore = false;
+        if (m_WasCapturedBeforeMenu) {
+            // Allow the window to settle after fullscreen/minimize toggle
+            SDL_Delay(100);
+            SDL_FlushEvent(SDL_MOUSEMOTION);
+
+            // Recapture via the proper input handler path, which handles
+            // pointer region lock, keyboard grab, and relative mouse mode
+            m_InputHandler->setCaptureActive(true);
+            m_WasCapturedBeforeMenu = false;
+
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Deferred capture restore completed after window state change");
+        }
+    }
+}
+
+void Session::showStreamingToast(const QString& message, int durationMs)
+{
+    if (!m_Toast) return;
+
+    int wx, wy, ww, wh;
+    SDL_GetWindowPosition(m_Window, &wx, &wy);
+    SDL_GetWindowSize(m_Window, &ww, &wh);
+    m_Toast->showToast(wx, wy, ww, wh, message, durationMs);
+    QCoreApplication::processEvents();
+}
+
+void Session::requestRuntimeBitrateChange(int bitrateKbps)
+{
+    if (!m_Computer) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Cannot change runtime bitrate: no m_Computer");
+        return;
+    }
+
+    try {
+        NvHTTP http(m_Computer);
+
+        // Build clientname the same way as openConnection() does for /launch
+        QString clientname = QHostInfo::localHostName();
+        if (!m_Computer->uuid.isEmpty()) {
+            QString pairname = NvComputer::getPairname(m_Computer->uuid);
+            if (!pairname.isEmpty()) {
+                clientname = pairname;
+            }
+        }
+
+        QString args = QString("bitrate=%1&clientname=%2")
+                           .arg(bitrateKbps)
+                           .arg(clientname);
+
+        QString response = http.openConnectionToString(
+            http.m_BaseUrlHttps,
+            "bitrate",
+            args,
+            5000,
+            NvHTTP::NVLL_VERBOSE);
+
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Runtime bitrate change to %d kbps: %s",
+                    bitrateKbps,
+                    response.toUtf8().constData());
+    }
+    catch (const GfeHttpResponseException& e) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Runtime bitrate change failed (HTTP): %s",
+                     e.toQString().toUtf8().constData());
+    }
+    catch (const QtNetworkReplyException& e) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Runtime bitrate change failed (Network): %s",
+                     e.toQString().toUtf8().constData());
+    }
+    catch (...) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Runtime bitrate change failed: unknown error");
+    }
+}
+
 void Session::notifyMouseEmulationMode(bool enabled)
 {
     m_MouseEmulationRefCount += enabled ? 1 : -1;
@@ -1621,6 +1849,12 @@ bool Session::startConnectionAsync()
 
     QString rtspSessionUrl;
 
+    // Query display HDR brightness capabilities
+    float maxBrightness = 0, minBrightness = 0, maxAverageBrightness = 0;
+#ifdef Q_OS_WIN32
+    queryDisplayHdrBrightness(maxBrightness, minBrightness, maxAverageBrightness);
+#endif
+
     try {
         NvHTTP http(m_Computer);
         RemoteStreamConfig remoteStreamConfig(
@@ -1630,7 +1864,10 @@ bool Session::startConnectionAsync()
             m_Preferences->remoteFps,
             m_Preferences->remoteFpsRate,
             m_Preferences->width,
-            m_Preferences->height
+            m_Preferences->height,
+            maxBrightness,
+            minBrightness,
+            maxAverageBrightness
         );
         http.startApp(m_Computer->currentGameId != 0 ? "resume" : "launch",
                       m_Computer->isNvidiaServerSoftware,
@@ -1803,6 +2040,61 @@ void Session::interrupt()
     event.quit.timestamp = SDL_GetTicks();
     SDL_PushEvent(&event);
 }
+
+#ifdef Q_OS_WIN32
+void Session::queryDisplayHdrBrightness(float& maxNits, float& minNits, float& maxFullNits)
+{
+    using Microsoft::WRL::ComPtr;
+
+    maxNits = 0;
+    minNits = 0;
+    maxFullNits = 0;
+
+    ComPtr<IDXGIFactory1> factory;
+    if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&factory))) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to create DXGI factory for brightness query");
+        return;
+    }
+
+    // Enumerate adapters and outputs to find HDR-capable display
+    ComPtr<IDXGIAdapter1> adapter;
+    for (UINT adapterIdx = 0; SUCCEEDED(factory->EnumAdapters1(adapterIdx, &adapter)); adapterIdx++) {
+        ComPtr<IDXGIOutput> output;
+        for (UINT outputIdx = 0; SUCCEEDED(adapter->EnumOutputs(outputIdx, &output)); outputIdx++) {
+            ComPtr<IDXGIOutput6> output6;
+            if (SUCCEEDED(output->QueryInterface(__uuidof(IDXGIOutput6), (void**)&output6))) {
+                DXGI_OUTPUT_DESC1 desc1;
+                if (SUCCEEDED(output6->GetDesc1(&desc1))) {
+                    // Use the first display with HDR support, or the first display if none support HDR
+                    if (maxNits == 0 || desc1.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020) {
+                        maxNits = desc1.MaxLuminance;
+                        minNits = desc1.MinLuminance;
+                        maxFullNits = desc1.MaxFullFrameLuminance;
+
+                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                                    "Display HDR brightness: max=%.1f nits, min=%.4f nits, maxFull=%.1f nits (HDR: %s)",
+                                    maxNits, minNits, maxFullNits,
+                                    desc1.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 ? "yes" : "no");
+
+                        if (desc1.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020) {
+                            return; // Found an HDR display, use it
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (maxNits > 0) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Using SDR display brightness: max=%.1f, min=%.4f, maxFull=%.1f",
+                    maxNits, minNits, maxFullNits);
+    } else {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "No display brightness information available");
+    }
+}
+#endif
 
 void Session::exec()
 {
@@ -1984,6 +2276,32 @@ void Session::exec()
     // Toggle the stats overlay if requested by the user
     m_OverlayManager.setOverlayState(Overlay::OverlayDebug, m_Preferences->showPerformanceOverlay);
 
+    // Initialize mouse state for menu
+    m_WasCapturedBeforeMenu = false;
+
+    // Create Qt-based overlay menu panel (rendered by OS compositor, not D3D11)
+    m_MenuPanel = new OverlayMenuPanel();
+    m_Toast = new OverlayToast();
+    m_MenuPanel->setActionCallback([this](OverlayMenuPanel::MenuAction action) {
+        dispatchQtMenuAction(action);
+    });
+    m_MenuPanel->setCloseCallback([this]() {
+        // Record close timestamp for edge-trigger debounce
+        m_MenuCloseTicks = SDL_GetTicks();
+
+        // Restore mouse capture after menu closes
+        // Note: for actions that change window state (fullscreen, minimize),
+        // we defer capture restoration to after the action completes.
+        // See dispatchQtMenuAction() for those cases.
+        if (m_WasCapturedBeforeMenu && !m_DeferCaptureRestore) {
+            m_InputHandler->setCaptureActive(true);
+            m_WasCapturedBeforeMenu = false;
+        }
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Qt overlay menu closed, capture %s",
+                    m_DeferCaptureRestore ? "deferred" : "restored");
+    });
+
     // Switch to async logging mode when we enter the SDL loop
     StreamUtils::enterAsyncLoggingMode();
 
@@ -2003,6 +2321,10 @@ void Session::exec()
         // and other problems.
         if (!SDL_WaitEventTimeout(&event, 1000)) {
             presence.runCallbacks();
+            // Process Qt events even during timeout so Qt overlay can paint/respond
+            if (m_MenuPanel && m_MenuPanel->needsEventProcessing()) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents);
+            }
             continue;
         }
 #else
@@ -2076,6 +2398,10 @@ void Session::exec()
                     m_AudioMuted = true;
                 }
                 m_InputHandler->notifyFocusLost();
+                // Close overlay menu when main window loses focus
+                if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+                    m_MenuPanel->closeMenu();
+                }
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
                 if (m_Preferences->muteOnFocusLoss) {
@@ -2085,6 +2411,8 @@ void Session::exec()
                 break;
             case SDL_WINDOWEVENT_LEAVE:
                 m_InputHandler->notifyMouseLeave();
+                break;
+            case SDL_WINDOWEVENT_SIZE_CHANGED:
                 break;
             }
 
@@ -2276,16 +2604,55 @@ void Session::exec()
         case SDL_KEYUP:
         case SDL_KEYDOWN:
             presence.runCallbacks();
+            // Ctrl+Alt+Shift+O toggles the Qt overlay menu
+            if (event.key.state == SDL_PRESSED &&
+                (event.key.keysym.mod & KMOD_CTRL) &&
+                (event.key.keysym.mod & KMOD_ALT) &&
+                (event.key.keysym.mod & KMOD_SHIFT) &&
+                (event.key.keysym.sym == SDLK_o || event.key.keysym.scancode == SDL_SCANCODE_O)) {
+                toggleQtOverlayMenu();
+                break;
+            }
             m_InputHandler->handleKeyEvent(&event.key);
             break;
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
+        {
             presence.runCallbacks();
+
+            // When Qt overlay menu is visible, consume all button events
+            // to prevent SDL from re-capturing the mouse
+            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+                break;
+            }
+
             m_InputHandler->handleMouseButtonEvent(&event.button);
             break;
+        }
         case SDL_MOUSEMOTION:
+        {
+            // Qt overlay menu: edge detection with debounce (500ms cooldown after close)
+            if (m_MenuPanel && !m_MenuPanel->isMenuVisible()) {
+                Uint32 elapsed = SDL_GetTicks() - m_MenuCloseTicks;
+                if (elapsed > 500) {
+                    int ww, wh;
+                    SDL_GetWindowSize(m_Window, &ww, &wh);
+                    // Trigger when mouse reaches rightmost 5 pixels
+                    if (event.motion.x >= ww - 5) {
+                        showQtOverlayMenu();
+                        break;
+                    }
+                }
+            }
+
+            // When Qt menu is visible, don't forward motion to input handler
+            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+                break;
+            }
+
             m_InputHandler->handleMouseMotionEvent(&event.motion);
             break;
+        }
         case SDL_MOUSEWHEEL:
             m_InputHandler->handleMouseWheelEvent(&event.wheel);
             break;
@@ -2333,11 +2700,51 @@ void Session::exec()
             }
             break;
         }
+
+        // Process Qt events when the overlay menu or toast is visible
+        // This ensures QRasterWindow receives paint/mouse events from the Win32 queue
+        if ((m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
+            (m_Toast && m_Toast->isVisible())) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents);
+        }
+
+        // Deferred microphone toggle — runs outside processEvents() to avoid
+        // heap corruption when creating QAudioSource within nested event loops
+        if (m_PendingMicToggle) {
+            m_PendingMicToggle = false;
+            if (m_MicStream) {
+                stopMicrophone();
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Microphone stopped via overlay menu");
+            } else {
+                startMicrophone();
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "Microphone %s via overlay menu",
+                            m_MicStream ? "started" : "failed to start");
+            }
+            // Update the toggle state in menu
+            if (m_MenuPanel) {
+                m_MenuPanel->updateMicrophoneState(m_MicStream != nullptr);
+            }
+        }
     }
 
 DispatchDeferredCleanup:
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();
+
+    // Destroy the Qt overlay menu panel
+    if (m_MenuPanel) {
+        m_MenuPanel->closeMenu();
+        delete m_MenuPanel;
+        m_MenuPanel = nullptr;
+    }
+
+    // Destroy the Qt overlay toast
+    if (m_Toast) {
+        m_Toast->close();
+        delete m_Toast;
+        m_Toast = nullptr;
+    }
 
     // Uncapture the mouse and hide the window immediately,
     // so we can return to the Qt GUI ASAP.

@@ -170,64 +170,13 @@ void AppModel::updateAppList(QVector<NvApp> newList)
 
     QVector<NvApp> newVisibleList = getVisibleApps(newList);
 
-    // Process removals and updates first
-    for (int i = 0; i < m_VisibleApps.count(); i++) {
-        const NvApp& existingApp = m_VisibleApps.at(i);
-
-        bool found = false;
-        for (const NvApp& newApp : std::as_const(newVisibleList)) {
-            if (existingApp.id == newApp.id) {
-                // If the data changed, update it in our list
-                if (existingApp != newApp) {
-                    m_VisibleApps.replace(i, newApp);
-                    emit dataChanged(createIndex(i, 0), createIndex(i, 0));
-                }
-
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) {
-            beginRemoveRows(QModelIndex(), i, i);
-            m_VisibleApps.removeAt(i);
-            endRemoveRows();
-            i--;
-        }
+    // Preserve server-provided ordering by resetting the model
+    // when the list content or order changes.
+    if (m_VisibleApps != newVisibleList) {
+        beginResetModel();
+        m_VisibleApps = newVisibleList;
+        endResetModel();
     }
-
-    // Process additions now
-    for (const NvApp& newApp : std::as_const(newVisibleList)) {
-        int insertionIndex = m_VisibleApps.size();
-        bool found = false;
-
-        for (int i = 0; i < m_VisibleApps.count(); i++) {
-            const NvApp& existingApp = m_VisibleApps.at(i);
-
-            if (existingApp.id == newApp.id) {
-                found = true;
-                break;
-            }
-            else if (existingApp.name.toLower() > newApp.name.toLower()) {
-                insertionIndex = i;
-                break;
-            }
-        }
-
-        if (!found) {
-            beginInsertRows(QModelIndex(), insertionIndex, insertionIndex);
-            m_VisibleApps.insert(insertionIndex, newApp);
-            endInsertRows();
-        }
-    }
-
-    // Verify that the incremental update matches the expected result
-    // Sort both lists before comparison since insertion order may differ
-    auto sortedNew = newVisibleList;
-    auto sortedCurrent = m_VisibleApps;
-    std::sort(sortedNew.begin(), sortedNew.end(), [](const NvApp& a, const NvApp& b) { return a.id < b.id; });
-    std::sort(sortedCurrent.begin(), sortedCurrent.end(), [](const NvApp& a, const NvApp& b) { return a.id < b.id; });
-    Q_ASSERT(sortedNew == sortedCurrent);
 }
 
 void AppModel::setAppHidden(int appIndex, bool hidden)

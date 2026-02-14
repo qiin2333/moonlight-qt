@@ -258,6 +258,11 @@ NvHTTP::startApp(QString verb,
                                    "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0)+
                                    "&customScreenMode="+QString::number(customScreenMode)+
                                    "&customVddScreenMode="+QString::number(customVddScreenMode)+
+                                   ((remoteStreamConfig.maxBrightness > 0) ?
+                                       "&maxBrightness="+QString::number(remoteStreamConfig.maxBrightness, 'f', 3)+
+                                       "&minBrightness="+QString::number(remoteStreamConfig.minBrightness, 'f', 6)+
+                                       "&maxAverageBrightness="+QString::number(remoteStreamConfig.maxAverageBrightness, 'f', 3) :
+                                        "")+
                                    LiGetLaunchUrlQueryParameters(),
                                    LAUNCH_TIMEOUT_MS);
 
