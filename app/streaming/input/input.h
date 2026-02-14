@@ -155,7 +155,7 @@ public:
     static
     QString getUnmappedGamepads();
 
-private:
+    // KeyCombo 枚举（公开以便 OverlayMenu 等外部组件调用）
     enum KeyCombo {
         KeyComboQuit,
         KeyComboUngrabInput,
@@ -169,6 +169,11 @@ private:
         KeyComboQuitAndExit,
         KeyComboMax
     };
+
+    // 公开 performSpecialKeyCombo 以便从悬浮菜单调用
+    void performSpecialKeyCombo(KeyCombo combo);
+
+private:
 
     GamepadState*
     findStateForGamepad(SDL_JoystickID id);
@@ -184,8 +189,6 @@ private:
     void disableTouchFeedback();
 
     void handleRelativeFingerEvent(SDL_TouchFingerEvent* event);
-
-    void performSpecialKeyCombo(KeyCombo combo);
 
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);

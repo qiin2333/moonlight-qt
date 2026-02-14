@@ -124,6 +124,7 @@ private:
     AVColorTransferCharacteristic m_LastColorTrc;
     int m_LastColorSpace;
     bool m_LastFullRange;
+    int m_LastEnhColorTrc;
 
     struct {
         int width;

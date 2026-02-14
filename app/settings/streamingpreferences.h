@@ -108,6 +108,22 @@ public:
     };
     Q_ENUM(CaptureSysKeysMode);
 
+    enum OverlayMenuPosition
+    {
+        OMP_RIGHT_EDGE,    // Default: show on right edge of streaming window
+        OMP_LEFT_EDGE,     // Show on left edge
+        OMP_AT_CURSOR,     // Show at right-click position
+        OMP_DISABLED,      // Do not show overlay menu
+    };
+    Q_ENUM(OverlayMenuPosition);
+
+    enum HdrMode
+    {
+        HDR_PQ  = 1,   // HDR10/PQ (SMPTE ST 2084) - default
+        HDR_HLG = 2,   // HLG (Hybrid Log-Gamma, ARIB STD-B67)
+    };
+    Q_ENUM(HdrMode);
+
     Q_PROPERTY(int width MEMBER width NOTIFY displayModeChanged)
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
@@ -141,6 +157,7 @@ public:
     Q_PROPERTY(AudioConfig audioConfig MEMBER audioConfig NOTIFY audioConfigChanged)
     Q_PROPERTY(VideoCodecConfig videoCodecConfig MEMBER videoCodecConfig NOTIFY videoCodecConfigChanged)
     Q_PROPERTY(bool enableHdr MEMBER enableHdr NOTIFY enableHdrChanged)
+    Q_PROPERTY(HdrMode hdrMode MEMBER hdrMode NOTIFY hdrModeChanged)
     Q_PROPERTY(bool enableYUV444 MEMBER enableYUV444 NOTIFY enableYUV444Changed)
     Q_PROPERTY(VideoDecoderSelection videoDecoderSelection MEMBER videoDecoderSelection NOTIFY videoDecoderSelectionChanged)
     Q_PROPERTY(WindowMode windowMode MEMBER windowMode NOTIFY windowModeChanged)
@@ -158,6 +175,7 @@ public:
     Q_PROPERTY(int customScreenMode MEMBER customScreenMode NOTIFY customScreenModeChanged)
     Q_PROPERTY(int customVddScreenMode MEMBER customVddScreenMode NOTIFY customVddScreenModeChanged)
     Q_PROPERTY(bool enableMicrophone MEMBER enableMicrophone NOTIFY enableMicrophoneChanged)
+    Q_PROPERTY(OverlayMenuPosition overlayMenuPosition MEMBER overlayMenuPosition NOTIFY overlayMenuPositionChanged)
 
     Q_INVOKABLE bool retranslate();
 
@@ -203,6 +221,7 @@ public:
     AudioConfig audioConfig;
     VideoCodecConfig videoCodecConfig;
     bool enableHdr;
+    HdrMode hdrMode;
     bool enableYUV444;
     VideoDecoderSelection videoDecoderSelection;
     WindowMode windowMode;
@@ -213,6 +232,7 @@ public:
     int customScreenMode;
     int customVddScreenMode;
     bool enableMicrophone;
+    OverlayMenuPosition overlayMenuPosition;
 
 signals:
     void displayModeChanged();
@@ -232,6 +252,7 @@ signals:
     void audioConfigChanged();
     void videoCodecConfigChanged();
     void enableHdrChanged();
+    void hdrModeChanged();
     void enableYUV444Changed();
     void videoDecoderSelectionChanged();
     void uiDisplayModeChanged();
@@ -263,6 +284,7 @@ signals:
     void customScreenModeChanged();
     void customVddScreenModeChanged();
     void enableMicrophoneChanged();
+    void overlayMenuPositionChanged();
 
 private:
     explicit StreamingPreferences(QQmlEngine *qmlEngine);

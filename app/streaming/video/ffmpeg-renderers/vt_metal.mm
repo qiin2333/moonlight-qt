@@ -272,6 +272,10 @@ public:
                 // https://developer.apple.com/documentation/metal/hdr_content/using_color_spaces_to_display_hdr_content
                 m_MetalLayer.colorspace = newColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2100_PQ);
             }
+            else if (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) {
+                // HLG (Hybrid Log-Gamma) — ITU-R BT.2100 HLG transfer function
+                m_MetalLayer.colorspace = newColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2100_HLG);
+            }
             else {
                 m_MetalLayer.colorspace = newColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2020);
             }
@@ -298,14 +302,18 @@ public:
         paramBuffer.chromaOffset = compat_make_half2(chromaOffset[0],
                                                      chromaOffset[1]);
 
-        // Set the EDR metadata for HDR10 to enable OS tonemapping
+        // Set the EDR metadata to enable OS tonemapping
         if (frame->color_trc == AVCOL_TRC_SMPTE2084 && m_MasteringDisplayColorVolume != nullptr) {
             m_MetalLayer.EDRMetadata = [CAEDRMetadata HDR10MetadataWithDisplayInfo:(__bridge NSData*)m_MasteringDisplayColorVolume
                                                                        contentInfo:(__bridge NSData*)m_ContentLightLevelInfo
                                                                 opticalOutputScale:203.0];
         }
+        else if (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) {
+            // HLG uses scene-referred luminance; no mastering display metadata needed
+            m_MetalLayer.EDRMetadata = [CAEDRMetadata HLGMetadata];
+        }
         else {
-            m_MetalLayer.EDRMetadata = nullptr;
+            m_MetalLayer.EDRMetadata = nil;
         }
 
         paramBuffer.bitnessScaleFactor = getBitnessScaleFactor(frame);
@@ -599,8 +607,8 @@ public:
                     renderRect.y = 0;
                 }
                 else if (i == Overlay::OverlayDebug) {
-                    // Top left
-                    renderRect.x = 0;
+                    // Top center
+                    renderRect.x = (m_LastDrawableWidth - overlayTexture.width) / 2;
                     renderRect.y = m_LastDrawableHeight - overlayTexture.height;
                 }
 

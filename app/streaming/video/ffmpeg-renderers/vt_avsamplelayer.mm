@@ -40,6 +40,7 @@ public:
           m_StreamView(nullptr),
           m_DisplayLink(nullptr),
           m_LastColorSpace(-1),
+          m_LastColorTrc(-1),
           m_ColorSpace(nullptr),
           m_VsyncMutex(nullptr),
           m_VsyncPassed(nullptr)
@@ -222,7 +223,8 @@ public:
         // Reset m_ColorSpace if the colorspace changes. This can happen when
         // a game enters HDR mode (Rec 601 -> Rec 2020).
         int colorspace = getFrameColorspace(frame);
-        if (colorspace != m_LastColorSpace) {
+        int colorTrc = frame->color_trc;
+        if (colorspace != m_LastColorSpace || colorTrc != m_LastColorTrc) {
             if (m_ColorSpace != nullptr) {
                 CGColorSpaceRelease(m_ColorSpace);
                 m_ColorSpace = nullptr;
@@ -237,6 +239,10 @@ public:
                 if (frame->color_trc == AVCOL_TRC_SMPTE2084) {
                     m_ColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2100_PQ);
                 }
+                else if (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) {
+                    // HLG (Hybrid Log-Gamma) — ITU-R BT.2100 HLG transfer function
+                    m_ColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2100_HLG);
+                }
                 else {
                     m_ColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2020);
                 }
@@ -247,6 +253,7 @@ public:
             }
 
             m_LastColorSpace = colorspace;
+            m_LastColorTrc = colorTrc;
         }
 
         if (m_ColorSpace != nullptr) {
@@ -483,6 +490,7 @@ private:
     NSTextField* m_OverlayTextFields[Overlay::OverlayMax];
     CVDisplayLinkRef m_DisplayLink;
     int m_LastColorSpace;
+    int m_LastColorTrc;
     CGColorSpaceRef m_ColorSpace;
     SDL_mutex* m_VsyncMutex;
     SDL_cond* m_VsyncPassed;

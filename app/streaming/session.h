@@ -10,6 +10,8 @@
 #include "video/decoder.h"
 #include "audio/renderers/renderer.h"
 #include "video/overlaymanager.h"
+#include "video/overlaymenupanel.h"
+#include "video/overlaytoast.h"
 #ifndef STEAM_LINK
 #include "micstream.h"
 #endif
@@ -170,6 +172,17 @@ private:
 
     void toggleFullscreen();
 
+    // Qt-based overlay menu
+    void showQtOverlayMenu();
+    void hideQtOverlayMenu();
+    void toggleQtOverlayMenu();
+    void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
+    void requestRuntimeBitrateChange(int bitrateKbps);
+    void showStreamingToast(const QString& message, int durationMs = 2000);
+#ifdef Q_OS_WIN32
+    void queryDisplayHdrBrightness(float& maxNits, float& minNits, float& maxFullNits);
+#endif
+
     void notifyMouseEmulationMode(bool enabled);
 
     void updateOptimalWindowDisplayMode();
@@ -286,6 +299,12 @@ private:
     Uint32 m_DropAudioEndTime;
 
     Overlay::OverlayManager m_OverlayManager;
+    bool m_WasCapturedBeforeMenu;  // 菜单打开前鼠标是否处于捕获状态
+    bool m_DeferCaptureRestore;    // 延迟恢复鼠标捕获（全屏切换等）
+    bool m_PendingMicToggle;       // 延迟麦克风切换（避免堆损坏）
+    OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
+    OverlayToast* m_Toast;           // Qt-based toast notification
+    Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
 
     static CONNECTION_LISTENER_CALLBACKS k_ConnCallbacks;
     static Session* s_ActiveSession;

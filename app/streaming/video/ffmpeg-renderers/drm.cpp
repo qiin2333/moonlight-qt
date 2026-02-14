@@ -152,6 +152,7 @@ DrmRenderer::DrmRenderer(AVHWDeviceType hwDeviceType, IFFmpegRenderer *backendRe
       m_OverlayRects{},
       m_Version(nullptr),
       m_HdrOutputMetadataBlobId(0),
+      m_LastHdrEotf(0),
       m_OutputRect{},
       m_SwFrameMapper(this),
       m_CurrentSwFrameIdx(0)
@@ -1031,8 +1032,9 @@ void DrmRenderer::setHdrMode(bool enabled)
             }
 
             outputMetadata.metadata_type = 0; // HDMI_STATIC_METADATA_TYPE1
-            outputMetadata.hdmi_metadata_type1.eotf = 2; // SMPTE ST 2084
+            outputMetadata.hdmi_metadata_type1.eotf = 2; // SMPTE ST 2084 (default, may be updated to HLG in renderFrame)
             outputMetadata.hdmi_metadata_type1.metadata_type = 0; // Static Metadata Type 1
+            m_LastHdrEotf = 2;
             for (int i = 0; i < 3; i++) {
                 outputMetadata.hdmi_metadata_type1.display_primaries[i].x = sunshineHdrMetadata.displayPrimaries[i].x;
                 outputMetadata.hdmi_metadata_type1.display_primaries[i].y = sunshineHdrMetadata.displayPrimaries[i].y;
@@ -1841,6 +1843,53 @@ void DrmRenderer::renderFrame(AVFrame* frame)
         else {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "COLOR_ENCODING property does not exist on video plane. Colors may be inaccurate!");
+        }
+
+        // Update HDR_OUTPUT_METADATA EOTF when transfer characteristics change
+        // EOTF 2 = SMPTE ST 2084 (PQ), EOTF 3 = ARIB STD-B67 (HLG)
+        if (m_HdrOutputMetadataBlobId != 0) {
+            uint16_t desiredEotf = (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) ? 3 : 2;
+            if (desiredEotf != m_LastHdrEotf) {
+                m_LastHdrEotf = desiredEotf;
+
+                // Destroy old blob and create new one with updated EOTF
+                drmModeDestroyPropertyBlob(m_DrmFd, m_HdrOutputMetadataBlobId);
+                m_HdrOutputMetadataBlobId = 0;
+
+                DrmDefs::hdr_output_metadata outputMetadata;
+                SS_HDR_METADATA sunshineHdrMetadata;
+                if (!LiGetHdrMetadata(&sunshineHdrMetadata)) {
+                    memset(&sunshineHdrMetadata, 0, sizeof(sunshineHdrMetadata));
+                }
+
+                outputMetadata.metadata_type = 0;
+                outputMetadata.hdmi_metadata_type1.eotf = desiredEotf;
+                outputMetadata.hdmi_metadata_type1.metadata_type = 0;
+                for (int i = 0; i < 3; i++) {
+                    outputMetadata.hdmi_metadata_type1.display_primaries[i].x = sunshineHdrMetadata.displayPrimaries[i].x;
+                    outputMetadata.hdmi_metadata_type1.display_primaries[i].y = sunshineHdrMetadata.displayPrimaries[i].y;
+                }
+                outputMetadata.hdmi_metadata_type1.white_point.x = sunshineHdrMetadata.whitePoint.x;
+                outputMetadata.hdmi_metadata_type1.white_point.y = sunshineHdrMetadata.whitePoint.y;
+                outputMetadata.hdmi_metadata_type1.max_display_mastering_luminance = sunshineHdrMetadata.maxDisplayLuminance;
+                outputMetadata.hdmi_metadata_type1.min_display_mastering_luminance = sunshineHdrMetadata.minDisplayLuminance;
+                outputMetadata.hdmi_metadata_type1.max_cll = sunshineHdrMetadata.maxContentLightLevel;
+                outputMetadata.hdmi_metadata_type1.max_fall = sunshineHdrMetadata.maxFrameAverageLightLevel;
+
+                int err = drmModeCreatePropertyBlob(m_DrmFd, &outputMetadata, sizeof(outputMetadata), &m_HdrOutputMetadataBlobId);
+                if (err < 0) {
+                    m_HdrOutputMetadataBlobId = 0;
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                                 "drmModeCreatePropertyBlob() failed for EOTF %d: %d",
+                                 desiredEotf, err);
+                }
+                else if (auto hdrProp = m_Connector.property("HDR_OUTPUT_METADATA")) {
+                    m_PropSetter.set(*hdrProp, m_HdrOutputMetadataBlobId);
+                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                                "Updated HDR EOTF to %s (%d)",
+                                desiredEotf == 3 ? "HLG" : "PQ", desiredEotf);
+                }
+            }
         }
     }
 

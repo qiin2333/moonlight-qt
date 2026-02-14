@@ -43,8 +43,8 @@ typedef struct _CSC_CONST_BUF
     // YUV offset values
     float offsets[OFFSETS_ELEMENT_COUNT];
 
-    // Padding float to end 16-byte boundary
-    float padding;
+    // HLG mode flag: 1.0 = HLG input (apply HLG→PQ EOTF conversion in shader)
+    float hlgMode;
 
     // Chroma offset values
     float chromaOffset[2];
@@ -77,6 +77,7 @@ D3D11VARenderer::D3D11VARenderer(int decoderSelectionPass)
       m_AmfInitialized(false),
       m_LastColorSpace(-1),
       m_LastFullRange(false),
+      m_LastEnhColorTrc(-1),
       m_OutputIndex(0)
 {
     m_ContextLock = SDL_CreateMutex();
@@ -892,8 +893,9 @@ void D3D11VARenderer::renderFrame(AVFrame* frame)
     HRESULT hr;
 
     if (frame->color_trc != m_LastColorTrc) {
-        if (frame->color_trc == AVCOL_TRC_SMPTE2084) {
-            // Switch to Rec 2020 PQ (SMPTE ST 2084) colorspace for HDR10 rendering
+        if (frame->color_trc == AVCOL_TRC_SMPTE2084 ||
+            frame->color_trc == AVCOL_TRC_ARIB_STD_B67) {
+            // Switch to HDR colorspace for PQ (HDR10) or HLG content
             hr = m_SwapChain->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
             if (FAILED(hr)) {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -1087,6 +1089,9 @@ void D3D11VARenderer::bindColorConversion(bool frameChanged, AVFrame* frame)
     getFrameChromaCositingOffsets(frame, chromaOffset);
     constBuf.chromaOffset[0] = chromaOffset[0] / framesContext->width;
     constBuf.chromaOffset[1] = chromaOffset[1] / framesContext->height;
+
+    // Set HLG mode flag for shader HLG→PQ EOTF conversion
+    constBuf.hlgMode = (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) ? 1.0f : 0.0f;
 
     // Limit chroma texcoords to avoid sampling from alignment texels
     constBuf.chromaUVMax[0] = frame->width != framesContext->width ?
@@ -2697,18 +2702,28 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
 {
     bool frameFullRange = isFrameFullRange(frame);
     int frameColorSpace = getFrameColorspace(frame);
+    int frameColorTrc = frame->color_trc;
 
-    if (frameColorSpace == m_LastColorSpace && frameFullRange == m_LastFullRange) {
+    if (frameColorSpace == m_LastColorSpace && frameFullRange == m_LastFullRange && frameColorTrc == m_LastEnhColorTrc) {
         return;
     }
 
     m_LastColorSpace = frameColorSpace;
     m_LastFullRange = frameFullRange;
+    m_LastEnhColorTrc = frameColorTrc;
 
     switch (frameColorSpace) {
     case COLORSPACE_REC_2020:
-        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
+    {
+        // For both PQ and HLG content, tell the Video Processor the data is PQ (G2084).
+        // The VP only does enhancement filtering (super resolution, etc.) — it does NOT
+        // handle the HLG→PQ transfer function conversion. That is done by the pixel shader
+        // via hlgToPQ(). If we declared GHLG input + G2084 output, some VP implementations
+        // would do their own HLG→PQ conversion, causing double-conversion with the shader.
+        DXGI_COLOR_SPACE_TYPE streamCS = frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
+                                                        : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020;
+        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, streamCS);
+        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), streamCS);
 
         if (m_VideoEnhancement->isVendorNVIDIA()) {
             enableNvidiaVideoSuperResolution(false);
@@ -2722,6 +2737,7 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
             m_AmfUpScaler->Init(m_AmfUpScalerSurfaceFormat, m_DecoderParams.width, m_DecoderParams.height);
         }
         break;
+    }
 
     default:
         m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 : DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);

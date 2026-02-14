@@ -1212,6 +1212,52 @@ Flickable {
                         StreamingPreferences.enableMicrophone = checked
                     }
                 }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Overlay menu position")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                AutoResizingComboBox {
+                    Component.onCompleted: {
+                        var saved = StreamingPreferences.overlayMenuPosition
+                        currentIndex = 0
+                        for (var i = 0; i < overlayMenuModel.count; i++) {
+                            if (overlayMenuModel.get(i).val === saved) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                        activated(currentIndex)
+                    }
+
+                    id: overlayMenuComboBox
+                    textRole: "text"
+                    model: ListModel {
+                        id: overlayMenuModel
+                        ListElement {
+                            text: qsTr("Right edge (default)")
+                            val: StreamingPreferences.OMP_RIGHT_EDGE
+                        }
+                        ListElement {
+                            text: qsTr("Left edge")
+                            val: StreamingPreferences.OMP_LEFT_EDGE
+                        }
+                        ListElement {
+                            text: qsTr("At cursor position")
+                            val: StreamingPreferences.OMP_AT_CURSOR
+                        }
+                        ListElement {
+                            text: qsTr("Disabled")
+                            val: StreamingPreferences.OMP_DISABLED
+                        }
+                    }
+                    onActivated: {
+                        StreamingPreferences.overlayMenuPosition = overlayMenuModel.get(currentIndex).val
+                    }
+                }
             }
         }
 
@@ -2100,6 +2146,45 @@ Flickable {
                                       qsTr("The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.")
                                     :
                                       qsTr("HDR streaming is not supported on this PC.")
+                }
+
+                ComboBox {
+                    id: hdrModeComboBox
+                    width: parent.width
+                    font.pointSize: 12
+                    enabled: enableHdr.checked
+                    textRole: "text"
+                    model: ListModel {
+                        id: hdrModeListModel
+                        ListElement {
+                            text: "HDR10 (PQ)"
+                            val: 1
+                        }
+                        ListElement {
+                            text: "HLG"
+                            val: 2
+                        }
+                    }
+
+                    Component.onCompleted: {
+                        for (var i = 0; i < hdrModeListModel.count; i++) {
+                            if (hdrModeListModel.get(i).val === StreamingPreferences.hdrMode) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                    }
+
+                    onActivated: {
+                        if (enabled) {
+                            StreamingPreferences.hdrMode = hdrModeListModel.get(currentIndex).val
+                        }
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.")
                 }
 
                 CheckBox {

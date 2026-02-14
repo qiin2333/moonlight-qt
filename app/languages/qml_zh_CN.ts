@@ -206,6 +206,102 @@
     </message>
 </context>
 <context>
+    <name>OverlayMenuPanel</name>
+    <message>
+        <source>Menu</source>
+        <translation>杂鱼♡</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>返回</translation>
+    </message>
+    <message>
+        <source>Quick Actions</source>
+        <translation>快捷操作</translation>
+    </message>
+    <message>
+        <source>Bitrate</source>
+        <translation>码率</translation>
+    </message>
+    <message>
+        <source>Toggle Fullscreen</source>
+        <translation>切换全屏</translation>
+    </message>
+    <message>
+        <source>Microphone</source>
+        <translation>麦克风</translation>
+    </message>
+    <message>
+        <source>Disconnect</source>
+        <translation>断开连接</translation>
+    </message>
+
+    <message>
+        <source>Quit Moonlight</source>
+        <translation>退出 Moonlight</translation>
+    </message>
+    <message>
+        <source>Performance Stats</source>
+        <translation>性能统计</translation>
+    </message>
+    <message>
+        <source>Mouse Mode</source>
+        <translation>鼠标模式</translation>
+    </message>
+    <message>
+        <source>Show/Hide Cursor</source>
+        <translation>显示/隐藏光标</translation>
+    </message>
+    <message>
+        <source>Minimize</source>
+        <translation>最小化</translation>
+    </message>
+    <message>
+        <source>Ungrab Mouse</source>
+        <translation>释放鼠标</translation>
+    </message>
+    <message>
+        <source>Paste Clipboard</source>
+        <translation>粘贴剪贴板</translation>
+    </message>
+    <message>
+        <source>Pointer Region Lock</source>
+        <translation>指针区域锁定</translation>
+    </message>
+    <message>
+        <source>1 Mbps</source>
+        <translation>1 Mbps</translation>
+    </message>
+    <message>
+        <source>2 Mbps</source>
+        <translation>2 Mbps</translation>
+    </message>
+    <message>
+        <source>5 Mbps</source>
+        <translation>5 Mbps</translation>
+    </message>
+    <message>
+        <source>10 Mbps</source>
+        <translation>10 Mbps</translation>
+    </message>
+    <message>
+        <source>20 Mbps</source>
+        <translation>20 Mbps</translation>
+    </message>
+    <message>
+        <source>30 Mbps</source>
+        <translation>30 Mbps</translation>
+    </message>
+    <message>
+        <source>50 Mbps</source>
+        <translation>50 Mbps</translation>
+    </message>
+    <message>
+        <source>100 Mbps</source>
+        <translation>100 Mbps</translation>
+    </message>
+</context>
+<context>
     <name>NvHTTP</name>
     <message>
         <location filename="../backend/nvhttp.cpp" line="357"/>
