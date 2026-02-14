@@ -43,8 +43,8 @@ typedef struct _CSC_CONST_BUF
     // YUV offset values
     float offsets[OFFSETS_ELEMENT_COUNT];
 
-    // Padding float to end 16-byte boundary
-    float padding;
+    // HLG mode flag: 1.0 = HLG input (apply HLG→PQ EOTF conversion in shader)
+    float hlgMode;
 
     // Chroma offset values
     float chromaOffset[2];
@@ -1089,6 +1089,9 @@ void D3D11VARenderer::bindColorConversion(bool frameChanged, AVFrame* frame)
     getFrameChromaCositingOffsets(frame, chromaOffset);
     constBuf.chromaOffset[0] = chromaOffset[0] / framesContext->width;
     constBuf.chromaOffset[1] = chromaOffset[1] / framesContext->height;
+
+    // Set HLG mode flag for shader HLG→PQ EOTF conversion
+    constBuf.hlgMode = (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) ? 1.0f : 0.0f;
 
     // Limit chroma texcoords to avoid sampling from alignment texels
     constBuf.chromaUVMax[0] = frame->width != framesContext->width ?
@@ -2742,6 +2745,7 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
             m_AmfUpScaler->Init(m_AmfUpScalerSurfaceFormat, m_DecoderParams.width, m_DecoderParams.height);
         }
         break;
+    }
 
     default:
         m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 : DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
