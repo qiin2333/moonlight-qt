@@ -2715,23 +2715,15 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
     switch (frameColorSpace) {
     case COLORSPACE_REC_2020:
     {
-        // Determine the correct DXGI colorspace based on transfer characteristics
-        DXGI_COLOR_SPACE_TYPE streamCS, outputCS;
-        if (frameColorTrc == AVCOL_TRC_ARIB_STD_B67) {
-            // HLG content: use GHLG colorspace for stream input, PQ for output
-            // The video processor will handle HLG→PQ conversion
-            streamCS = frameFullRange ? DXGI_COLOR_SPACE_YCBCR_FULL_GHLG_TOPLEFT_P2020
-                                      : DXGI_COLOR_SPACE_YCBCR_STUDIO_GHLG_TOPLEFT_P2020;
-            outputCS = frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
-                                      : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020;
-        } else {
-            // PQ (HDR10) content
-            streamCS = frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
-                                      : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020;
-            outputCS = streamCS;
-        }
+        // For both PQ and HLG content, tell the Video Processor the data is PQ (G2084).
+        // The VP only does enhancement filtering (super resolution, etc.) — it does NOT
+        // handle the HLG→PQ transfer function conversion. That is done by the pixel shader
+        // via hlgToPQ(). If we declared GHLG input + G2084 output, some VP implementations
+        // would do their own HLG→PQ conversion, causing double-conversion with the shader.
+        DXGI_COLOR_SPACE_TYPE streamCS = frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
+                                                        : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020;
         m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, streamCS);
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), outputCS);
+        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), streamCS);
 
         if (m_VideoEnhancement->isVendorNVIDIA()) {
             enableNvidiaVideoSuperResolution(false);
