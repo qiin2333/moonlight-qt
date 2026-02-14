@@ -65,8 +65,26 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     m_TitleFont.setPointSize(8);
     m_TitleFont.setWeight(QFont::DemiBold);
 
-    // Icon font (Segoe MDL2 Assets — available on Windows 10/11)
+    // Icon font: platform-specific
+#ifdef Q_OS_WIN
+    // Segoe MDL2 Assets — available on Windows 10/11
     m_IconFont = QFont(QStringLiteral("Segoe MDL2 Assets"), 10);
+#else
+    // Material Icons (bundled, Apache 2.0) — cross-platform fallback
+    {
+        int iconFontId = QFontDatabase::addApplicationFont(QStringLiteral(":/data/MaterialIcons-Regular.ttf"));
+        QString materialFamily;
+        if (iconFontId >= 0) {
+            QStringList families = QFontDatabase::applicationFontFamilies(iconFontId);
+            if (!families.isEmpty())
+                materialFamily = families.first();
+        }
+        if (!materialFamily.isEmpty())
+            m_IconFont = QFont(materialFamily, 12);
+        else
+            m_IconFont = QFont(QStringLiteral("Material Icons"), 12);
+    }
+#endif
     m_IconFont.setWeight(QFont::Normal);
 
     // --- Animations ---
@@ -541,8 +559,12 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
     const auto& items = level.items;
     int contentTop = titleH + m_Padding;
 
-    // Icon mapping for menu items (Segoe MDL2 Assets code points)
+    // Icon mapping for menu items
+    // Windows: Segoe MDL2 Assets code points
+    // Other platforms: Material Icons code points (bundled font)
     auto iconForItem = [](const MenuItem& item) -> QChar {
+#ifdef Q_OS_WIN
+        // Segoe MDL2 Assets code points
         if (item.type == MenuItemType::SubMenu) {
             if (item.targetLevel == 1) return QChar(0xE713); // Settings gear
             if (item.targetLevel == 2) return QChar(0xE9D9); // Diagnostic/chart
@@ -561,6 +583,27 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         case MenuAction::TogglePointerRegionLock: return QChar(0xE72E); // Lock
         default: return QChar();
         }
+#else
+        // Material Icons code points
+        if (item.type == MenuItemType::SubMenu) {
+            if (item.targetLevel == 1) return QChar(0xE8B8); // settings
+            if (item.targetLevel == 2) return QChar(0xE6C2); // assessment
+        }
+        switch (item.action) {
+        case MenuAction::ToggleFullScreen:  return QChar(0xE5D0); // fullscreen
+        case MenuAction::ToggleMicrophone:  return QChar(0xE029); // mic
+        case MenuAction::Quit:              return QChar(0xE5CD); // close
+        case MenuAction::QuitAndExit:       return QChar(0xE5CD); // close
+        case MenuAction::ToggleStatsOverlay:return QChar(0xE6C2); // assessment
+        case MenuAction::ToggleMouseMode:   return QChar(0xE323); // mouse (Material)
+        case MenuAction::ToggleCursorHide:  return QChar(0xE31A); // near_me (cursor arrow)
+        case MenuAction::ToggleMinimize:    return QChar(0xE15B); // remove (minimize bar)
+        case MenuAction::UngrabInput:       return QChar(0xE5C4); // arrow_back
+        case MenuAction::PasteText:         return QChar(0xE14F); // content_paste
+        case MenuAction::TogglePointerRegionLock: return QChar(0xE897); // lock
+        default: return QChar();
+        }
+#endif
     };
 
     // Icon column: only on top-level menu
