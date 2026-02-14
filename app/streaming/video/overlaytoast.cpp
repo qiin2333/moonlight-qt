@@ -53,12 +53,20 @@ void OverlayToast::showToast(int parentX, int parentY, int parentW, int parentH,
     int toastWidth = qMin(textWidth, 500);
     if (toastWidth < 120) toastWidth = 120;
 
+#ifdef Q_OS_MACOS
+    // On macOS, SDL and Qt both use points (logical coordinates)
+    int qpX = parentX;
+    int qpY = parentY;
+    int qpW = parentW;
+    int qpH = parentH;
+#else
     // Convert SDL pixel coords to Qt DIP
     qreal dpr = screen() ? screen()->devicePixelRatio() : 1.0;
     int qpX = qRound(parentX / dpr);
     int qpY = qRound(parentY / dpr);
     int qpW = qRound(parentW / dpr);
     int qpH = qRound(parentH / dpr);
+#endif
 
     // Position at bottom-center, 60px above the bottom
     int x = qpX + (qpW - toastWidth) / 2;

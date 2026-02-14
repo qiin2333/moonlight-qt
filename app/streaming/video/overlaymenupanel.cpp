@@ -304,11 +304,20 @@ void OverlayMenuPanel::showInternal()
 
 void OverlayMenuPanel::repositionWindow()
 {
+#ifdef Q_OS_MACOS
+    // On macOS, SDL and Qt both use points (logical coordinates)
+    int qpX = m_ParentX;
+    int qpY = m_ParentY;
+    int qpW = m_ParentW;
+    int qpH = m_ParentH;
+#else
+    // On other platforms, convert SDL pixel coordinates to Qt DIP
     qreal dpr = screen() ? screen()->devicePixelRatio() : 1.0;
     int qpX = qRound(m_ParentX / dpr);
     int qpY = qRound(m_ParentY / dpr);
     int qpW = qRound(m_ParentW / dpr);
     int qpH = qRound(m_ParentH / dpr);
+#endif
 
     int itemCount  = (int)m_MenuLevels[m_CurrentLevel].items.size();
     int titleH     = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
@@ -323,8 +332,13 @@ void OverlayMenuPanel::repositionWindow()
         break;
 
     case AnchorMode::AtCursor: {
+#ifdef Q_OS_MACOS
+        int qcX = m_CursorX;
+        int qcY = m_CursorY;
+#else
         int qcX = qRound(m_CursorX / dpr);
         int qcY = qRound(m_CursorY / dpr);
+#endif
         // Position menu so cursor is near top-left corner
         cx = qcX;
         cy = qcY;
