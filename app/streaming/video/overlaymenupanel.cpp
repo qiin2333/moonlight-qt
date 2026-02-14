@@ -5,6 +5,7 @@
 #include <QPainterPath>
 #include <QCursor>
 #include <QFontDatabase>
+#include <memory>
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     : QRasterWindow(parent),
@@ -410,8 +411,10 @@ void OverlayMenuPanel::closeMenu()
     m_OpacityAnim->setEndValue(0.0);
     m_OpacityAnim->setEasingCurve(QEasingCurve::InCubic);
 
-    // When fade-out completes, finalize
-    connect(m_OpacityAnim, &QPropertyAnimation::finished, this, [this]() {
+    // When fade-out completes, finalize (use disconnect to emulate single-shot for Qt 5 compat)
+    auto conn = std::make_shared<QMetaObject::Connection>();
+    *conn = connect(m_OpacityAnim, &QPropertyAnimation::finished, this, [this, conn]() {
+        disconnect(*conn);
         m_Closing = false;
         m_CurrentLevel = 0;
         hide();
@@ -419,7 +422,7 @@ void OverlayMenuPanel::closeMenu()
         if (m_CloseCallback) {
             m_CloseCallback();
         }
-    }, Qt::SingleShotConnection);
+    });
 
     m_SlideAnim->start();
     m_OpacityAnim->start();
@@ -686,7 +689,11 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
 
 void OverlayMenuPanel::mouseMoveEvent(QMouseEvent* event)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     int newIdx = itemAtPos(event->position().toPoint());
+#else
+    int newIdx = itemAtPos(event->pos());
+#endif
     if (newIdx != m_HoveredIndex) {
         m_HoveredIndex = newIdx;
         setCursor((m_HoveredIndex >= 0 || m_HoveredIndex == -2) ? Qt::PointingHandCursor : Qt::ArrowCursor);
@@ -698,7 +705,11 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() != Qt::LeftButton) return;
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     int idx = itemAtPos(event->position().toPoint());
+#else
+    int idx = itemAtPos(event->pos());
+#endif
 
     // Title bar click → navigate back
     if (idx == -2) {
