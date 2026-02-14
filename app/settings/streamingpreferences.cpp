@@ -66,6 +66,7 @@
 #define SER_SHOWLOCALCURSOR "showLocalCursor"
 #define SER_MICROPHONE "microphone"
 #define SER_OVERLAYMENUPOS "overlaymenuposition"
+#define SER_HDRMODE "hdrmode"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -181,6 +182,8 @@ void StreamingPreferences::reload()
     swapFaceButtons = settings.value(SER_SWAPFACEBUTTONS, false).toBool();
     keepAwake = settings.value(SER_KEEPAWAKE, true).toBool();
     enableHdr = settings.value(SER_HDR, false).toBool();
+    hdrMode = static_cast<HdrMode>(settings.value(SER_HDRMODE,
+                                                   static_cast<int>(HdrMode::HDR_PQ)).toInt());
     captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS,
                                                          static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
     audioConfig = static_cast<AudioConfig>(settings.value(SER_AUDIOCFG,
@@ -384,6 +387,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_SHOWPERFOVERLAY, showPerformanceOverlay);
     settings.setValue(SER_AUDIOCFG, static_cast<int>(audioConfig));
     settings.setValue(SER_HDR, enableHdr);
+    settings.setValue(SER_HDRMODE, static_cast<int>(hdrMode));
     settings.setValue(SER_YUV444, enableYUV444);
     settings.setValue(SER_VIDEOCFG, static_cast<int>(videoCodecConfig));
     settings.setValue(SER_VIDEODEC, static_cast<int>(videoDecoderSelection));

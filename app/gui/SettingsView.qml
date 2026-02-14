@@ -2148,6 +2148,45 @@ Flickable {
                                       qsTr("HDR streaming is not supported on this PC.")
                 }
 
+                ComboBox {
+                    id: hdrModeComboBox
+                    width: parent.width
+                    font.pointSize: 12
+                    enabled: enableHdr.checked
+                    textRole: "text"
+                    model: ListModel {
+                        id: hdrModeListModel
+                        ListElement {
+                            text: "HDR10 (PQ)"
+                            val: 1
+                        }
+                        ListElement {
+                            text: "HLG"
+                            val: 2
+                        }
+                    }
+
+                    Component.onCompleted: {
+                        for (var i = 0; i < hdrModeListModel.count; i++) {
+                            if (hdrModeListModel.get(i).val === StreamingPreferences.hdrMode) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                    }
+
+                    onActivated: {
+                        if (enabled) {
+                            StreamingPreferences.hdrMode = hdrModeListModel.get(currentIndex).val
+                        }
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.")
+                }
+
                 CheckBox {
                     id: enableYUV444
                     width: parent.width

@@ -912,6 +912,9 @@ bool Session::initialize(QQuickWindow* qtWindow)
     else {
         // Deprioritize 8-bit codecs if HDR is enabled
         m_SupportedVideoFormats.deprioritizeByMask(~VIDEO_FORMAT_MASK_10BIT);
+
+        // Set the HDR mode (PQ or HLG) based on user preference
+        m_StreamConfig.hdrMode = static_cast<int>(m_Preferences->hdrMode);
     }
 
     switch (m_Preferences->windowMode)
