@@ -14,7 +14,9 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
       m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
       m_ContentOffset(0),
       m_Closing(false),
-      m_TargetX(0)
+      m_TargetX(0),
+      m_AnchorMode(AnchorMode::RightEdge),
+      m_CursorX(0), m_CursorY(0)
 {
     setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
              | Qt::WindowDoesNotAcceptFocus);
@@ -216,11 +218,39 @@ void OverlayMenuPanel::updateBitrateState(int bitrateKbps)
 
 void OverlayMenuPanel::showAtRightEdge(int parentX, int parentY, int parentW, int parentH)
 {
+    m_AnchorMode = AnchorMode::RightEdge;
     m_ParentX = parentX;
     m_ParentY = parentY;
     m_ParentW = parentW;
     m_ParentH = parentH;
+    showInternal();
+}
 
+void OverlayMenuPanel::showAtLeftEdge(int parentX, int parentY, int parentW, int parentH)
+{
+    m_AnchorMode = AnchorMode::LeftEdge;
+    m_ParentX = parentX;
+    m_ParentY = parentY;
+    m_ParentW = parentW;
+    m_ParentH = parentH;
+    showInternal();
+}
+
+void OverlayMenuPanel::showAtCursor(int parentX, int parentY, int parentW, int parentH,
+                                     int cursorX, int cursorY)
+{
+    m_AnchorMode = AnchorMode::AtCursor;
+    m_ParentX = parentX;
+    m_ParentY = parentY;
+    m_ParentW = parentW;
+    m_ParentH = parentH;
+    m_CursorX = cursorX;
+    m_CursorY = cursorY;
+    showInternal();
+}
+
+void OverlayMenuPanel::showInternal()
+{
     m_CurrentLevel = 0;
     m_HoveredIndex = -1;
     m_ContentOffset = 0;
@@ -239,17 +269,18 @@ void OverlayMenuPanel::showAtRightEdge(int parentX, int parentY, int parentW, in
     repositionWindow();
     m_TargetX = x();
 
-    // Start from an offset position (slide distance in Qt DIP)
+    // Slide direction depends on anchor mode
     int slideDistance = 40;
-    setPosition(m_TargetX + slideDistance, y());
+    int slideDir = (m_AnchorMode == AnchorMode::LeftEdge) ? -1 : 1;
+    setPosition(m_TargetX + slideDistance * slideDir, y());
     setOpacity(0.0);
 
     show();
     raise();
 
-    // Animate slide: right → target
+    // Animate slide
     m_SlideAnim->setDuration(220);
-    m_SlideAnim->setStartValue(m_TargetX + slideDistance);
+    m_SlideAnim->setStartValue(m_TargetX + slideDistance * slideDir);
     m_SlideAnim->setEndValue(m_TargetX);
     m_SlideAnim->setEasingCurve(QEasingCurve::OutCubic);
 
@@ -282,10 +313,34 @@ void OverlayMenuPanel::repositionWindow()
     int titleH     = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
     int menuHeight = titleH + itemCount * m_ItemHeight + m_Padding * 2;
 
-    // Content area position (right-aligned to parent edge)
-    int cx = qpX + qpW - m_MenuWidth;
-    int cy = qpY + (qpH - menuHeight) / 2;
+    int cx, cy; // content top-left position
 
+    switch (m_AnchorMode) {
+    case AnchorMode::LeftEdge:
+        cx = qpX;
+        cy = qpY + (qpH - menuHeight) / 2;
+        break;
+
+    case AnchorMode::AtCursor: {
+        int qcX = qRound(m_CursorX / dpr);
+        int qcY = qRound(m_CursorY / dpr);
+        // Position menu so cursor is near top-left corner
+        cx = qcX;
+        cy = qcY;
+        // Clamp within parent bounds
+        if (cx + m_MenuWidth > qpX + qpW) cx = qpX + qpW - m_MenuWidth;
+        if (cx < qpX) cx = qpX;
+        break;
+    }
+
+    case AnchorMode::RightEdge:
+    default:
+        cx = qpX + qpW - m_MenuWidth;
+        cy = qpY + (qpH - menuHeight) / 2;
+        break;
+    }
+
+    // Clamp vertical position within parent
     if (cy < qpY) cy = qpY;
     if (cy + menuHeight > qpY + qpH) cy = qpY + qpH - menuHeight;
 

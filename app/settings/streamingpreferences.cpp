@@ -65,6 +65,7 @@
 #define SER_CUSTOMVDDSCREENMODE "customvddscreenmode"
 #define SER_SHOWLOCALCURSOR "showLocalCursor"
 #define SER_MICROPHONE "microphone"
+#define SER_OVERLAYMENUPOS "overlaymenuposition"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -154,6 +155,8 @@ void StreamingPreferences::reload()
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     videoEnhancement = settings.value(SER_VIDEOENHANCEMENT, false).toBool();
     enableMicrophone = settings.value(SER_MICROPHONE, false).toBool();
+    overlayMenuPosition = static_cast<OverlayMenuPosition>(settings.value(SER_OVERLAYMENUPOS,
+                                                           static_cast<int>(OverlayMenuPosition::OMP_RIGHT_EDGE)).toInt());
 
     streamResolutionScale = settings.value(SER_STREAMRESOLUTIONSCALE, false).toBool();
     streamResolutionScaleRatio = settings.value(SER_STREAMRESOLUTIONSCALERATIO, 100).toInt();
@@ -399,6 +402,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_CUSTOMSCREENMODE, customScreenMode);
     settings.setValue(SER_CUSTOMVDDSCREENMODE, customVddScreenMode);
     settings.setValue(SER_MICROPHONE, enableMicrophone);
+    settings.setValue(SER_OVERLAYMENUPOS, static_cast<int>(overlayMenuPosition));
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

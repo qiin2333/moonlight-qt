@@ -73,6 +73,13 @@ public:
     // Position the panel at the right edge of the given parent rect (SDL pixel coords)
     void showAtRightEdge(int parentX, int parentY, int parentW, int parentH);
 
+    // Position the panel at the left edge of the given parent rect (SDL pixel coords)
+    void showAtLeftEdge(int parentX, int parentY, int parentW, int parentH);
+
+    // Position the panel at a specific cursor position (SDL pixel coords)
+    void showAtCursor(int parentX, int parentY, int parentW, int parentH,
+                      int cursorX, int cursorY);
+
     void closeMenu();
     bool isMenuVisible() const { return m_Visible; }
     bool isClosing() const { return m_Closing; }
@@ -105,9 +112,12 @@ private:
         std::vector<MenuItem> items;
     };
 
+    enum class AnchorMode { RightEdge, LeftEdge, AtCursor };
+
     void buildMenuLevels();
     void navigateToLevel(int level);
     void repositionWindow();
+    void showInternal();     // shared show logic after geometry is set
     int  itemAtPos(const QPoint& pos) const;
 
     std::vector<MenuLevel> m_MenuLevels;
@@ -146,4 +156,8 @@ private:
     qreal  m_ContentOffset;   // horizontal paint offset during level transition
     bool   m_Closing;         // true while close animation is running
     int    m_TargetX;         // cached final x position for show animation
+
+    // Menu anchor mode and cursor position (for AtCursor mode)
+    AnchorMode m_AnchorMode;
+    int m_CursorX, m_CursorY; // SDL pixel coords for AtCursor mode
 };

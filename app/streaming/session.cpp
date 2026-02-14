@@ -1591,7 +1591,24 @@ void Session::showQtOverlayMenu()
     m_MenuPanel->updateMicrophoneState(m_MicStream != nullptr);
     m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
 
-    m_MenuPanel->showAtRightEdge(wx, wy, ww, wh);
+    // Show menu based on user preference
+    switch (m_Preferences->overlayMenuPosition) {
+    case StreamingPreferences::OMP_LEFT_EDGE:
+        m_MenuPanel->showAtLeftEdge(wx, wy, ww, wh);
+        break;
+    case StreamingPreferences::OMP_AT_CURSOR: {
+        int mx, my;
+        SDL_GetGlobalMouseState(&mx, &my);
+        m_MenuPanel->showAtCursor(wx, wy, ww, wh, mx, my);
+        break;
+    }
+    case StreamingPreferences::OMP_DISABLED:
+        return; // Do not show
+    case StreamingPreferences::OMP_RIGHT_EDGE:
+    default:
+        m_MenuPanel->showAtRightEdge(wx, wy, ww, wh);
+        break;
+    }
 
     // Pump Qt events immediately to trigger first paint
     QCoreApplication::processEvents(QEventLoop::AllEvents);

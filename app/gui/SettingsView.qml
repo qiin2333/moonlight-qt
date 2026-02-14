@@ -1212,6 +1212,52 @@ Flickable {
                         StreamingPreferences.enableMicrophone = checked
                     }
                 }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Overlay menu position")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                AutoResizingComboBox {
+                    Component.onCompleted: {
+                        var saved = StreamingPreferences.overlayMenuPosition
+                        currentIndex = 0
+                        for (var i = 0; i < overlayMenuModel.count; i++) {
+                            if (overlayMenuModel.get(i).val === saved) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                        activated(currentIndex)
+                    }
+
+                    id: overlayMenuComboBox
+                    textRole: "text"
+                    model: ListModel {
+                        id: overlayMenuModel
+                        ListElement {
+                            text: qsTr("Right edge (default)")
+                            val: StreamingPreferences.OMP_RIGHT_EDGE
+                        }
+                        ListElement {
+                            text: qsTr("Left edge")
+                            val: StreamingPreferences.OMP_LEFT_EDGE
+                        }
+                        ListElement {
+                            text: qsTr("At cursor position")
+                            val: StreamingPreferences.OMP_AT_CURSOR
+                        }
+                        ListElement {
+                            text: qsTr("Disabled")
+                            val: StreamingPreferences.OMP_DISABLED
+                        }
+                    }
+                    onActivated: {
+                        StreamingPreferences.overlayMenuPosition = overlayMenuModel.get(currentIndex).val
+                    }
+                }
             }
         }
 

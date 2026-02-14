@@ -108,6 +108,15 @@ public:
     };
     Q_ENUM(CaptureSysKeysMode);
 
+    enum OverlayMenuPosition
+    {
+        OMP_RIGHT_EDGE,    // Default: show on right edge of streaming window
+        OMP_LEFT_EDGE,     // Show on left edge
+        OMP_AT_CURSOR,     // Show at right-click position
+        OMP_DISABLED,      // Do not show overlay menu
+    };
+    Q_ENUM(OverlayMenuPosition);
+
     Q_PROPERTY(int width MEMBER width NOTIFY displayModeChanged)
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
@@ -158,6 +167,7 @@ public:
     Q_PROPERTY(int customScreenMode MEMBER customScreenMode NOTIFY customScreenModeChanged)
     Q_PROPERTY(int customVddScreenMode MEMBER customVddScreenMode NOTIFY customVddScreenModeChanged)
     Q_PROPERTY(bool enableMicrophone MEMBER enableMicrophone NOTIFY enableMicrophoneChanged)
+    Q_PROPERTY(OverlayMenuPosition overlayMenuPosition MEMBER overlayMenuPosition NOTIFY overlayMenuPositionChanged)
 
     Q_INVOKABLE bool retranslate();
 
@@ -213,6 +223,7 @@ public:
     int customScreenMode;
     int customVddScreenMode;
     bool enableMicrophone;
+    OverlayMenuPosition overlayMenuPosition;
 
 signals:
     void displayModeChanged();
@@ -263,6 +274,7 @@ signals:
     void customScreenModeChanged();
     void customVddScreenModeChanged();
     void enableMicrophoneChanged();
+    void overlayMenuPositionChanged();
 
 private:
     explicit StreamingPreferences(QQmlEngine *qmlEngine);
