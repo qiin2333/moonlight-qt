@@ -237,6 +237,10 @@ public:
                 if (frame->color_trc == AVCOL_TRC_SMPTE2084) {
                     m_ColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2100_PQ);
                 }
+                else if (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) {
+                    // HLG (Hybrid Log-Gamma) — ITU-R BT.2100 HLG transfer function
+                    m_ColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2100_HLG);
+                }
                 else {
                     m_ColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceITUR_2020);
                 }

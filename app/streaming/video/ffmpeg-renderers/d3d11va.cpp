@@ -77,6 +77,7 @@ D3D11VARenderer::D3D11VARenderer(int decoderSelectionPass)
       m_AmfInitialized(false),
       m_LastColorSpace(-1),
       m_LastFullRange(false),
+      m_LastEnhColorTrc(-1),
       m_OutputIndex(0)
 {
     m_ContextLock = SDL_CreateMutex();
@@ -892,8 +893,9 @@ void D3D11VARenderer::renderFrame(AVFrame* frame)
     HRESULT hr;
 
     if (frame->color_trc != m_LastColorTrc) {
-        if (frame->color_trc == AVCOL_TRC_SMPTE2084) {
-            // Switch to Rec 2020 PQ (SMPTE ST 2084) colorspace for HDR10 rendering
+        if (frame->color_trc == AVCOL_TRC_SMPTE2084 ||
+            frame->color_trc == AVCOL_TRC_ARIB_STD_B67) {
+            // Switch to HDR colorspace for PQ (HDR10) or HLG content
             hr = m_SwapChain->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
             if (FAILED(hr)) {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -2697,18 +2699,36 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
 {
     bool frameFullRange = isFrameFullRange(frame);
     int frameColorSpace = getFrameColorspace(frame);
+    int frameColorTrc = frame->color_trc;
 
-    if (frameColorSpace == m_LastColorSpace && frameFullRange == m_LastFullRange) {
+    if (frameColorSpace == m_LastColorSpace && frameFullRange == m_LastFullRange && frameColorTrc == m_LastEnhColorTrc) {
         return;
     }
 
     m_LastColorSpace = frameColorSpace;
     m_LastFullRange = frameFullRange;
+    m_LastEnhColorTrc = frameColorTrc;
 
     switch (frameColorSpace) {
     case COLORSPACE_REC_2020:
-        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
+    {
+        // Determine the correct DXGI colorspace based on transfer characteristics
+        DXGI_COLOR_SPACE_TYPE streamCS, outputCS;
+        if (frameColorTrc == AVCOL_TRC_ARIB_STD_B67) {
+            // HLG content: use GHLG colorspace for stream input, PQ for output
+            // The video processor will handle HLG→PQ conversion
+            streamCS = frameFullRange ? DXGI_COLOR_SPACE_YCBCR_FULL_GHLG_TOPLEFT_P2020
+                                      : DXGI_COLOR_SPACE_YCBCR_STUDIO_GHLG_TOPLEFT_P2020;
+            outputCS = frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
+                                      : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020;
+        } else {
+            // PQ (HDR10) content
+            streamCS = frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
+                                      : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020;
+            outputCS = streamCS;
+        }
+        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, streamCS);
+        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), outputCS);
 
         if (m_VideoEnhancement->isVendorNVIDIA()) {
             enableNvidiaVideoSuperResolution(false);

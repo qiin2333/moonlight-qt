@@ -758,6 +758,7 @@ private:
     SDL_Rect m_OverlayRects[Overlay::OverlayMax];
     drmVersionPtr m_Version;
     uint32_t m_HdrOutputMetadataBlobId;
+    uint16_t m_LastHdrEotf;
     SDL_Rect m_OutputRect;
     std::set<uint32_t> m_SupportedVideoPlaneFormats;
 
