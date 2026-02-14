@@ -567,16 +567,16 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         // Segoe MDL2 Assets code points
         if (item.type == MenuItemType::SubMenu) {
             if (item.targetLevel == 1) return QChar(0xE713); // Settings gear
-            if (item.targetLevel == 2) return QChar(0xE9D9); // Diagnostic/chart
+            if (item.targetLevel == 2) return QChar(0xE7F4); // DataSense (data/speed)
         }
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE740); // FullScreen
         case MenuAction::ToggleMicrophone:  return QChar(0xE720); // Microphone
         case MenuAction::Quit:              return QChar(0xE711); // Close/X
         case MenuAction::QuitAndExit:       return QChar(0xE711); // Close/X
-        case MenuAction::ToggleStatsOverlay:return QChar(0xE9D9); // Diagnostic
+        case MenuAction::ToggleStatsOverlay:return QChar(0xE7F4); // DataSense
         case MenuAction::ToggleMouseMode:   return QChar(0xE962); // Handwriting/pointer
-        case MenuAction::ToggleCursorHide:  return QChar(0xEDE3); // Cursor
+        case MenuAction::ToggleCursorHide:  return QChar(0xE76C); // PointerHand
         case MenuAction::ToggleMinimize:    return QChar(0xE921); // Minimize
         case MenuAction::UngrabInput:       return QChar(0xE785); // Mouse back
         case MenuAction::PasteText:         return QChar(0xE77F); // Paste
@@ -587,14 +587,14 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         // Material Icons code points
         if (item.type == MenuItemType::SubMenu) {
             if (item.targetLevel == 1) return QChar(0xE8B8); // settings
-            if (item.targetLevel == 2) return QChar(0xE6C2); // assessment
+            if (item.targetLevel == 2) return QChar(0xE1B2); // speed (bitrate)
         }
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE5D0); // fullscreen
         case MenuAction::ToggleMicrophone:  return QChar(0xE029); // mic
         case MenuAction::Quit:              return QChar(0xE5CD); // close
         case MenuAction::QuitAndExit:       return QChar(0xE5CD); // close
-        case MenuAction::ToggleStatsOverlay:return QChar(0xE6C2); // assessment
+        case MenuAction::ToggleStatsOverlay:return QChar(0xE1B2); // speed
         case MenuAction::ToggleMouseMode:   return QChar(0xE323); // mouse (Material)
         case MenuAction::ToggleCursorHide:  return QChar(0xE31A); // near_me (cursor arrow)
         case MenuAction::ToggleMinimize:    return QChar(0xE15B); // remove (minimize bar)
