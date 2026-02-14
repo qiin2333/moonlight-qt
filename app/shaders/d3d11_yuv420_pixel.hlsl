@@ -12,7 +12,7 @@ cbuffer CSC_CONST_BUF : register(b0)
 {
     min16float3x3 cscMatrix;
     min16float3 offsets;
-    float hlgMode;
+    min16float hlgMode;
     min16float2 chromaOffset;
     min16float2 chromaTexMax;
 };
