@@ -1575,6 +1575,11 @@ void Session::showQtOverlayMenu()
 {
     if (!m_MenuPanel || m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) return;
 
+    // Check if overlay menu is disabled before releasing mouse capture
+    if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_DISABLED) {
+        return; // Do not show
+    }
+
     // Save capture state and release mouse
     m_WasCapturedBeforeMenu = m_InputHandler->isCaptureActive();
     if (m_WasCapturedBeforeMenu) {
@@ -1599,14 +1604,15 @@ void Session::showQtOverlayMenu()
     case StreamingPreferences::OMP_LEFT_EDGE:
         m_MenuPanel->showAtLeftEdge(wx, wy, ww, wh);
         break;
-    case StreamingPreferences::OMP_AT_CURSOR: {
-        int mx, my;
-        SDL_GetGlobalMouseState(&mx, &my);
-        m_MenuPanel->showAtCursor(wx, wy, ww, wh, mx, my);
+    case StreamingPreferences::OMP_BUTTON:
+        // Show menu at the button's position (top-right corner)
+        m_MenuPanel->showAtCursor(wx, wy, ww, wh,
+                                  wx + ww - 40, wy + 40);
+        // Hide button while menu is visible
+        if (m_MenuButton) {
+            m_MenuButton->hideButton();
+        }
         break;
-    }
-    case StreamingPreferences::OMP_DISABLED:
-        return; // Do not show
     case StreamingPreferences::OMP_RIGHT_EDGE:
     default:
         m_MenuPanel->showAtRightEdge(wx, wy, ww, wh);
@@ -2301,6 +2307,7 @@ void Session::exec()
 
     // Create Qt-based overlay menu panel (rendered by OS compositor, not D3D11)
     m_MenuPanel = new OverlayMenuPanel();
+    m_MenuButton = nullptr;
     m_Toast = new OverlayToast();
     m_MenuPanel->setActionCallback([this](OverlayMenuPanel::MenuAction action) {
         dispatchQtMenuAction(action);
@@ -2317,10 +2324,32 @@ void Session::exec()
             m_InputHandler->setCaptureActive(true);
             m_WasCapturedBeforeMenu = false;
         }
+
+        // Re-show the floating menu button if in button mode
+        if (m_MenuButton && m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
+            int wx, wy, ww, wh;
+            SDL_GetWindowPosition(m_Window, &wx, &wy);
+            SDL_GetWindowSize(m_Window, &ww, &wh);
+            m_MenuButton->showButton(wx, wy, ww, wh);
+        }
+
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Qt overlay menu closed, capture %s",
                     m_DeferCaptureRestore ? "deferred" : "restored");
     });
+
+    // Create floating menu button if configured
+    if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
+        m_MenuButton = new OverlayMenuButton();
+        m_MenuButton->setClickCallback([this]() {
+            showQtOverlayMenu();
+        });
+        // Show button at initial position
+        int wx, wy, ww, wh;
+        SDL_GetWindowPosition(m_Window, &wx, &wy);
+        SDL_GetWindowSize(m_Window, &ww, &wh);
+        m_MenuButton->showButton(wx, wy, ww, wh);
+    }
 
     // Switch to async logging mode when we enter the SDL loop
     StreamUtils::enterAsyncLoggingMode();
@@ -2433,6 +2462,13 @@ void Session::exec()
                 m_InputHandler->notifyMouseLeave();
                 break;
             case SDL_WINDOWEVENT_SIZE_CHANGED:
+                // Reposition floating menu button if visible
+                if (m_MenuButton && m_MenuButton->isButtonVisible()) {
+                    int wx, wy, ww, wh;
+                    SDL_GetWindowPosition(m_Window, &wx, &wy);
+                    SDL_GetWindowSize(m_Window, &ww, &wh);
+                    m_MenuButton->repositionTo(wx, wy, ww, wh);
+                }
                 break;
             }
 
@@ -2652,13 +2688,22 @@ void Session::exec()
         case SDL_MOUSEMOTION:
         {
             // Qt overlay menu: edge detection with debounce (500ms cooldown after close)
-            if (m_MenuPanel && !m_MenuPanel->isMenuVisible()) {
+            // Only trigger for edge-based positions (not disabled, at-cursor, or button)
+            if (m_MenuPanel && !m_MenuPanel->isMenuVisible() &&
+                m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_DISABLED &&
+                m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_BUTTON) {
                 Uint32 elapsed = SDL_GetTicks() - m_MenuCloseTicks;
                 if (elapsed > 500) {
                     int ww, wh;
                     SDL_GetWindowSize(m_Window, &ww, &wh);
-                    // Trigger when mouse reaches rightmost 5 pixels
-                    if (event.motion.x >= ww - 5) {
+                    bool atEdge = false;
+                    if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_LEFT_EDGE) {
+                        atEdge = (event.motion.x <= 5);
+                    } else {
+                        // OMP_RIGHT_EDGE (default)
+                        atEdge = (event.motion.x >= ww - 5);
+                    }
+                    if (atEdge) {
                         showQtOverlayMenu();
                         break;
                     }
@@ -2757,6 +2802,13 @@ DispatchDeferredCleanup:
         m_MenuPanel->closeMenu();
         delete m_MenuPanel;
         m_MenuPanel = nullptr;
+    }
+
+    // Destroy the Qt overlay menu button
+    if (m_MenuButton) {
+        m_MenuButton->hideButton();
+        delete m_MenuButton;
+        m_MenuButton = nullptr;
     }
 
     // Destroy the Qt overlay toast

@@ -11,6 +11,7 @@
 #include "audio/renderers/renderer.h"
 #include "video/overlaymanager.h"
 #include "video/overlaymenupanel.h"
+#include "video/overlaymenubutton.h"
 #include "video/overlaytoast.h"
 #ifndef STEAM_LINK
 #include "micstream.h"
@@ -303,6 +304,7 @@ private:
     bool m_DeferCaptureRestore;    // 延迟恢复鼠标捕获（全屏切换等）
     bool m_PendingMicToggle;       // 延迟麦克风切换（避免堆损坏）
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
+    OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
 

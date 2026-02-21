@@ -202,6 +202,7 @@ SOURCES += \
     gui/sdlgamepadkeynavigation.cpp \
     streaming/video/overlaymanager.cpp \
     streaming/video/overlaymenupanel.cpp \
+    streaming/video/overlaymenubutton.cpp \
     streaming/video/overlaytoast.cpp \
     backend/systemproperties.cpp \
     wm.cpp \
@@ -246,6 +247,7 @@ HEADERS += \
     gui/sdlgamepadkeynavigation.h \
     streaming/video/overlaymanager.h \
     streaming/video/overlaymenupanel.h \
+    streaming/video/overlaymenubutton.h \
     streaming/video/overlaytoast.h \
     backend/systemproperties.h \
     imageutils.h

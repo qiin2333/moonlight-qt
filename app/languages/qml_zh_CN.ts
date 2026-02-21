@@ -1097,6 +1097,22 @@
         <translation>Discord Rich Presence 集成</translation>
     </message>
     <message>
+        <source>Overlay menu position</source>
+        <translation>覆盖菜单位置</translation>
+    </message>
+    <message>
+        <source>Right edge (default)</source>
+        <translation>右侧边缘（默认）</translation>
+    </message>
+    <message>
+        <source>Left edge</source>
+        <translation>左侧边缘</translation>
+    </message>
+    <message>
+        <source>Floating button</source>
+        <translation>浮动按钮</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="1264"/>
         <source>Updates your Discord status to display the name of the game you&apos;re streaming.</source>
         <translation>更新你的 Discord 状态，以显示正在运行的游戏名称。</translation>
