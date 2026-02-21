@@ -196,7 +196,7 @@ void MicStream::onAudio()
                               PCM_FRAME_SAMPLES,
                               encoded,
                               MAX_OPUS_SIZE);
-    if (len > 0) {
+        if (len > 0) {
             m_queue.enqueue(QByteArray(reinterpret_cast<char*>(encoded), len));
             m_opusBytes += len;
         } else {
@@ -214,14 +214,22 @@ void MicStream::sendLoop()
 
     while (!m_queue.isEmpty()) {
         QByteArray opus = m_queue.dequeue();
+        int opusLen = opus.size();
+
+        // PltEncryptMessage with CIPHER_FLAG_PAD_TO_BLOCK_SIZE writes PKCS7
+        // padding in-place past the input buffer. Reserve extra space so the
+        // underlying buffer can absorb up to 15 bytes of padding without
+        // overwriting adjacent heap memory.
+        opus.resize(((opusLen + 15) / 16) * 16);
+
         // sendMicrophoneOpusData handles RTP header and encryption internally
-        int rc = sendMicrophoneOpusData(reinterpret_cast<const unsigned char*>(opus.constData()), opus.size());
+        int rc = sendMicrophoneOpusData(reinterpret_cast<const unsigned char*>(opus.data()), opusLen);
         if (rc < 0) {
             qWarning() << "[MicStream] sendMicrophoneOpusData failed rc=" << rc;
             continue;
         }
         m_sentPackets++;
-        m_sentBytes += opus.size();
+        m_sentBytes += opusLen;
         m_timestamp += PCM_FRAME_SAMPLES;
     }
 }

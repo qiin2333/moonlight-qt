@@ -2001,7 +2001,9 @@ bool Session::startConnectionAsync()
 
     emit connectionStarted();
     if (m_Preferences->enableMicrophone) {
-        QMetaObject::invokeMethod(this, &Session::startMicrophone, Qt::QueuedConnection);
+        // Use the deferred mic toggle mechanism instead of QueuedConnection to avoid
+        // heap corruption when creating QAudioSource within nested event loops (processEvents).
+        m_PendingMicToggle = true;
     }
     return true;
 }
