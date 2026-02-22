@@ -42,6 +42,8 @@ public:
         TogglePointerRegionLock,
         // Microphone
         ToggleMicrophone,
+        // Gamepad mouse emulation
+        ToggleGamepadMouse,
         // Bitrate presets (kbps)
         SetBitrate1000,
         SetBitrate2000,
@@ -88,6 +90,19 @@ public:
     // Update dynamic state before showing the menu
     void updateMicrophoneState(bool enabled);
     void updateBitrateState(int bitrateKbps);
+    void updateGamepadMouseState(bool enabled);
+    void setHasGamepads(bool has) {
+        if (m_HasGamepads != has) {
+            m_HasGamepads = has;
+            buildMenuLevels();  // rebuild to show/hide gamepad items
+        }
+    }
+
+    // Gamepad navigation
+    void gamepadMoveUp();
+    void gamepadMoveDown();
+    void gamepadSelect();
+    void gamepadBack();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -118,12 +133,14 @@ private:
     void navigateToLevel(int level);
     void repositionWindow();
     void showInternal();     // shared show logic after geometry is set
+    void forceRepaint();     // synchronous repaint (requestUpdate is async on Windows)
     int  itemAtPos(const QPoint& pos) const;
 
     std::vector<MenuLevel> m_MenuLevels;
     int  m_CurrentLevel;
     int  m_HoveredIndex;
     bool m_Visible;
+    bool m_HasGamepads;
 
     ActionCallback m_ActionCallback;
     CloseCallback  m_CloseCallback;

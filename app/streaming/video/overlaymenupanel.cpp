@@ -2,6 +2,7 @@
 
 #include <QScreen>
 #include <QGuiApplication>
+#include <QCoreApplication>
 #include <QPainterPath>
 #include <QCursor>
 #include <QFontDatabase>
@@ -12,6 +13,7 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
       m_CurrentLevel(0),
       m_HoveredIndex(-1),
       m_Visible(false),
+      m_HasGamepads(false),
       m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
       m_ContentOffset(0),
       m_Closing(false),
@@ -96,11 +98,11 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     m_ContentSlideAnim->setEasingCurve(QEasingCurve::OutCubic);
     connect(m_ContentSlideAnim, &QVariantAnimation::valueChanged, this, [this](const QVariant& val) {
         m_ContentOffset = val.toReal();
-        requestUpdate();
+        forceRepaint();
     });
     connect(m_ContentSlideAnim, &QVariantAnimation::finished, this, [this]() {
         m_ContentOffset = 0;
-        requestUpdate();
+        forceRepaint();
     });
 
     buildMenuLevels();
@@ -108,6 +110,24 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
 
 OverlayMenuPanel::~OverlayMenuPanel()
 {
+}
+
+// ---------------------------------------------------------------------------
+// Synchronous repaint — requestUpdate() is async on Windows and may delay
+// the visual update by up to 1 second (until the next SDL event arrives).
+// This method directly delivers an UpdateRequest event so the paintEvent()
+// runs immediately within the current call frame.
+// ---------------------------------------------------------------------------
+
+void OverlayMenuPanel::forceRepaint()
+{
+    if (isExposed()) {
+        // Mark entire window as dirty (sets the dirty region for QPaintDeviceWindow)
+        update(QRect(0, 0, width(), height()));
+        // Synchronously deliver UpdateRequest to trigger paintEvent + backing store flush
+        QEvent ev(QEvent::UpdateRequest);
+        QCoreApplication::sendEvent(this, &ev);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -128,7 +148,12 @@ void OverlayMenuPanel::buildMenuLevels()
     top.items.push_back({tr("Toggle Fullscreen"), QString(), MenuItemType::Action,
                          MenuAction::ToggleFullScreen, 0, true, false, false});
     top.items.push_back({tr("Microphone"),    QString(),  MenuItemType::Toggle,
-                         MenuAction::ToggleMicrophone, 0, true, false, true}); // separator
+                         MenuAction::ToggleMicrophone, 0, true, false, !m_HasGamepads}); // separator if no gamepad item follows
+    // Only show Gamepad Mouse toggle when a gamepad is actually connected
+    if (m_HasGamepads) {
+        top.items.push_back({tr("Gamepad Mouse"), QString(),  MenuItemType::Toggle,
+                             MenuAction::ToggleGamepadMouse, 0, true, false, true}); // separator
+    }
     top.items.push_back({tr("Disconnect"),    QString(),  MenuItemType::Action,
                          MenuAction::Quit, 0, true, false, false});
     m_MenuLevels.push_back(top);
@@ -186,6 +211,19 @@ void OverlayMenuPanel::updateMicrophoneState(bool enabled)
     for (auto& item : m_MenuLevels[0].items) {
         if (item.action == MenuAction::ToggleMicrophone) {
             item.toggleState = enabled;
+            forceRepaint();
+            break;
+        }
+    }
+}
+
+void OverlayMenuPanel::updateGamepadMouseState(bool enabled)
+{
+    if (m_MenuLevels.empty()) return;
+    for (auto& item : m_MenuLevels[0].items) {
+        if (item.action == MenuAction::ToggleGamepadMouse) {
+            item.toggleState = enabled;
+            forceRepaint();
             break;
         }
     }
@@ -317,7 +355,7 @@ void OverlayMenuPanel::showInternal()
                        m_MenuWidth, height() - 2 * m_ShadowMargin);
     QCursor::setPos(contentRect.center());
 
-    requestUpdate();
+    forceRepaint();
 }
 
 void OverlayMenuPanel::repositionWindow()
@@ -411,7 +449,7 @@ void OverlayMenuPanel::navigateToLevel(int level)
         m_ContentSlideAnim->start();
     } else {
         // Back: instant switch, no animation (avoids jarring resize + slide combo)
-        requestUpdate();
+        forceRepaint();
     }
 }
 
@@ -572,6 +610,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE740); // FullScreen
         case MenuAction::ToggleMicrophone:  return QChar(0xE720); // Microphone
+        case MenuAction::ToggleGamepadMouse:  return QChar(0xE7FC); // Gamepad
         case MenuAction::Quit:              return QChar(0xE711); // Close/X
         case MenuAction::QuitAndExit:       return QChar(0xE711); // Close/X
         case MenuAction::ToggleStatsOverlay:return QChar(0xE7F4); // DataSense
@@ -592,6 +631,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE5D0); // fullscreen
         case MenuAction::ToggleMicrophone:  return QChar(0xE029); // mic
+        case MenuAction::ToggleGamepadMouse:  return QChar(0xE30F); // games (gamepad)
         case MenuAction::Quit:              return QChar(0xE5CD); // close
         case MenuAction::QuitAndExit:       return QChar(0xE5CD); // close
         case MenuAction::ToggleStatsOverlay:return QChar(0xE1B2); // speed
@@ -754,7 +794,7 @@ void OverlayMenuPanel::mouseMoveEvent(QMouseEvent* event)
     if (newIdx != m_HoveredIndex) {
         m_HoveredIndex = newIdx;
         setCursor((m_HoveredIndex >= 0 || m_HoveredIndex == -2) ? Qt::PointingHandCursor : Qt::ArrowCursor);
-        requestUpdate();
+        forceRepaint();
     }
 }
 
@@ -805,12 +845,124 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
         // Toggle visual state and dispatch
         auto& mutableItem = m_MenuLevels[m_CurrentLevel].items[idx];
         mutableItem.toggleState = !mutableItem.toggleState;
-        requestUpdate();
+        forceRepaint();
         if (m_ActionCallback) {
             m_ActionCallback(item.action);
         }
         break;
     }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Gamepad navigation
+// ---------------------------------------------------------------------------
+
+void OverlayMenuPanel::gamepadMoveUp()
+{
+    if (!m_Visible) return;
+    const auto& items = m_MenuLevels[m_CurrentLevel].items;
+    if (items.empty()) return;
+
+    if (m_HoveredIndex <= 0) {
+        // Wrap to last item, or move to title bar if on sub-level
+        if (m_CurrentLevel > 0 && m_HoveredIndex == 0) {
+            m_HoveredIndex = -2; // title bar (back button)
+        } else {
+            m_HoveredIndex = (int)items.size() - 1;
+        }
+    } else {
+        m_HoveredIndex--;
+    }
+    // Skip disabled items
+    if (m_HoveredIndex >= 0 && !items[m_HoveredIndex].enabled) {
+        gamepadMoveUp();
+        return;
+    }
+    forceRepaint();
+}
+
+void OverlayMenuPanel::gamepadMoveDown()
+{
+    if (!m_Visible) return;
+    const auto& items = m_MenuLevels[m_CurrentLevel].items;
+    if (items.empty()) return;
+
+    if (m_HoveredIndex == -2) {
+        // From title bar, move to first item
+        m_HoveredIndex = 0;
+    } else if (m_HoveredIndex < 0 || m_HoveredIndex >= (int)items.size() - 1) {
+        // Wrap to title bar on sub-level, or to first item on top level
+        if (m_CurrentLevel > 0) {
+            m_HoveredIndex = -2;
+        } else {
+            m_HoveredIndex = 0;
+        }
+    } else {
+        m_HoveredIndex++;
+    }
+    // Skip disabled items
+    if (m_HoveredIndex >= 0 && !items[m_HoveredIndex].enabled) {
+        gamepadMoveDown();
+        return;
+    }
+    forceRepaint();
+}
+
+void OverlayMenuPanel::gamepadSelect()
+{
+    if (!m_Visible) return;
+
+    // Title bar → back
+    if (m_HoveredIndex == -2) {
+        navigateToLevel(0);
+        return;
+    }
+
+    if (m_HoveredIndex < 0) return;
+
+    const auto& items = m_MenuLevels[m_CurrentLevel].items;
+    if (m_HoveredIndex >= (int)items.size() || !items[m_HoveredIndex].enabled) return;
+
+    const auto& item = items[m_HoveredIndex];
+
+    switch (item.type) {
+    case MenuItemType::Back:
+        navigateToLevel(0);
+        break;
+    case MenuItemType::SubMenu:
+        navigateToLevel(item.targetLevel);
+        break;
+    case MenuItemType::Action:
+    {
+        MenuAction action = item.action;
+        closeMenu();
+        if (m_ActionCallback) {
+            m_ActionCallback(action);
+        }
+        break;
+    }
+    case MenuItemType::Toggle:
+    {
+        auto& mutableItem = m_MenuLevels[m_CurrentLevel].items[m_HoveredIndex];
+        mutableItem.toggleState = !mutableItem.toggleState;
+        forceRepaint();
+        if (m_ActionCallback) {
+            m_ActionCallback(item.action);
+        }
+        break;
+    }
+    }
+}
+
+void OverlayMenuPanel::gamepadBack()
+{
+    if (!m_Visible) return;
+
+    if (m_CurrentLevel > 0) {
+        navigateToLevel(0);
+    } else {
+        closeMenu();
     }
 }
 

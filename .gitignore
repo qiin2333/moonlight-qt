@@ -4,5 +4,6 @@
 **/.vs/
 **/.vscode/
 build/
+soundio/libsoundio/
 config.tests/*/.qmake.stash
 config.tests/*/Makefile

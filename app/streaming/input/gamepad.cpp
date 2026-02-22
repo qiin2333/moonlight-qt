@@ -342,6 +342,10 @@ void SdlInputHandler::handleControllerButtonEvent(SDL_ControllerButtonEvent* eve
                                 "Mouse emulation active");
                     Session::get()->notifyMouseEmulationMode(true);
                 }
+                else {
+                    // Gamepad mouse disabled — long-press Start opens overlay menu
+                    Session::get()->showQtOverlayMenu();
+                }
             }
         }
         else if (state->mouseEmulationTimer != 0) {
@@ -1005,4 +1009,44 @@ int SdlInputHandler::getAttachedGamepadMask()
     }
 
     return mask;
+}
+
+bool SdlInputHandler::toggleGamepadMouseEmulation()
+{
+    // Find the first active gamepad and toggle its mouse emulation
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        if (m_GamepadState[i].controller != nullptr) {
+            GamepadState* state = &m_GamepadState[i];
+            if (state->mouseEmulationTimer != 0) {
+                // Deactivate
+                SDL_RemoveTimer(state->mouseEmulationTimer);
+                state->mouseEmulationTimer = 0;
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "Mouse emulation deactivated (via menu)");
+                Session::get()->notifyMouseEmulationMode(false);
+                return false;
+            } else {
+                // Activate
+                sendGamepadState(state);
+                state->mouseEmulationTimer = SDL_AddTimer(
+                    MOUSE_EMULATION_POLLING_INTERVAL,
+                    SdlInputHandler::mouseEmulationTimerCallback, state);
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "Mouse emulation active (via menu)");
+                Session::get()->notifyMouseEmulationMode(true);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+bool SdlInputHandler::isMouseEmulationActive()
+{
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        if (m_GamepadState[i].controller != nullptr &&
+            m_GamepadState[i].mouseEmulationTimer != 0) {
+            return true;
+        }
+    }
+    return false;
 }

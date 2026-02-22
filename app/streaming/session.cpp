@@ -1598,6 +1598,8 @@ void Session::showQtOverlayMenu()
     // Update dynamic state before showing
     m_MenuPanel->updateMicrophoneState(m_MicStream != nullptr);
     m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
+    m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
+    m_MenuPanel->updateGamepadMouseState(m_InputHandler->isMouseEmulationActive());
 
     // Show menu based on user preference
     switch (m_Preferences->overlayMenuPosition) {
@@ -1687,6 +1689,19 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
     case OverlayMenuPanel::MenuAction::ToggleMicrophone:
         m_PendingMicToggle = true;
         return;
+
+    // --- Gamepad mouse emulation toggle ---
+    // Immediately activates/deactivates mouse emulation on the connected gamepad
+    case OverlayMenuPanel::MenuAction::ToggleGamepadMouse:
+    {
+        if (m_InputHandler) {
+            bool nowActive = m_InputHandler->toggleGamepadMouseEmulation();
+            if (m_MenuPanel) {
+                m_MenuPanel->updateGamepadMouseState(nowActive);
+            }
+        }
+        return;
+    }
 
     // --- Bitrate presets ---
     case OverlayMenuPanel::MenuAction::SetBitrate1000:
@@ -2724,11 +2739,38 @@ void Session::exec()
             m_InputHandler->handleMouseWheelEvent(&event.wheel);
             break;
         case SDL_CONTROLLERAXISMOTION:
+            // When menu is visible, consume axis events to prevent game input
+            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+                break;
+            }
             m_InputHandler->handleControllerAxisEvent(&event.caxis);
             break;
         case SDL_CONTROLLERBUTTONDOWN:
         case SDL_CONTROLLERBUTTONUP:
             presence.runCallbacks();
+            // When Qt overlay menu is visible, handle gamepad navigation
+            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+                if (event.cbutton.state == SDL_PRESSED) {
+                    switch (event.cbutton.button) {
+                    case SDL_CONTROLLER_BUTTON_DPAD_UP:
+                        m_MenuPanel->gamepadMoveUp();
+                        break;
+                    case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+                        m_MenuPanel->gamepadMoveDown();
+                        break;
+                    case SDL_CONTROLLER_BUTTON_A:
+                        m_MenuPanel->gamepadSelect();
+                        break;
+                    case SDL_CONTROLLER_BUTTON_B:
+                    case SDL_CONTROLLER_BUTTON_START:
+                        m_MenuPanel->gamepadBack();
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                break;
+            }
             m_InputHandler->handleControllerButtonEvent(&event.cbutton);
             break;
 #if SDL_VERSION_ATLEAST(2, 0, 14)

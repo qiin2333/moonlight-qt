@@ -173,6 +173,15 @@ public:
     // 公开 performSpecialKeyCombo 以便从悬浮菜单调用
     void performSpecialKeyCombo(KeyCombo combo);
 
+    // Toggle gamepad mouse emulation for the first connected gamepad
+    bool toggleGamepadMouseEmulation();
+
+    // Check if any gamepad has mouse emulation currently active
+    bool isMouseEmulationActive();
+
+    // Update the gamepad mouse setting at runtime
+    void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
+
 private:
 
     GamepadState*
