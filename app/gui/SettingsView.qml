@@ -1162,6 +1162,10 @@ Flickable {
                             text: qsTr("7.1 surround sound")
                             val: StreamingPreferences.AC_71_SURROUND
                         }
+                        ListElement {
+                            text: qsTr("7.1.4 surround sound")
+                            val: StreamingPreferences.AC_714_SURROUND
+                        }
                     }
                     // ::onActivated must be used, as it only listens for when the index is changed by a human
                     onActivated : {

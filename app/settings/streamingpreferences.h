@@ -22,7 +22,8 @@ public:
     {
         AC_STEREO,
         AC_51_SURROUND,
-        AC_71_SURROUND
+        AC_71_SURROUND,
+        AC_714_SURROUND
     };
     Q_ENUM(AudioConfig)
 

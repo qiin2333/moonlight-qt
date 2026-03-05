@@ -724,6 +724,9 @@ bool Session::initialize(QQuickWindow* qtWindow)
     case StreamingPreferences::AC_71_SURROUND:
         m_StreamConfig.audioConfiguration = AUDIO_CONFIGURATION_71_SURROUND;
         break;
+    case StreamingPreferences::AC_714_SURROUND:
+        m_StreamConfig.audioConfiguration = AUDIO_CONFIGURATION_714_SURROUND;
+        break;
     }
 
     m_StreamConfig.enableMic = m_Preferences->enableMicrophone;
