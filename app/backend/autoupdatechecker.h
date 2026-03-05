@@ -22,7 +22,7 @@ private:
 
     int compareVersion(QVector<int>& version1, QVector<int>& version2);
 
-    QString getPlatform();
+    QString getExpectedAssetSuffix();
 
     QVector<int> m_CurrentVersionQuad;
     QNetworkAccessManager* m_Nam;
