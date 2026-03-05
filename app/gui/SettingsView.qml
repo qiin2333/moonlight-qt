@@ -1681,6 +1681,22 @@ Flickable {
                     ToolTip.text: qsTr("Prevents the screensaver from starting or the display from going to sleep while streaming.")
                 }
 
+                CheckBox {
+                    id: autoUpdateCheckBox
+                    width: parent.width
+                    text: qsTr("Automatically check for updates")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.autoUpdateCheck
+                    onCheckedChanged: {
+                        StreamingPreferences.autoUpdateCheck = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Check for new versions of Moonlight when the app starts.")
+                }
+
                 Label {
                     width: parent.width
                     text: qsTr("Overlay menu position")

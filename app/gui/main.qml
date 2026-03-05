@@ -385,7 +385,9 @@ ApplicationWindow {
 
                 Component.onCompleted: {
                     AutoUpdateChecker.onUpdateAvailable.connect(updateAvailable)
-                    AutoUpdateChecker.start()
+                    if (StreamingPreferences.autoUpdateCheck) {
+                        AutoUpdateChecker.start()
+                    }
                 }
 
                 Keys.onDownPressed: {

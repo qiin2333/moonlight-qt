@@ -177,6 +177,7 @@ public:
     Q_PROPERTY(int customVddScreenMode MEMBER customVddScreenMode NOTIFY customVddScreenModeChanged)
     Q_PROPERTY(bool enableMicrophone MEMBER enableMicrophone NOTIFY enableMicrophoneChanged)
     Q_PROPERTY(OverlayMenuPosition overlayMenuPosition MEMBER overlayMenuPosition NOTIFY overlayMenuPositionChanged)
+    Q_PROPERTY(bool autoUpdateCheck MEMBER autoUpdateCheck NOTIFY autoUpdateCheckChanged)
 
     Q_INVOKABLE bool retranslate();
 
@@ -234,6 +235,7 @@ public:
     int customVddScreenMode;
     bool enableMicrophone;
     OverlayMenuPosition overlayMenuPosition;
+    bool autoUpdateCheck;
 
 signals:
     void displayModeChanged();
@@ -286,6 +288,7 @@ signals:
     void customVddScreenModeChanged();
     void enableMicrophoneChanged();
     void overlayMenuPositionChanged();
+    void autoUpdateCheckChanged();
 
 private:
     explicit StreamingPreferences(QQmlEngine *qmlEngine);

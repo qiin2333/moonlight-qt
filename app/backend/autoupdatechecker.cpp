@@ -5,6 +5,10 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+// GitHub repository for update checks
+#define GITHUB_OWNER "qiin2333"
+#define GITHUB_REPO  "moonlight-qt"
+
 AutoUpdateChecker::AutoUpdateChecker(QObject *parent) :
     QObject(parent)
 {
@@ -34,7 +38,7 @@ void AutoUpdateChecker::start()
         return;
     }
 
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || defined(STEAM_LINK) || defined(APP_IMAGE) // Only run update checker on platforms without auto-update
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || defined(STEAM_LINK) || defined(APP_IMAGE)
 #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0) && QT_VERSION < QT_VERSION_CHECK(5, 15, 1) && !defined(QT_NO_BEARERMANAGEMENT)
     // HACK: Set network accessibility to work around QTBUG-80947 (introduced in Qt 5.14.0 and fixed in Qt 5.15.1)
     QT_WARNING_PUSH
@@ -43,9 +47,17 @@ void AutoUpdateChecker::start()
     QT_WARNING_POP
 #endif
 
-    // We'll get a callback when this is finished
-    QUrl url("https://moonlight-stream.org/updates/qt.json");
+    // Query GitHub Releases API for the latest release
+    QUrl url(QString("https://api.github.com/repos/%1/%2/releases/latest")
+                 .arg(GITHUB_OWNER, GITHUB_REPO));
     QNetworkRequest request(url);
+
+    // GitHub API requires a User-Agent header
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+                      QString("Moonlight/%1").arg(VERSION_STR));
+    // Request JSON response
+    request.setRawHeader("Accept", "application/vnd.github+json");
+
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     request.setAttribute(QNetworkRequest::Http2AllowedAttribute, true);
 #else
@@ -57,24 +69,29 @@ void AutoUpdateChecker::start()
 
 void AutoUpdateChecker::parseStringToVersionQuad(QString& string, QVector<int>& version)
 {
-    QStringList list = string.split('.');
+    // Strip leading 'v' if present (e.g., "v6.2.21" -> "6.2.21")
+    QString versionStr = string;
+    if (versionStr.startsWith('v') || versionStr.startsWith('V')) {
+        versionStr = versionStr.mid(1);
+    }
+
+    QStringList list = versionStr.split('.');
     for (const QString& component : std::as_const(list)) {
         version.append(component.toInt());
     }
 }
 
-QString AutoUpdateChecker::getPlatform()
+QString AutoUpdateChecker::getExpectedAssetSuffix()
 {
-#if defined(STEAM_LINK)
-    return QStringLiteral("steamlink");
+    // Return the expected installer file suffix for the current platform/arch
+#if defined(Q_OS_WIN32)
+    return QStringLiteral(".exe");
+#elif defined(Q_OS_DARWIN)
+    return QStringLiteral(".dmg");
 #elif defined(APP_IMAGE)
-    return QStringLiteral("appimage");
-#elif defined(Q_OS_DARWIN) && QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    // Qt 6 changed this from 'osx' to 'macos'. Use the old one
-    // to be consistent (and not require another entry in the manifest).
-    return QStringLiteral("osx");
+    return QStringLiteral(".AppImage");
 #else
-    return QSysInfo::productType();
+    return QString();
 #endif
 }
 
@@ -129,90 +146,90 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
         QJsonParseError error;
         QJsonDocument jsonDoc = QJsonDocument::fromJson(jsonString.toUtf8(), &error);
         if (jsonDoc.isNull()) {
-            qWarning() << "Update manifest malformed:" << error.errorString();
+            qWarning() << "GitHub release response malformed:" << error.errorString();
             return;
         }
 
-        QJsonArray array = jsonDoc.array();
-        if (array.isEmpty()) {
-            qWarning() << "Update manifest doesn't contain an array";
+        if (!jsonDoc.isObject()) {
+            qWarning() << "GitHub release response is not a JSON object";
             return;
         }
 
-        for (const auto& updateEntry : std::as_const(array)) {
-            if (updateEntry.isObject()) {
-                QJsonObject updateObj = updateEntry.toObject();
-                if (!updateObj.contains("platform") ||
-                        !updateObj.contains("arch") ||
-                        !updateObj.contains("version") ||
-                        !updateObj.contains("browser_url")) {
-                    qWarning() << "Update manifest entry missing vital field";
-                    continue;
-                }
+        QJsonObject releaseObj = jsonDoc.object();
 
-                if (!updateObj["platform"].isString() ||
-                        !updateObj["arch"].isString() ||
-                        !updateObj["version"].isString() ||
-                        !updateObj["browser_url"].isString()) {
-                    qWarning() << "Update manifest entry has unexpected vital field type";
-                    continue;
-                }
+        // GitHub Releases API response format:
+        // {
+        //   "tag_name": "v6.3.0",
+        //   "name": "Release 6.3.0",
+        //   "html_url": "https://github.com/owner/repo/releases/tag/v6.3.0",
+        //   "prerelease": false,
+        //   "draft": false,
+        //   "assets": [
+        //     {
+        //       "name": "MoonlightSetup-x64-6.3.0.exe",
+        //       "browser_download_url": "https://github.com/..."
+        //     }
+        //   ]
+        // }
 
-                if (updateObj["arch"] == QSysInfo::buildCpuArchitecture() &&
-                        updateObj["platform"] == getPlatform()) {
+        // Skip pre-releases and drafts
+        if (releaseObj["prerelease"].toBool(false) || releaseObj["draft"].toBool(false)) {
+            qDebug() << "Latest GitHub release is a pre-release or draft, skipping";
+            return;
+        }
 
-                    // Check the kernel version minimum if one exists
-                    if (updateObj.contains("kernel_version_at_least") && updateObj["kernel_version_at_least"].isString()) {
-                        QVector<int> requiredVersionQuad;
-                        QVector<int> actualVersionQuad;
+        if (!releaseObj.contains("tag_name") || !releaseObj["tag_name"].isString()) {
+            qWarning() << "GitHub release missing tag_name";
+            return;
+        }
 
-                        QString requiredVersion = updateObj["kernel_version_at_least"].toString();
-                        QString actualVersion = QSysInfo::kernelVersion();
-                        parseStringToVersionQuad(requiredVersion, requiredVersionQuad);
-                        parseStringToVersionQuad(actualVersion, actualVersionQuad);
+        QString tagName = releaseObj["tag_name"].toString();
+        qDebug() << "Latest GitHub release tag:" << tagName;
 
-                        if (compareVersion(actualVersionQuad, requiredVersionQuad) < 0) {
-                            qDebug() << "Skipping manifest entry due to kernel version (" << actualVersion << "<" << requiredVersion << ")";
-                            continue;
+        // Parse version from tag (strip 'v' prefix if present)
+        QVector<int> latestVersionQuad;
+        parseStringToVersionQuad(tagName, latestVersionQuad);
+
+        int res = compareVersion(m_CurrentVersionQuad, latestVersionQuad);
+        if (res < 0) {
+            // Current version is older than latest release
+            qDebug() << "Update available:" << tagName;
+
+            // Try to find a platform-specific download URL from assets
+            QString downloadUrl;
+            QString expectedSuffix = getExpectedAssetSuffix();
+
+            if (!expectedSuffix.isEmpty() && releaseObj.contains("assets") && releaseObj["assets"].isArray()) {
+                QJsonArray assets = releaseObj["assets"].toArray();
+                for (const auto& asset : std::as_const(assets)) {
+                    if (asset.isObject()) {
+                        QJsonObject assetObj = asset.toObject();
+                        QString assetName = assetObj["name"].toString();
+                        if (assetName.endsWith(expectedSuffix, Qt::CaseInsensitive)) {
+                            downloadUrl = assetObj["browser_download_url"].toString();
+                            qDebug() << "Found matching asset:" << assetName;
+                            break;
                         }
                     }
-
-                    qDebug() << "Found update manifest match for current platform";
-
-                    QString latestVersion = updateObj["version"].toString();
-                    qDebug() << "Latest version of Moonlight for this platform is:" << latestVersion;
-
-                    QVector<int> latestVersionQuad;
-                    parseStringToVersionQuad(latestVersion, latestVersionQuad);
-
-                    int res = compareVersion(m_CurrentVersionQuad, latestVersionQuad);
-                    if (res < 0) {
-                        // m_CurrentVersionQuad < latestVersionQuad
-                        qDebug() << "Update available";
-                        emit onUpdateAvailable(updateObj["version"].toString(),
-                                               updateObj["browser_url"].toString());
-                        return;
-                    }
-                    else if (res > 0) {
-                        qDebug() << "Update manifest version lower than current version";
-                        return;
-                    }
-                    else {
-                        qDebug() << "Update manifest version equal to current version";
-                        return;
-                    }
                 }
             }
-            else {
-                qWarning() << "Update manifest contained unrecognized entry:" << updateEntry.toString();
-            }
-        }
 
-        qWarning() << "No entry in update manifest found for current platform:"
-                   << QSysInfo::buildCpuArchitecture() << getPlatform() << QSysInfo::kernelVersion();
+            // Fall back to the release page URL if no matching asset found
+            if (downloadUrl.isEmpty()) {
+                downloadUrl = releaseObj["html_url"].toString();
+            }
+
+            emit onUpdateAvailable(tagName, downloadUrl);
+        }
+        else if (res > 0) {
+            qDebug() << "Current version is newer than latest release";
+        }
+        else {
+            qDebug() << "Current version matches latest release";
+        }
     }
     else {
-        qWarning() << "Update checking failed with error:" << reply->error();
+        qWarning() << "Update checking failed:" << reply->error() << reply->errorString();
         reply->deleteLater();
     }
 }
