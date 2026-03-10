@@ -2409,10 +2409,12 @@ bool D3D11VARenderer::initializeVideoProcessor()
 
     m_VideoContext->VideoProcessorSetStreamFrameFormat(m_VideoProcessor.Get(), 0, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
 
+    // NV12/P010 textures require YCbCr color spaces for proper video processor operation.
+    // Using RGB color spaces with YUV textures causes newer NVIDIA drivers to skip VSR.
     if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) {
-        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
+        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, DXGI_COLOR_SPACE_YCBCR_STUDIO_G2084_LEFT_P2020);
     } else {
-        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
+        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
     }
 
     // OUTPUT setting
@@ -2442,9 +2444,9 @@ bool D3D11VARenderer::initializeVideoProcessor()
     m_VideoContext->VideoProcessorSetOutputBackgroundColor(m_VideoProcessor.Get(), false, &bgColor);
 
     if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) {
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
+        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_YCBCR_STUDIO_G2084_LEFT_P2020);
     } else {
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
+        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
     }
 
     // Per-vendor filter enhancements
@@ -2720,8 +2722,9 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
         // handle the HLG→PQ transfer function conversion. That is done by the pixel shader
         // via hlgToPQ(). If we declared GHLG input + G2084 output, some VP implementations
         // would do their own HLG→PQ conversion, causing double-conversion with the shader.
-        DXGI_COLOR_SPACE_TYPE streamCS = frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
-                                                        : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020;
+        // NV12/P010 textures require YCbCr color spaces to match the actual texture format.
+        // There is no YCBCR_FULL_G2084 variant, so use STUDIO for both ranges with PQ content.
+        DXGI_COLOR_SPACE_TYPE streamCS = DXGI_COLOR_SPACE_YCBCR_STUDIO_G2084_LEFT_P2020;
         m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, streamCS);
         m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), streamCS);
 
@@ -2740,8 +2743,8 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
     }
 
     default:
-        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 : DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 : DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
+        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P709 : DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
+        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), frameFullRange ? DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P709 : DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
 
         if (m_VideoEnhancement->isVendorNVIDIA()) {
             enableNvidiaVideoSuperResolution();
