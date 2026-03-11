@@ -1000,10 +1000,18 @@ void D3D11VARenderer::bindVideoVertexBuffer(bool frameChanged, AVFrame* frame)
         SDL_FRect renderRect;
         StreamUtils::screenSpaceToNormalizedDeviceCoords(&dst, &renderRect, m_DisplayWidth, m_DisplayHeight);
 
-        // Don't sample from the alignment padding area
-        auto framesContext = (AVHWFramesContext*)frame->hw_frames_ctx->data;
-        float uMax = (float)frame->width / framesContext->width;
-        float vMax = (float)frame->height / framesContext->height;
+        float uMax, vMax;
+        if (m_VideoProcessorOutputRGBA) {
+            // VP RGBA output: VP already scaled to m_OutputTexture dimensions,
+            // texture has no alignment padding. Sample the full texture.
+            uMax = 1.0f;
+            vMax = 1.0f;
+        } else {
+            // Don't sample from the alignment padding area
+            auto framesContext = (AVHWFramesContext*)frame->hw_frames_ctx->data;
+            uMax = (float)frame->width / framesContext->width;
+            vMax = (float)frame->height / framesContext->height;
+        }
 
         VERTEX verts[] =
         {
@@ -1994,7 +2002,7 @@ std::vector<DXGI_FORMAT> D3D11VARenderer::getVideoTextureSRVFormats()
     // When VP outputs RGBA, only one SRV is needed (the RGBA texture itself)
     if (m_VideoProcessorOutputRGBA) {
         return { (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) ?
-                    DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_B8G8R8A8_UNORM };
+                    DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM };
     }
 
     if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_YUV444) {
@@ -2035,7 +2043,7 @@ bool D3D11VARenderer::setupVideoTexture(AVHWFramesContext* framesContext)
         m_VideoProcessorOutputRGBA = true;
         texDesc.Format = (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT)
                              ? DXGI_FORMAT_R10G10B10A2_UNORM
-                             : DXGI_FORMAT_B8G8R8A8_UNORM;
+                             : DXGI_FORMAT_R8G8B8A8_UNORM;
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "VP RGBA output: format=%x, size=%ux%u, m_VideoProcessorOutputRGBA=%d",
                     texDesc.Format, texDesc.Width, texDesc.Height, m_VideoProcessorOutputRGBA);
@@ -2493,12 +2501,13 @@ bool D3D11VARenderer::initializeVideoProcessor()
     bgColor.RGBA = { 0, 0, 0, 1 };
     m_VideoContext->VideoProcessorSetOutputBackgroundColor(m_VideoProcessor.Get(), false, &bgColor);
 
-    // VP output color space: RGB when outputting RGBA, YCbCr when outputting NV12/P010
+    // VP output color space: full-range RGB when outputting RGBA (matching swap chain),
+    // YCbCr when outputting NV12/P010
     if (m_VideoProcessorOutputRGBA) {
         if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) {
-            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
         } else {
-            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709);
         }
     } else {
         if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) {
@@ -2789,9 +2798,9 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
         m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, streamCS);
 
         if (m_VideoProcessorOutputRGBA) {
+            // Always use full-range RGB output to match swap chain color space
             m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(),
-                frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
-                               : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
+                DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
         } else {
             m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), streamCS);
         }
@@ -2814,8 +2823,9 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
         m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P709 : DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
 
         if (m_VideoProcessorOutputRGBA) {
+            // Always use full-range RGB output to match swap chain color space
             m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(),
-                frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 : DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
+                DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709);
         } else {
             m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(),
                 frameFullRange ? DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P709 : DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
