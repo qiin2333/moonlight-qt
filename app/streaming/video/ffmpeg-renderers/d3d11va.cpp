@@ -1013,6 +1013,13 @@ void D3D11VARenderer::bindVideoVertexBuffer(bool frameChanged, AVFrame* frame)
             vMax = (float)frame->height / framesContext->height;
         }
 
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "VertexBuf: frame=%dx%d, display=%ux%u, dst=(%d,%d,%d,%d), rect=(%.3f,%.3f,%.3f,%.3f), uv=(%.3f,%.3f), RGBA=%d",
+                    frame->width, frame->height, m_DisplayWidth, m_DisplayHeight,
+                    dst.x, dst.y, dst.w, dst.h,
+                    renderRect.x, renderRect.y, renderRect.w, renderRect.h,
+                    uMax, vMax, m_VideoProcessorOutputRGBA);
+
         VERTEX verts[] =
         {
             {renderRect.x, renderRect.y, 0, vMax},
@@ -2453,6 +2460,20 @@ bool D3D11VARenderer::initializeVideoProcessor()
         (ID3D11VideoProcessorInputView**)&m_InputView);
     if (FAILED(hr))
         return false;
+
+    // Log the enhanced texture (VP input) dimensions
+    {
+        D3D11_TEXTURE2D_DESC enhDesc;
+        m_EnhancedTexture->GetDesc(&enhDesc);
+        D3D11_TEXTURE2D_DESC vidDesc;
+        m_VideoTexture->GetDesc(&vidDesc);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "VP init: enhancedTex=%ux%u(fmt=%x), videoTex=%ux%u(fmt=%x), display=%ux%u, decoder=%ux%u",
+                    enhDesc.Width, enhDesc.Height, enhDesc.Format,
+                    vidDesc.Width, vidDesc.Height, vidDesc.Format,
+                    m_DisplayWidth, m_DisplayHeight,
+                    m_DecoderParams.width, m_DecoderParams.height);
+    }
 
     RECT inputRect = { 0 };
     inputRect.right = m_DisplayWidth;
