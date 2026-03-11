@@ -1013,13 +1013,6 @@ void D3D11VARenderer::bindVideoVertexBuffer(bool frameChanged, AVFrame* frame)
             vMax = (float)frame->height / framesContext->height;
         }
 
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "VertexBuf: frame=%dx%d, display=%ux%u, dst=(%d,%d,%d,%d), rect=(%.3f,%.3f,%.3f,%.3f), uv=(%.3f,%.3f), RGBA=%d",
-                    frame->width, frame->height, m_DisplayWidth, m_DisplayHeight,
-                    dst.x, dst.y, dst.w, dst.h,
-                    renderRect.x, renderRect.y, renderRect.w, renderRect.h,
-                    uMax, vMax, m_VideoProcessorOutputRGBA);
-
         VERTEX verts[] =
         {
             {renderRect.x, renderRect.y, 0, vMax},
@@ -1192,10 +1185,7 @@ void D3D11VARenderer::renderVideo(AVFrame* frame)
                                                      m_RenderSharedTextureArray.Get(),
                                                      (int)(intptr_t)frame->data[1],
                                                      &m_SrcBox);
-        HRESULT bltHr = m_VideoContext->VideoProcessorBlt(m_VideoProcessor.Get(), m_OutputView.Get(), 0, 1, &m_StreamData);
-        if (FAILED(bltHr)) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "VideoProcessorBlt failed: %x", bltHr);
-        }
+        m_VideoContext->VideoProcessorBlt(m_VideoProcessor.Get(), m_OutputView.Get(), 0, 1, &m_StreamData);
 
         srvIndex = 0;
     }
@@ -2051,9 +2041,6 @@ bool D3D11VARenderer::setupVideoTexture(AVHWFramesContext* framesContext)
         texDesc.Format = (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT)
                              ? DXGI_FORMAT_R10G10B10A2_UNORM
                              : DXGI_FORMAT_R8G8B8A8_UNORM;
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "VP RGBA output: format=%x, size=%ux%u, m_VideoProcessorOutputRGBA=%d",
-                    texDesc.Format, texDesc.Width, texDesc.Height, m_VideoProcessorOutputRGBA);
     } else {
         m_VideoProcessorOutputRGBA = false;
         texDesc.Format = m_TextureFormat;
@@ -2461,20 +2448,6 @@ bool D3D11VARenderer::initializeVideoProcessor()
     if (FAILED(hr))
         return false;
 
-    // Log the enhanced texture (VP input) dimensions
-    {
-        D3D11_TEXTURE2D_DESC enhDesc;
-        m_EnhancedTexture->GetDesc(&enhDesc);
-        D3D11_TEXTURE2D_DESC vidDesc;
-        m_VideoTexture->GetDesc(&vidDesc);
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "VP init: enhancedTex=%ux%u(fmt=%x), videoTex=%ux%u(fmt=%x), display=%ux%u, decoder=%ux%u",
-                    enhDesc.Width, enhDesc.Height, enhDesc.Format,
-                    vidDesc.Width, vidDesc.Height, vidDesc.Format,
-                    m_DisplayWidth, m_DisplayHeight,
-                    m_DecoderParams.width, m_DecoderParams.height);
-    }
-
     RECT inputRect = { 0 };
     inputRect.right = m_DisplayWidth;
     inputRect.bottom = m_DisplayHeight;
@@ -2502,14 +2475,8 @@ bool D3D11VARenderer::initializeVideoProcessor()
         m_VideoProcessorEnumerator.Get(),
         &outputViewDesc,
         (ID3D11VideoProcessorOutputView**)&m_OutputView);
-    if (FAILED(hr)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "CreateVideoProcessorOutputView failed: %x (m_VideoProcessorOutputRGBA=%d)",
-                     hr, m_VideoProcessorOutputRGBA);
+    if (FAILED(hr))
         return false;
-    }
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "VP output view created successfully (RGBA=%d)", m_VideoProcessorOutputRGBA);
 
     RECT targetRect = { 0 };
     targetRect.right = m_DisplayWidth;
@@ -2737,8 +2704,8 @@ bool D3D11VARenderer::enableNvidiaVideoSuperResolution(bool activate, bool logIn
     }
 
     if (logInfo) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "NVIDIA RTX Video Super Resolution %s (hr=%x, RGBA=%d)",
-                    activate ? "enabled" : "disabled", hr, m_VideoProcessorOutputRGBA);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "NVIDIA RTX Video Super Resolution %s",
+                    activate ? "enabled" : "disabled");
     }
 
     return true;
