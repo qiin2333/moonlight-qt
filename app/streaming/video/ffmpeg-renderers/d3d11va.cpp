@@ -597,8 +597,13 @@ bool D3D11VARenderer::initialize(PDECODER_PARAMETERS params)
     }
 
     if (m_BindDecoderOutputTextures) {
-        // Disable Video enhancement as we do not copy the frame to process it
-        m_VideoEnhancement->enableVideoEnhancement(false);
+        if (m_VideoEnhancement->isVideoEnhancementEnabled()) {
+            // VE requires frames to be copied through the video processor pipeline.
+            // Override direct bind to use the copy path instead.
+            m_BindDecoderOutputTextures = false;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Overriding bind mode for Video Enhancement (using copy path)");
+        }
     }
 
     // Set VSR and HDR
