@@ -1172,7 +1172,10 @@ void D3D11VARenderer::renderVideo(AVFrame* frame)
                                                      m_RenderSharedTextureArray.Get(),
                                                      (int)(intptr_t)frame->data[1],
                                                      &m_SrcBox);
-        m_VideoContext->VideoProcessorBlt(m_VideoProcessor.Get(), m_OutputView.Get(), 0, 1, &m_StreamData);
+        HRESULT bltHr = m_VideoContext->VideoProcessorBlt(m_VideoProcessor.Get(), m_OutputView.Get(), 0, 1, &m_StreamData);
+        if (FAILED(bltHr)) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "VideoProcessorBlt failed: %x", bltHr);
+        }
 
         srvIndex = 0;
     }
@@ -2028,6 +2031,9 @@ bool D3D11VARenderer::setupVideoTexture(AVHWFramesContext* framesContext)
         texDesc.Format = (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT)
                              ? DXGI_FORMAT_R10G10B10A2_UNORM
                              : DXGI_FORMAT_B8G8R8A8_UNORM;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "VP RGBA output: format=%x, size=%ux%u, m_VideoProcessorOutputRGBA=%d",
+                    texDesc.Format, texDesc.Width, texDesc.Height, m_VideoProcessorOutputRGBA);
     } else {
         m_VideoProcessorOutputRGBA = false;
         texDesc.Format = m_TextureFormat;
@@ -2462,8 +2468,14 @@ bool D3D11VARenderer::initializeVideoProcessor()
         m_VideoProcessorEnumerator.Get(),
         &outputViewDesc,
         (ID3D11VideoProcessorOutputView**)&m_OutputView);
-    if (FAILED(hr))
+    if (FAILED(hr)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "CreateVideoProcessorOutputView failed: %x (m_VideoProcessorOutputRGBA=%d)",
+                     hr, m_VideoProcessorOutputRGBA);
         return false;
+    }
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "VP output view created successfully (RGBA=%d)", m_VideoProcessorOutputRGBA);
 
     RECT targetRect = { 0 };
     targetRect.right = m_DisplayWidth;
@@ -2690,8 +2702,8 @@ bool D3D11VARenderer::enableNvidiaVideoSuperResolution(bool activate, bool logIn
     }
 
     if (logInfo) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "NVIDIA RTX Video Super Resolution %s",
-                    activate ? "enabled" : "disabled");
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "NVIDIA RTX Video Super Resolution %s (hr=%x, RGBA=%d)",
+                    activate ? "enabled" : "disabled", hr, m_VideoProcessorOutputRGBA);
     }
 
     return true;
