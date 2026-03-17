@@ -596,13 +596,15 @@ bool D3D11VARenderer::initialize(PDECODER_PARAMETERS params)
         }
     }
 
-    if (m_BindDecoderOutputTextures) {
-        // Disable Video enhancement as we do not copy the frame to process it
-        m_VideoEnhancement->enableVideoEnhancement(false);
-    }
-
     // Set VSR and HDR
     if (m_VideoEnhancement->isVideoEnhancementEnabled()) {
+        if (m_BindDecoderOutputTextures) {
+            // VE requires frames to be copied through the video processor pipeline.
+            // Override direct bind to use the copy path instead.
+            m_BindDecoderOutputTextures = false;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Overriding bind mode for Video Enhancement (using copy path)");
+        }
         // Create video processor on the render device for VE
         if (!m_VideoProcessor) {
             createVideoProcessor();
@@ -995,10 +997,18 @@ void D3D11VARenderer::bindVideoVertexBuffer(bool frameChanged, AVFrame* frame)
         SDL_FRect renderRect;
         StreamUtils::screenSpaceToNormalizedDeviceCoords(&dst, &renderRect, m_DisplayWidth, m_DisplayHeight);
 
-        // Don't sample from the alignment padding area
-        auto framesContext = (AVHWFramesContext*)frame->hw_frames_ctx->data;
-        float uMax = (float)frame->width / framesContext->width;
-        float vMax = (float)frame->height / framesContext->height;
+        float uMax, vMax;
+        if (m_VideoProcessorOutputRGBA) {
+            // VP RGBA output: VP already scaled to m_OutputTexture dimensions,
+            // texture has no alignment padding. Sample the full texture.
+            uMax = 1.0f;
+            vMax = 1.0f;
+        } else {
+            // Don't sample from the alignment padding area
+            auto framesContext = (AVHWFramesContext*)frame->hw_frames_ctx->data;
+            uMax = (float)frame->width / framesContext->width;
+            vMax = (float)frame->height / framesContext->height;
+        }
 
         VERTEX verts[] =
         {
@@ -1038,6 +1048,13 @@ void D3D11VARenderer::bindColorConversion(bool frameChanged, AVFrame* frame)
 {
     bool yuv444 = (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_YUV444);
     auto framesContext = (AVHWFramesContext*)frame->hw_frames_ctx->data;
+
+    // When VP outputs RGBA, the YUV→RGB conversion is done by the video processor.
+    // Use the overlay passthrough shader since the texture is already RGB.
+    if (m_VideoProcessorOutputRGBA) {
+        m_RenderDeviceContext->PSSetShader(m_OverlayPixelShader.Get(), nullptr, 0);
+        return;
+    }
 
     if (yuv444) {
         // We'll need to use one of the 4:4:4 shaders for this pixel format
@@ -1189,8 +1206,15 @@ void D3D11VARenderer::renderVideo(AVFrame* frame)
     bindColorConversion(frameChanged, frame);
 
     // Bind SRVs for this frame
-    ID3D11ShaderResourceView* frameSrvs[] = { m_VideoTextureResourceViews[srvIndex][0].Get(), m_VideoTextureResourceViews[srvIndex][1].Get() };
-    m_RenderDeviceContext->PSSetShaderResources(0, 2, frameSrvs);
+    if (m_VideoProcessorOutputRGBA) {
+        // VP output is RGBA - only one SRV (no separate chroma plane)
+        ID3D11ShaderResourceView* frameSrv = m_VideoTextureResourceViews[srvIndex][0].Get();
+        m_RenderDeviceContext->PSSetShaderResources(0, 1, &frameSrv);
+    }
+    else {
+        ID3D11ShaderResourceView* frameSrvs[] = { m_VideoTextureResourceViews[srvIndex][0].Get(), m_VideoTextureResourceViews[srvIndex][1].Get() };
+        m_RenderDeviceContext->PSSetShaderResources(0, 2, frameSrvs);
+    }
 
     // Draw the video
     m_RenderDeviceContext->DrawIndexed(6, 0, 0);
@@ -1969,6 +1993,12 @@ bool D3D11VARenderer::setupFrameRenderingResources(AVHWFramesContext* framesCont
 
 std::vector<DXGI_FORMAT> D3D11VARenderer::getVideoTextureSRVFormats()
 {
+    // When VP outputs RGBA, only one SRV is needed (the RGBA texture itself)
+    if (m_VideoProcessorOutputRGBA) {
+        return { (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) ?
+                    DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM };
+    }
+
     if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_YUV444) {
         // YUV 4:4:4 formats don't use a second SRV
         return { (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) ?
@@ -1999,7 +2029,20 @@ bool D3D11VARenderer::setupVideoTexture(AVHWFramesContext* framesContext)
     }
     texDesc.MipLevels = 1;
     texDesc.ArraySize = 1;
-    texDesc.Format = m_TextureFormat;
+
+    // When the video processor path is active (NVIDIA/Intel, not AMD AMF),
+    // use RGBA output so the VP does YUV→RGB conversion. NVIDIA VSR requires
+    // an RGB output format to activate on newer drivers.
+    if (m_VideoEnhancement->isVideoEnhancementEnabled() && !m_AmfInitialized) {
+        m_VideoProcessorOutputRGBA = true;
+        texDesc.Format = (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT)
+                             ? DXGI_FORMAT_R10G10B10A2_UNORM
+                             : DXGI_FORMAT_R8G8B8A8_UNORM;
+    } else {
+        m_VideoProcessorOutputRGBA = false;
+        texDesc.Format = m_TextureFormat;
+    }
+
     texDesc.SampleDesc.Quality = 0;
     texDesc.SampleDesc.Count = 1;
     texDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -2409,10 +2452,12 @@ bool D3D11VARenderer::initializeVideoProcessor()
 
     m_VideoContext->VideoProcessorSetStreamFrameFormat(m_VideoProcessor.Get(), 0, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
 
+    // NV12/P010 textures require YCbCr color spaces for proper video processor operation.
+    // Using RGB color spaces with YUV textures causes newer NVIDIA drivers to skip VSR.
     if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) {
-        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
+        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, DXGI_COLOR_SPACE_YCBCR_STUDIO_G2084_LEFT_P2020);
     } else {
-        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
+        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
     }
 
     // OUTPUT setting
@@ -2441,10 +2486,20 @@ bool D3D11VARenderer::initializeVideoProcessor()
     bgColor.RGBA = { 0, 0, 0, 1 };
     m_VideoContext->VideoProcessorSetOutputBackgroundColor(m_VideoProcessor.Get(), false, &bgColor);
 
-    if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) {
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020);
+    // VP output color space: full-range RGB when outputting RGBA (matching swap chain),
+    // YCbCr when outputting NV12/P010
+    if (m_VideoProcessorOutputRGBA) {
+        if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) {
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
+        } else {
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709);
+        }
     } else {
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
+        if (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) {
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_YCBCR_STUDIO_G2084_LEFT_P2020);
+        } else {
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
+        }
     }
 
     // Per-vendor filter enhancements
@@ -2715,15 +2770,25 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
     switch (frameColorSpace) {
     case COLORSPACE_REC_2020:
     {
-        // For both PQ and HLG content, tell the Video Processor the data is PQ (G2084).
-        // The VP only does enhancement filtering (super resolution, etc.) — it does NOT
-        // handle the HLG→PQ transfer function conversion. That is done by the pixel shader
-        // via hlgToPQ(). If we declared GHLG input + G2084 output, some VP implementations
-        // would do their own HLG→PQ conversion, causing double-conversion with the shader.
-        DXGI_COLOR_SPACE_TYPE streamCS = frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
-                                                        : DXGI_COLOR_SPACE_RGB_STUDIO_G2084_NONE_P2020;
+        // VP input is NV12/P010 (YCbCr), output is RGBA (RGB) when m_VideoProcessorOutputRGBA.
+        // For HLG content with RGBA output, let the VP handle the HLG→PQ conversion
+        // (GHLG input + G2084 output). This avoids needing a shader-side HLG→PQ pass.
+        // For PQ content, VP just does the YUV→RGB conversion with G2084 on both sides.
+        DXGI_COLOR_SPACE_TYPE streamCS;
+        if (m_VideoProcessorOutputRGBA && frameColorTrc == AVCOL_TRC_ARIB_STD_B67) {
+            streamCS = DXGI_COLOR_SPACE_YCBCR_STUDIO_GHLG_TOPLEFT_P2020;
+        } else {
+            streamCS = DXGI_COLOR_SPACE_YCBCR_STUDIO_G2084_LEFT_P2020;
+        }
         m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, streamCS);
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), streamCS);
+
+        if (m_VideoProcessorOutputRGBA) {
+            // Always use full-range RGB output to match swap chain color space
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(),
+                DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
+        } else {
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), streamCS);
+        }
 
         if (m_VideoEnhancement->isVendorNVIDIA()) {
             enableNvidiaVideoSuperResolution(false);
@@ -2740,8 +2805,16 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
     }
 
     default:
-        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 : DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
-        m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(), frameFullRange ? DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 : DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709);
+        m_VideoContext->VideoProcessorSetStreamColorSpace1(m_VideoProcessor.Get(), 0, frameFullRange ? DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P709 : DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
+
+        if (m_VideoProcessorOutputRGBA) {
+            // Always use full-range RGB output to match swap chain color space
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(),
+                DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709);
+        } else {
+            m_VideoContext->VideoProcessorSetOutputColorSpace1(m_VideoProcessor.Get(),
+                frameFullRange ? DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P709 : DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
+        }
 
         if (m_VideoEnhancement->isVendorNVIDIA()) {
             enableNvidiaVideoSuperResolution();

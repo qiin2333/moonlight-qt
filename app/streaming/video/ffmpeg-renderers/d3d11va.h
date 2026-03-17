@@ -115,6 +115,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Resource> m_BackBufferResource;
     VideoEnhancement* m_VideoEnhancement;
     bool m_AutoStreamSuperResolution = false;
+    bool m_VideoProcessorOutputRGBA = false;
 
     DECODER_PARAMETERS m_DecoderParams;
     DXGI_FORMAT m_TextureFormat;
