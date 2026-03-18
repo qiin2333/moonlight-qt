@@ -28,6 +28,25 @@ QString getAddressType(const NvAddress& address,
 
     return ComputerModel::tr("Other network");
 }
+
+QVector<NvAddress> getSelectableAddresses(NvComputer* computer)
+{
+    QVector<NvAddress> selectableAddresses;
+    for (const NvAddress& address : computer->uniqueAddresses()) {
+        if (computer->hasAddressTestSucceeded(address)) {
+            selectableAddresses.append(address);
+        }
+    }
+
+    if (selectableAddresses.isEmpty()) {
+        QReadLocker lock(&computer->lock);
+        if (!computer->activeAddress.isNull()) {
+            selectableAddresses.append(computer->activeAddress);
+        }
+    }
+
+    return selectableAddresses;
+}
 }
 
 ComputerModel::ComputerModel(QObject* object)
@@ -176,7 +195,7 @@ QVariantList ComputerModel::getConnectionAddressesForComputer(int computerIndex)
     }
 
     NvComputer* computer = m_Computers[computerIndex];
-    const QVector<NvAddress> uniqueAddresses = computer->uniqueAddresses();
+    const QVector<NvAddress> selectableAddresses = getSelectableAddresses(computer);
 
     NvAddress localAddress;
     NvAddress remoteAddress;
@@ -193,7 +212,7 @@ QVariantList ComputerModel::getConnectionAddressesForComputer(int computerIndex)
         activeAddress = computer->activeAddress;
     }
 
-    for (const NvAddress& address : uniqueAddresses) {
+    for (const NvAddress& address : selectableAddresses) {
         QVariantMap item;
         item["address"] = address.address();
         item["port"] = static_cast<int>(address.port());
@@ -213,7 +232,7 @@ bool ComputerModel::hasMultipleConnectionAddresses(int computerIndex) const
         return false;
     }
 
-    return m_Computers[computerIndex]->uniqueAddresses().count() > 1;
+    return getSelectableAddresses(m_Computers[computerIndex]).count() > 1;
 }
 
 bool ComputerModel::setActiveAddressForComputer(int computerIndex, QString address, int port)
@@ -229,10 +248,15 @@ bool ComputerModel::setActiveAddressForComputer(int computerIndex, QString addre
     }
 
     NvComputer* computer = m_Computers[computerIndex];
+    NvAddress selectedAddress(address, static_cast<uint16_t>(port));
+    if (!computer->hasAddressTestSucceeded(selectedAddress)) {
+        qWarning() << "Address was not validated by polling:" << selectedAddress.toString();
+        return false;
+    }
 
     {
         QWriteLocker lock(&computer->lock);
-        computer->activeAddress = NvAddress(address, static_cast<uint16_t>(port));
+        computer->activeAddress = selectedAddress;
     }
 
     emit dataChanged(createIndex(computerIndex, 0), createIndex(computerIndex, 0));
