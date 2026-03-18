@@ -86,6 +86,53 @@ CenteredGridView {
         return model
     }
 
+    function openAppView(computerIndex, computerName, showHiddenGames)
+    {
+        var component = Qt.createComponent("AppView.qml")
+        var properties = {"computerIndex": computerIndex, "objectName": computerName}
+        if (showHiddenGames === true) {
+            properties.showHiddenGames = true
+        }
+        var appView = component.createObject(stackView, properties)
+        stackView.push(appView)
+    }
+
+    function showAddressSelectionForComputer(computerIndex, computerName, openAppAfterSelection)
+    {
+        var addresses = computerModel.getConnectionAddressesForComputer(computerIndex)
+        if (addresses.length === 0) {
+            errorDialog.text = qsTr("No connection IP addresses are available for %1.").arg(computerName)
+            errorDialog.helpText = ""
+            errorDialog.open()
+            return
+        }
+
+        if (addresses.length === 1) {
+            if (openAppAfterSelection === true) {
+                openAppView(computerIndex, computerName, false)
+            }
+            return
+        }
+
+        var formattedAddresses = []
+        for (var i = 0; i < addresses.length; i++) {
+            var address = addresses[i]
+            formattedAddresses.push({
+                "address": address.address,
+                "port": address.port,
+                "displayText": address.display + " (" + address.type + ")",
+                "type": address.type,
+                "isActive": address.isActive
+            })
+        }
+
+        selectAddressDialog.pcIndex = computerIndex
+        selectAddressDialog.pcName = computerName
+        selectAddressDialog.openAppAfterSelection = openAppAfterSelection === true
+        selectAddressDialog.addresses = formattedAddresses
+        selectAddressDialog.open()
+    }
+
     Row {
         anchors.centerIn: parent
         spacing: 5
@@ -241,11 +288,14 @@ CenteredGridView {
                 NavigableMenuItem {
                     text: qsTr("View All Apps")
                     onTriggered: {
-                        var component = Qt.createComponent("AppView.qml")
-                        var appView = component.createObject(stackView, {"computerIndex": index, "objectName": model.name, "showHiddenGames": true})
-                        stackView.push(appView)
+                        openAppView(index, model.name, true)
                     }
                     visible: model.online && model.paired
+                }
+                NavigableMenuItem {
+                    text: qsTr("Select Connection IP")
+                    onTriggered: showAddressSelectionForComputer(index, model.name, false)
+                    visible: model.online && model.paired && computerModel.hasMultipleConnectionAddresses(index)
                 }
                 NavigableMenuItem {
                     text: qsTr("Wake PC")
@@ -294,10 +344,12 @@ CenteredGridView {
                     errorDialog.open()
                 }
                 else if (model.paired) {
-                    // go to game view
-                    var component = Qt.createComponent("AppView.qml")
-                    var appView = component.createObject(stackView, {"computerIndex": index, "objectName": model.name})
-                    stackView.push(appView)
+                    if (computerModel.hasMultipleConnectionAddresses(index)) {
+                        showAddressSelectionForComputer(index, model.name, true)
+                    }
+                    else {
+                        openAppView(index, model.name, false)
+                    }
                 }
                 else {
                     var pin = computerModel.generatePinString()
@@ -455,6 +507,81 @@ CenteredGridView {
                 Keys.onEnterPressed: {
                     renamePcDialog.accept()
                 }
+            }
+        }
+    }
+
+    NavigableDialog {
+        id: selectAddressDialog
+        property int pcIndex: -1
+        property string pcName: ""
+        property bool openAppAfterSelection: false
+        property var addresses: []
+
+        title: qsTr("Select Connection IP")
+        standardButtons: DialogButtonBox.Ok | DialogButtonBox.Cancel
+
+        onOpened: {
+            var activeIndex = 0
+            for (var i = 0; i < addresses.length; i++) {
+                if (addresses[i].isActive) {
+                    activeIndex = i
+                    break
+                }
+            }
+            addressCombo.currentIndex = activeIndex
+            addressCombo.forceActiveFocus()
+        }
+
+        onAccepted: {
+            if (addressCombo.currentIndex < 0 || addressCombo.currentIndex >= addresses.length) {
+                return
+            }
+
+            var selectedAddress = addresses[addressCombo.currentIndex]
+            if (!computerModel.setActiveAddressForComputer(pcIndex, selectedAddress.address, selectedAddress.port)) {
+                errorDialog.text = qsTr("Unable to switch the connection IP for %1.").arg(pcName)
+                errorDialog.helpText = ""
+                errorDialog.open()
+                return
+            }
+
+            if (openAppAfterSelection) {
+                openAppView(pcIndex, pcName, false)
+            }
+        }
+
+        onClosed: {
+            addresses = []
+            openAppAfterSelection = false
+            pcIndex = -1
+            pcName = ""
+        }
+
+        ColumnLayout {
+            width: 500
+            spacing: 8
+
+            Label {
+                text: qsTr("Choose the IP address to connect to %1:").arg(selectAddressDialog.pcName)
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+
+            AutoResizingComboBox {
+                id: addressCombo
+                model: selectAddressDialog.addresses
+                textRole: "displayText"
+                Layout.fillWidth: true
+            }
+
+            Label {
+                visible: addressCombo.currentIndex >= 0 &&
+                         addressCombo.currentIndex < selectAddressDialog.addresses.length
+                text: visible ? qsTr("Address type: %1").arg(selectAddressDialog.addresses[addressCombo.currentIndex].type) : ""
+                color: "#CCCCCC"
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
             }
         }
     }

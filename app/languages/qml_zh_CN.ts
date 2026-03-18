@@ -196,6 +196,31 @@
         <source>HTTPS Port: %1</source>
         <translation>HTTPS 端口: %1</translation>
     </message>
+    <message>
+        <location filename="../gui/computermodel.cpp" line="17"/>
+        <source>Local network</source>
+        <translation>局域网</translation>
+    </message>
+    <message>
+        <location filename="../gui/computermodel.cpp" line="20"/>
+        <source>Remote network</source>
+        <translation>远程网络</translation>
+    </message>
+    <message>
+        <location filename="../gui/computermodel.cpp" line="23"/>
+        <source>Manual</source>
+        <translation>手动配置</translation>
+    </message>
+    <message>
+        <location filename="../gui/computermodel.cpp" line="26"/>
+        <source>IPv6 network</source>
+        <translation>IPv6 网络</translation>
+    </message>
+    <message>
+        <location filename="../gui/computermodel.cpp" line="29"/>
+        <source>Other network</source>
+        <translation>其他网络</translation>
+    </message>
 </context>
 <context>
     <name>GamepadMapper</name>
@@ -445,6 +470,32 @@
         <location filename="../gui/PcView.qml" line="354"/>
         <source>Enter the new name for this PC:</source>
         <translation>输入这台计算机的新名称:</translation>
+    </message>
+    <message>
+        <location filename="../gui/PcView.qml" line="104"/>
+        <source>No connection IP addresses are available for %1.</source>
+        <translation>%1 没有可用的连接 IP 地址。</translation>
+    </message>
+    <message>
+        <location filename="../gui/PcView.qml" line="289"/>
+        <location filename="../gui/PcView.qml" line="514"/>
+        <source>Select Connection IP</source>
+        <translation>选择连接 IP</translation>
+    </message>
+    <message>
+        <location filename="../gui/PcView.qml" line="536"/>
+        <source>Unable to switch the connection IP for %1.</source>
+        <translation>无法切换 %1 的连接 IP。</translation>
+    </message>
+    <message>
+        <location filename="../gui/PcView.qml" line="559"/>
+        <source>Choose the IP address to connect to %1:</source>
+        <translation>请选择用于连接 %1 的 IP 地址：</translation>
+    </message>
+    <message>
+        <location filename="../gui/PcView.qml" line="574"/>
+        <source>Address type: %1</source>
+        <translation>地址类型：%1</translation>
     </message>
 </context>
 <context>
