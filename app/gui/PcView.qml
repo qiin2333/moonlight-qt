@@ -120,7 +120,7 @@ CenteredGridView {
             formattedAddresses.push({
                 "address": address.address,
                 "port": address.port,
-                "displayText": address.display + " (" + address.type + ")",
+                "displayText": address.display,
                 "type": address.type,
                 "isActive": address.isActive
             })
@@ -520,6 +520,7 @@ CenteredGridView {
 
         title: qsTr("Select Connection IP")
         standardButtons: DialogButtonBox.Ok | DialogButtonBox.Cancel
+        width: Math.max(320, Math.min(560, pcGrid.width - 40))
 
         onOpened: {
             var activeIndex = 0
@@ -559,7 +560,7 @@ CenteredGridView {
         }
 
         ColumnLayout {
-            width: 500
+            width: parent.width
             spacing: 8
 
             Label {
@@ -572,6 +573,8 @@ CenteredGridView {
                 id: addressCombo
                 model: selectAddressDialog.addresses
                 textRole: "displayText"
+                maximumWidth: parent.width
+                popup.width: width
                 Layout.fillWidth: true
             }
 
