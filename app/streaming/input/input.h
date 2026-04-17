@@ -221,6 +221,7 @@ private:
     bool m_SwapWinAltKeys;
     bool m_ReverseScrollDirection;
     bool m_SwapFaceButtons;
+    StreamingPreferences::GamepadQuitCombo m_GamepadQuitCombo;
 
     bool m_MouseWasInVideoRegion;
     bool m_PendingMouseButtonsAllUpOnVideoRegionLeave;
