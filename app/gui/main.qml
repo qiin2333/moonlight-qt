@@ -439,6 +439,29 @@ ApplicationWindow {
             }
 
             NavigableToolButton {
+                id: ipSettingsButton
+                visible: stackView.currentItem instanceof AppView &&
+                         stackView.currentItem.hasMultipleAddresses
+
+                iconSource: "qrc:/res/ic_network_white_48px.svg"
+
+                ToolTip.delay: 1000
+                ToolTip.timeout: 3000
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Connection IP")
+
+                onClicked: {
+                    if (stackView.currentItem.openIpDialog) {
+                        stackView.currentItem.openIpDialog()
+                    }
+                }
+
+                Keys.onDownPressed: {
+                    stackView.currentItem.forceActiveFocus(Qt.TabFocus)
+                }
+            }
+
+            NavigableToolButton {
                 id: displaySettingsButton
                 visible: stackView.currentItem instanceof AppView
 

@@ -31,21 +31,9 @@ QString getAddressType(const NvAddress& address,
 
 QVector<NvAddress> getSelectableAddresses(NvComputer* computer)
 {
-    QVector<NvAddress> selectableAddresses;
-    for (const NvAddress& address : computer->uniqueAddresses()) {
-        if (computer->hasAddressTestSucceeded(address)) {
-            selectableAddresses.append(address);
-        }
-    }
-
-    if (selectableAddresses.isEmpty()) {
-        QReadLocker lock(&computer->lock);
-        if (!computer->activeAddress.isNull()) {
-            selectableAddresses.append(computer->activeAddress);
-        }
-    }
-
-    return selectableAddresses;
+    // Return all unique addresses, not just tested ones,
+    // so the user can always select from all known addresses.
+    return computer->uniqueAddresses();
 }
 }
 
@@ -219,6 +207,7 @@ QVariantList ComputerModel::getConnectionAddressesForComputer(int computerIndex)
         item["display"] = address.toString();
         item["type"] = getAddressType(address, localAddress, remoteAddress, manualAddress, ipv6Address);
         item["isActive"] = address == activeAddress;
+        item["isTested"] = computer->hasAddressTestSucceeded(address);
         addresses.append(item);
     }
 
@@ -249,8 +238,17 @@ bool ComputerModel::setActiveAddressForComputer(int computerIndex, QString addre
 
     NvComputer* computer = m_Computers[computerIndex];
     NvAddress selectedAddress(address, static_cast<uint16_t>(port));
-    if (!computer->hasAddressTestSucceeded(selectedAddress)) {
-        qWarning() << "Address was not validated by polling:" << selectedAddress.toString();
+
+    // Verify the address is one of the known addresses
+    bool found = false;
+    for (const NvAddress& addr : computer->uniqueAddresses()) {
+        if (addr == selectedAddress) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        qWarning() << "Address is not a known address:" << selectedAddress.toString();
         return false;
     }
 

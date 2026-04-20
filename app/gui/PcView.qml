@@ -122,7 +122,8 @@ CenteredGridView {
                 "port": address.port,
                 "displayText": address.display,
                 "type": address.type,
-                "isActive": address.isActive
+                "isActive": address.isActive,
+                "isTested": address.isTested
             })
         }
 
@@ -344,12 +345,8 @@ CenteredGridView {
                     errorDialog.open()
                 }
                 else if (model.paired) {
-                    if (computerModel.hasMultipleConnectionAddresses(index)) {
-                        showAddressSelectionForComputer(index, model.name, true)
-                    }
-                    else {
-                        openAppView(index, model.name, false)
-                    }
+                    // Go directly to app view; IP can be changed from there
+                    openAppView(index, model.name, false)
                 }
                 else {
                     var pin = computerModel.generatePinString()

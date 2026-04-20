@@ -44,6 +44,14 @@ public:
 
     Q_INVOKABLE void setAppDirectLaunch(int appIndex, bool directLaunch);
 
+    Q_INVOKABLE QVariantList getConnectionAddresses();
+
+    Q_INVOKABLE bool hasMultipleConnectionAddresses();
+
+    Q_INVOKABLE bool setActiveAddress(QString address, int port);
+
+    Q_INVOKABLE QVariantMap getActiveAddressInfo();
+
     QVariant data(const QModelIndex &index, int role) const override;
 
     int rowCount(const QModelIndex &parent) const override;
