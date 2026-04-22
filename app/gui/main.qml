@@ -371,7 +371,12 @@ ApplicationWindow {
                 visible: false
 
                 onClicked: {
-                    if (SystemProperties.hasBrowser) {
+                    if (AutoUpdateChecker.supportsInAppUpdate()) {
+                        portableUpdateDialog.text = qsTr("Preparing portable update...")
+                        portableUpdateDialog.open()
+                        AutoUpdateChecker.installUpdate(browserUrl)
+                    }
+                    else if (SystemProperties.hasBrowser) {
                         Qt.openUrlExternally(browserUrl);
                     }
                 }
@@ -383,8 +388,25 @@ ApplicationWindow {
                     updateButton.visible = true
                 }
 
+                function portableUpdateStatusChanged(message)
+                {
+                    portableUpdateDialog.text = message
+                    if (!portableUpdateDialog.visible) {
+                        portableUpdateDialog.open()
+                    }
+                }
+
+                function portableUpdateFailed(message)
+                {
+                    portableUpdateDialog.close()
+                    portableUpdateErrorDialog.text = message
+                    portableUpdateErrorDialog.open()
+                }
+
                 Component.onCompleted: {
                     AutoUpdateChecker.onUpdateAvailable.connect(updateAvailable)
+                    AutoUpdateChecker.onPortableUpdateStatusChanged.connect(portableUpdateStatusChanged)
+                    AutoUpdateChecker.onPortableUpdateFailed.connect(portableUpdateFailed)
                     if (StreamingPreferences.autoUpdateCheck) {
                         AutoUpdateChecker.start()
                     }
@@ -491,6 +513,19 @@ ApplicationWindow {
                    "Your streaming performance may be severely degraded in this configuration.")
         helpText: qsTr("Click the Help button for more information on solving this problem.")
         helpUrl: "https://github.com/moonlight-stream/moonlight-docs/wiki/Fixing-Hardware-Decoding-Problems"
+    }
+
+    NavigableMessageDialog {
+        id: portableUpdateDialog
+        standardButtons: 0
+        closePolicy: Popup.NoAutoClose
+        showSpinner: true
+        text: qsTr("Preparing portable update...")
+    }
+
+    ErrorMessageDialog {
+        id: portableUpdateErrorDialog
+        text: ""
     }
 
     ErrorMessageDialog {
