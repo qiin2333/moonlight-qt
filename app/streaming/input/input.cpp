@@ -9,6 +9,15 @@
 #include <QDir>
 #include <QGuiApplication>
 
+// Include SDL_syswm.h after Qt headers to avoid X11 macro conflicts on Linux
+#include <SDL_syswm.h>
+
+#ifdef Q_OS_WIN32
+#include <Windows.h>
+#include <Imm.h>
+#pragma comment(lib, "imm32.lib")
+#endif
+
 SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight)
     : m_MultiController(prefs.multiController),
       m_GamepadMouse(prefs.gamepadMouse),
@@ -251,6 +260,14 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+
+#ifdef Q_OS_WIN32
+    SDL_SysWMinfo info;
+    SDL_VERSION(&info.version);
+    if (SDL_GetWindowWMInfo(m_Window, &info) && info.subsystem == SDL_SYSWM_WINDOWS) {
+        ImmAssociateContext(info.info.win.window, NULL);
+    }
+#endif
 }
 
 void SdlInputHandler::raiseAllKeys()
@@ -307,6 +324,13 @@ void SdlInputHandler::notifyFocusLost()
 
 void SdlInputHandler::notifyFocusGained()
 {
+#ifdef Q_OS_WIN32
+    SDL_SysWMinfo info;
+    SDL_VERSION(&info.version);
+    if (SDL_GetWindowWMInfo(m_Window, &info) && info.subsystem == SDL_SYSWM_WINDOWS) {
+        ImmAssociateContext(info.info.win.window, NULL);
+    }
+#endif
 }
 
 bool SdlInputHandler::isCaptureActive()
