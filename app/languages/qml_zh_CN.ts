@@ -1510,6 +1510,12 @@
         <translation>Moonlight 可用更新：版本 %1</translation>
     </message>
     <message>
+        <location filename="../gui/main.qml" line="375"/>
+        <location filename="../gui/main.qml" line="523"/>
+        <source>Preparing portable update...</source>
+        <translation>正在准备便携版更新...</translation>
+    </message>
+    <message>
         <location filename="../gui/main.qml" line="378"/>
         <source>Help</source>
         <translation>帮助</translation>
@@ -1563,6 +1569,94 @@
         <location filename="../gui/main.qml" line="505"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>输入你主机的 IP 地址：</translation>
+    </message>
+</context>
+<context>
+    <name>PortableUpdateInstaller</name>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="34"/>
+        <source>In-app update is only supported for the portable Windows build.</source>
+        <translation>应用内更新仅支持 Windows 便携版。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="39"/>
+        <source>Portable update is already in progress.</source>
+        <translation>便携版更新已在进行中。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="45"/>
+        <source>The update URL is invalid.</source>
+        <translation>更新链接无效。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="50"/>
+        <source>The portable update package was not found for this release.</source>
+        <translation>此版本未找到对应的便携版更新包。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="68"/>
+        <source>Unable to create a temporary folder for the update.</source>
+        <translation>无法为更新创建临时目录。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="86"/>
+        <source>Unable to create the update package on disk.</source>
+        <translation>无法在磁盘上创建更新包。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="113"/>
+        <source>Downloading portable update...</source>
+        <translation>正在下载便携版更新...</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="155"/>
+        <source>The current Moonlight folder is not writable. Move the portable build to a writable location or run it with sufficient permissions.</source>
+        <translation>当前 Moonlight 文件夹不可写。请将便携版移动到可写位置，或以足够权限运行。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="213"/>
+        <source>Unable to determine free disk space for the portable update.</source>
+        <translation>无法确定便携版更新所需的可用磁盘空间。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="218"/>
+        <source>Not enough free disk space for the portable update. Need about %1 MB free.</source>
+        <translation>便携版更新所需磁盘空间不足。大约需要 %1 MB 可用空间。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="297"/>
+        <source>Failed while writing the update package to disk.</source>
+        <translation>将更新包写入磁盘时失败。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="306"/>
+        <source>Downloading portable update... %1%</source>
+        <translation>正在下载便携版更新... %1%</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="310"/>
+        <source>Downloading portable update... %1 MB</source>
+        <translation>正在下载便携版更新... %1 MB</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="322"/>
+        <source>Failed to download the update: %1</source>
+        <translation>下载更新失败：%1</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="341"/>
+        <source>Unable to prepare the portable update installer.</source>
+        <translation>无法准备便携版更新安装程序。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="364"/>
+        <source>Unable to launch the portable updater.</source>
+        <translation>无法启动便携版更新程序。</translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="368"/>
+        <source>Installing update and restarting Moonlight...</source>
+        <translation>正在安装更新并重启 Moonlight...</translation>
     </message>
 </context>
 </TS>

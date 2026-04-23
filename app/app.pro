@@ -197,6 +197,7 @@ SOURCES += \
     streaming/bwtracker.cpp \
     streaming/streamutils.cpp \
     backend/autoupdatechecker.cpp \
+    backend/portableupdateinstaller.cpp \
     path.cpp \
     settings/mappingmanager.cpp \
     gui/sdlgamepadkeynavigation.cpp \
@@ -242,6 +243,7 @@ HEADERS += \
     streaming/bwtracker.h \
     streaming/streamutils.h \
     backend/autoupdatechecker.h \
+    backend/portableupdateinstaller.h \
     path.h \
     settings/mappingmanager.h \
     gui/sdlgamepadkeynavigation.h \

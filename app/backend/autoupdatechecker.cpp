@@ -1,9 +1,15 @@
 #include "autoupdatechecker.h"
+#include "portableupdateinstaller.h"
 
-#include <QNetworkReply>
+#include <QDir>
+#include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QSysInfo>
+#include <QTextStream>
 
 // GitHub repository for update checks
 #define GITHUB_OWNER "qiin2333"
@@ -13,6 +19,7 @@ AutoUpdateChecker::AutoUpdateChecker(QObject *parent) :
     QObject(parent)
 {
     m_Nam = new QNetworkAccessManager(this);
+    m_PortableUpdateInstaller = new PortableUpdateInstaller(this);
 
     // Never communicate over HTTP
     m_Nam->setStrictTransportSecurityEnabled(true);
@@ -29,6 +36,21 @@ AutoUpdateChecker::AutoUpdateChecker(QObject *parent) :
 
     // Should at least have a 1.0-style version number
     Q_ASSERT(m_CurrentVersionQuad.count() > 1);
+
+    connect(m_PortableUpdateInstaller, &PortableUpdateInstaller::onPortableUpdateStatusChanged,
+            this, &AutoUpdateChecker::onPortableUpdateStatusChanged);
+    connect(m_PortableUpdateInstaller, &PortableUpdateInstaller::onPortableUpdateFailed,
+            this, &AutoUpdateChecker::onPortableUpdateFailed);
+}
+
+bool AutoUpdateChecker::supportsInAppUpdate() const
+{
+    return m_PortableUpdateInstaller->supportsInAppUpdate();
+}
+
+void AutoUpdateChecker::installUpdate(QString url)
+{
+    m_PortableUpdateInstaller->installUpdate(url);
 }
 
 void AutoUpdateChecker::start()
@@ -83,9 +105,8 @@ void AutoUpdateChecker::parseStringToVersionQuad(QString& string, QVector<int>& 
 
 QString AutoUpdateChecker::getExpectedAssetSuffix()
 {
-    // Return the expected installer file suffix for the current platform/arch
 #if defined(Q_OS_WIN32)
-    return QStringLiteral(".exe");
+    return isPortableInstall() ? QStringLiteral(".zip") : QStringLiteral(".exe");
 #elif defined(Q_OS_DARWIN)
     return QStringLiteral(".dmg");
 #elif defined(APP_IMAGE)
@@ -93,6 +114,42 @@ QString AutoUpdateChecker::getExpectedAssetSuffix()
 #else
     return QString();
 #endif
+}
+
+bool AutoUpdateChecker::isPortableInstall() const
+{
+#if defined(Q_OS_WIN32)
+    return QFile::exists(QDir::currentPath() + "/portable.dat");
+#else
+    return false;
+#endif
+}
+
+QString AutoUpdateChecker::getExpectedAssetPrefix() const
+{
+#if defined(Q_OS_WIN32)
+    if (isPortableInstall()) {
+        return QStringLiteral("MoonlightPortable-%1-").arg(getCurrentBuildArch());
+    }
+
+    return QStringLiteral("MoonlightSetup-");
+#else
+    return QString();
+#endif
+}
+
+QString AutoUpdateChecker::getCurrentBuildArch() const
+{
+    QString buildArch = QSysInfo::buildCpuArchitecture();
+
+    if (buildArch == "x86_64") {
+        return QStringLiteral("x64");
+    }
+    else if (buildArch == "i386") {
+        return QStringLiteral("x86");
+    }
+
+    return buildArch.toLower();
 }
 
 int AutoUpdateChecker::compareVersion(QVector<int>& version1, QVector<int>& version2) {
@@ -197,6 +254,7 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
 
             // Try to find a platform-specific download URL from assets
             QString downloadUrl;
+            QString expectedPrefix = getExpectedAssetPrefix();
             QString expectedSuffix = getExpectedAssetSuffix();
 
             if (!expectedSuffix.isEmpty() && releaseObj.contains("assets") && releaseObj["assets"].isArray()) {
@@ -205,7 +263,11 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
                     if (asset.isObject()) {
                         QJsonObject assetObj = asset.toObject();
                         QString assetName = assetObj["name"].toString();
-                        if (assetName.endsWith(expectedSuffix, Qt::CaseInsensitive)) {
+                        bool prefixMatches = expectedPrefix.isEmpty() ||
+                                             assetName.startsWith(expectedPrefix, Qt::CaseInsensitive);
+                        bool suffixMatches = assetName.endsWith(expectedSuffix, Qt::CaseInsensitive);
+
+                        if (prefixMatches && suffixMatches) {
                             downloadUrl = assetObj["browser_download_url"].toString();
                             qDebug() << "Found matching asset:" << assetName;
                             break;
