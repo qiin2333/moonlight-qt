@@ -367,21 +367,49 @@ void SdlInputHandler::handleControllerButtonEvent(SDL_ControllerButtonEvent* eve
         }
     }
 
-    // Handle Start+Select+L1+R1 as a gamepad quit combo
-    if (state->buttons == (PLAY_FLAG | BACK_FLAG | LB_FLAG | RB_FLAG) && qgetenv("NO_GAMEPAD_QUIT") != "1") {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected quit gamepad button combo");
+    // Handle configurable gamepad quit combo
+    if (qgetenv("NO_GAMEPAD_QUIT") != "1") {
+        int quitComboMask;
+        switch (m_GamepadQuitCombo) {
+        case StreamingPreferences::GQC_SELECT_L1_R1_X:
+            quitComboMask = BACK_FLAG | LB_FLAG | RB_FLAG | X_FLAG;
+            break;
+        case StreamingPreferences::GQC_SELECT_L1_R1_Y:
+            quitComboMask = BACK_FLAG | LB_FLAG | RB_FLAG | Y_FLAG;
+            break;
+        case StreamingPreferences::GQC_START_L1_R1_A:
+            quitComboMask = PLAY_FLAG | LB_FLAG | RB_FLAG | A_FLAG;
+            break;
+        case StreamingPreferences::GQC_START_L1_R1_B:
+            quitComboMask = PLAY_FLAG | LB_FLAG | RB_FLAG | B_FLAG;
+            break;
+        case StreamingPreferences::GQC_L1_R1_X_Y:
+            quitComboMask = LB_FLAG | RB_FLAG | X_FLAG | Y_FLAG;
+            break;
+        case StreamingPreferences::GQC_L1_R1_A_B:
+            quitComboMask = LB_FLAG | RB_FLAG | A_FLAG | B_FLAG;
+            break;
+        case StreamingPreferences::GQC_DEFAULT:
+        default:
+            quitComboMask = PLAY_FLAG | BACK_FLAG | LB_FLAG | RB_FLAG;
+            break;
+        }
 
-        // Push a quit event to the main loop
-        SDL_Event event;
-        event.type = SDL_QUIT;
-        event.quit.timestamp = SDL_GetTicks();
-        SDL_PushEvent(&event);
+        if (state->buttons == quitComboMask) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Detected quit gamepad button combo");
 
-        // Clear buttons down on this gamepad
-        LiSendMultiControllerEvent(state->index, m_GamepadMask,
-                                   0, 0, 0, 0, 0, 0, 0);
-        return;
+            // Push a quit event to the main loop
+            SDL_Event event;
+            event.type = SDL_QUIT;
+            event.quit.timestamp = SDL_GetTicks();
+            SDL_PushEvent(&event);
+
+            // Clear buttons down on this gamepad
+            LiSendMultiControllerEvent(state->index, m_GamepadMask,
+                                       0, 0, 0, 0, 0, 0, 0);
+            return;
+        }
     }
 
     // Handle Select+L1+R1+X as a gamepad overlay combo

@@ -2012,6 +2012,70 @@ Flickable {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Allows Moonlight to capture gamepad inputs even if it's not the current window in focus")
                 }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Gamepad quit combo")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                AutoResizingComboBox {
+                    Component.onCompleted: {
+                        var saved_combo = StreamingPreferences.gamepadQuitCombo
+                        currentIndex = 0
+                        for (var i = 0; i < gamepadQuitComboListModel.count; i++) {
+                            if (saved_combo === gamepadQuitComboListModel.get(i).val) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                        activated(currentIndex)
+                    }
+
+                    id: gamepadQuitComboComboBox
+                    textRole: "text"
+                    model: ListModel {
+                        id: gamepadQuitComboListModel
+                        ListElement {
+                            text: qsTr("Start + Select + L1 + R1 (Default)")
+                            val: StreamingPreferences.GQC_DEFAULT
+                        }
+                        ListElement {
+                            text: qsTr("Select + L1 + R1 + X")
+                            val: StreamingPreferences.GQC_SELECT_L1_R1_X
+                        }
+                        ListElement {
+                            text: qsTr("Select + L1 + R1 + Y")
+                            val: StreamingPreferences.GQC_SELECT_L1_R1_Y
+                        }
+                        ListElement {
+                            text: qsTr("Start + L1 + R1 + A")
+                            val: StreamingPreferences.GQC_START_L1_R1_A
+                        }
+                        ListElement {
+                            text: qsTr("Start + L1 + R1 + B")
+                            val: StreamingPreferences.GQC_START_L1_R1_B
+                        }
+                        ListElement {
+                            text: qsTr("L1 + R1 + X + Y")
+                            val: StreamingPreferences.GQC_L1_R1_X_Y
+                        }
+                        ListElement {
+                            text: qsTr("L1 + R1 + A + B")
+                            val: StreamingPreferences.GQC_L1_R1_A_B
+                        }
+                    }
+
+                    onActivated: {
+                        StreamingPreferences.gamepadQuitCombo = gamepadQuitComboListModel.get(currentIndex).val
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Choose which button combination exits streaming. Use alternatives if the default doesn't work on your device.")
+                }
             }
         }
 
