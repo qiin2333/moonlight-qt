@@ -34,20 +34,49 @@ extern struct stat g_DrmMasterStat;
 extern bool g_DisableDrmHooks;
 
 #define MAX_SDL_FD_COUNT 8
-int g_SdlDrmMasterFds[MAX_SDL_FD_COUNT];
+int g_SdlDrmMasterFds[MAX_SDL_FD_COUNT] = {-1, -1, -1, -1, -1, -1, -1, -1};
 int g_SdlDrmMasterFdCount = 0;
 pthread_mutex_t g_FdTableLock = PTHREAD_MUTEX_INITIALIZER;
+
+// This lock protects sections of code that must run uninterrupted with DRM master
+pthread_mutex_t g_MasterLock;
+pthread_once_t g_MasterLockInit;
+
+// Lock order: g_MasterLock -> g_FdTableLock
+
+static void initializeMasterLock(void)
+{
+    pthread_mutexattr_t attr;
+
+    // g_MasterLock must be a recursive mutex because we can't fully
+    // predict how SDL and Vulkan/GL driver code will behave. They may
+    // call functions that trigger reentrancy into our hooks again,
+    // which can deadlock if the caller already holds the master lock.
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&g_MasterLock, &attr);
+    pthread_mutexattr_destroy(&attr);
+}
+
+void lockDrmMaster()
+{
+    pthread_once(&g_MasterLockInit, initializeMasterLock);
+    pthread_mutex_lock(&g_MasterLock);
+}
+
+void unlockDrmMaster()
+{
+    pthread_mutex_unlock(&g_MasterLock);
+}
 
 // Caller must hold g_FdTableLock
 int getSdlFdEntryIndex(bool unused)
 {
     for (int i = 0; i < MAX_SDL_FD_COUNT; i++) {
-        // We slightly bend the FD rules here by treating 0
-        // as invalid since that's our global default value.
-        if (unused && g_SdlDrmMasterFds[i] <= 0) {
+        if (unused && g_SdlDrmMasterFds[i] < 0) {
             return i;
         }
-        else if (!unused && g_SdlDrmMasterFds[i] > 0) {
+        else if (!unused && g_SdlDrmMasterFds[i] >= 0) {
             return i;
         }
     }
@@ -58,6 +87,13 @@ int getSdlFdEntryIndex(bool unused)
 // Returns true if the final SDL FD was removed
 bool removeSdlFd(int fd)
 {
+    // -1 will break our logic below that looks for matches
+    // in the entire array (which we must do because it may
+    // not be contiguously populated).
+    if (fd == -1) {
+        return false;
+    }
+
     pthread_mutex_lock(&g_FdTableLock);
     if (g_SdlDrmMasterFdCount != 0) {
         // Clear the entry for this fd from the table
@@ -132,6 +168,9 @@ int openHook(typeof(open) *real_open, typeof(close) *real_close, const char *pat
                 int freeFdIndex;
                 int allocatedFdIndex;
 
+                // Prevent other threads from stealing DRM master for now
+                lockDrmMaster();
+
                 // It is our device. Time to do the magic!
                 pthread_mutex_lock(&g_FdTableLock);
 
@@ -139,6 +178,7 @@ int openHook(typeof(open) *real_open, typeof(close) *real_close, const char *pat
                 freeFdIndex = getSdlFdEntryIndex(true);
                 if (freeFdIndex < 0) {
                     pthread_mutex_unlock(&g_FdTableLock);
+                    unlockDrmMaster();
                     SDL_assert(freeFdIndex >= 0);
                     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                                  "No unused SDL FD table entries!");
@@ -159,6 +199,7 @@ int openHook(typeof(open) *real_open, typeof(close) *real_close, const char *pat
                     // Drop master on Qt's FD so we can pick it up for SDL.
                     if (drmDropMaster(g_QtDrmMasterFd) < 0) {
                         pthread_mutex_unlock(&g_FdTableLock);
+                        unlockDrmMaster();
                         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                                      "Failed to drop master on Qt DRM FD: %d",
                                      errno);
@@ -190,6 +231,8 @@ int openHook(typeof(open) *real_open, typeof(close) *real_close, const char *pat
                 }
 
                 pthread_mutex_unlock(&g_FdTableLock);
+
+                unlockDrmMaster();
             }
         }
     }
