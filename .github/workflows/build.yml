@@ -152,20 +152,18 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
+    - name: Install create-dmg
+      run: |
+        brew install node
+        npm install --global create-dmg
+
     - name: Install Qt
-      uses: jurplel/install-qt-action@v3
+      uses: jurplel/install-qt-action@v4
       with:
-        version: '6.10.2'
+        version: '6.11.0'
         modules: 'qtmultimedia qtimageformats'
         cache: true
-
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-
-    - name: Install create-dmg
-      run: npm install --global create-dmg
+        aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
 
     - name: Get version
       run: |

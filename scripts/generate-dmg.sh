@@ -73,6 +73,18 @@ echo Creating app bundle
 EXTRA_ARGS=
 if [ "$BUILD_CONFIG" == "Debug" ]; then EXTRA_ARGS="$EXTRA_ARGS -use-debug-libs"; fi
 echo Extra deployment arguments: $EXTRA_ARGS
+
+# Qt 6.10+ can ship the Mimer SQL driver with an absolute dependency on
+# /usr/local/lib/libmimerapi.dylib, which is not present on GitHub's macOS
+# runners. Moonlight doesn't use Qt SQL plugins, so remove the problematic
+# plugin in CI before macdeployqt scans Qt's plugin tree.
+if [ "$GITHUB_ACTIONS" == "true" ]; then
+  QT_PLUGIN_DIR=`qmake -query QT_INSTALL_PLUGINS 2>/dev/null`
+  if [ -n "$QT_PLUGIN_DIR" ]; then
+    rm -f "$QT_PLUGIN_DIR/sqldrivers/libqsqlmimer.dylib"
+  fi
+fi
+
 macdeployqt $BUILD_FOLDER/app/Moonlight.app $EXTRA_ARGS -qmldir=$SOURCE_ROOT/app/gui -appstore-compliant || fail "macdeployqt failed!"
 
 echo Removing dSYM files from app bundle
@@ -88,10 +100,15 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
   create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --identity="$SIGNING_IDENTITY" --no-version-in-filename || fail "create-dmg failed!"
 else
   create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --no-version-in-filename
-  case $? in
+  CREATE_DMG_STATUS=$?
+  case $CREATE_DMG_STATUS in
     0) ;;
     2) ;;
-    *) fail "create-dmg failed!";;
+    *)
+      echo "create-dmg failed with status $CREATE_DMG_STATUS; falling back to hdiutil"
+      rm -f $INSTALLER_FOLDER/Moonlight.dmg
+      hdiutil create -volname Moonlight -srcfolder $BUILD_FOLDER/app/Moonlight.app -ov -format UDZO $INSTALLER_FOLDER/Moonlight.dmg || fail "fallback hdiutil DMG creation failed!"
+      ;;
   esac
 fi
 
