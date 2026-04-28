@@ -6,6 +6,8 @@
 #include <QMetaObject>
 #include <QtEndian>
 
+#include <cstring>
+
 #include <SDL.h>
 
 #include <Limelight.h>
@@ -85,7 +87,7 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
     if (!decodeFrame(frame, kind, payload)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "ClipboardSync: discarding malformed inbound frame (%d bytes)",
-                    frame.size());
+                    static_cast<int>(frame.size()));
         return;
     }
 
@@ -162,7 +164,7 @@ void ClipboardSync::onLocalClipboardChanged()
         // or send failed; log once at debug level to avoid spam.
         SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
                      "ClipboardSync: LiSendClipboardData(%d bytes) -> %d",
-                     frame.size(), rc);
+                     static_cast<int>(frame.size()), rc);
     }
 }
 
