@@ -1,4 +1,5 @@
 #include "session.h"
+#include "clipboardsync.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
@@ -67,7 +68,9 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     Session::clRumbleTriggers,
     Session::clSetMotionEventState,
     Session::clSetControllerLED,
-    Session::clSetAdaptiveTriggers
+    Session::clSetAdaptiveTriggers,
+    nullptr, // resolutionChanged (unused on Qt client)
+    Session::clClipboardData
 };
 
 Session* Session::s_ActiveSession;
@@ -217,6 +220,17 @@ void Session::clSetHdrMode(bool enabled)
         }
         SDL_UnlockMutex(s_ActiveSession->m_DecoderLock);
     }
+}
+
+void Session::clClipboardData(const char* data, int length)
+{
+    Session* session = s_ActiveSession;
+    if (session == nullptr || session->m_ClipboardSync == nullptr) {
+        return;
+    }
+
+    // Marshals to GUI thread internally; safe to call from the recv thread.
+    session->m_ClipboardSync->handleIncomingFrame(data, length);
 }
 
 void Session::clRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger, uint16_t rightTrigger)
@@ -584,12 +598,19 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_MenuCloseTicks(0),
       m_MicStream(nullptr)
 {
+    m_ClipboardSync = nullptr;
 }
 
 Session::~Session()
 {
     // NB: This may not get destroyed for a long time! Don't put any non-trivial cleanup here.
     // Use Session::exec() or DeferredSessionCleanupTask instead.
+
+    if (m_ClipboardSync != nullptr) {
+        m_ClipboardSync->stop();
+        delete m_ClipboardSync;
+        m_ClipboardSync = nullptr;
+    }
 
     SDL_DestroyMutex(m_DecoderLock);
 }
@@ -2047,6 +2068,14 @@ void Session::start()
 
     // We're now active
     s_ActiveSession = this;
+
+    // Construct the clipboard sync helper on the GUI thread before the
+    // control receive thread can possibly invoke clClipboardData(). It is
+    // started after a successful connection in clConnectionStatusUpdate.
+    if (m_ClipboardSync == nullptr) {
+        m_ClipboardSync = new ClipboardSync(this);
+        m_ClipboardSync->start();
+    }
 
     // Initialize the gamepad code with our preferences
     // NB: m_InputHandler must be initialize before starting the connection.
