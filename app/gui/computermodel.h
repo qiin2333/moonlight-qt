@@ -2,6 +2,7 @@
 #include "streaming/session.h"
 
 #include <QAbstractListModel>
+#include <QVariantList>
 
 class ComputerModel : public QAbstractListModel
 {
@@ -44,6 +45,12 @@ public:
     Q_INVOKABLE void renameComputer(int computerIndex, QString name);
 
     Q_INVOKABLE Session* createSessionForCurrentGame(int computerIndex);
+
+    Q_INVOKABLE QVariantList getConnectionAddressesForComputer(int computerIndex) const;
+
+    Q_INVOKABLE bool hasMultipleConnectionAddresses(int computerIndex) const;
+
+    Q_INVOKABLE bool setActiveAddressForComputer(int computerIndex, QString address, int port);
 
 signals:
     void pairingCompleted(QVariant error);

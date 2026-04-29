@@ -1,7 +1,41 @@
 #include "computermodel.h"
 #include "backend/nvcomputer.h"
 
+#include <QDebug>
+#include <QReadLocker>
 #include <QThreadPool>
+#include <QWriteLocker>
+
+namespace {
+QString getAddressType(const NvAddress& address,
+                       const NvAddress& localAddress,
+                       const NvAddress& remoteAddress,
+                       const NvAddress& manualAddress,
+                       const NvAddress& ipv6Address)
+{
+    if (address == localAddress) {
+        return ComputerModel::tr("Local network");
+    }
+    if (address == remoteAddress) {
+        return ComputerModel::tr("Remote network");
+    }
+    if (address == manualAddress) {
+        return ComputerModel::tr("Manual");
+    }
+    if (address == ipv6Address) {
+        return ComputerModel::tr("IPv6 network");
+    }
+
+    return ComputerModel::tr("Other network");
+}
+
+QVector<NvAddress> getSelectableAddresses(NvComputer* computer)
+{
+    // Return all unique addresses, not just tested ones,
+    // so the user can always select from all known addresses.
+    return computer->uniqueAddresses();
+}
+}
 
 ComputerModel::ComputerModel(QObject* object)
     : QAbstractListModel(object) {}
@@ -137,6 +171,94 @@ Session* ComputerModel::createSessionForCurrentGame(int computerIndex)
     // We have a current running app but it's not in our app list
     Q_ASSERT(false);
     return nullptr;
+}
+
+QVariantList ComputerModel::getConnectionAddressesForComputer(int computerIndex) const
+{
+    QVariantList addresses;
+
+    if (computerIndex < 0 || computerIndex >= m_Computers.count()) {
+        qWarning() << "Invalid computer index for getConnectionAddressesForComputer:" << computerIndex;
+        return addresses;
+    }
+
+    NvComputer* computer = m_Computers[computerIndex];
+    const QVector<NvAddress> selectableAddresses = getSelectableAddresses(computer);
+
+    NvAddress localAddress;
+    NvAddress remoteAddress;
+    NvAddress manualAddress;
+    NvAddress ipv6Address;
+    NvAddress activeAddress;
+
+    {
+        QReadLocker lock(&computer->lock);
+        localAddress = computer->localAddress;
+        remoteAddress = computer->remoteAddress;
+        manualAddress = computer->manualAddress;
+        ipv6Address = computer->ipv6Address;
+        activeAddress = computer->activeAddress;
+    }
+
+    for (const NvAddress& address : selectableAddresses) {
+        QVariantMap item;
+        item["address"] = address.address();
+        item["port"] = static_cast<int>(address.port());
+        item["display"] = address.toString();
+        item["type"] = getAddressType(address, localAddress, remoteAddress, manualAddress, ipv6Address);
+        item["isActive"] = address == activeAddress;
+        item["isTested"] = computer->hasAddressTestSucceeded(address);
+        addresses.append(item);
+    }
+
+    return addresses;
+}
+
+bool ComputerModel::hasMultipleConnectionAddresses(int computerIndex) const
+{
+    if (computerIndex < 0 || computerIndex >= m_Computers.count()) {
+        qWarning() << "Invalid computer index for hasMultipleConnectionAddresses:" << computerIndex;
+        return false;
+    }
+
+    return getSelectableAddresses(m_Computers[computerIndex]).count() > 1;
+}
+
+bool ComputerModel::setActiveAddressForComputer(int computerIndex, QString address, int port)
+{
+    if (computerIndex < 0 || computerIndex >= m_Computers.count()) {
+        qWarning() << "Invalid computer index for setActiveAddressForComputer:" << computerIndex;
+        return false;
+    }
+
+    if (address.isEmpty() || port <= 0) {
+        qWarning() << "Invalid address for setActiveAddressForComputer:" << address << port;
+        return false;
+    }
+
+    NvComputer* computer = m_Computers[computerIndex];
+    NvAddress selectedAddress(address, static_cast<uint16_t>(port));
+
+    // Verify the address is one of the known addresses
+    bool found = false;
+    for (const NvAddress& addr : computer->uniqueAddresses()) {
+        if (addr == selectedAddress) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        qWarning() << "Address is not a known address:" << selectedAddress.toString();
+        return false;
+    }
+
+    {
+        QWriteLocker lock(&computer->lock);
+        computer->activeAddress = selectedAddress;
+    }
+
+    emit dataChanged(createIndex(computerIndex, 0), createIndex(computerIndex, 0));
+    return true;
 }
 
 void ComputerModel::deleteComputer(int computerIndex)
