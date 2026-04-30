@@ -98,12 +98,8 @@ set DEPLOY_FOLDER=%BUILD_ROOT%\deploy-%ARCH%-%BUILD_CONFIG%
 set INSTALLER_FOLDER=%BUILD_ROOT%\installer-%ARCH%-%BUILD_CONFIG%
 set SYMBOLS_FOLDER=%BUILD_ROOT%\symbols-%ARCH%-%BUILD_CONFIG%
 
-rem Allow CI to override the version.txt with an environment variable
-if defined CI_VERSION (
-    set VERSION=%CI_VERSION%
-) else (
-    set /p VERSION=<%SOURCE_ROOT%\app\version.txt
-)
+rem Derive artifact version from CI_VERSION or Git tags (fallback: app\version.txt)
+for /f "usebackq delims=" %%i in (`python "%SOURCE_ROOT%\scripts\derive-version.py" --source-root "%SOURCE_ROOT%" --field artifact`) do set VERSION=%%i
 
 rem Use the correct VC tools for the specified architecture
 if /I "%ARCH%" EQU "x64" (

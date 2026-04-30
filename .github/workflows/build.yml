@@ -28,7 +28,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
 
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
@@ -41,8 +41,7 @@ jobs:
     - name: Get version
       shell: cmd
       run: |
-        set /p VERSION=<app\version.txt
-        echo VERSION=%VERSION% >> %GITHUB_ENV%
+        for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo VERSION=%%i >> %GITHUB_ENV%
 
     - name: Setup build environment
       shell: cmd
@@ -150,7 +149,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
 
     - name: Install create-dmg
       run: |
@@ -167,7 +166,7 @@ jobs:
 
     - name: Get version
       run: |
-        VERSION=$(cat app/version.txt)
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Build and generate DMG
@@ -188,7 +187,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
 
     - name: Install Qt 6.8.3
       uses: jurplel/install-qt-action@v3
@@ -202,7 +201,7 @@ jobs:
         mkdir -p $HOME/local/{bin,include,lib}
         echo "$HOME/local/bin" >> $GITHUB_PATH
         echo "PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$HOME/local/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
-        echo "VERSION=$(cat app/version.txt)" >> $GITHUB_ENV
+        echo "VERSION=$(python3 scripts/derive-version.py --field artifact)" >> $GITHUB_ENV
         echo "UBUNTU_RELEASE=$(lsb_release -rs)" >> $GITHUB_ENV
 
     # This may still install various Qt packages, but the later install step will override them
@@ -358,7 +357,7 @@ jobs:
 
     - name: Get version
       run: |
-        VERSION=$(cat app/version.txt)
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Build AppImage
@@ -394,7 +393,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
 
     - name: Install dependencies
       run: |
@@ -408,7 +407,7 @@ jobs:
 
     - name: Get version
       run: |
-        VERSION=$(cat app/version.txt)
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Build SteamLink app

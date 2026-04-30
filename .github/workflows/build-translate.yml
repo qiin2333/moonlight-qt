@@ -15,7 +15,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
 
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
@@ -28,8 +28,7 @@ jobs:
     - name: Get version
       shell: cmd
       run: |
-        set /p VERSION=<app\version.txt
-        echo VERSION=%VERSION% >> %GITHUB_ENV%
+        for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo VERSION=%%i >> %GITHUB_ENV%
 
     - name: Setup build environment
       shell: cmd

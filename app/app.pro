@@ -11,6 +11,20 @@ unix:!macx {
 
 include(../globaldefs.pri)
 
+win32 {
+    VERSION_PYTHON = python
+} else {
+    VERSION_PYTHON = python3
+}
+
+VERSION_SCRIPT = $$shell_quote($$PWD/../scripts/derive-version.py)
+VERSION_SOURCE_ROOT = $$shell_quote($$PWD/..)
+MOONLIGHT_VERSION = $$system($$VERSION_PYTHON $$VERSION_SCRIPT --source-root $$VERSION_SOURCE_ROOT --field display)
+MOONLIGHT_NUMERIC_VERSION = $$system($$VERSION_PYTHON $$VERSION_SCRIPT --source-root $$VERSION_SOURCE_ROOT --field numeric)
+
+isEmpty(MOONLIGHT_VERSION): MOONLIGHT_VERSION = $$cat(version.txt)
+isEmpty(MOONLIGHT_NUMERIC_VERSION): MOONLIGHT_NUMERIC_VERSION = $$cat(version.txt)
+
 # Precompile QML files to avoid writing qmlcache on portable versions.
 # Since this binds the app against the Qt runtime version, we will only
 # do this for Windows and Mac (when disable-prebuilts is not defined),
@@ -583,7 +597,7 @@ win32 {
 macx {
     # Create Info.plist in object dir with the correct version string
     system(cp $$PWD/Info.plist $$OUT_PWD/Info.plist)
-    system(sed -i -e 's/VERSION/$$cat(version.txt)/g' $$OUT_PWD/Info.plist)
+    system(sed -i -e 's/VERSION/$$MOONLIGHT_NUMERIC_VERSION/g' $$OUT_PWD/Info.plist)
 
     QMAKE_INFO_PLIST = $$OUT_PWD/Info.plist
 
@@ -605,5 +619,5 @@ macx {
     }
 }
 
-VERSION = "$$cat(version.txt)"
-DEFINES += VERSION_STR=\\\"$$cat(version.txt)\\\"
+VERSION = "$$MOONLIGHT_NUMERIC_VERSION"
+DEFINES += VERSION_STR=\\\"$$MOONLIGHT_VERSION\\\"
