@@ -51,8 +51,13 @@ jobs:
         set JOM_MAX_CPUS=%NUMBER_OF_PROCESSORS%
         echo JOM_MAX_CPUS=%JOM_MAX_CPUS% >> %GITHUB_ENV%
         rem Increase virtual memory to prevent out-of-memory issues
-        wmic pagefileset where name="C:\\pagefile.sys" set InitialSize=4096,MaximumSize=8192
-        wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False
+        where wmic >nul 2>nul
+        if %ERRORLEVEL% EQU 0 (
+          wmic pagefileset where name="C:\\pagefile.sys" set InitialSize=4096,MaximumSize=8192 || echo Failed to set pagefile size
+          wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False || echo Failed to disable automatic pagefile management
+        ) else (
+          echo wmic is not available; skipping pagefile tuning.
+        )
 
     - name: Configure build environment
       shell: cmd
