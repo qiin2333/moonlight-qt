@@ -116,6 +116,12 @@ jobs:
     - name: Build Windows arm64
       shell: cmd
       run: |
+        rem Force the ARM64 Qt bin to the front of PATH so that build-arch.bat's
+        rem `where qmake.bat` / `where qmake.exe` resolves to the cross-compiled
+        rem ARM64 Qt instead of the x64 Qt installed earlier in this job. Without
+        rem this, windeployqt would deploy x64 Qt DLLs into the ARM64 portable
+        rem package, producing 0xc000007b on launch (qiin2333/moonlight-qt#71).
+        set "PATH=%Qt6_DIR%\bin;%PATH%"
         copy /y scripts\appveyor\qmake.bat %Qt6_DIR%\bin\
         copy /y scripts\appveyor\qtpaths.bat %Qt6_DIR%\bin\
         copy /y scripts\appveyor\target_qt.conf %Qt6_DIR%\bin\
