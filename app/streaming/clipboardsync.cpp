@@ -1,12 +1,21 @@
 #include "clipboardsync.h"
+#include "backend/nvcomputer.h"
 
 #include <QBuffer>
 #include <QClipboard>
 #include <QDateTime>
 #include <QGuiApplication>
 #include <QImage>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMetaObject>
 #include <QMimeData>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QSslConfiguration>
+#include <QSslError>
+#include <QUrl>
 #include <QtEndian>
 
 #include <cstring>
@@ -15,8 +24,9 @@
 
 #include <Limelight.h>
 
-ClipboardSync::ClipboardSync(QObject* parent)
-    : QObject(parent)
+ClipboardSync::ClipboardSync(NvComputer* computer, QObject* parent)
+    : QObject(parent),
+      m_Computer(computer)
 {
     qRegisterMetaType<QByteArray>("QByteArray");
 }
@@ -121,29 +131,63 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
     }
 
     if (kind == KIND_PNG) {
-        QImage image;
-        if (!image.loadFromData(payload, "PNG") || image.isNull()) {
+        applyInboundPng(payload);
+        return;
+    }
+
+    if (kind == KIND_REF) {
+        // Payload is a small UTF-8 JSON descriptor: {"id":"...","mime":"...","size":N}.
+        QJsonParseError jerr{};
+        QJsonDocument doc = QJsonDocument::fromJson(payload, &jerr);
+        if (jerr.error != QJsonParseError::NoError || !doc.isObject()) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "ClipboardSync: dropping inbound PNG payload (decode failed, %d bytes)",
-                        static_cast<int>(payload.size()));
+                        "ClipboardSync: dropping inbound REF with bad JSON (%s)",
+                        jerr.errorString().toUtf8().constData());
             return;
         }
-
-        QClipboard* cb = QGuiApplication::clipboard();
-        if (cb == nullptr) {
+        QJsonObject obj = doc.object();
+        QString id = obj.value(QStringLiteral("id")).toString();
+        QString mime = obj.value(QStringLiteral("mime")).toString();
+        qint64 size = static_cast<qint64>(obj.value(QStringLiteral("size")).toDouble(0));
+        if (id.isEmpty() || id.size() > 128) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: dropping inbound REF with bad id length");
             return;
         }
-
-        // Hash the wire bytes (not the decoded pixels) so the echo we suppress
-        // matches what we'd re-encode if QClipboard hands the image straight back.
-        uint64_t hash = hashBytes(payload);
-        recordHash(hash);
-        m_SuppressNextChange = true;
-        cb->setImage(image);
+        if (size > MAX_BLOB_BYTES) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: dropping inbound REF, declared size %lld exceeds %lld cap",
+                        static_cast<long long>(size), static_cast<long long>(MAX_BLOB_BYTES));
+            return;
+        }
+        fetchRefAndApply(id, mime);
         return;
     }
 
     // Unknown kind — ignore.
+}
+
+void ClipboardSync::applyInboundPng(const QByteArray& payload)
+{
+    QImage image;
+    if (!image.loadFromData(payload, "PNG") || image.isNull()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "ClipboardSync: dropping inbound PNG payload (decode failed, %d bytes)",
+                    static_cast<int>(payload.size()));
+        return;
+    }
+
+    QClipboard* cb = QGuiApplication::clipboard();
+    if (cb == nullptr) {
+        return;
+    }
+
+    // Hash the wire bytes (not the decoded pixels) so the echo we suppress
+    // matches what we'd re-encode if QClipboard hands the image straight back.
+    uint64_t hash = hashBytes(payload);
+    recordHash(hash);
+    m_SuppressNextChange = true;
+    cb->setImage(image);
 }
 
 void ClipboardSync::onLocalClipboardChanged()
@@ -190,9 +234,22 @@ void ClipboardSync::onLocalClipboardChanged()
             }
 
             if (png.size() > MAX_PAYLOAD) {
-                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                            "ClipboardSync: PNG payload %d B exceeds %d B single-packet cap, dropping",
-                            static_cast<int>(png.size()), MAX_PAYLOAD);
+                // Out-of-band path. Record the underlying PNG hash before
+                // upload so the echo we'll see when the host loops the REF
+                // back (and we fetch the same bytes) is suppressed.
+                if (png.size() > MAX_BLOB_BYTES) {
+                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                                "ClipboardSync: PNG payload %lld B exceeds %lld B blob cap, dropping",
+                                static_cast<long long>(png.size()),
+                                static_cast<long long>(MAX_BLOB_BYTES));
+                    return;
+                }
+                uint64_t hash = hashBytes(png);
+                if (seenRecently(hash)) {
+                    return;
+                }
+                recordHash(hash);
+                uploadAndSendRef(png, QStringLiteral("image/png"));
                 return;
             }
 
@@ -336,4 +393,148 @@ uint64_t ClipboardSync::hashBytes(const QByteArray& bytes)
         h *= 0x100000001b3ULL;
     }
     return h;
+}
+
+QNetworkAccessManager* ClipboardSync::nam()
+{
+    if (m_Nam == nullptr) {
+        m_Nam = new QNetworkAccessManager(this);
+        // Pin the host's self-signed cert exactly like NvHTTP does: ignore
+        // SSL errors only when the offending cert matches the pinned one.
+        connect(m_Nam, &QNetworkAccessManager::sslErrors, this,
+                [this](QNetworkReply* reply, const QList<QSslError>& errors) {
+                    if (m_Computer == nullptr || m_Computer->serverCert.isNull()) {
+                        return;
+                    }
+                    for (const QSslError& e : errors) {
+                        if (m_Computer->serverCert != e.certificate()) {
+                            return;
+                        }
+                    }
+                    reply->ignoreSslErrors(errors);
+                });
+    }
+    return m_Nam;
+}
+
+bool ClipboardSync::buildBlobUrl(const QString& tail, QUrl& outUrl) const
+{
+    if (m_Computer == nullptr || m_Computer->serverCert.isNull()) {
+        return false;
+    }
+    NvAddress addr = m_Computer->activeAddress;
+    uint16_t port = m_Computer->activeHttpsPort;
+    if (addr.isNull() || port == 0) {
+        return false;
+    }
+    QString host = addr.address();
+    if (host.contains(':')) {
+        host = QString("[%1]").arg(host); // bracketed IPv6
+    }
+    outUrl = QUrl(QString("https://%1:%2/api/v1/clipboard%3").arg(host).arg(port).arg(tail));
+    return outUrl.isValid();
+}
+
+void ClipboardSync::uploadAndSendRef(const QByteArray& payload, const QString& mime)
+{
+    QUrl url;
+    if (!buildBlobUrl(QStringLiteral("/blob"), url)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "ClipboardSync: cannot upload blob (no host context)");
+        return;
+    }
+
+    QNetworkRequest req(url);
+    req.setHeader(QNetworkRequest::ContentTypeHeader,
+                  QStringLiteral("application/octet-stream"));
+    req.setRawHeader("X-Clipboard-Mime", mime.toUtf8());
+    req.setSslConfiguration(QSslConfiguration::defaultConfiguration());
+
+    QNetworkReply* reply = nam()->post(req, payload);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, mime, payloadSize = payload.size()]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: blob upload failed: %s",
+                        reply->errorString().toUtf8().constData());
+            return;
+        }
+        QJsonParseError jerr{};
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &jerr);
+        if (jerr.error != QJsonParseError::NoError || !doc.isObject()) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: blob upload response not JSON: %s",
+                        jerr.errorString().toUtf8().constData());
+            return;
+        }
+        QString id = doc.object().value(QStringLiteral("id")).toString();
+        if (id.isEmpty()) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: blob upload response missing id");
+            return;
+        }
+
+        QJsonObject meta;
+        meta.insert(QStringLiteral("id"), id);
+        meta.insert(QStringLiteral("mime"), mime);
+        meta.insert(QStringLiteral("size"), static_cast<double>(payloadSize));
+        QByteArray json = QJsonDocument(meta).toJson(QJsonDocument::Compact);
+
+        QByteArray frame;
+        if (!encodeFrame(KIND_REF, json, frame)) {
+            return;
+        }
+        int rc = LiSendClipboardData(frame.constData(), frame.size());
+        if (rc != 0) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                         "ClipboardSync: LiSendClipboardData(REF, %d bytes) -> %d",
+                         static_cast<int>(frame.size()), rc);
+        }
+    });
+}
+
+void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime)
+{
+    QUrl url;
+    if (!buildBlobUrl(QStringLiteral("/blob/") + id, url)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "ClipboardSync: cannot fetch blob (no host context)");
+        return;
+    }
+
+    QNetworkRequest req(url);
+    req.setSslConfiguration(QSslConfiguration::defaultConfiguration());
+
+    QNetworkReply* reply = nam()->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, mime]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: blob fetch failed: %s",
+                        reply->errorString().toUtf8().constData());
+            return;
+        }
+        QByteArray bytes = reply->readAll();
+        if (bytes.isEmpty()) {
+            return;
+        }
+        // Trust the REF descriptor's mime over Content-Type.
+        if (mime == QStringLiteral("image/png")) {
+            applyInboundPng(bytes);
+        } else if (mime.startsWith(QStringLiteral("text/"))) {
+            if (bytes.contains('\0')) {
+                return;
+            }
+            uint64_t hash = hashBytes(bytes);
+            recordHash(hash);
+            m_SuppressNextChange = true;
+            if (SDL_SetClipboardText(bytes.constData()) != 0) {
+                m_SuppressNextChange = false;
+            }
+        } else {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: dropping fetched blob with unsupported mime '%s'",
+                        mime.toUtf8().constData());
+        }
+    });
 }

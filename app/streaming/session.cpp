@@ -2073,7 +2073,7 @@ void Session::start()
     // control receive thread can possibly invoke clClipboardData(). It is
     // started after a successful connection in clConnectionStatusUpdate.
     if (m_ClipboardSync == nullptr) {
-        m_ClipboardSync = new ClipboardSync(this);
+        m_ClipboardSync = new ClipboardSync(m_Computer, this);
         m_ClipboardSync->start();
     }
 
