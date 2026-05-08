@@ -13,8 +13,9 @@
 // payload, little-endian) over Limelight control packet 0x5508
 // (LiSendClipboardData / ConnListenerClipboardData).
 //
-// Currently only kind=1 (UTF-8 text) is implemented in both directions.
-// Image / file payloads are accepted on the wire but ignored.
+// Supports kind=1 (UTF-8 text) and kind=2 (PNG image) in both directions.
+// File / other payloads are accepted on the wire but ignored.
+// Single-packet only (no chunking) — payloads above MAX_PAYLOAD are dropped.
 //
 // Echo suppression: when we either write a payload to the local clipboard
 // (because the host pushed it) or send a payload to the host (because we
@@ -43,6 +44,9 @@ public:
     static constexpr int     MAX_PAYLOAD  = 65535 - 10; // wire frame must fit u16 length
     static constexpr int     ECHO_TTL_MS  = 5000;
     static constexpr int     ECHO_MAX     = 16;
+    // Mirror the Android client's cap (32 Mpx) so a stray full-screen capture
+    // doesn't try to PNG-encode a 100 MB bitmap and stall the GUI thread.
+    static constexpr qint64  MAX_IMAGE_PIXELS = 32LL * 1024 * 1024;
 
     explicit ClipboardSync(QObject* parent = nullptr);
     ~ClipboardSync() override;
@@ -66,7 +70,7 @@ private slots:
     void onIncomingFrame(QByteArray frame);
 
 private:
-    bool encodeTextFrame(const QByteArray& utf8, QByteArray& outFrame) const;
+    bool encodeFrame(uint8_t kind, const QByteArray& payload, QByteArray& outFrame) const;
     bool decodeFrame(const QByteArray& frame,
                      uint8_t& outKind,
                      QByteArray& outPayload) const;

@@ -1,9 +1,12 @@
 #include "clipboardsync.h"
 
+#include <QBuffer>
 #include <QClipboard>
 #include <QDateTime>
 #include <QGuiApplication>
+#include <QImage>
 #include <QMetaObject>
+#include <QMimeData>
 #include <QtEndian>
 
 #include <cstring>
@@ -42,7 +45,7 @@ void ClipboardSync::start()
 
     m_Active = true;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "ClipboardSync: started (text-only, bidirectional)");
+                "ClipboardSync: started (text + PNG, bidirectional)");
 }
 
 void ClipboardSync::stop()
@@ -91,33 +94,56 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
         return;
     }
 
-    if (kind != KIND_TEXT) {
-        // Image / file kinds are not yet wired up on the Qt client.
+    if (kind == KIND_TEXT) {
+        // Validate UTF-8 by round-tripping through QString. Reject anything that
+        // contains an embedded NUL since SDL_SetClipboardText is C-string-based.
+        if (payload.contains('\0')) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: dropping inbound text payload with embedded NUL");
+            return;
+        }
+
+        // Record hash *before* writing so the dataChanged echo we're about to
+        // trigger is suppressed.
+        uint64_t hash = hashBytes(payload);
+        recordHash(hash);
+        m_SuppressNextChange = true;
+
+        // SDL_SetClipboardText copies internally; payload is already null-safe
+        // because QByteArray's data() guarantees a trailing NUL.
+        if (SDL_SetClipboardText(payload.constData()) != 0) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: SDL_SetClipboardText failed: %s",
+                        SDL_GetError());
+            m_SuppressNextChange = false;
+        }
         return;
     }
 
-    // Validate UTF-8 by round-tripping through QString. Reject anything that
-    // contains an embedded NUL since SDL_SetClipboardText is C-string-based.
-    if (payload.contains('\0')) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "ClipboardSync: dropping inbound text payload with embedded NUL");
+    if (kind == KIND_PNG) {
+        QImage image;
+        if (!image.loadFromData(payload, "PNG") || image.isNull()) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: dropping inbound PNG payload (decode failed, %d bytes)",
+                        static_cast<int>(payload.size()));
+            return;
+        }
+
+        QClipboard* cb = QGuiApplication::clipboard();
+        if (cb == nullptr) {
+            return;
+        }
+
+        // Hash the wire bytes (not the decoded pixels) so the echo we suppress
+        // matches what we'd re-encode if QClipboard hands the image straight back.
+        uint64_t hash = hashBytes(payload);
+        recordHash(hash);
+        m_SuppressNextChange = true;
+        cb->setImage(image);
         return;
     }
 
-    // Record hash *before* writing so the dataChanged echo we're about to
-    // trigger is suppressed.
-    uint64_t hash = hashBytes(payload);
-    recordHash(hash);
-    m_SuppressNextChange = true;
-
-    // SDL_SetClipboardText copies internally; payload is already null-safe
-    // because QByteArray's data() guarantees a trailing NUL.
-    if (SDL_SetClipboardText(payload.constData()) != 0) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "ClipboardSync: SDL_SetClipboardText failed: %s",
-                    SDL_GetError());
-        m_SuppressNextChange = false;
-    }
+    // Unknown kind — ignore.
 }
 
 void ClipboardSync::onLocalClipboardChanged()
@@ -134,6 +160,59 @@ void ClipboardSync::onLocalClipboardChanged()
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb == nullptr) {
         return;
+    }
+
+    const QMimeData* mime = cb->mimeData();
+
+    // Image takes precedence — some applications attach a fallback text label
+    // (file path, alt text) alongside the bitmap; we want the picture, not the
+    // path. Matches moonlight-android's ClipboardSyncManager ordering.
+    if (mime != nullptr && mime->hasImage()) {
+        QImage image = qvariant_cast<QImage>(mime->imageData());
+        if (!image.isNull()) {
+            const qint64 pixels = static_cast<qint64>(image.width()) * image.height();
+            if (pixels <= 0 || pixels > MAX_IMAGE_PIXELS) {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "ClipboardSync: image too large (%dx%d), dropping",
+                            image.width(), image.height());
+                return;
+            }
+
+            QByteArray png;
+            png.reserve(64 * 1024);
+            QBuffer buf(&png);
+            buf.open(QIODevice::WriteOnly);
+            if (!image.save(&buf, "PNG") || png.isEmpty()) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "ClipboardSync: PNG encode failed (%dx%d)",
+                            image.width(), image.height());
+                return;
+            }
+
+            if (png.size() > MAX_PAYLOAD) {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "ClipboardSync: PNG payload %d B exceeds %d B single-packet cap, dropping",
+                            static_cast<int>(png.size()), MAX_PAYLOAD);
+                return;
+            }
+
+            uint64_t hash = hashBytes(png);
+            if (seenRecently(hash)) {
+                return;
+            }
+            recordHash(hash);
+
+            QByteArray frame;
+            if (encodeFrame(KIND_PNG, png, frame)) {
+                int rc = LiSendClipboardData(frame.constData(), frame.size());
+                if (rc != 0) {
+                    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                                 "ClipboardSync: LiSendClipboardData(PNG, %d bytes) -> %d",
+                                 static_cast<int>(frame.size()), rc);
+                }
+            }
+            return;
+        }
     }
 
     QString text = cb->text();
@@ -154,7 +233,7 @@ void ClipboardSync::onLocalClipboardChanged()
     recordHash(hash);
 
     QByteArray frame;
-    if (!encodeTextFrame(utf8, frame)) {
+    if (!encodeFrame(KIND_TEXT, utf8, frame)) {
         return;
     }
 
@@ -163,32 +242,32 @@ void ClipboardSync::onLocalClipboardChanged()
         // Negative return = no active session, host doesn't support clipboard,
         // or send failed; log once at debug level to avoid spam.
         SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
-                     "ClipboardSync: LiSendClipboardData(%d bytes) -> %d",
+                     "ClipboardSync: LiSendClipboardData(text, %d bytes) -> %d",
                      static_cast<int>(frame.size()), rc);
     }
 }
 
-bool ClipboardSync::encodeTextFrame(const QByteArray& utf8, QByteArray& outFrame) const
+bool ClipboardSync::encodeFrame(uint8_t kind, const QByteArray& payload, QByteArray& outFrame) const
 {
-    if (utf8.size() > MAX_PAYLOAD) {
+    if (payload.size() > MAX_PAYLOAD) {
         return false;
     }
 
     outFrame.clear();
-    outFrame.reserve(10 + utf8.size());
+    outFrame.reserve(10 + payload.size());
 
     // u8 version
     outFrame.append(static_cast<char>(WIRE_VERSION));
     // u8 kind
-    outFrame.append(static_cast<char>(KIND_TEXT));
+    outFrame.append(static_cast<char>(kind));
     // u32 token (LE) - we don't generate tokens client-side; 0 is accepted.
     quint32 tokenLE = qToLittleEndian<quint32>(0);
     outFrame.append(reinterpret_cast<const char*>(&tokenLE), sizeof(tokenLE));
     // u32 length (LE)
-    quint32 lenLE = qToLittleEndian<quint32>(static_cast<quint32>(utf8.size()));
+    quint32 lenLE = qToLittleEndian<quint32>(static_cast<quint32>(payload.size()));
     outFrame.append(reinterpret_cast<const char*>(&lenLE), sizeof(lenLE));
     // bytes payload
-    outFrame.append(utf8);
+    outFrame.append(payload);
     return true;
 }
 
