@@ -54,8 +54,9 @@ public:
     // Payload size at/above which we switch from inline KIND_TEXT/KIND_PNG to
     // out-of-band blob transfer (KIND_REF). Leaves headroom under the wire cap.
     static constexpr int     INLINE_THRESHOLD = 60000;
-    // Mirrors the service-side blob store cap (50 MiB).
-    static constexpr qint64  MAX_BLOB_BYTES   = 50LL * 1024 * 1024;
+    // Mirrors the cross-client cap (64 MiB) shared with the Android and
+    // HarmonyOS clients. The service-side blob store accepts up to this much.
+    static constexpr qint64  MAX_BLOB_BYTES   = 64LL * 1024 * 1024;
     static constexpr int     ECHO_TTL_MS  = 5000;
     static constexpr int     ECHO_MAX     = 16;
     // Mirror the Android client's cap (32 Mpx) so a stray full-screen capture
@@ -100,7 +101,7 @@ private:
     bool buildBlobUrl(const QString& tail, QUrl& outUrl) const;
     QNetworkAccessManager* nam();
     void uploadAndSendRef(const QByteArray& payload, const QString& mime);
-    void fetchRefAndApply(const QString& id, const QString& mime);
+    void fetchRefAndApply(const QString& id, const QString& mime, qint64 advertisedSize);
     void applyInboundPng(const QByteArray& payload);
 
     NvComputer* m_Computer = nullptr;

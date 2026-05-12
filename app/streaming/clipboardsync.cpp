@@ -160,7 +160,7 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
                         static_cast<long long>(size), static_cast<long long>(MAX_BLOB_BYTES));
             return;
         }
-        fetchRefAndApply(id, mime);
+        fetchRefAndApply(id, mime, size);
         return;
     }
 
@@ -493,7 +493,7 @@ void ClipboardSync::uploadAndSendRef(const QByteArray& payload, const QString& m
     });
 }
 
-void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime)
+void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime, qint64 advertisedSize)
 {
     QUrl url;
     if (!buildBlobUrl(QStringLiteral("/blob/") + id, url)) {
@@ -506,7 +506,7 @@ void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime)
     req.setSslConfiguration(QSslConfiguration::defaultConfiguration());
 
     QNetworkReply* reply = nam()->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, mime]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, mime, advertisedSize]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
@@ -516,6 +516,23 @@ void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime)
         }
         QByteArray bytes = reply->readAll();
         if (bytes.isEmpty()) {
+            return;
+        }
+        // Defense: cap actual download size in case the server lied about
+        // advertised size or QNAM streamed past the declared length.
+        if (bytes.size() > MAX_BLOB_BYTES) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: dropping fetched blob, actual size %lld exceeds %lld cap",
+                        static_cast<long long>(bytes.size()),
+                        static_cast<long long>(MAX_BLOB_BYTES));
+            return;
+        }
+        // Hard-fail on advertised/actual mismatch when REF declared a size.
+        if (advertisedSize > 0 && bytes.size() != advertisedSize) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "ClipboardSync: dropping fetched blob, size mismatch (got %lld, advertised %lld)",
+                        static_cast<long long>(bytes.size()),
+                        static_cast<long long>(advertisedSize));
             return;
         }
         // Trust the REF descriptor's mime over Content-Type.
