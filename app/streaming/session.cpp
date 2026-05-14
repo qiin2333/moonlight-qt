@@ -2497,8 +2497,25 @@ void Session::exec()
     // Switch to async logging mode when we enter the SDL loop
     StreamUtils::enterAsyncLoggingMode();
 
-    // Hijack this thread to be the SDL main thread. We have to do this
-    // because we want to suspend all Qt processing until the stream is over.
+    // Hijack this thread to be the SDL main thread. We still need to pump Qt
+    // periodically while streaming because ClipboardSync relies on Qt's event
+    // loop for QClipboard notifications, queued inbound frames, and QNAM blob
+    // callbacks. Without this, PNG clipboard sync can stall on every platform.
+    constexpr Uint32 QT_EVENT_PUMP_INTERVAL_MS = 10;
+    Uint32 lastQtEventPumpTicks = 0;
+    auto processQtEventsDuringStream = [this, &lastQtEventPumpTicks](bool force = false) {
+        const bool qtUiVisible = (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
+                                 (m_Toast && m_Toast->isVisible());
+        const Uint32 now = SDL_GetTicks();
+        if (!force && !qtUiVisible && now - lastQtEventPumpTicks < QT_EVENT_PUMP_INTERVAL_MS) {
+            return;
+        }
+        lastQtEventPumpTicks = now;
+        QCoreApplication::processEvents(qtUiVisible
+                                        ? QEventLoop::AllEvents
+                                        : QEventLoop::ExcludeUserInputEvents);
+    };
+
     SDL_Event event;
     for (;;) {
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
@@ -2513,10 +2530,7 @@ void Session::exec()
         // and other problems.
         if (!SDL_WaitEventTimeout(&event, 1000)) {
             presence.runCallbacks();
-            // Process Qt events even during timeout so Qt overlay can paint/respond
-            if (m_MenuPanel && m_MenuPanel->needsEventProcessing()) {
-                QCoreApplication::processEvents(QEventLoop::AllEvents);
-            }
+            processQtEventsDuringStream(true);
             continue;
         }
 #else
@@ -2533,6 +2547,7 @@ void Session::exec()
             SDL_Delay(10);
 #endif
             presence.runCallbacks();
+            processQtEventsDuringStream();
             continue;
         }
 #endif
@@ -2936,12 +2951,7 @@ void Session::exec()
             break;
         }
 
-        // Process Qt events when the overlay menu or toast is visible
-        // This ensures QRasterWindow receives paint/mouse events from the Win32 queue
-        if ((m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
-            (m_Toast && m_Toast->isVisible())) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents);
-        }
+        processQtEventsDuringStream();
 
         // Deferred microphone toggle — runs outside processEvents() to avoid
         // heap corruption when creating QAudioSource within nested event loops

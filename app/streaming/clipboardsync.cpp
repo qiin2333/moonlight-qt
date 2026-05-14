@@ -16,7 +16,6 @@
 #include <QRegularExpression>
 #include <QSslConfiguration>
 #include <QSslError>
-#include <QTimer>
 #include <QUrl>
 #include <QtEndian>
 
@@ -25,10 +24,6 @@
 #include <SDL.h>
 
 #include <Limelight.h>
-
-#ifdef Q_OS_MACOS
-#include "clipboard_mac.h"
-#endif
 
 namespace {
 bool isImageLikeMimeFormat(const QString& format)
@@ -67,17 +62,6 @@ void ClipboardSync::start()
             this, &ClipboardSync::onLocalClipboardChanged,
             Qt::UniqueConnection);
 
-#ifdef Q_OS_MACOS
-    m_LastMacClipboardChangeCount = MacClipboard::changeCount();
-    if (m_MacClipboardPollTimer == nullptr) {
-        m_MacClipboardPollTimer = new QTimer(this);
-        connect(m_MacClipboardPollTimer, &QTimer::timeout,
-                this, &ClipboardSync::onMacClipboardPollTimeout,
-                Qt::UniqueConnection);
-    }
-    m_MacClipboardPollTimer->start(MAC_CLIPBOARD_POLL_INTERVAL_MS);
-#endif
-
     m_Active = true;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "ClipboardSync: started (text + PNG, bidirectional)");
@@ -94,13 +78,6 @@ void ClipboardSync::stop()
         disconnect(cb, &QClipboard::dataChanged,
                    this, &ClipboardSync::onLocalClipboardChanged);
     }
-
-#ifdef Q_OS_MACOS
-    if (m_MacClipboardPollTimer != nullptr) {
-        m_MacClipboardPollTimer->stop();
-    }
-    m_LastMacClipboardChangeCount = -1;
-#endif
 
     m_EchoCache.clear();
     m_SuppressNextChange = false;
@@ -137,28 +114,7 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
     }
 
     if (kind == KIND_TEXT) {
-        // Validate UTF-8 by round-tripping through QString. Reject anything that
-        // contains an embedded NUL since SDL_SetClipboardText is C-string-based.
-        if (payload.contains('\0')) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "ClipboardSync: dropping inbound text payload with embedded NUL");
-            return;
-        }
-
-        // Record hash *before* writing so the dataChanged echo we're about to
-        // trigger is suppressed.
-        uint64_t hash = hashBytes(payload);
-        recordHash(hash);
-        m_SuppressNextChange = true;
-
-        // SDL_SetClipboardText copies internally; payload is already null-safe
-        // because QByteArray's data() guarantees a trailing NUL.
-        if (SDL_SetClipboardText(payload.constData()) != 0) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "ClipboardSync: SDL_SetClipboardText failed: %s",
-                        SDL_GetError());
-            m_SuppressNextChange = false;
-        }
+        applyInboundText(payload);
         return;
     }
 
@@ -199,6 +155,27 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
     // Unknown kind — ignore.
 }
 
+void ClipboardSync::applyInboundText(const QByteArray& payload)
+{
+    if (payload.contains('\0')) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "ClipboardSync: dropping inbound text payload with embedded NUL");
+        return;
+    }
+
+    QClipboard* cb = QGuiApplication::clipboard();
+    if (cb == nullptr) {
+        return;
+    }
+
+    // Record hash *before* writing so the dataChanged echo we're about to
+    // trigger is suppressed.
+    uint64_t hash = hashBytes(payload);
+    recordHash(hash);
+    m_SuppressNextChange = true;
+    cb->setText(QString::fromUtf8(payload));
+}
+
 void ClipboardSync::applyInboundPng(const QByteArray& payload)
 {
     QImage image;
@@ -220,17 +197,12 @@ void ClipboardSync::applyInboundPng(const QByteArray& payload)
     recordHash(hash);
     m_SuppressNextChange = true;
 
-#ifdef Q_OS_MACOS
-    QString writeDescription;
-    if (MacClipboard::writeImageFromPng(payload, &writeDescription)) {
-        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
-                     "ClipboardSync: wrote inbound PNG to macOS pasteboard as %s",
-                     writeDescription.toUtf8().constData());
-        return;
-    }
-#endif
-
-    cb->setImage(image);
+    QMimeData* mime = new QMimeData();
+    mime->setImageData(image);
+    mime->setData(QStringLiteral("image/png"), payload);
+    mime->setHtml(QStringLiteral("<img src=\"data:image/png;base64,%1\">")
+                  .arg(QString::fromLatin1(payload.toBase64())));
+    cb->setMimeData(mime);
 }
 
 bool ClipboardSync::encodeImageAsPng(const QImage& image,
@@ -493,16 +465,11 @@ bool ClipboardSync::extractClipboardPng(const QMimeData* mime,
         return false;
     }
 
-    if (mime->hasImage()) {
-        QImage image = qvariant_cast<QImage>(mime->imageData());
-        if (!image.isNull() && encodeImageAsPng(image, outPng, "mime imageData")) {
-            if (outSourceDescription != nullptr) {
-                *outSourceDescription = QStringLiteral("imageData");
-            }
-            return true;
-        }
-    }
-
+    // Prefer raw image bytes attached by the producer (including our own
+    // applyInboundPng which sets "image/png" verbatim) BEFORE falling back
+    // to re-encoding mime->imageData(). This keeps echoed inbound PNGs
+    // byte-identical so the FNV-1a hash matches the echo cache and we
+    // don't ping-pong the same image back to the host.
     const QStringList preferredFormats {
         QStringLiteral("image/png"),
         QStringLiteral("image/tiff"),
@@ -515,6 +482,16 @@ bool ClipboardSync::extractClipboardPng(const QMimeData* mime,
 
     if (tryExtractImageBytes(mime, preferredFormats, outPng, outSourceDescription)) {
         return true;
+    }
+
+    if (mime->hasImage()) {
+        QImage image = qvariant_cast<QImage>(mime->imageData());
+        if (!image.isNull() && encodeImageAsPng(image, outPng, "mime imageData")) {
+            if (outSourceDescription != nullptr) {
+                *outSourceDescription = QStringLiteral("imageData");
+            }
+            return true;
+        }
     }
 
     if (tryExtractImageFromUrls(mime, outPng, outSourceDescription)) {
@@ -535,9 +512,6 @@ void ClipboardSync::onLocalClipboardChanged()
     }
 
     if (m_SuppressNextChange) {
-#ifdef Q_OS_MACOS
-        m_LastMacClipboardChangeCount = MacClipboard::changeCount();
-#endif
         m_SuppressNextChange = false;
         return;
     }
@@ -546,28 +520,6 @@ void ClipboardSync::onLocalClipboardChanged()
     if (cb == nullptr) {
         return;
     }
-
-#ifdef Q_OS_MACOS
-    m_LastMacClipboardChangeCount = MacClipboard::changeCount();
-
-    QByteArray nativePng;
-    QString nativeSourceDescription;
-    QString nativeFormatsSummary;
-    bool nativeHadImageLikeData = false;
-    if (MacClipboard::readImageAsPng(nativePng,
-                                     &nativeSourceDescription,
-                                     &nativeFormatsSummary,
-                                     &nativeHadImageLikeData)) {
-        sendClipboardPng(nativePng, nativeSourceDescription);
-        return;
-    }
-
-    if (nativeHadImageLikeData && !nativeFormatsSummary.isEmpty()) {
-        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
-                     "ClipboardSync: macOS pasteboard image extraction failed for formats [%s]",
-                     nativeFormatsSummary.toUtf8().constData());
-    }
-#endif
 
     const QMimeData* mime = cb->mimeData();
 
@@ -632,23 +584,6 @@ void ClipboardSync::onLocalClipboardChanged()
                      static_cast<int>(frame.size()), rc);
     }
 }
-
-#ifdef Q_OS_MACOS
-void ClipboardSync::onMacClipboardPollTimeout()
-{
-    if (!m_Active) {
-        return;
-    }
-
-    int currentChangeCount = MacClipboard::changeCount();
-    if (currentChangeCount < 0 || currentChangeCount == m_LastMacClipboardChangeCount) {
-        return;
-    }
-
-    m_LastMacClipboardChangeCount = currentChangeCount;
-    onLocalClipboardChanged();
-}
-#endif
 
 bool ClipboardSync::encodeFrame(uint8_t kind, const QByteArray& payload, QByteArray& outFrame) const
 {
@@ -885,15 +820,7 @@ void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime, qin
         if (mime == QStringLiteral("image/png")) {
             applyInboundPng(bytes);
         } else if (mime.startsWith(QStringLiteral("text/"))) {
-            if (bytes.contains('\0')) {
-                return;
-            }
-            uint64_t hash = hashBytes(bytes);
-            recordHash(hash);
-            m_SuppressNextChange = true;
-            if (SDL_SetClipboardText(bytes.constData()) != 0) {
-                m_SuppressNextChange = false;
-            }
+            applyInboundText(bytes);
         } else {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "ClipboardSync: dropping fetched blob with unsupported mime '%s'",

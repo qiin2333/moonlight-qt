@@ -15,7 +15,6 @@ class QMimeData;
 class QNetworkAccessManager;
 class QNetworkReply;
 class QSslError;
-class QTimer;
 
 // ClipboardSync owns the bidirectional clipboard sync state for an active
 // streaming session against an AlkaidLab Sunshine fork host. It implements
@@ -66,9 +65,6 @@ public:
     // Mirror the Android client's cap (32 Mpx) so a stray full-screen capture
     // doesn't try to PNG-encode a 100 MB bitmap and stall the GUI thread.
     static constexpr qint64  MAX_IMAGE_PIXELS = 32LL * 1024 * 1024;
-#ifdef Q_OS_MACOS
-    static constexpr int     MAC_CLIPBOARD_POLL_INTERVAL_MS = 200;
-#endif
 
     explicit ClipboardSync(NvComputer* computer = nullptr, QObject* parent = nullptr);
     ~ClipboardSync() override;
@@ -90,10 +86,6 @@ private slots:
 
     // Queued slot used by handleIncomingFrame() to deliver to GUI thread.
     void onIncomingFrame(QByteArray frame);
-
-#ifdef Q_OS_MACOS
-    void onMacClipboardPollTimeout();
-#endif
 
 private:
     bool encodeFrame(uint8_t kind, const QByteArray& payload, QByteArray& outFrame) const;
@@ -132,6 +124,7 @@ private:
     QNetworkAccessManager* nam();
     void uploadAndSendRef(const QByteArray& payload, const QString& mime);
     void fetchRefAndApply(const QString& id, const QString& mime, qint64 advertisedSize);
+    void applyInboundText(const QByteArray& payload);
     void applyInboundPng(const QByteArray& payload);
 
     NvComputer* m_Computer = nullptr;
@@ -142,9 +135,4 @@ private:
 
     // Guard against re-entering onLocalClipboardChanged from our own SDL write.
     bool m_SuppressNextChange = false;
-
-#ifdef Q_OS_MACOS
-    QTimer* m_MacClipboardPollTimer = nullptr;
-    int m_LastMacClipboardChangeCount = -1;
-#endif
 };
