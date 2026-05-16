@@ -1986,3 +1986,224 @@ sha256
 2026-05-16 05:16:41,192 - aqt.updater - INFO - updater 5108 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Xmld.prl
 2026-05-16 05:16:41,193 - aqt.main - INFO - installer 5108 Finished installation
 2026-05-16 05:16:41,193 - aqt.main - INFO - installer 5108 Time elapsed: 31.19903290 second
+2026-05-16 05:49:21,402 - aqt.main - INFO - installer 1336 aqtinstall(aqt) v3.1.21 on Python 3.11.9 [CPython MSC v.1938 64 bit (AMD64)]
+2026-05-16 05:49:21,402 - aqt.helper - DEBUG - helper 1336 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/Updates.xml.sha256
+2026-05-16 05:49:23,439 - aqt.helper - DEBUG - helper 1336 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtwebengine/683/msvc2022_64/Updates.xml.sha256
+2026-05-16 05:49:25,081 - aqt.archives - INFO - archives 1336 Found extension qtwebengine
+2026-05-16 05:49:25,081 - aqt.helper - DEBUG - helper 1336 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtpdf/683/msvc2022_64/Updates.xml.sha256
+2026-05-16 05:49:27,542 - aqt.archives - INFO - archives 1336 Found extension qtpdf
+2026-05-16 05:49:28,216 - aqt.helper - DEBUG - helper 5648 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.addons.qtmultimedia.win64_msvc2022_64/6.8.3-0-202503201308qtmultimedia-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z.sha256
+2026-05-16 05:49:28,216 - aqt.helper - DEBUG - helper 1652 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtbase-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z.sha256
+2026-05-16 05:49:28,220 - aqt.helper - DEBUG - helper 1264 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtsvg-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z.sha256
+2026-05-16 05:49:28,223 - aqt.helper - DEBUG - helper 3192 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtdeclarative-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z.sha256
+2026-05-16 05:49:29,216 - aqt.helper - INFO - helper 3192 Downloading qtdeclarative...
+2026-05-16 05:49:29,216 - aqt.installer - DEBUG - installer 3192 Download URL: https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtdeclarative-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:29,233 - aqt.helper - INFO - helper 1264 Downloading qtsvg...
+2026-05-16 05:49:29,233 - aqt.installer - DEBUG - installer 1264 Download URL: https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtsvg-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:29,234 - aqt.helper - INFO - helper 5648 Downloading qtmultimedia...
+2026-05-16 05:49:29,235 - aqt.installer - DEBUG - installer 5648 Download URL: https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.addons.qtmultimedia.win64_msvc2022_64/6.8.3-0-202503201308qtmultimedia-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:29,246 - aqt.helper - INFO - helper 1652 Downloading qtbase...
+2026-05-16 05:49:29,246 - aqt.installer - DEBUG - installer 1652 Download URL: https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtbase-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:30,182 - aqt.helper - DEBUG - helper 3192 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtdeclarative-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:30,182 - aqt.helper - INFO - helper 3192 Redirected: qt.mirror.constant.com
+2026-05-16 05:49:30,229 - aqt.helper - DEBUG - helper 1264 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtsvg-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:30,229 - aqt.helper - INFO - helper 1264 Redirected: qt.mirror.constant.com
+2026-05-16 05:49:30,231 - aqt.helper - DEBUG - helper 1652 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qtbase-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:30,231 - aqt.helper - INFO - helper 1652 Redirected: qt.mirror.constant.com
+2026-05-16 05:49:30,275 - aqt.helper - DEBUG - helper 5648 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.addons.qtmultimedia.win64_msvc2022_64/6.8.3-0-202503201308qtmultimedia-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:30,275 - aqt.helper - INFO - helper 5648 Redirected: qt.mirror.constant.com
+2026-05-16 05:49:31,278 - aqt.installer - INFO - installer 1264 Finished installation of qtsvg-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z in 3.06052200
+2026-05-16 05:49:31,290 - aqt.helper - DEBUG - helper 1264 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qttools-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z.sha256
+2026-05-16 05:49:32,268 - aqt.helper - INFO - helper 1264 Downloading qttools...
+2026-05-16 05:49:32,268 - aqt.installer - DEBUG - installer 1264 Download URL: https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qttools-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:33,243 - aqt.helper - DEBUG - helper 1264 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qttools-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:33,243 - aqt.helper - INFO - helper 1264 Redirected: qt.mirror.constant.com
+2026-05-16 05:49:38,265 - aqt.installer - INFO - installer 1264 Finished installation of qttools-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z in 6.97583370
+2026-05-16 05:49:38,273 - aqt.installer - INFO - installer 5648 Finished installation of qtmultimedia-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z in 10.06153710
+2026-05-16 05:49:38,294 - aqt.helper - DEBUG - helper 1264 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qttranslations-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z.sha256
+2026-05-16 05:49:38,301 - aqt.helper - DEBUG - helper 5648 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308d3dcompiler_47-x64.7z.sha256
+2026-05-16 05:49:39,014 - aqt.installer - INFO - installer 1652 Finished installation of qtbase-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z in 10.80035490
+2026-05-16 05:49:39,034 - aqt.helper - DEBUG - helper 1652 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308opengl32sw-64-mesa_11_2_2-signed_sha256.7z.sha256
+2026-05-16 05:49:39,295 - aqt.helper - INFO - helper 5648 Downloading d3dcompiler_47...
+2026-05-16 05:49:39,295 - aqt.installer - DEBUG - installer 5648 Download URL: https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308d3dcompiler_47-x64.7z
+2026-05-16 05:49:39,321 - aqt.helper - INFO - helper 1264 Downloading qttranslations...
+2026-05-16 05:49:39,321 - aqt.installer - DEBUG - installer 1264 Download URL: https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qttranslations-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:39,933 - aqt.helper - INFO - helper 1652 Downloading opengl32sw...
+2026-05-16 05:49:39,934 - aqt.installer - DEBUG - installer 1652 Download URL: https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308opengl32sw-64-mesa_11_2_2-signed_sha256.7z
+2026-05-16 05:49:40,222 - aqt.helper - DEBUG - helper 1264 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308qttranslations-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z
+2026-05-16 05:49:40,222 - aqt.helper - INFO - helper 1264 Redirected: qt.mirror.constant.com
+2026-05-16 05:49:40,232 - aqt.helper - DEBUG - helper 5648 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308d3dcompiler_47-x64.7z
+2026-05-16 05:49:40,232 - aqt.helper - INFO - helper 5648 Redirected: qt.mirror.constant.com
+2026-05-16 05:49:40,997 - aqt.helper - DEBUG - helper 1652 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/qt.qt6.683.win64_msvc2022_64/6.8.3-0-202503201308opengl32sw-64-mesa_11_2_2-signed_sha256.7z
+2026-05-16 05:49:40,997 - aqt.helper - INFO - helper 1652 Redirected: qt.mirror.constant.com
+2026-05-16 05:49:41,391 - aqt.installer - INFO - installer 5648 Finished installation of d3dcompiler_47-x64.7z in 3.09402520
+2026-05-16 05:49:41,602 - aqt.installer - INFO - installer 1264 Finished installation of qttranslations-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z in 3.30991680
+2026-05-16 05:49:42,367 - aqt.installer - INFO - installer 1652 Finished installation of opengl32sw-64-mesa_11_2_2-signed_sha256.7z in 3.33508770
+2026-05-16 05:49:56,500 - aqt.installer - INFO - installer 3192 Finished installation of qtdeclarative-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-X86_64.7z in 28.27912210
+2026-05-16 05:49:56,619 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\bin\qmake.exe
+2026-05-16 05:49:56,623 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Concurrent.prl
+2026-05-16 05:49:56,623 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Concurrentd.prl
+2026-05-16 05:49:56,625 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Core.prl
+2026-05-16 05:49:56,625 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Cored.prl
+2026-05-16 05:49:56,625 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6DBus.prl
+2026-05-16 05:49:56,625 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6DBusd.prl
+2026-05-16 05:49:56,627 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Designer.prl
+2026-05-16 05:49:56,627 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6DesignerComponents.prl
+2026-05-16 05:49:56,627 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6DesignerComponentsd.prl
+2026-05-16 05:49:56,627 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Designerd.prl
+2026-05-16 05:49:56,627 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6DeviceDiscoverySupport.prl
+2026-05-16 05:49:56,629 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6DeviceDiscoverySupportd.prl
+2026-05-16 05:49:56,629 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6EntryPoint.prl
+2026-05-16 05:49:56,629 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6EntryPointd.prl
+2026-05-16 05:49:56,629 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6ExampleIcons.prl
+2026-05-16 05:49:56,631 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6ExampleIconsd.prl
+2026-05-16 05:49:56,631 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6ExamplesAssetDownloader.prl
+2026-05-16 05:49:56,631 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6ExamplesAssetDownloaderd.prl
+2026-05-16 05:49:56,631 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6FbSupport.prl
+2026-05-16 05:49:56,631 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6FbSupportd.prl
+2026-05-16 05:49:56,631 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6FFmpegMediaPluginImpl.prl
+2026-05-16 05:49:56,633 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6FFmpegMediaPluginImpld.prl
+2026-05-16 05:49:56,633 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Gui.prl
+2026-05-16 05:49:56,633 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Guid.prl
+2026-05-16 05:49:56,633 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Help.prl
+2026-05-16 05:49:56,633 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Helpd.prl
+2026-05-16 05:49:56,635 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsAnimation.prl
+2026-05-16 05:49:56,635 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsAnimationd.prl
+2026-05-16 05:49:56,635 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsFolderListModel.prl
+2026-05-16 05:49:56,635 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsFolderListModeld.prl
+2026-05-16 05:49:56,635 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsPlatform.prl
+2026-05-16 05:49:56,637 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsPlatformd.prl
+2026-05-16 05:49:56,637 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsQmlModels.prl
+2026-05-16 05:49:56,637 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsQmlModelsd.prl
+2026-05-16 05:49:56,637 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsSettings.prl
+2026-05-16 05:49:56,637 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsSettingsd.prl
+2026-05-16 05:49:56,639 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsSharedImage.prl
+2026-05-16 05:49:56,639 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsSharedImaged.prl
+2026-05-16 05:49:56,639 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsWavefrontMesh.prl
+2026-05-16 05:49:56,639 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6LabsWavefrontMeshd.prl
+2026-05-16 05:49:56,639 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Multimedia.prl
+2026-05-16 05:49:56,641 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Multimediad.prl
+2026-05-16 05:49:56,641 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6MultimediaQuick.prl
+2026-05-16 05:49:56,642 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6MultimediaQuickd.prl
+2026-05-16 05:49:56,642 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6MultimediaTestLib.prl
+2026-05-16 05:49:56,642 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6MultimediaTestLibd.prl
+2026-05-16 05:49:56,643 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6MultimediaWidgets.prl
+2026-05-16 05:49:56,643 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6MultimediaWidgetsd.prl
+2026-05-16 05:49:56,644 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Network.prl
+2026-05-16 05:49:56,644 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Networkd.prl
+2026-05-16 05:49:56,644 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6OpenGL.prl
+2026-05-16 05:49:56,645 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6OpenGLd.prl
+2026-05-16 05:49:56,645 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6OpenGLWidgets.prl
+2026-05-16 05:49:56,646 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6OpenGLWidgetsd.prl
+2026-05-16 05:49:56,646 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6PacketProtocol.prl
+2026-05-16 05:49:56,646 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6PacketProtocold.prl
+2026-05-16 05:49:56,647 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6PrintSupport.prl
+2026-05-16 05:49:56,647 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6PrintSupportd.prl
+2026-05-16 05:49:56,647 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Qml.prl
+2026-05-16 05:49:56,647 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlAssetDownloader.prl
+2026-05-16 05:49:56,647 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlAssetDownloaderd.prl
+2026-05-16 05:49:56,649 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlCompiler.prl
+2026-05-16 05:49:56,649 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlCompilerd.prl
+2026-05-16 05:49:56,649 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlCore.prl
+2026-05-16 05:49:56,649 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlCored.prl
+2026-05-16 05:49:56,649 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Qmld.prl
+2026-05-16 05:49:56,651 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlDebug.prl
+2026-05-16 05:49:56,651 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlDebugd.prl
+2026-05-16 05:49:56,651 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlDom.prl
+2026-05-16 05:49:56,651 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlDomd.prl
+2026-05-16 05:49:56,651 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlLocalStorage.prl
+2026-05-16 05:49:56,653 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlLocalStoraged.prl
+2026-05-16 05:49:56,653 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlLS.prl
+2026-05-16 05:49:56,653 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlLSd.prl
+2026-05-16 05:49:56,653 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlMeta.prl
+2026-05-16 05:49:56,653 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlMetad.prl
+2026-05-16 05:49:56,655 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlModels.prl
+2026-05-16 05:49:56,655 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlModelsd.prl
+2026-05-16 05:49:56,655 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlNetwork.prl
+2026-05-16 05:49:56,655 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlNetworkd.prl
+2026-05-16 05:49:56,655 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlToolingSettings.prl
+2026-05-16 05:49:56,657 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlToolingSettingsd.prl
+2026-05-16 05:49:56,657 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlTypeRegistrar.prl
+2026-05-16 05:49:56,657 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlTypeRegistrard.prl
+2026-05-16 05:49:56,657 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlWorkerScript.prl
+2026-05-16 05:49:56,657 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlWorkerScriptd.prl
+2026-05-16 05:49:56,659 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlXmlListModel.prl
+2026-05-16 05:49:56,659 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QmlXmlListModeld.prl
+2026-05-16 05:49:56,659 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Quick.prl
+2026-05-16 05:49:56,659 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Quick3DSpatialAudio.prl
+2026-05-16 05:49:56,659 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Quick3DSpatialAudiod.prl
+2026-05-16 05:49:56,661 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2.prl
+2026-05-16 05:49:56,661 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Basic.prl
+2026-05-16 05:49:56,661 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Basicd.prl
+2026-05-16 05:49:56,661 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2BasicStyleImpl.prl
+2026-05-16 05:49:56,662 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2BasicStyleImpld.prl
+2026-05-16 05:49:56,662 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2d.prl
+2026-05-16 05:49:56,662 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2FluentWinUI3StyleImpl.prl
+2026-05-16 05:49:56,662 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2FluentWinUI3StyleImpld.prl
+2026-05-16 05:49:56,662 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Fusion.prl
+2026-05-16 05:49:56,664 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Fusiond.prl
+2026-05-16 05:49:56,664 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2FusionStyleImpl.prl
+2026-05-16 05:49:56,664 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2FusionStyleImpld.prl
+2026-05-16 05:49:56,664 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Imagine.prl
+2026-05-16 05:49:56,664 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Imagined.prl
+2026-05-16 05:49:56,666 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2ImagineStyleImpl.prl
+2026-05-16 05:49:56,666 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2ImagineStyleImpld.prl
+2026-05-16 05:49:56,666 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Impl.prl
+2026-05-16 05:49:56,666 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Impld.prl
+2026-05-16 05:49:56,666 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Material.prl
+2026-05-16 05:49:56,668 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Materiald.prl
+2026-05-16 05:49:56,668 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2MaterialStyleImpl.prl
+2026-05-16 05:49:56,668 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2MaterialStyleImpld.prl
+2026-05-16 05:49:56,668 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Universal.prl
+2026-05-16 05:49:56,668 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2Universald.prl
+2026-05-16 05:49:56,668 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2UniversalStyleImpl.prl
+2026-05-16 05:49:56,670 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2UniversalStyleImpld.prl
+2026-05-16 05:49:56,670 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2WindowsStyleImpl.prl
+2026-05-16 05:49:56,670 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControls2WindowsStyleImpld.prl
+2026-05-16 05:49:56,670 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControlsTestUtils.prl
+2026-05-16 05:49:56,670 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickControlsTestUtilsd.prl
+2026-05-16 05:49:56,672 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Quickd.prl
+2026-05-16 05:49:56,672 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickDialogs2.prl
+2026-05-16 05:49:56,672 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickDialogs2d.prl
+2026-05-16 05:49:56,672 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickDialogs2QuickImpl.prl
+2026-05-16 05:49:56,672 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickDialogs2QuickImpld.prl
+2026-05-16 05:49:56,674 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickDialogs2Utils.prl
+2026-05-16 05:49:56,674 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickDialogs2Utilsd.prl
+2026-05-16 05:49:56,674 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickEffects.prl
+2026-05-16 05:49:56,674 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickEffectsd.prl
+2026-05-16 05:49:56,674 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickLayouts.prl
+2026-05-16 05:49:56,676 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickLayoutsd.prl
+2026-05-16 05:49:56,676 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickParticles.prl
+2026-05-16 05:49:56,676 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickParticlesd.prl
+2026-05-16 05:49:56,676 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickShapes.prl
+2026-05-16 05:49:56,676 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickShapesd.prl
+2026-05-16 05:49:56,678 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickTemplates2.prl
+2026-05-16 05:49:56,678 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickTemplates2d.prl
+2026-05-16 05:49:56,678 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickTest.prl
+2026-05-16 05:49:56,678 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickTestd.prl
+2026-05-16 05:49:56,678 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickTestUtils.prl
+2026-05-16 05:49:56,680 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickTestUtilsd.prl
+2026-05-16 05:49:56,680 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickVectorImage.prl
+2026-05-16 05:49:56,680 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickVectorImaged.prl
+2026-05-16 05:49:56,680 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickVectorImageGenerator.prl
+2026-05-16 05:49:56,680 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickVectorImageGeneratord.prl
+2026-05-16 05:49:56,682 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickWidgets.prl
+2026-05-16 05:49:56,682 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6QuickWidgetsd.prl
+2026-05-16 05:49:56,682 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6SpatialAudio.prl
+2026-05-16 05:49:56,682 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6SpatialAudiod.prl
+2026-05-16 05:49:56,682 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Sql.prl
+2026-05-16 05:49:56,684 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Sqld.prl
+2026-05-16 05:49:56,684 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Svg.prl
+2026-05-16 05:49:56,684 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Svgd.prl
+2026-05-16 05:49:56,684 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6SvgWidgets.prl
+2026-05-16 05:49:56,686 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6SvgWidgetsd.prl
+2026-05-16 05:49:56,686 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Test.prl
+2026-05-16 05:49:56,686 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Testd.prl
+2026-05-16 05:49:56,686 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6UiTools.prl
+2026-05-16 05:49:56,688 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6UiToolsd.prl
+2026-05-16 05:49:56,688 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Widgets.prl
+2026-05-16 05:49:56,688 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Widgetsd.prl
+2026-05-16 05:49:56,688 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Xml.prl
+2026-05-16 05:49:56,690 - aqt.updater - INFO - updater 1336 Patching D:\a\moonlight-qt\Qt\6.8.3\msvc2022_64\lib\Qt6Xmld.prl
+2026-05-16 05:49:56,690 - aqt.main - INFO - installer 1336 Finished installation
+2026-05-16 05:49:56,690 - aqt.main - INFO - installer 1336 Time elapsed: 35.28938580 second
