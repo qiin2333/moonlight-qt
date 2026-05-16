@@ -33,7 +33,10 @@ jobs:
     - name: Get version
       shell: cmd
       run: |
+        rem 在源码污染（setup-deps、构建过程会改 tracked 文件）之前固化版本号，
+        rem 写入 CI_VERSION 让后续 derive-version.py 调用直接采用此值，避免出现 .dirty 后缀。
         for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo VERSION=%%i >> %GITHUB_ENV%
+        for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo CI_VERSION=%%i >> %GITHUB_ENV%
 
     - name: Download dependencies
       shell: pwsh
@@ -170,6 +173,7 @@ jobs:
       run: |
         VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Install create-dmg
       run: |
@@ -206,7 +210,9 @@ jobs:
 
     - name: Get version
       run: |
-        echo "VERSION=$(python3 scripts/derive-version.py --field artifact)" >> $GITHUB_ENV
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Install Qt 6.8.3
       uses: jurplel/install-qt-action@v3
@@ -378,6 +384,7 @@ jobs:
       run: |
         VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Build AppImage
       env:
@@ -428,6 +435,7 @@ jobs:
       run: |
         VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Build SteamLink app
       run: |
