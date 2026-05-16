@@ -133,6 +133,10 @@ private:
     bool m_Active = false;
     QQueue<QPair<uint64_t, qint64>> m_EchoCache; // (hash, timestamp_ms)
 
-    // Guard against re-entering onLocalClipboardChanged from our own SDL write.
-    bool m_SuppressNextChange = false;
+    // Counter for self-writes pending QClipboard::dataChanged callbacks.
+    // Some Windows clipboard hooks (e.g. IME composition managers) cause a
+    // single setMimeData() to fire dataChanged twice; a bool latch would
+    // absorb the first echo and leak the second back to the host. Counting
+    // lets multiple pending writes coexist without ping-pong.
+    int m_PendingSelfWrites = 0;
 };

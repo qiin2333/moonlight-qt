@@ -31,6 +31,18 @@ bool isImageLikeMimeFormat(const QString& format)
     return format.startsWith(QStringLiteral("image/"), Qt::CaseInsensitive)
             || format.compare(QStringLiteral("application/x-qt-image"), Qt::CaseInsensitive) == 0;
 }
+
+// PNG ::= 89 50 4E 47 0D 0A 1A 0A (RFC 2083 §3.1). Some Windows apps
+// (older Office, IM clients) advertise "image/png" on the clipboard but
+// stuff a DIB/BMP payload inside; loadFromData still decodes those by
+// sniffing the actual magic, so we cannot trust the mime name alone.
+// Only treat the bytes as wire-ready PNG when the magic matches.
+bool looksLikePngBytes(const QByteArray& bytes)
+{
+    static const unsigned char kMagic[8] = { 0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a };
+    return bytes.size() >= 8
+            && memcmp(bytes.constData(), kMagic, sizeof(kMagic)) == 0;
+}
 }
 
 ClipboardSync::ClipboardSync(NvComputer* computer, QObject* parent)
@@ -80,7 +92,7 @@ void ClipboardSync::stop()
     }
 
     m_EchoCache.clear();
-    m_SuppressNextChange = false;
+    m_PendingSelfWrites = 0;
     m_Active = false;
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "ClipboardSync: stopped");
@@ -172,7 +184,7 @@ void ClipboardSync::applyInboundText(const QByteArray& payload)
     // trigger is suppressed.
     uint64_t hash = hashBytes(payload);
     recordHash(hash);
-    m_SuppressNextChange = true;
+    ++m_PendingSelfWrites;
     cb->setText(QString::fromUtf8(payload));
 }
 
@@ -195,13 +207,17 @@ void ClipboardSync::applyInboundPng(const QByteArray& payload)
     // matches what we'd re-encode if QClipboard hands the image straight back.
     uint64_t hash = hashBytes(payload);
     recordHash(hash);
-    m_SuppressNextChange = true;
+    ++m_PendingSelfWrites;
 
     QMimeData* mime = new QMimeData();
     mime->setImageData(image);
+    // Provide raw PNG bytes too so apps that prefer image/png over CF_DIB
+    // (browsers, modern image editors) get the lossless copy verbatim.
+    // Intentionally NOT setting HTML: pasting a giant base64 data: URI into
+    // CF_HTML adds nothing useful (Office takes the bitmap path anyway) and
+    // some Windows clipboard hooks reject oversize CF_HTML, dropping the
+    // entire mime data set on the floor.
     mime->setData(QStringLiteral("image/png"), payload);
-    mime->setHtml(QStringLiteral("<img src=\"data:image/png;base64,%1\">")
-                  .arg(QString::fromLatin1(payload.toBase64())));
     cb->setMimeData(mime);
 }
 
@@ -311,7 +327,8 @@ bool ClipboardSync::tryExtractImageBytes(const QMimeData* mime,
             continue;
         }
 
-        if (format.compare(QStringLiteral("image/png"), Qt::CaseInsensitive) == 0) {
+        if (format.compare(QStringLiteral("image/png"), Qt::CaseInsensitive) == 0
+                && looksLikePngBytes(bytes)) {
             const qint64 pixels = static_cast<qint64>(image.width()) * image.height();
             if (pixels <= 0 || pixels > MAX_IMAGE_PIXELS) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
@@ -511,8 +528,8 @@ void ClipboardSync::onLocalClipboardChanged()
         return;
     }
 
-    if (m_SuppressNextChange) {
-        m_SuppressNextChange = false;
+    if (m_PendingSelfWrites > 0) {
+        --m_PendingSelfWrites;
         return;
     }
 
