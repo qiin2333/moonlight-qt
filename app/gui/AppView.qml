@@ -287,12 +287,42 @@ CenteredGridView {
         currentIndex = -1
     }
 
+    // Re-syncs the "running" badge against the latest NvComputer state. The
+    // polling thread can update currentGameId through a code path that
+    // doesn't reach AppModel's slot (e.g. mDNS PendingAddTask folding under
+    // contended locks), leaving the badge stale after we return from a
+    // stream. We re-check on activation and again a few ticks later to cover
+    // the case where the host hasn't finished tearing down the prior
+    // session by the time onActivated fires.
+    Timer {
+        id: postActivationResyncTimer
+        interval: 500
+        repeat: true
+        property int ticksLeft: 0
+        onTriggered: {
+            appModel.forceSyncCurrentGame()
+            if (--ticksLeft <= 0) {
+                stop()
+            }
+        }
+        function kick() {
+            ticksLeft = 4   // 0.5s, 1.0s, 1.5s, 2.0s
+            restart()
+        }
+    }
+
     StackView.onActivated: {
         appModel.computerLost.connect(computerLost)
         activated = true
 
         // 从服务端加载显示器列表
         loadDisplays()
+
+        // Self-heal the running-game indicator in case our cached state
+        // drifted from NvComputer's actual currentGameId while we were
+        // on another page (typically during a streaming session).
+        appModel.forceSyncCurrentGame()
+        postActivationResyncTimer.kick()
 
         // Highlight the first item if a gamepad is connected
         if (currentIndex === -1 && SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {

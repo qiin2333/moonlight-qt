@@ -52,6 +52,14 @@ public:
 
     Q_INVOKABLE QVariantMap getActiveAddressInfo();
 
+    // Defensive self-heal: re-read m_Computer->currentGameId and force-emit
+    // RunningRole dataChanged for the affected rows if it differs from our
+    // cached m_CurrentGameId. Useful when the polling thread updated state
+    // through a path that bypassed the computerStateChanged signal (e.g.
+    // mDNS re-resolution folding via PendingAddTask under contended locks).
+    // Cheap when nothing has changed.
+    Q_INVOKABLE void forceSyncCurrentGame();
+
     QVariant data(const QModelIndex &index, int role) const override;
 
     int rowCount(const QModelIndex &parent) const override;

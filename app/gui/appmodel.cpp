@@ -422,6 +422,53 @@ void AppModel::handleComputerStateChanged(NvComputer* computer)
     }
 }
 
+void AppModel::forceSyncCurrentGame()
+{
+    // Re-read currentGameId directly from the shared NvComputer state and
+    // run the same dataChanged emit logic as handleComputerStateChanged
+    // when it differs from our cache. This is a defensive self-heal for
+    // cases where the polling thread updated NvComputer through a path
+    // that didn't reach our slot (e.g. mDNS PendingAddTask fold or a
+    // signal dropped due to receiver-side lifecycle timing).
+    if (m_Computer == nullptr) {
+        return;
+    }
+
+    int currentGameId;
+    {
+        QReadLocker lock(&m_Computer->lock);
+        currentGameId = m_Computer->currentGameId;
+    }
+
+    if (currentGameId == m_CurrentGameId) {
+        return;
+    }
+
+    // Invalidate the running state of the newly running game
+    for (int i = 0; i < m_VisibleApps.count(); i++) {
+        if (m_VisibleApps[i].id == currentGameId) {
+            emit dataChanged(createIndex(i, 0),
+                             createIndex(i, 0),
+                             QVector<int>() << RunningRole);
+            break;
+        }
+    }
+
+    // Invalidate the running state of the previously running game (if any)
+    if (m_CurrentGameId != 0) {
+        for (int i = 0; i < m_VisibleApps.count(); i++) {
+            if (m_VisibleApps[i].id == m_CurrentGameId) {
+                emit dataChanged(createIndex(i, 0),
+                                 createIndex(i, 0),
+                                 QVector<int>() << RunningRole);
+                break;
+            }
+        }
+    }
+
+    m_CurrentGameId = currentGameId;
+}
+
 void AppModel::handleBoxArtLoaded(NvComputer* computer, NvApp app, QUrl /* image */)
 {
     Q_ASSERT(computer == m_Computer);

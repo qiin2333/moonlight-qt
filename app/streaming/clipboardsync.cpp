@@ -1,5 +1,6 @@
 #include "clipboardsync.h"
 #include "backend/nvcomputer.h"
+#include "backend/identitymanager.h"
 
 #include <QBuffer>
 #include <QClipboard>
@@ -28,8 +29,38 @@
 namespace {
 bool isImageLikeMimeFormat(const QString& format)
 {
-    return format.startsWith(QStringLiteral("image/"), Qt::CaseInsensitive)
-            || format.compare(QStringLiteral("application/x-qt-image"), Qt::CaseInsensitive) == 0;
+    if (format.startsWith(QStringLiteral("image/"), Qt::CaseInsensitive)
+            || format.compare(QStringLiteral("application/x-qt-image"), Qt::CaseInsensitive) == 0) {
+        return true;
+    }
+
+    // Chromium/Edge/Firefox register Windows clipboard formats like
+    // "PNG" / "image/png" / "DeviceIndependentBitmap" directly; Qt
+    // surfaces those mangled as application/x-qt-windows-mime;value="...".
+    // Recognize the common image-bearing variants so we still treat them
+    // as candidates for extractClipboardPng().
+    if (format.startsWith(QStringLiteral("application/x-qt-windows-mime;value=\""),
+                          Qt::CaseInsensitive)) {
+        // Extract inner value name.
+        const int prefixLen = QStringLiteral("application/x-qt-windows-mime;value=\"").size();
+        const int endQuote = format.indexOf(QLatin1Char('"'), prefixLen);
+        if (endQuote > prefixLen) {
+            const QString inner = format.mid(prefixLen, endQuote - prefixLen);
+            if (inner.compare(QStringLiteral("PNG"), Qt::CaseInsensitive) == 0
+                    || inner.compare(QStringLiteral("image/png"), Qt::CaseInsensitive) == 0
+                    || inner.compare(QStringLiteral("image/jpeg"), Qt::CaseInsensitive) == 0
+                    || inner.compare(QStringLiteral("image/bmp"), Qt::CaseInsensitive) == 0
+                    || inner.compare(QStringLiteral("image/webp"), Qt::CaseInsensitive) == 0
+                    || inner.compare(QStringLiteral("DeviceIndependentBitmap"), Qt::CaseInsensitive) == 0
+                    || inner.compare(QStringLiteral("DeviceIndependentBitmapV5"), Qt::CaseInsensitive) == 0
+                    || inner.compare(QStringLiteral("JFIF"), Qt::CaseInsensitive) == 0
+                    || inner.compare(QStringLiteral("GIF"), Qt::CaseInsensitive) == 0) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 // PNG ::= 89 50 4E 47 0D 0A 1A 0A (RFC 2083 §3.1). Some Windows apps
@@ -327,7 +358,9 @@ bool ClipboardSync::tryExtractImageBytes(const QMimeData* mime,
             continue;
         }
 
-        if (format.compare(QStringLiteral("image/png"), Qt::CaseInsensitive) == 0
+        if ((format.compare(QStringLiteral("image/png"), Qt::CaseInsensitive) == 0
+                || format.compare(QStringLiteral("application/x-qt-windows-mime;value=\"PNG\""), Qt::CaseInsensitive) == 0
+                || format.compare(QStringLiteral("application/x-qt-windows-mime;value=\"image/png\""), Qt::CaseInsensitive) == 0)
                 && looksLikePngBytes(bytes)) {
             const qint64 pixels = static_cast<qint64>(image.width()) * image.height();
             if (pixels <= 0 || pixels > MAX_IMAGE_PIXELS) {
@@ -489,6 +522,8 @@ bool ClipboardSync::extractClipboardPng(const QMimeData* mime,
     // don't ping-pong the same image back to the host.
     const QStringList preferredFormats {
         QStringLiteral("image/png"),
+        QStringLiteral("application/x-qt-windows-mime;value=\"PNG\""),
+        QStringLiteral("application/x-qt-windows-mime;value=\"image/png\""),
         QStringLiteral("image/tiff"),
         QStringLiteral("image/jpeg"),
         QStringLiteral("image/jpg"),
@@ -746,7 +781,10 @@ void ClipboardSync::uploadAndSendRef(const QByteArray& payload, const QString& m
     req.setHeader(QNetworkRequest::ContentTypeHeader,
                   QStringLiteral("application/octet-stream"));
     req.setRawHeader("X-Clipboard-Mime", mime.toUtf8());
-    req.setSslConfiguration(QSslConfiguration::defaultConfiguration());
+    // Sunshine pins clipboard blob endpoint to its mTLS server (cert
+    // required); reuse the same paired client identity nvhttp does, or
+    // every fetch/upload fails with a TLS 'certificate required' alert.
+    req.setSslConfiguration(IdentityManager::get()->getSslConfig());
 
     QNetworkReply* reply = nam()->post(req, payload);
     connect(reply, &QNetworkReply::finished, this, [this, reply, mime, payloadSize = payload.size()]() {
@@ -801,7 +839,7 @@ void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime, qin
     }
 
     QNetworkRequest req(url);
-    req.setSslConfiguration(QSslConfiguration::defaultConfiguration());
+    req.setSslConfiguration(IdentityManager::get()->getSslConfig());
 
     QNetworkReply* reply = nam()->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, mime, advertisedSize]() {
