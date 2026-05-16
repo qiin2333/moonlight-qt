@@ -30,6 +30,11 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
+    - name: Get version
+      shell: cmd
+      run: |
+        for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo VERSION=%%i >> %GITHUB_ENV%
+
     - name: Download dependencies
       shell: pwsh
       run: ./setup-deps.ps1
@@ -41,11 +46,6 @@ jobs:
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia qtimageformats'
         cache: true
-
-    - name: Get version
-      shell: cmd
-      run: |
-        for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo VERSION=%%i >> %GITHUB_ENV%
 
     - name: Setup build environment
       shell: cmd
@@ -166,6 +166,11 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
+    - name: Get version
+      run: |
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
     - name: Install create-dmg
       run: |
         brew install node
@@ -178,11 +183,6 @@ jobs:
         modules: 'qtmultimedia qtimageformats'
         cache: true
         aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
-
-    - name: Get version
-      run: |
-        VERSION=$(python3 scripts/derive-version.py --field artifact)
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Build and generate DMG
       run: |
@@ -204,6 +204,10 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
+    - name: Get version
+      run: |
+        echo "VERSION=$(python3 scripts/derive-version.py --field artifact)" >> $GITHUB_ENV
+
     - name: Install Qt 6.8.3
       uses: jurplel/install-qt-action@v3
       with:
@@ -216,7 +220,6 @@ jobs:
         mkdir -p $HOME/local/{bin,include,lib}
         echo "$HOME/local/bin" >> $GITHUB_PATH
         echo "PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$HOME/local/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
-        echo "VERSION=$(python3 scripts/derive-version.py --field artifact)" >> $GITHUB_ENV
         echo "UBUNTU_RELEASE=$(lsb_release -rs)" >> $GITHUB_ENV
 
     # This may still install various Qt packages, but the later install step will override them
