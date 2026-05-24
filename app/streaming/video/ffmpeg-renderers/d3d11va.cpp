@@ -1349,12 +1349,12 @@ bool D3D11VARenderer::createOverlayVertexBuffer(Overlay::OverlayType type, int w
     // and screen y=displayHeight maps to NDC y=1 (top of screen).
     if (type == Overlay::OverlayStatusUpdate) {
         // Bottom center
-        renderRect.x = (m_DisplayWidth - width) / 2.0f;
+        renderRect.x = (m_DisplayWidth - width) / 2;
         renderRect.y = 0;
     }
     else if (type == Overlay::OverlayDebug) {
         // Top center
-        renderRect.x = (m_DisplayWidth - width) / 2.0f;
+        renderRect.x = (m_DisplayWidth - width) / 2;
         renderRect.y = m_DisplayHeight - height;
     }
 
