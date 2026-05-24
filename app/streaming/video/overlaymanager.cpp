@@ -7,6 +7,32 @@
 
 using namespace Overlay;
 
+static void configureFontRendering(TTF_Font* font, bool isBold, bool isItalic)
+{
+    if (font == nullptr) {
+        return;
+    }
+
+    int style = TTF_STYLE_NORMAL;
+    if (isBold) {
+        style |= TTF_STYLE_BOLD;
+    }
+    if (isItalic) {
+        style |= TTF_STYLE_ITALIC;
+    }
+    TTF_SetFontStyle(font, style);
+
+    TTF_SetFontHinting(font, TTF_HINTING_NORMAL);
+
+    TTF_SetFontOutline(font, 0);
+
+    if (TTF_GetFontKerning != nullptr) {
+        TTF_SetFontKerning(font, 1);
+    }
+
+    TTF_SetFontWrappedAlign(font, TTF_WRAPPED_ALIGN_CENTER);
+}
+
 OverlayManager::OverlayManager() :
     m_Renderer(nullptr),
     m_FontData(Path::readDataFile("ModeSeven.ttf"))
@@ -327,31 +353,7 @@ TTF_Font* OverlayManager::getFontForStyle(OverlayType type, bool isBold, bool is
             return nullptr;
         }
         
-        // 设置字体样式
-        int style = TTF_STYLE_NORMAL;
-        if (isBold) style |= TTF_STYLE_BOLD;
-        if (isItalic) style |= TTF_STYLE_ITALIC;
-        TTF_SetFontStyle(*targetFont, style);
-        
-        // 启用字体平滑渲染设置
-        // 设置字体提示以改善渲染质量
-        TTF_SetFontHinting(*targetFont, TTF_HINTING_LIGHT);
-        
-        // 启用字体轮廓 (如果支持)
-        TTF_SetFontOutline(*targetFont, 0);
-        
-        // 设置字体距离 (字符间距)
-        // TTF_SetFontKerning(*targetFont, 1); // 启用字距调整
-        
-        // 额外的字体质量设置
-        // 设置字体样式优化
-        if (TTF_GetFontKerning != nullptr) {
-            // 如果支持字距调整，启用它以获得更好的字符间距
-            TTF_SetFontKerning(*targetFont, 1);
-        }
-        
-        // 设置字体包装对齐（用于多行文本）
-        TTF_SetFontWrappedAlign(*targetFont, TTF_WRAPPED_ALIGN_CENTER);
+        configureFontRendering(*targetFont, isBold, isItalic);
     }
     
     return *targetFont;
@@ -598,21 +600,7 @@ TTF_Font* OverlayManager::getFontForStyleAndSize(OverlayType type, bool isBold, 
         return getFontForStyle(type, isBold, isItalic);
     }
     
-    // 设置字体样式
-    int style = TTF_STYLE_NORMAL;
-    if (isBold) style |= TTF_STYLE_BOLD;
-    if (isItalic) style |= TTF_STYLE_ITALIC;
-    TTF_SetFontStyle(tempFont, style);
-    
-    // 应用字体平滑设置
-    TTF_SetFontHinting(tempFont, TTF_HINTING_LIGHT);
-    TTF_SetFontOutline(tempFont, 0);
-    
-    if (TTF_GetFontKerning != nullptr) {
-        TTF_SetFontKerning(tempFont, 1);
-    }
-    
-    TTF_SetFontWrappedAlign(tempFont, TTF_WRAPPED_ALIGN_CENTER);
+    configureFontRendering(tempFont, isBold, isItalic);
     
     return tempFont;
 }
