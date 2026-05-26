@@ -540,8 +540,8 @@ ApplicationWindow {
 
     NavigableMessageDialog {
         id: portableUpdateDialog
-        standardButtons: 0
-        closePolicy: Popup.NoAutoClose
+        standardButtons: Dialog.NoButton
+        closePolicy: Popup.CloseOnEscape
         showSpinner: true
         text: qsTr("Preparing portable update...")
     }
