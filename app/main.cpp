@@ -1,6 +1,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QDir>
 #include <QIcon>
 #include <QQuickStyle>
 #include <QMutex>
@@ -19,6 +20,26 @@
 #ifdef Q_OS_UNIX
 #include <sys/socket.h>
 #include <signal.h>
+#endif
+
+// Don't let SDL hook our main function, since Qt is already
+// doing the same thing. This needs to be before any headers
+// that might include SDL.h themselves.
+#define SDL_MAIN_HANDLED
+#include "SDL_compat.h"
+
+#ifdef HAVE_FFMPEG
+#include "streaming/video/ffmpeg.h"
+#endif
+
+#if defined(Q_OS_WIN32)
+#include "antihookingprotection.h"
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <dxgi1_6.h>
+#elif defined(Q_OS_LINUX)
+#include <openssl/ssl.h>
 #endif
 
 static QString getStartupApplicationDir(const char* argv0)
@@ -50,26 +71,6 @@ static QString getStartupApplicationDir(const char* argv0)
 
     return QDir::currentPath();
 }
-
-// Don't let SDL hook our main function, since Qt is already
-// doing the same thing. This needs to be before any headers
-// that might include SDL.h themselves.
-#define SDL_MAIN_HANDLED
-#include "SDL_compat.h"
-
-#ifdef HAVE_FFMPEG
-#include "streaming/video/ffmpeg.h"
-#endif
-
-#if defined(Q_OS_WIN32)
-#include "antihookingprotection.h"
-
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <dxgi1_6.h>
-#elif defined(Q_OS_LINUX)
-#include <openssl/ssl.h>
-#endif
 
 #include "cli/listapps.h"
 #include "cli/quitstream.h"
