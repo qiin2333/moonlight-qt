@@ -10,6 +10,7 @@ QString Path::s_CacheDir;
 QString Path::s_LogDir;
 QString Path::s_BoxArtCacheDir;
 QString Path::s_QmlCacheDir;
+QString Path::s_PortableRootDir;
 
 QString Path::getLogDir()
 {
@@ -27,6 +28,15 @@ QString Path::getQmlCacheDir()
 {
     Q_ASSERT(!s_QmlCacheDir.isEmpty());
     return s_QmlCacheDir;
+}
+
+QString Path::getPortableRootDir()
+{
+    if (!s_PortableRootDir.isEmpty()) {
+        return s_PortableRootDir;
+    }
+
+    return QDir(QCoreApplication::applicationDirPath()).absolutePath();
 }
 
 QByteArray Path::readDataFile(QString fileName)
@@ -75,7 +85,16 @@ QString Path::getDataFilePath(QString fileName)
         return candidatePath;
     }
 
-    // Check the current directory
+    // Check the app installation directory before the current directory.
+    // This matters for portable builds launched via a shortcut or shell with
+    // a different working directory.
+    candidatePath = QDir(getPortableRootDir()).absoluteFilePath(fileName);
+    if (QFile::exists(candidatePath)) {
+        qInfo() << "Found" << fileName << "at" << candidatePath;
+        return candidatePath;
+    }
+
+    // Check the current directory for developer/local overrides.
     candidatePath = QDir(QDir::currentPath()).absoluteFilePath(fileName);
     if (QFile::exists(candidatePath)) {
         qInfo() << "Found" << fileName << "at" << candidatePath;
@@ -89,7 +108,8 @@ QString Path::getDataFilePath(QString fileName)
         return candidatePath;
     }
 
-    // Now try the directory of our app installation (for Windows, if current dir doesn't find it)
+    // Now try the directory of our app installation explicitly in case the
+    // portable root was not initialized yet.
     candidatePath = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(fileName);
     if (QFile::exists(candidatePath)) {
         qInfo() << "Found" << fileName << "at" << candidatePath;
@@ -102,18 +122,22 @@ QString Path::getDataFilePath(QString fileName)
     return QString(candidatePath);
 }
 
-void Path::initialize(bool portable)
+void Path::initialize(bool portable, const QString& portableRootDir)
 {
     if (portable) {
-        s_LogDir = QDir::currentPath();
-        s_BoxArtCacheDir = QDir::currentPath() + "/boxart";
-        s_QmlCacheDir = QDir::currentPath() + "/qmlcache";
+        s_PortableRootDir = QDir(portableRootDir.isEmpty() ?
+                                 QCoreApplication::applicationDirPath() :
+                                 portableRootDir).absolutePath();
+        s_LogDir = s_PortableRootDir;
+        s_BoxArtCacheDir = s_PortableRootDir + "/boxart";
+        s_QmlCacheDir = s_PortableRootDir + "/qmlcache";
 
         // In order for the If-Modified-Since logic to work in MappingFetcher,
         // the cache directory must be different than the current directory.
-        s_CacheDir = QDir::currentPath() + "/cache";
+        s_CacheDir = s_PortableRootDir + "/cache";
     }
     else {
+        s_PortableRootDir.clear();
 #ifdef Q_OS_DARWIN
         // On macOS, $TMPDIR is some random folder under /var/folders/ that nobody can
         // easily find, so use the system's global tmp directory instead.

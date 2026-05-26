@@ -1,6 +1,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QDir>
 #include <QIcon>
 #include <QQuickStyle>
 #include <QMutex>
@@ -13,6 +14,8 @@
 #include <QTemporaryFile>
 #include <QRegularExpression>
 #include <QFontDatabase>
+#include <QFileInfo>
+#include <QStandardPaths>
 
 #ifdef Q_OS_UNIX
 #include <sys/socket.h>
@@ -38,6 +41,36 @@
 #elif defined(Q_OS_LINUX)
 #include <openssl/ssl.h>
 #endif
+
+static QString getStartupApplicationDir(const char* argv0)
+{
+#if defined(Q_OS_WIN32)
+    WCHAR modulePath[MAX_PATH];
+    DWORD modulePathLength = GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+    if (modulePathLength > 0 && modulePathLength < MAX_PATH) {
+        return QFileInfo(QString::fromWCharArray(modulePath, modulePathLength)).absolutePath();
+    }
+#endif
+
+    QString programPath = QString::fromLocal8Bit(argv0 ? argv0 : "");
+    if (!programPath.isEmpty()) {
+        QFileInfo programInfo(programPath);
+        if (programInfo.isAbsolute()) {
+            return programInfo.absolutePath();
+        }
+
+        if (programPath.contains('/') || programPath.contains('\\')) {
+            return QFileInfo(QDir::current(), programPath).absolutePath();
+        }
+
+        QString resolvedExecutable = QStandardPaths::findExecutable(programPath);
+        if (!resolvedExecutable.isEmpty()) {
+            return QFileInfo(resolvedExecutable).absolutePath();
+        }
+    }
+
+    return QDir::currentPath();
+}
 
 #include "cli/listapps.h"
 #include "cli/quitstream.h"
@@ -424,6 +457,8 @@ int main(int argc, char *argv[])
 {
     SDL_SetMainReady();
 
+    const QString startupApplicationDir = getStartupApplicationDir(argc > 0 ? argv[0] : nullptr);
+
     // Set the app version for the QCommandLineParser's showVersion() command
     QCoreApplication::setApplicationVersion(VERSION_STR);
 
@@ -434,13 +469,13 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain("moonlight-stream.com");
     QCoreApplication::setApplicationName("Moonlight");
 
-    if (QFile(QDir::currentPath() + "/portable.dat").exists()) {
+    if (QFile(QDir(startupApplicationDir).filePath("portable.dat")).exists()) {
         QSettings::setDefaultFormat(QSettings::IniFormat);
-        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, QDir::currentPath());
-        QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, QDir::currentPath());
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, startupApplicationDir);
+        QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, startupApplicationDir);
 
         // Initialize paths for portable mode
-        Path::initialize(true);
+        Path::initialize(true, startupApplicationDir);
     }
     else {
         // Initialize paths for standard installation
