@@ -167,6 +167,7 @@ public:
         KeyComboPasteText,
         KeyComboTogglePointerRegionLock,
         KeyComboQuitAndExit,
+        KeyComboToggleKeyboardGrab,
         KeyComboMax
     };
 
