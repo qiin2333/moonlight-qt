@@ -1,5 +1,6 @@
 #include "autoupdatechecker.h"
 #include "portableupdateinstaller.h"
+#include "path.h"
 
 #include <QDir>
 #include <QFile>
@@ -119,7 +120,7 @@ QString AutoUpdateChecker::getExpectedAssetSuffix()
 bool AutoUpdateChecker::isPortableInstall() const
 {
 #if defined(Q_OS_WIN32)
-    return QFile::exists(QDir::currentPath() + "/portable.dat");
+    return QFile::exists(QDir(Path::getPortableRootDir()).filePath("portable.dat"));
 #else
     return false;
 #endif

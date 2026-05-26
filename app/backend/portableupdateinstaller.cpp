@@ -1,4 +1,5 @@
 #include "portableupdateinstaller.h"
+#include "path.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -116,7 +117,7 @@ void PortableUpdateInstaller::installUpdate(const QString& url)
 bool PortableUpdateInstaller::isPortableInstall() const
 {
 #if defined(Q_OS_WIN32)
-    return QFile::exists(QDir::currentPath() + "/portable.dat");
+    return QFile::exists(QDir(Path::getPortableRootDir()).filePath("portable.dat"));
 #else
     return false;
 #endif
@@ -139,7 +140,7 @@ QString PortableUpdateInstaller::getPortableUpdaterExecutable() const
 bool PortableUpdateInstaller::hasLikelyWritableInstallDir() const
 {
 #if defined(Q_OS_WIN32)
-    return QFileInfo(QDir::currentPath()).isWritable();
+    return QFileInfo(Path::getPortableRootDir()).isWritable();
 #else
     return false;
 #endif
@@ -148,7 +149,7 @@ bool PortableUpdateInstaller::hasLikelyWritableInstallDir() const
 bool PortableUpdateInstaller::ensureWritableInstallDir(QString& errorMessage) const
 {
 #if defined(Q_OS_WIN32)
-    QTemporaryFile probeFile(QDir(QDir::currentPath()).filePath("MoonlightUpdateWriteProbe-XXXXXX.tmp"));
+    QTemporaryFile probeFile(QDir(Path::getPortableRootDir()).filePath("MoonlightUpdateWriteProbe-XXXXXX.tmp"));
     probeFile.setAutoRemove(true);
 
     if (!probeFile.open()) {
@@ -166,7 +167,7 @@ bool PortableUpdateInstaller::ensureWritableInstallDir(QString& errorMessage) co
 
 QString PortableUpdateInstaller::createPortableUpdateWorkspace() const
 {
-    QString workspace = QDir(QDir::currentPath()).filePath(
+    QString workspace = QDir(Path::getPortableRootDir()).filePath(
                 QString("MoonlightPortableUpdate-%1-%2")
                 .arg(QCoreApplication::applicationPid())
                 .arg(QDateTime::currentMSecsSinceEpoch()));
@@ -206,7 +207,7 @@ bool PortableUpdateInstaller::ensureSufficientDiskSpace(qint64 requiredBytes, QS
         return true;
     }
 
-    QStorageInfo storage(QDir::currentPath());
+    QStorageInfo storage(Path::getPortableRootDir());
     storage.refresh();
 
     if (!storage.isValid() || !storage.isReady()) {
@@ -344,7 +345,7 @@ void PortableUpdateInstaller::handlePortableUpdateDownloadFinished()
 
     QString zipPath = QDir(m_PortableUpdateWorkspace).filePath("MoonlightPortableUpdate.zip");
     QString workspacePath = QDir::toNativeSeparators(m_PortableUpdateWorkspace);
-    QString installDir = QDir::toNativeSeparators(QDir::currentPath());
+    QString installDir = QDir::toNativeSeparators(Path::getPortableRootDir());
     QString exePath = QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
 
     QString updaterExecutable = getPortableUpdaterExecutable();
