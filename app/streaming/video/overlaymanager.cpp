@@ -7,31 +7,49 @@
 
 using namespace Overlay;
 
+static void configureFontRendering(TTF_Font* font, bool isBold, bool isItalic)
+{
+    if (font == nullptr) {
+        return;
+    }
+
+    int style = TTF_STYLE_NORMAL;
+    if (isBold) {
+        style |= TTF_STYLE_BOLD;
+    }
+    if (isItalic) {
+        style |= TTF_STYLE_ITALIC;
+    }
+    TTF_SetFontStyle(font, style);
+
+    TTF_SetFontHinting(font, TTF_HINTING_NORMAL);
+
+    TTF_SetFontOutline(font, 0);
+
+    if (TTF_GetFontKerning != nullptr) {
+        TTF_SetFontKerning(font, 1);
+    }
+
+    TTF_SetFontWrappedAlign(font, TTF_WRAPPED_ALIGN_CENTER);
+}
+
 OverlayManager::OverlayManager() :
     m_Renderer(nullptr),
     m_FontData(Path::readDataFile("ModeSeven.ttf"))
 {
     memset(m_Overlays, 0, sizeof(m_Overlays));
 
-    // 获取默认显示器的DPI
-    float ddpi, hdpi, vdpi;
-    if (SDL_GetDisplayDPI(0, &ddpi, &hdpi, &vdpi) != 0) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "无法获取显示器DPI: %s", SDL_GetError());
-        ddpi = 96.0f; // 使用默认DPI
-    }
-    
-    // DPI缩放因子（基于标准96 DPI）
-    float dpiScale = ddpi / 96.0f;
-    
-    // 使用DPI缩放调整字体大小
+    // 不使用 SDL_GetDisplayDPI() 的硬件 DPI 来缩放 overlay。
+    // SDL 文档明确说明该值并不总是可靠，而我们也确认近两个月仓库代码基本未变，
+    // 但覆盖层尺寸却发生了回归，更像是 SDL 运行时/平台 DPI 返回值变化所致。
+    // 这里恢复为固定字号，保持覆盖层外观稳定。
     m_Overlays[OverlayType::OverlayDebug].color = {0xBD, 0xF9, 0xE7, 0xFF};
-    m_Overlays[OverlayType::OverlayDebug].fontSize = (int)(20 * dpiScale);
-    m_Overlays[OverlayType::OverlayDebug].bgcolor = {0x00, 0x00, 0x00, 0x96};
+    m_Overlays[OverlayType::OverlayDebug].fontSize = 20;
+    m_Overlays[OverlayType::OverlayDebug].bgcolor = {0x00, 0x00, 0x00, 0x66};
     m_Overlays[OverlayType::OverlayDebug].textAlignment = TextAlignment::AlignBottom;
 
     m_Overlays[OverlayType::OverlayStatusUpdate].color = {0xCC, 0x00, 0x00, 0xFF};
-    m_Overlays[OverlayType::OverlayStatusUpdate].fontSize = (int)(36 * dpiScale);
+    m_Overlays[OverlayType::OverlayStatusUpdate].fontSize = 36;
     m_Overlays[OverlayType::OverlayStatusUpdate].textAlignment = TextAlignment::AlignCenter;
 
     // While TTF will usually not be initialized here, it is valid for that not to
@@ -95,9 +113,7 @@ char* OverlayManager::getOverlayText(OverlayType type)
 
 void OverlayManager::updateOverlayText(OverlayType type, const char* text)
 {
-    strncpy(m_Overlays[type].text, text, sizeof(m_Overlays[0].text));
-    m_Overlays[type].text[getOverlayMaxTextLength() - 1] = '\0';
-
+    SDL_utf8strlcpy(m_Overlays[type].text, text, sizeof(m_Overlays[0].text));
     setOverlayTextUpdated(type);
 }
 
@@ -335,31 +351,7 @@ TTF_Font* OverlayManager::getFontForStyle(OverlayType type, bool isBold, bool is
             return nullptr;
         }
         
-        // 设置字体样式
-        int style = TTF_STYLE_NORMAL;
-        if (isBold) style |= TTF_STYLE_BOLD;
-        if (isItalic) style |= TTF_STYLE_ITALIC;
-        TTF_SetFontStyle(*targetFont, style);
-        
-        // 启用字体平滑渲染设置
-        // 设置字体提示以改善渲染质量
-        TTF_SetFontHinting(*targetFont, TTF_HINTING_LIGHT);
-        
-        // 启用字体轮廓 (如果支持)
-        TTF_SetFontOutline(*targetFont, 0);
-        
-        // 设置字体距离 (字符间距)
-        // TTF_SetFontKerning(*targetFont, 1); // 启用字距调整
-        
-        // 额外的字体质量设置
-        // 设置字体样式优化
-        if (TTF_GetFontKerning != nullptr) {
-            // 如果支持字距调整，启用它以获得更好的字符间距
-            TTF_SetFontKerning(*targetFont, 1);
-        }
-        
-        // 设置字体包装对齐（用于多行文本）
-        TTF_SetFontWrappedAlign(*targetFont, TTF_WRAPPED_ALIGN_CENTER);
+        configureFontRendering(*targetFont, isBold, isItalic);
     }
     
     return *targetFont;
@@ -427,13 +419,8 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
         return nullptr;
     }
     
-    // 添加内边距
-    float ddpi, hdpi, vdpi;
-    int padding = 2; // 默认内边距
-    if (SDL_GetDisplayDPI(0, &ddpi, &hdpi, &vdpi) == 0) {
-        float dpiScale = ddpi / 96.0f;
-        padding = (int)(padding * dpiScale);
-    }
+    // 添加内边距。保持固定值，避免硬件 DPI 波动让覆盖层边距忽大忽小。
+    int padding = 4;
     
     // 使用精确的高度计算（考虑ascent和descent）
     int surfaceHeight = maxAscent + maxDescent;
@@ -611,21 +598,7 @@ TTF_Font* OverlayManager::getFontForStyleAndSize(OverlayType type, bool isBold, 
         return getFontForStyle(type, isBold, isItalic);
     }
     
-    // 设置字体样式
-    int style = TTF_STYLE_NORMAL;
-    if (isBold) style |= TTF_STYLE_BOLD;
-    if (isItalic) style |= TTF_STYLE_ITALIC;
-    TTF_SetFontStyle(tempFont, style);
-    
-    // 应用字体平滑设置
-    TTF_SetFontHinting(tempFont, TTF_HINTING_LIGHT);
-    TTF_SetFontOutline(tempFont, 0);
-    
-    if (TTF_GetFontKerning != nullptr) {
-        TTF_SetFontKerning(tempFont, 1);
-    }
-    
-    TTF_SetFontWrappedAlign(tempFont, TTF_WRAPPED_ALIGN_CENTER);
+    configureFontRendering(tempFont, isBold, isItalic);
     
     return tempFont;
 }

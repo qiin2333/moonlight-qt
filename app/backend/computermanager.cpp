@@ -49,6 +49,7 @@ private:
             return false;
         }
 
+        m_Computer->markAddressTestSucceeded(address);
         changed = m_Computer->update(newState);
         return true;
     }

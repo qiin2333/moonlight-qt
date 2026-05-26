@@ -15,7 +15,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
 
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
@@ -28,19 +28,15 @@ jobs:
     - name: Get version
       shell: cmd
       run: |
-        set /p VERSION=<app\version.txt
-        echo VERSION=%VERSION% >> %GITHUB_ENV%
+        for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo VERSION=%%i >> %GITHUB_ENV%
 
     - name: Setup build environment
       shell: cmd
       run: |
-        echo Setting up optimized build environment...
-        set NUMBER_OF_PROCESSORS=2
-        set JOM_MAX_CPUS=%NUMBER_OF_PROCESSORS%
-        echo JOM_MAX_CPUS=%JOM_MAX_CPUS% >> %GITHUB_ENV%
-        rem Increase virtual memory to prevent out-of-memory issues
-        wmic pagefileset where name="C:\\pagefile.sys" set InitialSize=4096,MaximumSize=8192
-        wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False
+        echo Setting up build environment...
+        set JOM_MAX_CPUS=2
+        echo JOM_MAX_CPUS=%JOM_MAX_CPUS%>> %GITHUB_ENV%
+        exit /b 0
 
     - name: Configure build environment
       shell: cmd
@@ -77,7 +73,7 @@ jobs:
         git config user.name github-actions
         git config user.email github-actions@github.com
         $modifiedFiles = $(git status --porcelain)
-        if ($modifiedMoFiles) {
+        if ($modifiedFiles) {
           git add .
           $date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
           git commit -m "chore: 自动构建翻译文件 $date"

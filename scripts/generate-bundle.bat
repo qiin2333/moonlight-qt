@@ -39,12 +39,8 @@ set SOURCE_ROOT=%cd%
 set BUILD_FOLDER=%BUILD_ROOT%\build-%BUILD_CONFIG%
 set INSTALLER_FOLDER=%BUILD_ROOT%\installer-%BUILD_CONFIG%
 
-rem Allow CI to override the version.txt with an environment variable
-if defined CI_VERSION (
-    set VERSION=%CI_VERSION%
-) else (
-    set /p VERSION=<%SOURCE_ROOT%\app\version.txt
-)
+rem Derive artifact version from CI_VERSION or Git tags (fallback: app\version.txt)
+for /f "usebackq delims=" %%i in (`python "%SOURCE_ROOT%\scripts\derive-version.py" --source-root "%SOURCE_ROOT%" --field artifact`) do set VERSION=%%i
 
 rem Ensure that all architectures have been built before the final bundle
 if not exist "%BUILD_ROOT%\build-x64-%BUILD_CONFIG%\Moonlight.msi" (

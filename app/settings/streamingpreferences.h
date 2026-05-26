@@ -125,6 +125,18 @@ public:
     };
     Q_ENUM(HdrMode);
 
+    enum GamepadQuitCombo
+    {
+        GQC_DEFAULT         = 0,  // Start + Select + L1 + R1 (original)
+        GQC_SELECT_L1_R1_X  = 1,  // Select + L1 + R1 + X (avoids Start+Select conflict)
+        GQC_SELECT_L1_R1_Y  = 2,  // Select + L1 + R1 + Y
+        GQC_START_L1_R1_A   = 3,  // Start + L1 + R1 + A (avoids Select conflict)
+        GQC_START_L1_R1_B   = 4,  // Start + L1 + R1 + B (avoids Select conflict)
+        GQC_L1_R1_X_Y       = 5,  // L1 + R1 + X + Y (no Select/Start at all)
+        GQC_L1_R1_A_B       = 6,  // L1 + R1 + A + B (no Select/Start at all)
+    };
+    Q_ENUM(GamepadQuitCombo);
+
     Q_PROPERTY(int width MEMBER width NOTIFY displayModeChanged)
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
@@ -168,6 +180,7 @@ public:
     Q_PROPERTY(bool swapWinAltKeys MEMBER swapWinAltKeys NOTIFY swapWinAltKeysChanged)
     Q_PROPERTY(bool muteOnFocusLoss MEMBER muteOnFocusLoss NOTIFY muteOnFocusLossChanged)
     Q_PROPERTY(bool backgroundGamepad MEMBER backgroundGamepad NOTIFY backgroundGamepadChanged)
+    Q_PROPERTY(GamepadQuitCombo gamepadQuitCombo MEMBER gamepadQuitCombo NOTIFY gamepadQuitComboChanged)
     Q_PROPERTY(bool reverseScrollDirection MEMBER reverseScrollDirection NOTIFY reverseScrollDirectionChanged)
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
     Q_PROPERTY(bool keepAwake MEMBER keepAwake NOTIFY keepAwakeChanged)
@@ -216,6 +229,7 @@ public:
     bool swapWinAltKeys;
     bool muteOnFocusLoss;
     bool backgroundGamepad;
+    GamepadQuitCombo gamepadQuitCombo;
     bool reverseScrollDirection;
     bool swapFaceButtons;
     bool keepAwake;
@@ -279,6 +293,7 @@ signals:
     void swapWinAltKeysChanged();
     void muteOnFocusLossChanged();
     void backgroundGamepadChanged();
+    void gamepadQuitComboChanged();
     void reverseScrollDirectionChanged();
     void swapFaceButtonsChanged();
     void captureSysKeysModeChanged();

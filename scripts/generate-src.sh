@@ -10,7 +10,7 @@ git diff-index --quiet HEAD -- || fail "Source archives must not have unstaged c
 
 BUILD_ROOT=$PWD/build
 ARCHIVE_FOLDER=$BUILD_ROOT/source
-VERSION=`cat app/version.txt`
+VERSION=$(python3 scripts/derive-version.py --field artifact)
 
 echo Cleaning output directories
 rm -rf $ARCHIVE_FOLDER

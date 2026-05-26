@@ -1,4 +1,40 @@
-# Moonlight PC
+# Moonlight PC（qiin2333 fork）
+
+> **关于本 fork / About this fork**
+>
+> 这是 [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) 的分叉版本，主要面向搭配 [AlkaidLab Sunshine fork](https://github.com/qiin2333/Sunshine) 使用的中文用户。本 fork 持续同步上游，并叠加下文所列的额外特性与本地化改进。
+>
+> This is a downstream fork of upstream Moonlight Qt, primarily targeting Chinese users paired with the AlkaidLab Sunshine fork. It tracks upstream and adds the extra features listed below.
+
+## 🌙 本 fork 相对上游的主要差异
+
+### 流媒体协议层增强（需配合 AlkaidLab Sunshine fork）
+- **双向剪贴板同步**（控制通道 `0x5508`）：文本、PNG 图像、>60 KB 大图通过 REF blob 带外传输；图像支持 Chromium/Edge/Firefox 的 Windows PNG MIME 与 macOS 原生 NSPasteboard 多 UTI 写入。
+- **高品质麦克风（HQ Mic）**：使用 `moonlight-common-c` 的 `mic` 分支，支持持续音频与 7.1.4 环绕声。
+- **远程分辨率缩放**与**自定义远程分辨率/帧率**：流分辨率与本地显示器分辨率解耦。
+- **AppView 屏幕组合 / 屏幕选项**：在主机应用列表里选择目标显示器/虚拟屏组合。
+- **自定义连接 IP** 与持久化配对名。
+
+### 客户端交互改进
+- **Win11 风格悬浮菜单**：动画、图标、可选浮动月亮按钮。
+- **可配置手柄退出组合键**，**手柄鼠标即时切换**，仅在手柄连接时显示开关。
+- **串流时自动禁用 IME**（基于 Win32 IMM hooks）。
+- **AppView "Running" 角标自愈**：返回主机列表时如检测到 NvComputer 状态漂移会主动重发 `dataChanged`，避免角标残留/缺失。
+- **性能覆盖层**：水平居中、可控字体、渲染时间统计、强制软解时隐藏硬解警告等。
+
+### 自动化与构建
+- **自动检查更新**：基于本 fork 的 GitHub Releases API。
+- **自动翻译构建**：`.github/workflows/build-translate.yml` 周期性提交 `.qm` / `.ts`。
+- **基于 Git tag 的版本号**：`scripts/derive-version.py`，CI 通过 `CI_VERSION` 固化避免依赖安装阶段污染产物名。
+- 升级 Windows / macOS CI 到 Qt 6.11.1、macOS Tahoe ARM64 runner。
+
+### 协议兼容性
+- 与上游 Moonlight / 标准 Sunshine 完全兼容（剪贴板图像与 HQ Mic 等扩展特性会自动降级）。
+- 全部扩展协议仅在握手到 Gen7Enc 的 Sunshine 主机时启用。
+
+详细更新历史见 [Releases](https://github.com/qiin2333/moonlight-qt/releases)。
+
+---
 
 [Moonlight PC](https://moonlight-stream.org) is an open source PC client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).
 
@@ -91,7 +127,10 @@ for different architectures, which handle building deps and extra linking for yo
     * You can install Qt via Homebrew on macOS, but you will need to use `brew install qt --with-debug` to be able to create debug builds of Moonlight.
     * You may also use your Linux distro's package manager for the Qt SDK as long as the packages are Qt 5.12 or later.
     * This step is not required for building on Steam Link, because the Steam Link SDK includes Qt 5.14.
-2. Run `git submodule update --init --recursive` from within `moonlight-qt/`
+2. Download submodules and dependencies
+    * Run `git submodule update --init --recursive` from within `moonlight-qt/`.
+    * On Windows and macOS, you must also run `setup-deps.ps1` (Windows) or `setup-deps.py` (macOS).
+    * Perform these steps each time you pull new changes from the Git repository.
 3. Open the project in Qt Creator or build from qmake on the command line.
     * To build a binary for use on non-development machines, use the scripts in the `scripts` folder.
         * For Windows builds, use `scripts\build-arch.bat` and `scripts\generate-bundle.bat`. Execute these scripts from the root of the repository within a Qt command prompt. Ensure  7-Zip binary directory is on your `%PATH%`.

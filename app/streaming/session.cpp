@@ -1,4 +1,5 @@
 #include "session.h"
+#include "clipboardsync.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
@@ -67,7 +68,9 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     Session::clRumbleTriggers,
     Session::clSetMotionEventState,
     Session::clSetControllerLED,
-    Session::clSetAdaptiveTriggers
+    Session::clSetAdaptiveTriggers,
+    nullptr, // resolutionChanged (unused on Qt client)
+    Session::clClipboardData
 };
 
 Session* Session::s_ActiveSession;
@@ -217,6 +220,17 @@ void Session::clSetHdrMode(bool enabled)
         }
         SDL_UnlockMutex(s_ActiveSession->m_DecoderLock);
     }
+}
+
+void Session::clClipboardData(const char* data, int length)
+{
+    Session* session = s_ActiveSession;
+    if (session == nullptr || session->m_ClipboardSync == nullptr) {
+        return;
+    }
+
+    // Marshals to GUI thread internally; safe to call from the recv thread.
+    session->m_ClipboardSync->handleIncomingFrame(data, length);
 }
 
 void Session::clRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger, uint16_t rightTrigger)
@@ -584,12 +598,19 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_MenuCloseTicks(0),
       m_MicStream(nullptr)
 {
+    m_ClipboardSync = nullptr;
 }
 
 Session::~Session()
 {
     // NB: This may not get destroyed for a long time! Don't put any non-trivial cleanup here.
     // Use Session::exec() or DeferredSessionCleanupTask instead.
+
+    if (m_ClipboardSync != nullptr) {
+        m_ClipboardSync->stop();
+        delete m_ClipboardSync;
+        m_ClipboardSync = nullptr;
+    }
 
     SDL_DestroyMutex(m_DecoderLock);
 }
@@ -647,6 +668,12 @@ bool Session::initialize(QQuickWindow* qtWindow)
         return false;
     }
 
+    // Stop text input. SDL enables it by default
+    // when we initialize the video subsystem, but this
+    // causes an IME popup when certain keys are held down
+    // on macOS.
+    SDL_StopTextInput();
+
     LiInitializeStreamConfiguration(&m_StreamConfig);
     m_StreamConfig.width = m_Preferences->width;
     m_StreamConfig.height = m_Preferences->height;
@@ -664,21 +691,13 @@ bool Session::initialize(QQuickWindow* qtWindow)
     getWindowDimensions(x, y, width, height);
 
     // Create a hidden window to use for decoder initialization tests
-    SDL_Window* testWindow = SDL_CreateWindow("", x, y, width, height,
-                                              SDL_WINDOW_HIDDEN | StreamUtils::getPlatformWindowFlags());
+    SDL_Window* testWindow = StreamUtils::createTestWindow();
     if (!testWindow) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Failed to create test window with platform flags: %s",
-                    SDL_GetError());
-
-        testWindow = SDL_CreateWindow("", x, y, width, height, SDL_WINDOW_HIDDEN);
-        if (!testWindow) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                         "Failed to create window for hardware decode test: %s",
-                         SDL_GetError());
-            SDL_QuitSubSystem(SDL_INIT_VIDEO);
-            return false;
-        }
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Failed to create window for hardware decode test: %s",
+                     SDL_GetError());
+        SDL_QuitSubSystem(SDL_INIT_VIDEO);
+        return false;
     }
 
     qInfo() << "Server GPU:" << m_Computer->gpuModel;
@@ -810,24 +829,6 @@ bool Session::initialize(QQuickWindow* qtWindow)
             }
         }
 
-#if 0
-        // TODO: Determine if AV1 is better depending on the decoder
-        if (getDecoderAvailability(testWindow,
-                                   m_Preferences->videoDecoderSelection,
-                                   m_Preferences->enableYUV444 ?
-                                        (m_Preferences->enableHdr ? VIDEO_FORMAT_AV1_HIGH10_444 : VIDEO_FORMAT_AV1_HIGH8_444) :
-                                        (m_Preferences->enableHdr ? VIDEO_FORMAT_AV1_MAIN10 : VIDEO_FORMAT_AV1_MAIN8),
-                                   m_StreamConfig.width,
-                                   m_StreamConfig.height,
-                                   m_StreamConfig.fps) != DecoderAvailability::Hardware) {
-            // Deprioritize AV1 unless we can't hardware decode HEVC and have HDR enabled.
-            // We want to keep AV1 at the top of the list for HDR with software decoding
-            // because dav1d is higher performance than FFmpeg's HEVC software decoder.
-            if (hevcDA == DecoderAvailability::Hardware || !m_Preferences->enableHdr) {
-                m_SupportedVideoFormats.deprioritizeByMask(VIDEO_FORMAT_MASK_AV1);
-            }
-        }
-#else
         // Deprioritize AV1 unless we can't hardware decode HEVC, and have HDR enabled
         // or we're on Windows or a non-x86 Linux/BSD.
         //
@@ -855,7 +856,15 @@ bool Session::initialize(QQuickWindow* qtWindow)
             ) {
             m_SupportedVideoFormats.deprioritizeByMask(VIDEO_FORMAT_MASK_AV1);
         }
-#endif
+        else if (!m_Preferences->enableHdr &&
+                   getDecoderAvailability(testWindow,
+                                          m_Preferences->videoDecoderSelection,
+                                          m_Preferences->enableYUV444 ? VIDEO_FORMAT_AV1_HIGH8_444 : VIDEO_FORMAT_AV1_MAIN8,
+                                          m_StreamConfig.width,
+                                          m_StreamConfig.height,
+                                          m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+            m_SupportedVideoFormats.deprioritizeByMask(VIDEO_FORMAT_MASK_AV1);
+        }
 
 #ifdef Q_OS_DARWIN
         {
@@ -1469,7 +1478,8 @@ void Session::updateOptimalWindowDisplayMode()
     if (!matchVideo) {
         // Start with the native desktop resolution and try to find
         // the highest refresh rate that our stream FPS evenly divides.
-        for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++) {
+        int numDisplayModes = SDL_GetNumDisplayModes(displayIndex);
+        for (int i = 0; i < numDisplayModes; i++) {
             if (SDL_GetDisplayMode(displayIndex, i, &mode) == 0) {
                 if (mode.w == desktopMode.w && mode.h == desktopMode.h &&
                     mode.refresh_rate % m_StreamConfig.fps == 0) {
@@ -1492,7 +1502,8 @@ void Session::updateOptimalWindowDisplayMode()
     if (bestMode.refresh_rate == 0) {
         float bestModeAspectRatio = 0;
         float videoAspectRatio = (float)m_ActiveVideoWidth / (float)m_ActiveVideoHeight;
-        for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++) {
+        int numDisplayModes = SDL_GetNumDisplayModes(displayIndex);
+        for (int i = 0; i < numDisplayModes; i++) {
             if (SDL_GetDisplayMode(displayIndex, i, &mode) == 0) {
                 float modeAspectRatio = (float)mode.w / (float)mode.h;
                 if (mode.w >= m_ActiveVideoWidth && mode.h >= m_ActiveVideoHeight &&
@@ -1860,6 +1871,111 @@ public:
     Session* m_Session;
 };
 
+namespace {
+
+struct HostConnectionInfoSnapshot
+{
+    QString address;
+    QString appVersion;
+    QString gfeVersion;
+    int currentGameId = 0;
+    int serverCodecModeSupport = 0;
+};
+
+struct PreparedServerInformation
+{
+    QByteArray address;
+    QByteArray appVersion;
+    QByteArray gfeVersion;
+    QByteArray rtspSessionUrl;
+    SERVER_INFORMATION info;
+};
+
+HostConnectionInfoSnapshot captureHostConnectionInfoSnapshot(NvComputer* computer)
+{
+    HostConnectionInfoSnapshot snapshot;
+
+    QReadLocker lock(&computer->lock);
+    snapshot.address = computer->activeAddress.address();
+    snapshot.appVersion = computer->appVersion;
+    snapshot.gfeVersion = computer->gfeVersion;
+    snapshot.currentGameId = computer->currentGameId;
+    snapshot.serverCodecModeSupport = computer->serverCodecModeSupport;
+
+    return snapshot;
+}
+
+void updateHostConnectionInfoFromServerInfo(const QString& serverInfo,
+                                            NvComputer* computer,
+                                            HostConnectionInfoSnapshot* snapshot,
+                                            bool resumingSession)
+{
+    QString refreshedCodecSupport = NvHTTP::getXmlString(serverInfo, "ServerCodecModeSupport");
+    QString refreshedAppVersion = NvHTTP::getXmlString(serverInfo, "appversion");
+    QString refreshedGfeVersion = NvHTTP::getXmlString(serverInfo, "GfeVersion");
+
+    if (!refreshedCodecSupport.isEmpty()) {
+        int refreshedServerCodecModeSupport = refreshedCodecSupport.toInt();
+
+        if (refreshedServerCodecModeSupport != snapshot->serverCodecModeSupport) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Host codec mode support changed after %s: %d -> %d",
+                        resumingSession ? "resume" : "launch",
+                        snapshot->serverCodecModeSupport,
+                        refreshedServerCodecModeSupport);
+        }
+
+        snapshot->serverCodecModeSupport = refreshedServerCodecModeSupport;
+    }
+
+    if (!refreshedAppVersion.isEmpty()) {
+        snapshot->appVersion = refreshedAppVersion;
+    }
+
+    if (!refreshedGfeVersion.isEmpty()) {
+        snapshot->gfeVersion = refreshedGfeVersion;
+    }
+
+    snapshot->currentGameId = NvHTTP::getCurrentGame(serverInfo);
+
+    QWriteLocker lock(&computer->lock);
+    computer->serverCodecModeSupport = snapshot->serverCodecModeSupport;
+    computer->currentGameId = snapshot->currentGameId;
+
+    if (!snapshot->appVersion.isEmpty()) {
+        computer->appVersion = snapshot->appVersion;
+    }
+
+    if (!snapshot->gfeVersion.isEmpty()) {
+        computer->gfeVersion = snapshot->gfeVersion;
+    }
+}
+
+void prepareServerInformation(const HostConnectionInfoSnapshot& snapshot,
+                              const QString& rtspSessionUrl,
+                              PreparedServerInformation* prepared)
+{
+    LiInitializeServerInformation(&prepared->info);
+
+    prepared->address = snapshot.address.toUtf8();
+    prepared->appVersion = snapshot.appVersion.toUtf8();
+    prepared->info.address = prepared->address.constData();
+    prepared->info.serverInfoAppVersion = prepared->appVersion.constData();
+    prepared->info.serverCodecModeSupport = snapshot.serverCodecModeSupport;
+
+    if (!snapshot.gfeVersion.isEmpty()) {
+        prepared->gfeVersion = snapshot.gfeVersion.toUtf8();
+        prepared->info.serverInfoGfeVersion = prepared->gfeVersion.constData();
+    }
+
+    if (!rtspSessionUrl.isEmpty()) {
+        prepared->rtspSessionUrl = rtspSessionUrl.toUtf8();
+        prepared->info.rtspSessionUrl = prepared->rtspSessionUrl.constData();
+    }
+}
+
+} // namespace
+
 // Called in a non-main thread
 bool Session::startConnectionAsync()
 {
@@ -1891,6 +2007,9 @@ bool Session::startConnectionAsync()
         enableGameOptimizations = m_Preferences->gameOptimizations;
     }
 
+    HostConnectionInfoSnapshot hostConnectionInfo = captureHostConnectionInfoSnapshot(m_Computer);
+    const bool resumingSession = hostConnectionInfo.currentGameId != 0;
+
     QString rtspSessionUrl;
 
     // Query display HDR brightness capabilities
@@ -1913,7 +2032,7 @@ bool Session::startConnectionAsync()
             minBrightness,
             maxAverageBrightness
         );
-        http.startApp(m_Computer->currentGameId != 0 ? "resume" : "launch",
+        http.startApp(resumingSession ? "resume" : "launch",
                       m_Computer->isNvidiaServerSoftware,
                       m_App.id, &m_StreamConfig,
                       enableGameOptimizations,
@@ -1924,6 +2043,23 @@ bool Session::startConnectionAsync()
                       m_Preferences->customScreenMode,
                       m_Preferences->customVddScreenMode,
                       remoteStreamConfig);
+
+        try {
+            updateHostConnectionInfoFromServerInfo(http.getServerInfo(NvHTTP::NVLL_NONE),
+                                                   m_Computer,
+                                                   &hostConnectionInfo,
+                                                   resumingSession);
+        } catch (const GfeHttpResponseException& e) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Failed to refresh server info after %s: %s",
+                        resumingSession ? "resume" : "launch",
+                        qPrintable(e.toQString()));
+        } catch (const QtNetworkReplyException& e) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Failed to refresh server info after %s: %s",
+                        resumingSession ? "resume" : "launch",
+                        qPrintable(e.toQString()));
+        }
     } catch (const GfeHttpResponseException& e) {
         emit displayLaunchError(tr("Host returned error: %1").arg(e.toQString()));
         return false;
@@ -1932,29 +2068,8 @@ bool Session::startConnectionAsync()
         return false;
     }
 
-    QByteArray hostnameStr = m_Computer->activeAddress.address().toUtf8();
-    QByteArray siAppVersion = m_Computer->appVersion.toUtf8();
-
-    SERVER_INFORMATION hostInfo;
-    hostInfo.address = hostnameStr.data();
-    hostInfo.serverInfoAppVersion = siAppVersion.data();
-    hostInfo.serverCodecModeSupport = m_Computer->serverCodecModeSupport;
-
-    // Older GFE versions didn't have this field
-    QByteArray siGfeVersion;
-    if (!m_Computer->gfeVersion.isEmpty()) {
-        siGfeVersion = m_Computer->gfeVersion.toUtf8();
-    }
-    if (!siGfeVersion.isEmpty()) {
-        hostInfo.serverInfoGfeVersion = siGfeVersion.data();
-    }
-
-    // Older GFE and Sunshine versions didn't have this field
-    QByteArray rtspSessionUrlStr;
-    if (!rtspSessionUrl.isEmpty()) {
-        rtspSessionUrlStr = rtspSessionUrl.toUtf8();
-        hostInfo.rtspSessionUrl = rtspSessionUrlStr.data();
-    }
+    PreparedServerInformation preparedHostInfo;
+    prepareServerInformation(hostConnectionInfo, rtspSessionUrl, &preparedHostInfo);
 
     if (m_Preferences->packetSize != 0) {
         // Override default packet size and remote streaming detection
@@ -2008,7 +2123,7 @@ bool Session::startConnectionAsync()
                                                                          false);
     }
 
-    int err = LiStartConnection(&hostInfo, &m_StreamConfig, &k_ConnCallbacks,
+    int err = LiStartConnection(&preparedHostInfo.info, &m_StreamConfig, &k_ConnCallbacks,
                                 &m_VideoCallbacks, &m_AudioCallbacks,
                                 NULL, 0, NULL, 0);
     if (err != 0) {
@@ -2063,6 +2178,14 @@ void Session::start()
 
     // We're now active
     s_ActiveSession = this;
+
+    // Construct the clipboard sync helper on the GUI thread before the
+    // control receive thread can possibly invoke clClipboardData(). It is
+    // started after a successful connection in clConnectionStatusUpdate.
+    if (m_ClipboardSync == nullptr) {
+        m_ClipboardSync = new ClipboardSync(m_Computer, this);
+        m_ClipboardSync->start();
+    }
 
     // Initialize the gamepad code with our preferences
     // NB: m_InputHandler must be initialize before starting the connection.
@@ -2276,24 +2399,24 @@ void Session::exec()
     bool needsFirstEnterCapture = false;
     bool needsPostDecoderCreationCapture = false;
 
-    // HACK: For Wayland, we wait until we get the first SDL_WINDOWEVENT_ENTER
-    // event where it seems to work consistently on GNOME. For other platforms,
-    // especially where SDL may call SDL_RecreateWindow(), we must only capture
-    // after the decoder is created.
-    if (strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
-        // Native Wayland: Capture on SDL_WINDOWEVENT_ENTER
-        needsFirstEnterCapture = true;
+    // Avoid capturing the mouse initially for windowed relative mode.
+    // We still capture in windowed absolute mode because it doesn't
+    // constrain the motion of the cursor. This allows the user to
+    // easily reposition or resize the window.
+    if (m_IsFullScreen || m_Preferences->absoluteMouseMode) {
+        // HACK: For Wayland, we wait until we get the first SDL_WINDOWEVENT_ENTER
+        // event where it seems to work consistently on GNOME. For other platforms,
+        // especially where SDL may call SDL_RecreateWindow(), we must only capture
+        // after the decoder is created.
+        if (strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
+            // Native Wayland: Capture on SDL_WINDOWEVENT_ENTER
+            needsFirstEnterCapture = true;
+        }
+        else {
+            // X11/XWayland: Capture after decoder creation
+            needsPostDecoderCreationCapture = true;
+        }
     }
-    else {
-        // X11/XWayland: Capture after decoder creation
-        needsPostDecoderCreationCapture = true;
-    }
-
-    // Stop text input. SDL enables it by default
-    // when we initialize the video subsystem, but this
-    // causes an IME popup when certain keys are held down
-    // on macOS.
-    SDL_StopTextInput();
 
     // Disable the screen saver if requested
     if (m_Preferences->keepAwake) {
@@ -2374,8 +2497,25 @@ void Session::exec()
     // Switch to async logging mode when we enter the SDL loop
     StreamUtils::enterAsyncLoggingMode();
 
-    // Hijack this thread to be the SDL main thread. We have to do this
-    // because we want to suspend all Qt processing until the stream is over.
+    // Hijack this thread to be the SDL main thread. We still need to pump Qt
+    // periodically while streaming because ClipboardSync relies on Qt's event
+    // loop for QClipboard notifications, queued inbound frames, and QNAM blob
+    // callbacks. Without this, PNG clipboard sync can stall on every platform.
+    constexpr Uint32 QT_EVENT_PUMP_INTERVAL_MS = 10;
+    Uint32 lastQtEventPumpTicks = 0;
+    auto processQtEventsDuringStream = [this, &lastQtEventPumpTicks](bool force = false) {
+        const bool qtUiVisible = (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
+                                 (m_Toast && m_Toast->isVisible());
+        const Uint32 now = SDL_GetTicks();
+        if (!force && !qtUiVisible && now - lastQtEventPumpTicks < QT_EVENT_PUMP_INTERVAL_MS) {
+            return;
+        }
+        lastQtEventPumpTicks = now;
+        QCoreApplication::processEvents(qtUiVisible
+                                        ? QEventLoop::AllEvents
+                                        : QEventLoop::ExcludeUserInputEvents);
+    };
+
     SDL_Event event;
     for (;;) {
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
@@ -2390,10 +2530,7 @@ void Session::exec()
         // and other problems.
         if (!SDL_WaitEventTimeout(&event, 1000)) {
             presence.runCallbacks();
-            // Process Qt events even during timeout so Qt overlay can paint/respond
-            if (m_MenuPanel && m_MenuPanel->needsEventProcessing()) {
-                QCoreApplication::processEvents(QEventLoop::AllEvents);
-            }
+            processQtEventsDuringStream(true);
             continue;
         }
 #else
@@ -2410,6 +2547,7 @@ void Session::exec()
             SDL_Delay(10);
 #endif
             presence.runCallbacks();
+            processQtEventsDuringStream();
             continue;
         }
 #endif
@@ -2813,12 +2951,7 @@ void Session::exec()
             break;
         }
 
-        // Process Qt events when the overlay menu or toast is visible
-        // This ensures QRasterWindow receives paint/mouse events from the Win32 queue
-        if ((m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
-            (m_Toast && m_Toast->isVisible())) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents);
-        }
+        processQtEventsDuringStream();
 
         // Deferred microphone toggle — runs outside processEvents() to avoid
         // heap corruption when creating QAudioSource within nested event loops

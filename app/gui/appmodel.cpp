@@ -1,6 +1,33 @@
 #include "appmodel.h"
 #include "../backend/nvhttp.h"
 
+#include <QReadLocker>
+#include <QWriteLocker>
+
+namespace {
+QString getAddressType(const NvAddress& address,
+                       const NvAddress& localAddress,
+                       const NvAddress& remoteAddress,
+                       const NvAddress& manualAddress,
+                       const NvAddress& ipv6Address)
+{
+    if (address == localAddress) {
+        return AppModel::tr("Local network");
+    }
+    if (address == remoteAddress) {
+        return AppModel::tr("Remote network");
+    }
+    if (address == manualAddress) {
+        return AppModel::tr("Manual");
+    }
+    if (address == ipv6Address) {
+        return AppModel::tr("IPv6 network");
+    }
+
+    return AppModel::tr("Other network");
+}
+}
+
 AppModel::AppModel(QObject *parent)
     : QAbstractListModel(parent)
 {
@@ -224,6 +251,126 @@ void AppModel::setAppDirectLaunch(int appIndex, bool directLaunch)
     m_ComputerManager->clientSideAttributeUpdated(m_Computer);
 }
 
+QVariantList AppModel::getConnectionAddresses()
+{
+    QVariantList addresses;
+    if (!m_Computer) {
+        return addresses;
+    }
+
+    QVector<NvAddress> allAddresses = m_Computer->uniqueAddresses();
+
+    NvAddress localAddress;
+    NvAddress remoteAddress;
+    NvAddress manualAddress;
+    NvAddress ipv6Address;
+    NvAddress activeAddress;
+
+    {
+        QReadLocker lock(&m_Computer->lock);
+        localAddress = m_Computer->localAddress;
+        remoteAddress = m_Computer->remoteAddress;
+        manualAddress = m_Computer->manualAddress;
+        ipv6Address = m_Computer->ipv6Address;
+        activeAddress = m_Computer->activeAddress;
+    }
+
+    // Add "Auto (default)" option
+    QVariantMap autoItem;
+    autoItem["address"] = "";
+    autoItem["port"] = 0;
+    autoItem["display"] = tr("Auto (default)");
+    autoItem["type"] = tr("Automatic selection with fallback");
+    autoItem["isActive"] = false;
+    autoItem["isAuto"] = true;
+    addresses.append(autoItem);
+
+    for (const NvAddress& address : allAddresses) {
+        QVariantMap item;
+        item["address"] = address.address();
+        item["port"] = static_cast<int>(address.port());
+        item["display"] = address.toString();
+        item["type"] = getAddressType(address, localAddress, remoteAddress, manualAddress, ipv6Address);
+        item["isActive"] = address == activeAddress;
+        item["isAuto"] = false;
+        item["isTested"] = m_Computer->hasAddressTestSucceeded(address);
+        addresses.append(item);
+    }
+
+    return addresses;
+}
+
+bool AppModel::hasMultipleConnectionAddresses()
+{
+    if (!m_Computer) {
+        return false;
+    }
+    return m_Computer->uniqueAddresses().count() > 1;
+}
+
+bool AppModel::setActiveAddress(QString address, int port)
+{
+    if (!m_Computer) {
+        return false;
+    }
+
+    if (address.isEmpty() || port <= 0) {
+        return false;
+    }
+
+    NvAddress selectedAddress(address, static_cast<uint16_t>(port));
+
+    // Verify the address is one of the known addresses
+    bool found = false;
+    for (const NvAddress& addr : m_Computer->uniqueAddresses()) {
+        if (addr == selectedAddress) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        qWarning() << "Address is not a known address:" << selectedAddress.toString();
+        return false;
+    }
+
+    {
+        QWriteLocker lock(&m_Computer->lock);
+        m_Computer->activeAddress = selectedAddress;
+    }
+
+    return true;
+}
+
+QVariantMap AppModel::getActiveAddressInfo()
+{
+    QVariantMap info;
+    if (!m_Computer) {
+        return info;
+    }
+
+    NvAddress activeAddress;
+    NvAddress localAddress;
+    NvAddress remoteAddress;
+    NvAddress manualAddress;
+    NvAddress ipv6Address;
+
+    {
+        QReadLocker lock(&m_Computer->lock);
+        activeAddress = m_Computer->activeAddress;
+        localAddress = m_Computer->localAddress;
+        remoteAddress = m_Computer->remoteAddress;
+        manualAddress = m_Computer->manualAddress;
+        ipv6Address = m_Computer->ipv6Address;
+    }
+
+    info["address"] = activeAddress.address();
+    info["port"] = static_cast<int>(activeAddress.port());
+    info["display"] = activeAddress.toString();
+    info["type"] = getAddressType(activeAddress, localAddress, remoteAddress, manualAddress, ipv6Address);
+
+    return info;
+}
+
 void AppModel::handleComputerStateChanged(NvComputer* computer)
 {
     // Ignore updates for computers that aren't ours
@@ -273,6 +420,53 @@ void AppModel::handleComputerStateChanged(NvComputer* computer)
         // Now update our internal state
         m_CurrentGameId = m_Computer->currentGameId;
     }
+}
+
+void AppModel::forceSyncCurrentGame()
+{
+    // Re-read currentGameId directly from the shared NvComputer state and
+    // run the same dataChanged emit logic as handleComputerStateChanged
+    // when it differs from our cache. This is a defensive self-heal for
+    // cases where the polling thread updated NvComputer through a path
+    // that didn't reach our slot (e.g. mDNS PendingAddTask fold or a
+    // signal dropped due to receiver-side lifecycle timing).
+    if (m_Computer == nullptr) {
+        return;
+    }
+
+    int currentGameId;
+    {
+        QReadLocker lock(&m_Computer->lock);
+        currentGameId = m_Computer->currentGameId;
+    }
+
+    if (currentGameId == m_CurrentGameId) {
+        return;
+    }
+
+    // Invalidate the running state of the newly running game
+    for (int i = 0; i < m_VisibleApps.count(); i++) {
+        if (m_VisibleApps[i].id == currentGameId) {
+            emit dataChanged(createIndex(i, 0),
+                             createIndex(i, 0),
+                             QVector<int>() << RunningRole);
+            break;
+        }
+    }
+
+    // Invalidate the running state of the previously running game (if any)
+    if (m_CurrentGameId != 0) {
+        for (int i = 0; i < m_VisibleApps.count(); i++) {
+            if (m_VisibleApps[i].id == m_CurrentGameId) {
+                emit dataChanged(createIndex(i, 0),
+                                 createIndex(i, 0),
+                                 QVector<int>() << RunningRole);
+                break;
+            }
+        }
+    }
+
+    m_CurrentGameId = currentGameId;
 }
 
 void AppModel::handleBoxArtLoaded(NvComputer* computer, NvApp app, QUrl /* image */)

@@ -208,6 +208,9 @@ NvComputer::NvComputer(NvHTTP& http, QString serverInfo)
     this->gfeVersion = NvHTTP::getXmlString(serverInfo, "GfeVersion");
     this->gpuModel = NvHTTP::getXmlString(serverInfo, "gputype");
     this->activeAddress = http.address();
+    if (!this->activeAddress.isNull()) {
+        this->m_TestedAddresses.append(this->activeAddress);
+    }
     this->state = NvComputer::CS_ONLINE;
     this->pendingQuit = false;
     this->isSupportedServerVersion = CompatFetcher::isGfeVersionSupported(this->gfeVersion);
@@ -519,6 +522,38 @@ QVector<NvAddress> NvComputer::uniqueAddresses() const
     return uniqueAddressList;
 }
 
+void NvComputer::markAddressTestSucceeded(const NvAddress& address)
+{
+    if (address.isNull()) {
+        return;
+    }
+
+    QWriteLocker lock(&this->lock);
+    for (const NvAddress& testedAddress : std::as_const(m_TestedAddresses)) {
+        if (testedAddress == address) {
+            return;
+        }
+    }
+
+    m_TestedAddresses.append(address);
+}
+
+bool NvComputer::hasAddressTestSucceeded(const NvAddress& address) const
+{
+    if (address.isNull()) {
+        return false;
+    }
+
+    QReadLocker lock(&this->lock);
+    for (const NvAddress& testedAddress : std::as_const(m_TestedAddresses)) {
+        if (testedAddress == address) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool NvComputer::update(const NvComputer& that)
 {
     bool changed = false;
@@ -578,6 +613,20 @@ bool NvComputer::update(const NvComputer& that)
     if (!that.appList.isEmpty()) {
         // updateAppList() handles merging client-side attributes
         updateAppList(that.appList);
+    }
+
+    if (!this->activeAddress.isNull()) {
+        bool activeAddressAlreadyTested = false;
+        for (const NvAddress& testedAddress : std::as_const(m_TestedAddresses)) {
+            if (testedAddress == this->activeAddress) {
+                activeAddressAlreadyTested = true;
+                break;
+            }
+        }
+
+        if (!activeAddressAlreadyTested) {
+            m_TestedAddresses.append(this->activeAddress);
+        }
     }
 
     return changed;

@@ -67,6 +67,12 @@ public:
     uniqueAddresses() const;
 
     void
+    markAddressTestSucceeded(const NvAddress& address);
+
+    bool
+    hasAddressTestSucceeded(const NvAddress& address) const;
+
+    void
     serialize(QSettings& settings, bool serializeApps) const;
 
     // Caller is responsible for synchronizing read access to both hosts
@@ -124,4 +130,5 @@ public:
 
 private:
     uint16_t externalPort;
+    QVector<NvAddress> m_TestedAddresses;
 };

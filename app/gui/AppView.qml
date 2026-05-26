@@ -35,6 +35,12 @@ CenteredGridView {
     property bool isVddSelected: selectedDisplayId === "vdd"
     // 物理显示器列表
     property var displayList: []
+    // 是否有多个连接地址
+    property bool hasMultipleAddresses: appModel.hasMultipleConnectionAddresses()
+    // 当前活动地址信息
+    property var activeAddressInfo: appModel.getActiveAddressInfo()
+    // 是否使用自动选择模式
+    property bool useAutoAddress: true
 
     // 加载显示器列表
     function loadDisplays() {
@@ -54,6 +60,26 @@ CenteredGridView {
     function openDisplayDialog() {
         loadDisplays()
         displayDialog.open()
+    }
+
+    // IP选择弹窗
+    function openIpDialog() {
+        var addresses = appModel.getConnectionAddresses()
+        ipDialog.addresses = addresses
+        // Find current active index
+        var activeIdx = 0
+        if (useAutoAddress) {
+            activeIdx = 0 // "Auto (default)" is always index 0
+        } else {
+            for (var i = 0; i < addresses.length; i++) {
+                if (addresses[i].isActive && !addresses[i].isAuto) {
+                    activeIdx = i
+                    break
+                }
+            }
+        }
+        ipCombo.currentIndex = activeIdx
+        ipDialog.open()
     }
 
     Popup {
@@ -261,12 +287,42 @@ CenteredGridView {
         currentIndex = -1
     }
 
+    // Re-syncs the "running" badge against the latest NvComputer state. The
+    // polling thread can update currentGameId through a code path that
+    // doesn't reach AppModel's slot (e.g. mDNS PendingAddTask folding under
+    // contended locks), leaving the badge stale after we return from a
+    // stream. We re-check on activation and again a few ticks later to cover
+    // the case where the host hasn't finished tearing down the prior
+    // session by the time onActivated fires.
+    Timer {
+        id: postActivationResyncTimer
+        interval: 500
+        repeat: true
+        property int ticksLeft: 0
+        onTriggered: {
+            appModel.forceSyncCurrentGame()
+            if (--ticksLeft <= 0) {
+                stop()
+            }
+        }
+        function kick() {
+            ticksLeft = 4   // 0.5s, 1.0s, 1.5s, 2.0s
+            restart()
+        }
+    }
+
     StackView.onActivated: {
         appModel.computerLost.connect(computerLost)
         activated = true
 
         // 从服务端加载显示器列表
         loadDisplays()
+
+        // Self-heal the running-game indicator in case our cached state
+        // drifted from NvComputer's actual currentGameId while we were
+        // on another page (typically during a streaming session).
+        appModel.forceSyncCurrentGame()
+        postActivationResyncTimer.kick()
 
         // Highlight the first item if a gamepad is connected
         if (currentIndex === -1 && SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
@@ -574,6 +630,131 @@ CenteredGridView {
             font.pointSize: 20
             verticalAlignment: Text.AlignVCenter
             wrapMode: Text.Wrap
+        }
+    }
+
+    Popup {
+        id: ipDialog
+        property var addresses: []
+
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        anchors.centerIn: parent
+        width: Math.min(500, appGrid.width - 40)
+        padding: 20
+
+        background: Rectangle {
+            color: "#EE333333"
+            radius: 12
+            border.color: "#55FFFFFF"
+            border.width: 1
+        }
+
+        Column {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            spacing: 16
+
+            Label {
+                text: qsTr("Connection IP Settings")
+                color: "#FFFFFF"
+                font.pointSize: 14
+                font.bold: true
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: "#44FFFFFF"
+            }
+
+            Label {
+                text: qsTr("Select the IP address to connect to this PC:")
+                color: "#AAFFFFFF"
+                font.pointSize: 11
+                wrapMode: Text.Wrap
+                width: parent.width
+            }
+
+            ComboBox {
+                id: ipCombo
+                width: parent.width
+                font.pointSize: 10
+                model: ipDialog.addresses
+                textRole: "display"
+
+                Material.foreground: "#CCFFFFFF"
+            }
+
+            Label {
+                visible: ipCombo.currentIndex >= 0 &&
+                         ipCombo.currentIndex < ipDialog.addresses.length
+                text: visible ? qsTr("Type: %1").arg(ipDialog.addresses[ipCombo.currentIndex].type) : ""
+                color: "#AAFFFFFF"
+                font.pointSize: 10
+                wrapMode: Text.Wrap
+                width: parent.width
+            }
+
+            Label {
+                visible: ipCombo.currentIndex > 0 &&
+                         ipCombo.currentIndex < ipDialog.addresses.length &&
+                         !ipDialog.addresses[ipCombo.currentIndex].isTested
+                text: qsTr("Warning: This address has not been verified by polling yet.")
+                color: "#FFCC00"
+                font.pointSize: 9
+                wrapMode: Text.Wrap
+                width: parent.width
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: "#44FFFFFF"
+            }
+
+            Row {
+                spacing: 12
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                Button {
+                    text: qsTr("Apply")
+                    onClicked: {
+                        if (ipCombo.currentIndex < 0 || ipCombo.currentIndex >= ipDialog.addresses.length) {
+                            return
+                        }
+
+                        var selected = ipDialog.addresses[ipCombo.currentIndex]
+                        if (selected.isAuto) {
+                            useAutoAddress = true
+                        } else {
+                            useAutoAddress = false
+                            appModel.setActiveAddress(selected.address, selected.port)
+                            activeAddressInfo = appModel.getActiveAddressInfo()
+                        }
+                        ipDialog.close()
+                    }
+
+                    Material.foreground: "#FFFFFF"
+                }
+
+                Button {
+                    text: qsTr("Cancel")
+                    onClicked: ipDialog.close()
+
+                    Material.foreground: "#AAFFFFFF"
+                }
+            }
+
+            Label {
+                text: qsTr("\"Auto\" uses the default address selection with automatic fallback. Selecting a specific IP will pin the connection to that address.")
+                color: "#77FFFFFF"
+                font.pointSize: 9
+                wrapMode: Text.Wrap
+                width: parent.width
+            }
         }
     }
 

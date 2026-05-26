@@ -20,10 +20,10 @@ jobs:
         include:
           # Windows
           - os: windows-2025
-            qt_version: 6.10.2
+            qt_version: 6.11.1
           # macOS
-          - os: macos-15
-            qt_version: 6.10.2
+          - os: macos-26
+            qt_version: 6.11.1
 
     runs-on: ${{ matrix.os }}
 
@@ -32,7 +32,11 @@ jobs:
         uses: actions/checkout@v5
         with:
           submodules: 'recursive'
-          fetch-depth: 1
+          fetch-depth: 0
+
+      - name: Download dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: powershell ./setup-deps.ps1
 
       - name: Install create-dmg (macOS)
         if: runner.os == 'macOS'
@@ -48,7 +52,7 @@ jobs:
           add-tools-to-path: ${{ runner.os != 'Windows' }}
           version: ${{ matrix.qt_version }}
           modules: 'qtimageformats'
-          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@9edeb24ae65361fd032a063a0b0148764eff09c5'
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
 
       - name: Install Qt ARM64 (Windows)
         if: runner.os == 'Windows'
@@ -89,7 +93,7 @@ jobs:
           }
 
       - name: Upload Binaries (Windows x64)
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         if: runner.os == 'Windows'
         with:
           name: Moonlight-${{ runner.os }}-x64-${{ env.CI_VERSION }}
@@ -97,7 +101,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Binaries (Windows arm64)
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         if: runner.os == 'Windows'
         with:
           name: Moonlight-${{ runner.os }}-arm64-${{ env.CI_VERSION }}
@@ -105,7 +109,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Binaries (macOS)
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         if: runner.os == 'macOS'
         with:
           name: Moonlight-${{ runner.os }}-${{ env.CI_VERSION }}
@@ -114,7 +118,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Symbols
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: zDevDbgSyms-${{ runner.os }}-${{ env.CI_VERSION }}
           path: |

@@ -28,7 +28,19 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
+
+    - name: Get version
+      shell: cmd
+      run: |
+        rem 在源码污染（setup-deps、构建过程会改 tracked 文件）之前固化版本号，
+        rem 写入 CI_VERSION 让后续 derive-version.py 调用直接采用此值，避免出现 .dirty 后缀。
+        for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo VERSION=%%i >> %GITHUB_ENV%
+        for /f "delims=" %%i in ('python scripts\derive-version.py --field artifact') do echo CI_VERSION=%%i >> %GITHUB_ENV%
+
+    - name: Download dependencies
+      shell: pwsh
+      run: ./setup-deps.ps1
 
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
@@ -38,12 +50,6 @@ jobs:
         modules: 'qtmultimedia qtimageformats'
         cache: true
 
-    - name: Get version
-      shell: cmd
-      run: |
-        set /p VERSION=<app\version.txt
-        echo VERSION=%VERSION% >> %GITHUB_ENV%
-
     - name: Setup build environment
       shell: cmd
       run: |
@@ -52,8 +58,13 @@ jobs:
         set JOM_MAX_CPUS=%NUMBER_OF_PROCESSORS%
         echo JOM_MAX_CPUS=%JOM_MAX_CPUS% >> %GITHUB_ENV%
         rem Increase virtual memory to prevent out-of-memory issues
-        wmic pagefileset where name="C:\\pagefile.sys" set InitialSize=4096,MaximumSize=8192
-        wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False
+        where wmic >nul 2>nul
+        if %ERRORLEVEL% EQU 0 (
+          wmic pagefileset where name="C:\\pagefile.sys" set InitialSize=4096,MaximumSize=8192 || echo Failed to set pagefile size
+          wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False || echo Failed to disable automatic pagefile management
+        ) else (
+          echo wmic is not available; skipping pagefile tuning.
+        )
 
     - name: Configure build environment
       shell: cmd
@@ -112,6 +123,12 @@ jobs:
     - name: Build Windows arm64
       shell: cmd
       run: |
+        rem Force the ARM64 Qt bin to the front of PATH so that build-arch.bat's
+        rem `where qmake.bat` / `where qmake.exe` resolves to the cross-compiled
+        rem ARM64 Qt instead of the x64 Qt installed earlier in this job. Without
+        rem this, windeployqt would deploy x64 Qt DLLs into the ARM64 portable
+        rem package, producing 0xc000007b on launch (qiin2333/moonlight-qt#71).
+        set "PATH=%Qt6_DIR%\bin;%PATH%"
         copy /y scripts\appveyor\qmake.bat %Qt6_DIR%\bin\
         copy /y scripts\appveyor\qtpaths.bat %Qt6_DIR%\bin\
         copy /y scripts\appveyor\target_qt.conf %Qt6_DIR%\bin\
@@ -150,27 +167,26 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
-
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.10.2'
-        modules: 'qtmultimedia qtimageformats'
-        cache: true
-
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-
-    - name: Install create-dmg
-      run: npm install --global create-dmg
+        fetch-depth: 0
 
     - name: Get version
       run: |
-        VERSION=$(cat app/version.txt)
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Install create-dmg
+      run: |
+        brew install node
+        npm install --global create-dmg
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.11.0'
+        modules: 'qtmultimedia qtimageformats'
+        cache: true
+        aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
 
     - name: Build and generate DMG
       run: |
@@ -190,7 +206,13 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
+
+    - name: Get version
+      run: |
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Install Qt 6.8.3
       uses: jurplel/install-qt-action@v3
@@ -204,7 +226,6 @@ jobs:
         mkdir -p $HOME/local/{bin,include,lib}
         echo "$HOME/local/bin" >> $GITHUB_PATH
         echo "PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$HOME/local/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
-        echo "VERSION=$(cat app/version.txt)" >> $GITHUB_ENV
         echo "UBUNTU_RELEASE=$(lsb_release -rs)" >> $GITHUB_ENV
 
     # This may still install various Qt packages, but the later install step will override them
@@ -332,11 +353,12 @@ jobs:
         sudo ldconfig
         cd ..
 
-    - name: Install linuxdeployqt
+    - name: Install linuxdeploy
       run: |
-        mkdir $HOME/bin
-        wget -O $HOME/bin/linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
-        chmod a+x $HOME/bin/linuxdeployqt
+        mkdir -p $HOME/bin
+        wget -O $HOME/bin/linuxdeploy-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        wget -O $HOME/bin/linuxdeploy-plugin-qt-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+        chmod a+x $HOME/bin/linuxdeploy*.AppImage
 
     - name: Setup FUSE for AppImage
       run: |
@@ -360,8 +382,9 @@ jobs:
 
     - name: Get version
       run: |
-        VERSION=$(cat app/version.txt)
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Build AppImage
       env:
@@ -372,7 +395,7 @@ jobs:
         # export PATH=/usr/lib/qt5/bin:$PATH
         # export QT_QPA_PLATFORM_PLUGIN_PATH=/usr/lib/x86_64-linux-gnu/qt5/plugins
         
-        # Add linuxdeployqt to PATH
+        # Add linuxdeploy to PATH
         export PATH=$PATH:$HOME/bin
         
         echo "Building AppImage with CI-optimized settings..."
@@ -396,7 +419,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
 
     - name: Install dependencies
       run: |
@@ -410,8 +433,9 @@ jobs:
 
     - name: Get version
       run: |
-        VERSION=$(cat app/version.txt)
+        VERSION=$(python3 scripts/derive-version.py --field artifact)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Build SteamLink app
       run: |
