@@ -1676,6 +1676,10 @@ void Session::showQtOverlayMenu()
     m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
     m_MenuPanel->updateGamepadMouseState(m_InputHandler->isMouseEmulationActive());
 
+    if (m_MenuButton) {
+        m_MenuButton->hideButton();
+    }
+
     // Show menu based on user preference
     switch (m_Preferences->overlayMenuPosition) {
     case StreamingPreferences::OMP_LEFT_EDGE:
@@ -1685,10 +1689,6 @@ void Session::showQtOverlayMenu()
         // Show menu at the button's position (top-right corner)
         m_MenuPanel->showAtCursor(wx, wy, ww, wh,
                                   wx + ww - 40, wy + 40);
-        // Hide button while menu is visible
-        if (m_MenuButton) {
-            m_MenuButton->hideButton();
-        }
         break;
     case StreamingPreferences::OMP_RIGHT_EDGE:
     default:
@@ -1880,6 +1880,41 @@ void Session::restoreCaptureAfterQtOverlay(const char* reason, bool delayForWind
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "Qt overlay capture restored after %s", reason ? reason : "menu close");
+}
+
+bool Session::isEdgeOverlayMenuPosition() const
+{
+    return m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_LEFT_EDGE ||
+           m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_RIGHT_EDGE;
+}
+
+void Session::showQtOverlayButton(int cursorY)
+{
+    if (!m_MenuButton || !m_Window || !m_MenuPanel ||
+            m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) {
+        return;
+    }
+
+    int wx, wy, ww, wh;
+    SDL_GetWindowPosition(m_Window, &wx, &wy);
+    SDL_GetWindowSize(m_Window, &ww, &wh);
+
+    OverlayMenuButton::Placement placement = OverlayMenuButton::Placement::TopRight;
+    switch (m_Preferences->overlayMenuPosition) {
+    case StreamingPreferences::OMP_LEFT_EDGE:
+        placement = OverlayMenuButton::Placement::LeftEdge;
+        break;
+    case StreamingPreferences::OMP_RIGHT_EDGE:
+        placement = OverlayMenuButton::Placement::RightEdge;
+        break;
+    case StreamingPreferences::OMP_BUTTON:
+    default:
+        placement = OverlayMenuButton::Placement::TopRight;
+        break;
+    }
+
+    m_MenuButton->setAutoHideOnLeave(isEdgeOverlayMenuPosition());
+    m_MenuButton->showButton(wx, wy, ww, wh, placement, cursorY);
 }
 
 void Session::showStreamingToast(const QString& message, int durationMs)
@@ -2707,14 +2742,12 @@ void Session::exec()
             restoreCaptureAfterQtOverlay("menu close");
         }
 
-        // Re-show the floating menu button if in button mode
+        // Re-show the persistent floating menu button if in button mode.
+        // Edge modes show the button only when the pointer reaches the edge.
         if (m_MenuButton &&
             m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON &&
             !(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_MINIMIZED)) {
-            int wx, wy, ww, wh;
-            SDL_GetWindowPosition(m_Window, &wx, &wy);
-            SDL_GetWindowSize(m_Window, &ww, &wh);
-            m_MenuButton->showButton(wx, wy, ww, wh);
+            showQtOverlayButton();
         }
 
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
@@ -2722,17 +2755,17 @@ void Session::exec()
                     m_DeferCaptureRestore ? "deferred" : "restored");
     });
 
-    // Create floating menu button if configured
-    if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
+    // Create floating menu button if configured. In edge modes, the button is
+    // hidden until the mouse reaches the edge, then it acts as a deliberate
+    // click target to avoid opening the full menu by accident.
+    if (m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_DISABLED) {
         m_MenuButton = new OverlayMenuButton();
         m_MenuButton->setClickCallback([this]() {
             showQtOverlayMenu();
         });
-        // Show button at initial position
-        int wx, wy, ww, wh;
-        SDL_GetWindowPosition(m_Window, &wx, &wy);
-        SDL_GetWindowSize(m_Window, &ww, &wh);
-        m_MenuButton->showButton(wx, wy, ww, wh);
+        if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
+            showQtOverlayButton();
+        }
     }
 
     // Switch to async logging mode when we enter the SDL loop
@@ -2881,10 +2914,7 @@ void Session::exec()
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 // Reposition floating menu button if visible
                 if (m_MenuButton && m_MenuButton->isButtonVisible()) {
-                    int wx, wy, ww, wh;
-                    SDL_GetWindowPosition(m_Window, &wx, &wy);
-                    SDL_GetWindowSize(m_Window, &ww, &wh);
-                    m_MenuButton->repositionTo(wx, wy, ww, wh);
+                    showQtOverlayButton();
                 }
                 break;
             }
@@ -3104,11 +3134,11 @@ void Session::exec()
         }
         case SDL_MOUSEMOTION:
         {
-            // Qt overlay menu: edge detection with debounce (500ms cooldown after close)
-            // Only trigger for edge-based positions (not disabled, at-cursor, or button)
+            // Qt overlay menu: edge detection with debounce (500ms cooldown
+            // after close). Edge modes reveal a small moon button first; the
+            // full menu opens only after the user clicks that button.
             if (m_MenuPanel && !m_MenuPanel->isMenuVisible() &&
-                m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_DISABLED &&
-                m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_BUTTON) {
+                isEdgeOverlayMenuPosition()) {
                 Uint32 elapsed = SDL_GetTicks() - m_MenuCloseTicks;
                 if (elapsed > 500) {
                     int ww, wh;
@@ -3121,8 +3151,11 @@ void Session::exec()
                         atEdge = (event.motion.x >= ww - 5);
                     }
                     if (atEdge) {
-                        showQtOverlayMenu();
+                        showQtOverlayButton(event.motion.y);
                         break;
+                    }
+                    else if (m_MenuButton && m_MenuButton->isButtonVisible()) {
+                        m_MenuButton->hideButton();
                     }
                 }
             }

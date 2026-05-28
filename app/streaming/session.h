@@ -183,6 +183,8 @@ private:
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void releaseCaptureForQtOverlay();
     void restoreCaptureAfterQtOverlay(const char* reason, bool delayForWindowStateChange = false);
+    bool isEdgeOverlayMenuPosition() const;
+    void showQtOverlayButton(int cursorY = -1);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void showStreamingToast(const QString& message, int durationMs = 2000);
 #ifdef Q_OS_WIN32

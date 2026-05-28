@@ -21,21 +21,32 @@ class OverlayMenuButton : public QRasterWindow {
 public:
     using ClickCallback = std::function<void()>;
 
+    enum class Placement {
+        TopRight,
+        LeftEdge,
+        RightEdge,
+    };
+
     explicit OverlayMenuButton(QWindow* parent = nullptr);
     ~OverlayMenuButton() override;
 
     void setClickCallback(ClickCallback cb) { m_ClickCallback = std::move(cb); }
+    void setAutoHideOnLeave(bool autoHide) { m_AutoHideOnLeave = autoHide; }
 
     /**
      * Reposition the button relative to the given parent rect (SDL pixel coords).
-     * Places the button at the top-right corner of the streaming window.
+     * Places the button at the requested location on the streaming window.
      */
-    void repositionTo(int parentX, int parentY, int parentW, int parentH);
+    void repositionTo(int parentX, int parentY, int parentW, int parentH,
+                      Placement placement = Placement::TopRight,
+                      int cursorY = -1);
 
     /**
-     * Show the button at the top-right corner of the given parent rect.
+     * Show the button at the requested location on the given parent rect.
      */
-    void showButton(int parentX, int parentY, int parentW, int parentH);
+    void showButton(int parentX, int parentY, int parentW, int parentH,
+                    Placement placement = Placement::TopRight,
+                    int cursorY = -1);
 
     /**
      * Hide the button.
@@ -56,6 +67,7 @@ private:
     ClickCallback m_ClickCallback;
     bool m_Hovered;
     bool m_ButtonVisible;
+    bool m_AutoHideOnLeave;
 
     // Button size (logical pixels)
     static constexpr int kButtonSize = 36;
