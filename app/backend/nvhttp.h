@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QJsonObject>
 #include <QVariant>
 
 class NvComputer;
@@ -143,6 +144,24 @@ public:
                            int timeoutMs,
                            NvLogLevel logLevel = NvLogLevel::NVLL_VERBOSE);
 
+    bool
+    getAbrCapabilities(int* hostMaxBitrateKbps = nullptr);
+
+    QJsonObject
+    configureAbr(bool enabled,
+                 int minBitrateKbps,
+                 int maxBitrateKbps,
+                 QString mode,
+                 int timeoutMs = 2000);
+
+    QJsonObject
+    sendAbrFeedback(double packetLoss,
+                    double rttMs,
+                    double decodeFps,
+                    int droppedFrames,
+                    int currentBitrateKbps,
+                    int timeoutMs = 2000);
+
     void setServerCert(QSslCertificate serverCert);
 
     void setAddress(NvAddress address);
@@ -202,6 +221,22 @@ private:
                    QString arguments,
                    int timeoutMs,
                    NvLogLevel logLevel);
+
+    QNetworkReply*
+    openJsonConnection(QUrl baseUrl,
+                       QString command,
+                       QJsonObject body,
+                       bool post,
+                       int timeoutMs,
+                       NvLogLevel logLevel);
+
+    QJsonObject
+    openJsonConnectionToObject(QUrl baseUrl,
+                               QString command,
+                               QJsonObject body,
+                               bool post,
+                               int timeoutMs,
+                               NvLogLevel logLevel = NvLogLevel::NVLL_VERBOSE);
 
     NvAddress m_Address;
     QNetworkAccessManager* m_Nam;

@@ -42,6 +42,7 @@
 #include <QtEndian>
 #include <QCoreApplication>
 #include <QThreadPool>
+#include <QRunnable>
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QImage>
@@ -75,6 +76,69 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
 
 Session* Session::s_ActiveSession;
 QSemaphore Session::s_ActiveSessionSemaphore(1);
+
+class AbrFeedbackTask : public QRunnable
+{
+public:
+    AbrFeedbackTask(NvAddress address,
+                    uint16_t httpsPort,
+                    QSslCertificate serverCert,
+                    QString uuid,
+                    double packetLoss,
+                    double rttMs,
+                    double decodeFps,
+                    int droppedFrames,
+                    std::shared_ptr<std::atomic_bool> inFlight,
+                    std::shared_ptr<std::atomic_int> currentBitrateKbps)
+        : m_Address(address),
+          m_HttpsPort(httpsPort),
+          m_ServerCert(serverCert),
+          m_Uuid(uuid),
+          m_PacketLoss(packetLoss),
+          m_RttMs(rttMs),
+          m_DecodeFps(decodeFps),
+          m_DroppedFrames(droppedFrames),
+          m_InFlight(inFlight),
+          m_CurrentBitrateKbps(currentBitrateKbps)
+    {
+    }
+
+    virtual void run() override
+    {
+        try {
+            NvHTTP http(m_Address, m_HttpsPort, m_ServerCert, nullptr, m_Uuid);
+            QJsonObject response = http.sendAbrFeedback(m_PacketLoss,
+                                                        m_RttMs,
+                                                        m_DecodeFps,
+                                                        m_DroppedFrames,
+                                                        m_CurrentBitrateKbps->load(),
+                                                        2000);
+
+            int newBitrate = response.value("newBitrate").toInt(0);
+            if (newBitrate > 0) {
+                m_CurrentBitrateKbps->store(newBitrate);
+                qInfo() << "Sunshine ABR adjusted bitrate to" << newBitrate << "Kbps:" << response.value("reason").toString();
+            }
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Sunshine ABR feedback failed:" << e.what();
+        }
+
+        m_InFlight->store(false);
+    }
+
+private:
+    NvAddress m_Address;
+    uint16_t m_HttpsPort;
+    QSslCertificate m_ServerCert;
+    QString m_Uuid;
+    double m_PacketLoss;
+    double m_RttMs;
+    double m_DecodeFps;
+    int m_DroppedFrames;
+    std::shared_ptr<std::atomic_bool> m_InFlight;
+    std::shared_ptr<std::atomic_int> m_CurrentBitrateKbps;
+};
 
 void Session::clStageStarting(int stage)
 {
@@ -594,10 +658,15 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_MenuPanel(nullptr),
       m_DeferCaptureRestore(false),
       m_PendingMicToggle(false),
+            m_SunshineAbrEnabled(false),
+            m_LastAbrFeedbackTicks(0),
+            m_AbrFeedbackInFlight(std::make_shared<std::atomic_bool>(false)),
+            m_AbrCurrentBitrateKbps(std::make_shared<std::atomic_int>(0)),
       m_Toast(nullptr),
       m_MenuCloseTicks(0),
       m_MicStream(nullptr)
 {
+    memset(&m_LastAbrVideoStats, 0, sizeof(m_LastAbrVideoStats));
     m_ClipboardSync = nullptr;
 }
 
@@ -1821,6 +1890,8 @@ void Session::requestRuntimeBitrateChange(int bitrateKbps)
                     "Runtime bitrate change to %d kbps: %s",
                     bitrateKbps,
                     response.toUtf8().constData());
+
+        m_AbrCurrentBitrateKbps->store(bitrateKbps);
     }
     catch (const GfeHttpResponseException& e) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -1836,6 +1907,136 @@ void Session::requestRuntimeBitrateChange(int bitrateKbps)
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Runtime bitrate change failed: unknown error");
     }
+}
+
+void Session::startSunshineAbr()
+{
+    m_SunshineAbrEnabled = false;
+
+    if (!m_Preferences->enableSunshineAbr || !m_Computer) {
+        return;
+    }
+
+    try {
+        NvHTTP http(m_Computer);
+
+        int hostMaxBitrate = 0;
+        if (!http.getAbrCapabilities(&hostMaxBitrate)) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Host does not advertise Sunshine ABR support");
+            return;
+        }
+
+        QJsonObject configResponse = http.configureAbr(true,
+                                                       0,
+                                                       m_Preferences->bitrateKbps,
+                                                       "balanced",
+                                                       2000);
+        if (!configResponse.value("success").toBool(false)) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Sunshine ABR configure rejected by host");
+            return;
+        }
+
+        int initialBitrate = configResponse.value("initialBitrate").toInt(m_StreamConfig.bitrate);
+        m_AbrCurrentBitrateKbps->store(initialBitrate);
+        m_AbrFeedbackInFlight->store(false);
+
+        const RTP_VIDEO_STATS* videoStats = LiGetRTPVideoStats();
+        if (videoStats != nullptr) {
+            memcpy(&m_LastAbrVideoStats, videoStats, sizeof(m_LastAbrVideoStats));
+        }
+        else {
+            memset(&m_LastAbrVideoStats, 0, sizeof(m_LastAbrVideoStats));
+        }
+
+        m_LastAbrFeedbackTicks = SDL_GetTicks();
+        m_SunshineAbrEnabled = true;
+
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Sunshine ABR enabled: initial=%d Kbps, max=%d Kbps, hostMax=%d Kbps",
+                    initialBitrate,
+                    configResponse.value("maxBitrate").toInt(0),
+                    hostMaxBitrate);
+    }
+    catch (const std::exception& e) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Sunshine ABR unavailable: %s",
+                    e.what());
+    }
+    catch (...) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Sunshine ABR unavailable: unknown error");
+    }
+}
+
+void Session::stopSunshineAbr()
+{
+    if (!m_SunshineAbrEnabled || !m_Computer) {
+        m_SunshineAbrEnabled = false;
+        return;
+    }
+
+    m_SunshineAbrEnabled = false;
+
+    try {
+        NvHTTP http(m_Computer);
+        http.configureAbr(false, 0, 0, "balanced", 1000);
+    }
+    catch (const std::exception& e) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Sunshine ABR disable failed: %s",
+                    e.what());
+    }
+    catch (...) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Sunshine ABR disable failed: unknown error");
+    }
+}
+
+void Session::sendSunshineAbrFeedback()
+{
+    if (!m_SunshineAbrEnabled || !m_Computer) {
+        return;
+    }
+
+    if (m_AbrFeedbackInFlight->exchange(true)) {
+        return;
+    }
+
+    const RTP_VIDEO_STATS* videoStats = LiGetRTPVideoStats();
+    if (videoStats == nullptr) {
+        m_AbrFeedbackInFlight->store(false);
+        return;
+    }
+
+    const uint32_t deltaVideo = videoStats->packetCountVideo - m_LastAbrVideoStats.packetCountVideo;
+    const uint32_t deltaFec = videoStats->packetCountFec - m_LastAbrVideoStats.packetCountFec;
+    const uint32_t deltaFecFailed = videoStats->packetCountFecFailed - m_LastAbrVideoStats.packetCountFecFailed;
+    const uint32_t deltaOos = videoStats->packetCountOOS - m_LastAbrVideoStats.packetCountOOS;
+    const uint32_t deltaInvalid = videoStats->packetCountInvalid - m_LastAbrVideoStats.packetCountInvalid;
+    const uint32_t deltaFecInvalid = videoStats->packetCountFecInvalid - m_LastAbrVideoStats.packetCountFecInvalid;
+    memcpy(&m_LastAbrVideoStats, videoStats, sizeof(m_LastAbrVideoStats));
+
+    const uint64_t packetCount = static_cast<uint64_t>(deltaVideo) + deltaFec;
+    const uint64_t lossIndicators = static_cast<uint64_t>(deltaFecFailed) + deltaOos + deltaInvalid + deltaFecInvalid;
+    const double packetLoss = packetCount > 0 ? qMin(100.0, (static_cast<double>(lossIndicators) * 100.0) / packetCount) : 0.0;
+    const int droppedFrames = static_cast<int>(deltaFecFailed + deltaOos + deltaInvalid);
+
+    uint32_t rtt = 0;
+    uint32_t rttVariance = 0;
+    LiGetEstimatedRttInfo(&rtt, &rttVariance);
+
+    QThreadPool::globalInstance()->start(new AbrFeedbackTask(m_Computer->activeAddress,
+                                                             m_Computer->activeHttpsPort,
+                                                             m_Computer->serverCert,
+                                                             m_Computer->uuid,
+                                                             packetLoss,
+                                                             rtt,
+                                                             m_ActiveVideoFrameRate,
+                                                             droppedFrames,
+                                                             m_AbrFeedbackInFlight,
+                                                             m_AbrCurrentBitrateKbps));
 }
 
 void Session::notifyMouseEmulationMode(bool enabled)
@@ -2133,6 +2334,7 @@ bool Session::startConnectionAsync()
     }
 
     emit connectionStarted();
+    startSunshineAbr();
     if (m_Preferences->enableMicrophone) {
         // Use the deferred mic toggle mechanism instead of QueuedConnection to avoid
         // heap corruption when creating QAudioSource within nested event loops (processEvents).
@@ -2516,8 +2718,23 @@ void Session::exec()
                                         : QEventLoop::ExcludeUserInputEvents);
     };
 
+    constexpr Uint32 ABR_FEEDBACK_INTERVAL_MS = 3000;
+    auto processSunshineAbrFeedback = [this]() {
+        if (!m_SunshineAbrEnabled) {
+            return;
+        }
+
+        const Uint32 now = SDL_GetTicks();
+        if (now - m_LastAbrFeedbackTicks >= ABR_FEEDBACK_INTERVAL_MS) {
+            m_LastAbrFeedbackTicks = now;
+            sendSunshineAbrFeedback();
+        }
+    };
+
     SDL_Event event;
     for (;;) {
+        processSunshineAbrFeedback();
+
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
         // SDL 2.0.18 has a proper wait event implementation that uses platform
         // support to block on events rather than polling on Windows, macOS, X11,
@@ -2531,6 +2748,7 @@ void Session::exec()
         if (!SDL_WaitEventTimeout(&event, 1000)) {
             presence.runCallbacks();
             processQtEventsDuringStream(true);
+            processSunshineAbrFeedback();
             continue;
         }
 #else
@@ -2548,6 +2766,7 @@ void Session::exec()
 #endif
             presence.runCallbacks();
             processQtEventsDuringStream();
+            processSunshineAbrFeedback();
             continue;
         }
 #endif
@@ -3019,6 +3238,7 @@ DispatchDeferredCleanup:
     // Destroy the decoder, since this must be done on the main thread
     // NB: This must happen before LiStopConnection() for pull-based
     // decoders.
+    stopSunshineAbr();
     SDL_LockMutex(m_DecoderLock);
     delete m_VideoDecoder;
     m_VideoDecoder = nullptr;

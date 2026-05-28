@@ -558,6 +558,68 @@ NvHTTP::openConnectionToString(QUrl baseUrl,
     return ret;
 }
 
+bool
+NvHTTP::getAbrCapabilities(int* hostMaxBitrateKbps)
+{
+    QJsonObject response = openJsonConnectionToObject(m_BaseUrlHttps,
+                                                      "api/abr/capabilities",
+                                                      QJsonObject(),
+                                                      false,
+                                                      FAST_FAIL_TIMEOUT_MS,
+                                                      NvLogLevel::NVLL_ERROR);
+    if (hostMaxBitrateKbps != nullptr) {
+        *hostMaxBitrateKbps = response.value("hostMaxBitrate").toInt(0);
+    }
+
+    return response.value("supported").toBool(false);
+}
+
+QJsonObject
+NvHTTP::configureAbr(bool enabled,
+                     int minBitrateKbps,
+                     int maxBitrateKbps,
+                     QString mode,
+                     int timeoutMs)
+{
+    QJsonObject body;
+    body["enabled"] = enabled;
+    if (enabled) {
+        body["minBitrate"] = minBitrateKbps;
+        body["maxBitrate"] = maxBitrateKbps;
+        body["mode"] = mode;
+    }
+
+    return openJsonConnectionToObject(m_BaseUrlHttps,
+                                      "api/abr",
+                                      body,
+                                      true,
+                                      timeoutMs,
+                                      NvLogLevel::NVLL_ERROR);
+}
+
+QJsonObject
+NvHTTP::sendAbrFeedback(double packetLoss,
+                        double rttMs,
+                        double decodeFps,
+                        int droppedFrames,
+                        int currentBitrateKbps,
+                        int timeoutMs)
+{
+    QJsonObject body;
+    body["packetLoss"] = packetLoss;
+    body["rttMs"] = rttMs;
+    body["decodeFps"] = decodeFps;
+    body["droppedFrames"] = droppedFrames;
+    body["currentBitrate"] = currentBitrateKbps;
+
+    return openJsonConnectionToObject(m_BaseUrlHttps,
+                                      "api/abr/feedback",
+                                      body,
+                                      true,
+                                      timeoutMs,
+                                      NvLogLevel::NVLL_ERROR);
+}
+
 QNetworkReply*
 NvHTTP::openConnection(QUrl baseUrl,
                        QString command,
@@ -663,6 +725,123 @@ NvHTTP::openConnection(QUrl baseUrl,
             delete reply;
             throw exception;
         }
+    }
+
+    return reply;
+}
+
+QJsonObject
+NvHTTP::openJsonConnectionToObject(QUrl baseUrl,
+                                   QString command,
+                                   QJsonObject body,
+                                   bool post,
+                                   int timeoutMs,
+                                   NvLogLevel logLevel)
+{
+    QNetworkReply* reply = openJsonConnection(baseUrl, command, body, post, timeoutMs, logLevel);
+    QByteArray response = reply->readAll();
+    delete reply;
+
+    QJsonParseError parseError;
+    QJsonDocument document = QJsonDocument::fromJson(response, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        qWarning() << command << "JSON response parse failed:" << parseError.errorString();
+        throw GfeHttpResponseException(-1, "Malformed JSON response");
+    }
+
+    return document.object();
+}
+
+QNetworkReply*
+NvHTTP::openJsonConnection(QUrl baseUrl,
+                           QString command,
+                           QJsonObject body,
+                           bool post,
+                           int timeoutMs,
+                           NvLogLevel logLevel)
+{
+    // Port must be set
+    Q_ASSERT(baseUrl.port(0) != 0);
+
+    QUrl url(baseUrl);
+    url.setPath("/" + command);
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setSslConfiguration(IdentityManager::get()->getSslConfig());
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    // Disable HTTP/2 (GFE 3.22 doesn't like it) and Qt 6 enables it by default
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+#endif
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
+    // Use fine-grained idle timeouts to avoid calling QNetworkAccessManager::clearAccessCache(),
+    // which tears down the NAM's global thread each time. We must not keep persistent connections
+    // or GFE will puke.
+    request.setAttribute(QNetworkRequest::ConnectionCacheExpiryTimeoutSecondsAttribute, 0);
+#endif
+
+    auto sslErrorsConnection = connect(m_Nam, &QNetworkAccessManager::sslErrors, this, &NvHTTP::handleSslErrors);
+    QNetworkReply* reply = post ?
+                m_Nam->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact)) :
+                m_Nam->get(request);
+
+    QEventLoop loop;
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, &loop, &QEventLoop::quit);
+    if (timeoutMs) {
+        QTimer::singleShot(timeoutMs, &loop, &QEventLoop::quit);
+    }
+    if (logLevel >= NvLogLevel::NVLL_VERBOSE) {
+        qInfo() << "Executing JSON request:" << url.toString();
+    }
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
+
+    if (!reply->isFinished())
+    {
+        if (logLevel >= NvLogLevel::NVLL_ERROR) {
+            qWarning() << "Aborting timed out JSON request for" << url.toString();
+        }
+        reply->abort();
+    }
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 3, 0)
+    m_Nam->clearAccessCache();
+#endif
+    disconnect(sslErrorsConnection);
+
+    if (reply->error() != QNetworkReply::NoError)
+    {
+        if (logLevel >= NvLogLevel::NVLL_ERROR) {
+            qWarning() << command << "JSON request failed with error:" << reply->error();
+        }
+
+        if (reply->error() == QNetworkReply::SslHandshakeFailedError) {
+            GfeHttpResponseException exception(401, "Server certificate mismatch");
+            delete reply;
+            throw exception;
+        }
+        else if (reply->error() == QNetworkReply::OperationCanceledError) {
+            QtNetworkReplyException exception(QNetworkReply::TimeoutError, "Request timed out");
+            delete reply;
+            throw exception;
+        }
+        else {
+            QtNetworkReplyException exception(reply->error(), reply->errorString());
+            delete reply;
+            throw exception;
+        }
+    }
+
+    int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (httpStatus >= 400) {
+        QString errorText = QString::fromUtf8(reply->readAll());
+        if (logLevel >= NvLogLevel::NVLL_ERROR) {
+            qWarning() << command << "JSON request failed with HTTP status" << httpStatus << errorText;
+        }
+        delete reply;
+        throw GfeHttpResponseException(httpStatus, errorText);
     }
 
     return reply;

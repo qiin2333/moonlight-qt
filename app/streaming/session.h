@@ -3,6 +3,9 @@
 #include <QSemaphore>
 #include <QQuickWindow>
 
+#include <atomic>
+#include <memory>
+
 #include <Limelight.h>
 #include <opus_multistream.h>
 #include "settings/streamingpreferences.h"
@@ -262,6 +265,10 @@ private:
     void startMicrophone();
     void stopMicrophone();
 
+    void startSunshineAbr();
+    void stopSunshineAbr();
+    void sendSunshineAbrFeedback();
+
     static
     int drSubmitDecodeUnit(PDECODE_UNIT du);
 
@@ -306,6 +313,11 @@ private:
     bool m_WasCapturedBeforeMenu;  // 菜单打开前鼠标是否处于捕获状态
     bool m_DeferCaptureRestore;    // 延迟恢复鼠标捕获（全屏切换等）
     bool m_PendingMicToggle;       // 延迟麦克风切换（避免堆损坏）
+    bool m_SunshineAbrEnabled;
+    Uint32 m_LastAbrFeedbackTicks;
+    RTP_VIDEO_STATS m_LastAbrVideoStats;
+    std::shared_ptr<std::atomic_bool> m_AbrFeedbackInFlight;
+    std::shared_ptr<std::atomic_int> m_AbrCurrentBitrateKbps;
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
     OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification
