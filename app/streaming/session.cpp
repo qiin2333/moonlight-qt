@@ -1913,8 +1913,7 @@ void Session::showQtOverlayButton(int cursorY)
         break;
     }
 
-    m_MenuButton->setAutoHideOnLeave(isEdgeOverlayMenuPosition());
-    m_MenuButton->setInputTransparent(isEdgeOverlayMenuPosition());
+    m_MenuButton->setAutoHideOnLeave(false);
     m_MenuButton->showButton(wx, wy, ww, wh, placement, cursorY);
 }
 
@@ -2756,17 +2755,15 @@ void Session::exec()
                     m_DeferCaptureRestore ? "deferred" : "restored");
     });
 
-    // Create floating menu button if configured. In edge modes, the button is
-    // hidden until the mouse reaches the edge, then it acts as a deliberate
-    // click target to avoid opening the full menu by accident.
-    if (m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_DISABLED) {
+    // Create the persistent floating menu button only in button mode. Edge
+    // modes deliberately avoid showing any Qt top-level window on hover because
+    // doing so can disturb SDL relative/fake capture and bounce the pointer.
+    if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
         m_MenuButton = new OverlayMenuButton();
         m_MenuButton->setClickCallback([this]() {
             showQtOverlayMenu();
         });
-        if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
-            showQtOverlayButton();
-        }
+        showQtOverlayButton();
     }
 
     // Switch to async logging mode when we enter the SDL loop
@@ -2803,6 +2800,37 @@ void Session::exec()
             m_LastAbrFeedbackTicks = now;
             sendSunshineAbrFeedback();
         }
+    };
+
+    constexpr int EDGE_MENU_TRIGGER_WIDTH = 5;
+    constexpr int EDGE_MENU_CUE_SIZE = 36;
+    constexpr int EDGE_MENU_CUE_MARGIN = 10;
+    bool edgeMenuCueVisible = false;
+    int edgeMenuCueY = 0;
+    auto isPointInEdgeMenuCue = [this, &edgeMenuCueVisible, &edgeMenuCueY](int x, int y) {
+        if (!edgeMenuCueVisible || !isEdgeOverlayMenuPosition()) {
+            return false;
+        }
+
+        int ww, wh;
+        SDL_GetWindowSize(m_Window, &ww, &wh);
+        int cueTop = edgeMenuCueY - EDGE_MENU_CUE_SIZE / 2;
+        int minY = EDGE_MENU_CUE_MARGIN;
+        int maxY = wh - EDGE_MENU_CUE_SIZE - EDGE_MENU_CUE_MARGIN;
+        if (maxY < minY) {
+            maxY = minY;
+        }
+        cueTop = qBound(minY, cueTop, maxY);
+
+        bool inX;
+        if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_LEFT_EDGE) {
+            inX = x >= 0 && x <= EDGE_MENU_CUE_SIZE;
+        }
+        else {
+            inX = x >= ww - EDGE_MENU_CUE_SIZE && x <= ww;
+        }
+
+        return inX && y >= cueTop && y <= cueTop + EDGE_MENU_CUE_SIZE;
     };
 
     SDL_Event event;
@@ -3132,15 +3160,10 @@ void Session::exec()
 
             if (event.type == SDL_MOUSEBUTTONDOWN &&
                     event.button.button == SDL_BUTTON_LEFT &&
-                    m_MenuButton && m_MenuButton->isButtonVisible() &&
-                    isEdgeOverlayMenuPosition()) {
-                int wx, wy;
-                SDL_GetWindowPosition(m_Window, &wx, &wy);
-                if (m_MenuButton->containsGlobalPixelPoint(wx + event.button.x,
-                                                           wy + event.button.y)) {
-                    showQtOverlayMenu();
-                    break;
-                }
+                    isPointInEdgeMenuCue(event.button.x, event.button.y)) {
+                edgeMenuCueVisible = false;
+                showQtOverlayMenu();
+                break;
             }
 
             m_InputHandler->handleMouseButtonEvent(&event.button);
@@ -3149,8 +3172,8 @@ void Session::exec()
         case SDL_MOUSEMOTION:
         {
             // Qt overlay menu: edge detection with debounce (500ms cooldown
-            // after close). Edge modes reveal a small moon button first; the
-            // full menu opens only after the user clicks that button.
+            // after close). Edge modes track a deliberate click target without
+            // showing a Qt top-level window, which avoids disturbing capture.
             if (m_MenuPanel && !m_MenuPanel->isMenuVisible() &&
                 isEdgeOverlayMenuPosition()) {
                 Uint32 elapsed = SDL_GetTicks() - m_MenuCloseTicks;
@@ -3159,22 +3182,19 @@ void Session::exec()
                     SDL_GetWindowSize(m_Window, &ww, &wh);
                     bool atEdge = false;
                     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_LEFT_EDGE) {
-                        atEdge = (event.motion.x <= 5);
+                        atEdge = (event.motion.x <= EDGE_MENU_TRIGGER_WIDTH);
                     } else {
                         // OMP_RIGHT_EDGE (default)
-                        atEdge = (event.motion.x >= ww - 5);
+                        atEdge = (event.motion.x >= ww - EDGE_MENU_TRIGGER_WIDTH);
                     }
                     if (atEdge) {
-                        showQtOverlayButton(event.motion.y);
+                        edgeMenuCueVisible = true;
+                        edgeMenuCueY = event.motion.y;
                         break;
                     }
-                    else if (m_MenuButton && m_MenuButton->isButtonVisible()) {
-                        int wx, wy;
-                        SDL_GetWindowPosition(m_Window, &wx, &wy);
-                        if (!m_MenuButton->containsGlobalPixelPoint(wx + event.motion.x,
-                                                                    wy + event.motion.y)) {
-                            m_MenuButton->hideButton();
-                        }
+                    else if (edgeMenuCueVisible &&
+                             !isPointInEdgeMenuCue(event.motion.x, event.motion.y)) {
+                        edgeMenuCueVisible = false;
                     }
                 }
             }

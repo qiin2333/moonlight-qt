@@ -32,7 +32,6 @@ public:
 
     void setClickCallback(ClickCallback cb) { m_ClickCallback = std::move(cb); }
     void setAutoHideOnLeave(bool autoHide) { m_AutoHideOnLeave = autoHide; }
-    void setInputTransparent(bool transparent);
 
     /**
      * Reposition the button relative to the given parent rect (SDL pixel coords).
@@ -55,7 +54,6 @@ public:
     void hideButton();
 
     bool isButtonVisible() const { return m_ButtonVisible; }
-    bool containsGlobalPixelPoint(int globalX, int globalY) const;
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -70,7 +68,6 @@ private:
     bool m_Hovered;
     bool m_ButtonVisible;
     bool m_AutoHideOnLeave;
-    bool m_InputTransparent;
 
     // Button size (logical pixels)
     static constexpr int kButtonSize = 36;
