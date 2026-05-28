@@ -181,6 +181,8 @@ private:
     void hideQtOverlayMenu();
     void toggleQtOverlayMenu();
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
+    void releaseCaptureForQtOverlay();
+    void restoreCaptureAfterQtOverlay(const char* reason, bool delayForWindowStateChange = false);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void showStreamingToast(const QString& message, int durationMs = 2000);
 #ifdef Q_OS_WIN32

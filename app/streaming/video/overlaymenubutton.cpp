@@ -1,5 +1,7 @@
 #include "overlaymenubutton.h"
 
+#include "overlaywindowutils.h"
+
 #include <QScreen>
 #include <QPainterPath>
 
@@ -8,8 +10,7 @@ OverlayMenuButton::OverlayMenuButton(QWindow* parent)
       m_Hovered(false),
       m_ButtonVisible(false)
 {
-    setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
-             | Qt::WindowDoesNotAcceptFocus);
+        setFlags(OverlayWindowUtils::nonActivatingToolFlags());
 
     QSurfaceFormat fmt;
     fmt.setAlphaBufferSize(8);
@@ -46,8 +47,7 @@ void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int pa
 {
     repositionTo(parentX, parentY, parentW, parentH);
     m_ButtonVisible = true;
-    show();
-    raise();
+    OverlayWindowUtils::showWithoutActivating(this);
     requestUpdate();
 }
 

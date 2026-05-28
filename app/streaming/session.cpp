@@ -1663,15 +1663,7 @@ void Session::showQtOverlayMenu()
         return; // Do not show
     }
 
-    // Save capture state and release mouse
-    m_WasCapturedBeforeMenu = m_InputHandler->isCaptureActive();
-    if (m_WasCapturedBeforeMenu) {
-        SDL_SetRelativeMouseMode(SDL_FALSE);
-        SDL_ShowCursor(SDL_ENABLE);
-    }
-
-    // Flush stale mouse motion events from relative mode
-    SDL_FlushEvent(SDL_MOUSEMOTION);
+    releaseCaptureForQtOverlay();
 
     // Get SDL window position and size in screen coordinates
     int wx, wy, ww, wh;
@@ -1758,8 +1750,14 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
         combo = SdlInputHandler::KeyComboToggleMinimize;
         break;
     case OverlayMenuPanel::MenuAction::UngrabInput:
-        combo = SdlInputHandler::KeyComboUngrabInput;
-        break;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Qt overlay menu action: %d", (int)action);
+        m_WasCapturedBeforeMenu = false;
+        if (m_InputHandler) {
+            m_InputHandler->setCaptureActive(false);
+            m_InputHandler->raiseAllKeys();
+        }
+        return;
     case OverlayMenuPanel::MenuAction::PasteText:
         combo = SdlInputHandler::KeyComboPasteText;
         break;
@@ -1825,23 +1823,63 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
                 "Qt overlay menu action: %d", (int)action);
     m_InputHandler->performSpecialKeyCombo(combo);
 
+    if (action == OverlayMenuPanel::MenuAction::ToggleMinimize) {
+        // The user explicitly minimized the stream window. Do not let the menu
+        // close callback recapture input or raise the SDL window back again.
+        m_WasCapturedBeforeMenu = false;
+        return;
+    }
+
     // Restore mouse capture after window-state-changing actions complete
     if (m_DeferCaptureRestore) {
         m_DeferCaptureRestore = false;
-        if (m_WasCapturedBeforeMenu) {
-            // Allow the window to settle after fullscreen/minimize toggle
-            SDL_Delay(100);
-            SDL_FlushEvent(SDL_MOUSEMOTION);
-
-            // Recapture via the proper input handler path, which handles
-            // pointer region lock, keyboard grab, and relative mouse mode
-            m_InputHandler->setCaptureActive(true);
-            m_WasCapturedBeforeMenu = false;
-
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Deferred capture restore completed after window state change");
-        }
+        restoreCaptureAfterQtOverlay("window state change", true);
     }
+}
+
+void Session::releaseCaptureForQtOverlay()
+{
+    m_WasCapturedBeforeMenu = m_InputHandler && m_InputHandler->isCaptureActive();
+    if (m_WasCapturedBeforeMenu) {
+        // Use the input handler path rather than directly toggling SDL relative
+        // mode. This keeps fake capture, pointer-region lock, and keyboard grab
+        // state in sync while Qt owns the temporary menu interaction.
+        m_InputHandler->setCaptureActive(false);
+    }
+
+    // Flush stale relative/fake-capture motion so the menu open transition and
+    // later recapture don't replay a large cursor delta to the host.
+    SDL_FlushEvent(SDL_MOUSEMOTION);
+}
+
+void Session::restoreCaptureAfterQtOverlay(const char* reason, bool delayForWindowStateChange)
+{
+    if (!m_WasCapturedBeforeMenu || !m_InputHandler || !m_Window) {
+        return;
+    }
+
+    if (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_MINIMIZED) {
+        m_WasCapturedBeforeMenu = false;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Qt overlay capture restore skipped after %s because window is minimized",
+                    reason ? reason : "menu close");
+        return;
+    }
+
+    if (delayForWindowStateChange) {
+        // Let fullscreen/minimize style changes settle before asking SDL to
+        // restore relative mouse mode and grabs.
+        SDL_Delay(100);
+    }
+
+    SDL_RaiseWindow(m_Window);
+    SDL_FlushEvent(SDL_MOUSEMOTION);
+    m_InputHandler->setCaptureActive(true);
+    SDL_FlushEvent(SDL_MOUSEMOTION);
+    m_WasCapturedBeforeMenu = false;
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Qt overlay capture restored after %s", reason ? reason : "menu close");
 }
 
 void Session::showStreamingToast(const QString& message, int durationMs)
@@ -2665,13 +2703,14 @@ void Session::exec()
         // Note: for actions that change window state (fullscreen, minimize),
         // we defer capture restoration to after the action completes.
         // See dispatchQtMenuAction() for those cases.
-        if (m_WasCapturedBeforeMenu && !m_DeferCaptureRestore) {
-            m_InputHandler->setCaptureActive(true);
-            m_WasCapturedBeforeMenu = false;
+        if (!m_DeferCaptureRestore) {
+            restoreCaptureAfterQtOverlay("menu close");
         }
 
         // Re-show the floating menu button if in button mode
-        if (m_MenuButton && m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
+        if (m_MenuButton &&
+            m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON &&
+            !(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_MINIMIZED)) {
             int wx, wy, ww, wh;
             SDL_GetWindowPosition(m_Window, &wx, &wy);
             SDL_GetWindowSize(m_Window, &ww, &wh);
@@ -2707,6 +2746,7 @@ void Session::exec()
     Uint32 lastQtEventPumpTicks = 0;
     auto processQtEventsDuringStream = [this, &lastQtEventPumpTicks](bool force = false) {
         const bool qtUiVisible = (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
+                                 (m_MenuButton && m_MenuButton->isButtonVisible()) ||
                                  (m_Toast && m_Toast->isVisible());
         const Uint32 now = SDL_GetTicks();
         if (!force && !qtUiVisible && now - lastQtEventPumpTicks < QT_EVENT_PUMP_INTERVAL_MS) {
@@ -3096,6 +3136,9 @@ void Session::exec()
             break;
         }
         case SDL_MOUSEWHEEL:
+            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+                break;
+            }
             m_InputHandler->handleMouseWheelEvent(&event.wheel);
             break;
         case SDL_CONTROLLERAXISMOTION:

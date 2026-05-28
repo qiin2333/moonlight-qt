@@ -1,5 +1,7 @@
 #include "overlaytoast.h"
 
+#include "overlaywindowutils.h"
+
 #include <QScreen>
 #include <QFontMetrics>
 #include <QPainterPath>
@@ -12,8 +14,7 @@ OverlayToast::OverlayToast(QWindow* parent)
       m_VertPadding(10),
       m_BorderRadius(8)
 {
-    setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
-             | Qt::WindowDoesNotAcceptFocus | Qt::WindowTransparentForInput);
+        setFlags(OverlayWindowUtils::nonActivatingToolFlags(Qt::WindowTransparentForInput));
 
     QSurfaceFormat fmt;
     fmt.setAlphaBufferSize(8);
@@ -73,8 +74,7 @@ void OverlayToast::showToast(int parentX, int parentY, int parentW, int parentH,
     int y = qpY + qpH - m_ToastHeight - 60;
 
     setGeometry(x, y, toastWidth, m_ToastHeight);
-    show();
-    raise();
+    OverlayWindowUtils::showWithoutActivating(this);
     requestUpdate();
 
     m_DismissTimer.start(durationMs);
