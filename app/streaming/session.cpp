@@ -1677,7 +1677,7 @@ void Session::showQtOverlayMenu()
     m_MenuPanel->updateGamepadMouseState(m_InputHandler->isMouseEmulationActive());
 
     if (m_MenuButton) {
-        m_MenuButton->hideButton();
+        m_MenuButton->hideButton(false);
     }
 
     // Show menu based on user preference
@@ -1839,8 +1839,8 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
 
 void Session::releaseCaptureForQtOverlay()
 {
-    m_WasCapturedBeforeMenu = m_InputHandler && m_InputHandler->isCaptureActive();
-    if (m_WasCapturedBeforeMenu) {
+    if (m_InputHandler && m_InputHandler->isCaptureActive()) {
+        m_WasCapturedBeforeMenu = true;
         // Use the input handler path rather than directly toggling SDL relative
         // mode. This keeps fake capture, pointer-region lock, and keyboard grab
         // state in sync while Qt owns the temporary menu interaction.
@@ -1914,6 +1914,9 @@ void Session::showQtOverlayButton(int cursorY)
     }
 
     m_MenuButton->setAutoHideOnLeave(isEdgeOverlayMenuPosition());
+    if (isEdgeOverlayMenuPosition()) {
+        releaseCaptureForQtOverlay();
+    }
     m_MenuButton->showButton(wx, wy, ww, wh, placement, cursorY);
 }
 
@@ -2763,6 +2766,12 @@ void Session::exec()
         m_MenuButton->setClickCallback([this]() {
             showQtOverlayMenu();
         });
+        m_MenuButton->setHideCallback([this]() {
+            if (isEdgeOverlayMenuPosition() &&
+                    (!m_MenuPanel || !m_MenuPanel->isMenuVisible())) {
+                restoreCaptureAfterQtOverlay("edge overlay button hide");
+            }
+        });
         if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
             showQtOverlayButton();
         }
@@ -3281,7 +3290,7 @@ DispatchDeferredCleanup:
 
     // Destroy the Qt overlay menu button
     if (m_MenuButton) {
-        m_MenuButton->hideButton();
+        m_MenuButton->hideButton(false);
         delete m_MenuButton;
         m_MenuButton = nullptr;
     }

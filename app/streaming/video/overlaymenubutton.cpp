@@ -80,12 +80,17 @@ void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int pa
     requestUpdate();
 }
 
-void OverlayMenuButton::hideButton()
+void OverlayMenuButton::hideButton(bool notify)
 {
+    bool wasVisible = m_ButtonVisible;
     m_Hovered = false;
     m_ButtonVisible = false;
     setOpacity(0.35);
     hide();
+
+    if (notify && wasVisible && m_HideCallback) {
+        m_HideCallback();
+    }
 }
 
 void OverlayMenuButton::drawCrescentMoon(QPainter& p, qreal cx, qreal cy, qreal radius)
