@@ -804,6 +804,23 @@ Flickable {
                     hoverEnabled: true
                 }
 
+                CheckBox {
+                    id: sunshineAbrCheck
+                    width: parent.width
+                    hoverEnabled: true
+                    text: qsTr("Smart bitrate with Sunshine")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.enableSunshineAbr
+                    onCheckedChanged: {
+                        StreamingPreferences.enableSunshineAbr = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 8000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Allows Sunshine to automatically adjust stream bitrate up to the selected video bitrate when the host supports ABR.")
+                }
+
                 Label {
                     width: parent.width
                     id: windowModeTitle
