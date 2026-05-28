@@ -7,7 +7,7 @@ Menu {
     onOpened: {
         // If the initiating object currently has keyboard focus,
         // give focus to the first visible and enabled menu item
-        if (initiator.focus) {
+        if (initiator && initiator.focus) {
             for (var i = 0; i < count; i++) {
                 var item = itemAt(i)
                 if (item.visible && item.enabled) {

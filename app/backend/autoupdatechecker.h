@@ -26,13 +26,13 @@ private slots:
     void handleUpdateCheckRequestFinished(QNetworkReply* reply);
 
 private:
-    void parseStringToVersionQuad(QString& string, QVector<int>& version);
+    void parseStringToVersionQuad(const QString& string, QVector<int>& version);
 
-    int compareVersion(QVector<int>& version1, QVector<int>& version2);
+    int compareVersion(const QVector<int>& version1, const QVector<int>& version2);
 
     bool isPortableInstall() const;
     QString getExpectedAssetPrefix() const;
-    QString getExpectedAssetSuffix();
+    QString getExpectedAssetSuffix() const;
     QString getCurrentBuildArch() const;
 
     QVector<int> m_CurrentVersionQuad;

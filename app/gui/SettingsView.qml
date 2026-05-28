@@ -1013,7 +1013,7 @@ Flickable {
                         maximumLength: 3
                         inputMethodHints: Qt.ImhDigitsOnly
                         validator: IntValidator{bottom:20; top:100}
-                        width: 60
+                        Layout.preferredWidth: 60
                         visible: streamResolutionScaleCheck.checked
                         text: StreamingPreferences.streamResolutionScaleRatio.toString()
                         onTextChanged: {
@@ -1035,7 +1035,7 @@ Flickable {
                 RowLayout {
                     CheckBox {
                         id: remoteResolutionCheck
-                        width: parent.width
+                        Layout.fillWidth: true
                         text: qsTr("Remote Resolution")
                         font.pointSize: 12
                         checked: StreamingPreferences.remoteResolution
@@ -1050,7 +1050,7 @@ Flickable {
                         inputMethodHints: Qt.ImhDigitsOnly
                         placeholderText: "1280"
                         validator: IntValidator{bottom:256; top:8192}
-                        width: 120
+                        Layout.preferredWidth: 120
                         visible: remoteResolutionCheck.checked
                         text: StreamingPreferences.remoteResolutionWidth > 0 ? StreamingPreferences.remoteResolutionWidth.toString() : "800"
                         onTextChanged: {
@@ -1065,7 +1065,7 @@ Flickable {
                         text: "x"
                         font.bold: true
                         visible: remoteResolutionCheck.checked
-                        anchors.verticalCenter: remoteResolutionCheck.verticalCenter
+                        Layout.alignment: Qt.AlignVCenter
                     }
                     
                     TextField {
@@ -1074,7 +1074,7 @@ Flickable {
                         inputMethodHints: Qt.ImhDigitsOnly
                         placeholderText: "720"
                         validator: IntValidator{bottom:256; top:8192}
-                        width: 120
+                        Layout.preferredWidth: 120
                         visible: remoteResolutionCheck.checked
                         text: StreamingPreferences.remoteResolutionHeight > 0 ? StreamingPreferences.remoteResolutionHeight.toString() : "600"
                         onTextChanged: {
@@ -1103,7 +1103,7 @@ Flickable {
                         maximumLength: 3
                         inputMethodHints: Qt.ImhDigitsOnly
                         validator: IntValidator{bottom:1; top:512}
-                        width: 80
+                        Layout.preferredWidth: 80
                         visible: remoteFpsCheck.checked
                         text: StreamingPreferences.remoteFpsRate > 0 ? StreamingPreferences.remoteFpsRate.toString() : "60"
                         onTextChanged: {
@@ -1119,7 +1119,7 @@ Flickable {
                         text: qsTr("FPS")
                         font.bold: true
                         visible: remoteFpsCheck.checked
-                        anchors.verticalCenter: remoteFpsCheck.verticalCenter
+                        Layout.alignment: Qt.AlignVCenter
                     }
                 }
             }

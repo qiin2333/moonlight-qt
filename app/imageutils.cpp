@@ -90,7 +90,11 @@ QString ImageUtils::fetchAndSaveRandomBackground(const QString &apiUrl)
     
     // 最多重试3次（因为部分随机图片可能返回500）
     for (int attempt = 0; attempt < 3; attempt++) {
-        QNetworkRequest request(apiUrl);
+        QNetworkRequest request{QUrl(apiUrl)};
+        request.setRawHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36");
+        request.setRawHeader("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
+        request.setRawHeader("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8");
+        request.setRawHeader("Referer", QUrl(apiUrl).toEncoded());
         request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                              QNetworkRequest::NoLessSafeRedirectPolicy);
         

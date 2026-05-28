@@ -90,21 +90,40 @@ void AutoUpdateChecker::start()
 #endif
 }
 
-void AutoUpdateChecker::parseStringToVersionQuad(QString& string, QVector<int>& version)
+void AutoUpdateChecker::parseStringToVersionQuad(const QString& string, QVector<int>& version)
 {
-    // Strip leading 'v' if present (e.g., "v6.2.21" -> "6.2.21")
-    QString versionStr = string;
+    version.clear();
+
+    // Strip leading 'v' and ignore SemVer suffixes/build metadata:
+    //   v6.2.82                  -> 6.2.82
+    //   6.2.82+14.g13ca12da.dirty -> 6.2.82
+    //   v6.2.82-14-g13ca12da      -> 6.2.82
+    QString versionStr = string.trimmed();
     if (versionStr.startsWith('v') || versionStr.startsWith('V')) {
         versionStr = versionStr.mid(1);
     }
 
+    int suffixIndex = versionStr.indexOf('+');
+    int prereleaseIndex = versionStr.indexOf('-');
+    if (suffixIndex < 0 || (prereleaseIndex >= 0 && prereleaseIndex < suffixIndex)) {
+        suffixIndex = prereleaseIndex;
+    }
+    if (suffixIndex >= 0) {
+        versionStr = versionStr.left(suffixIndex);
+    }
+
     QStringList list = versionStr.split('.');
     for (const QString& component : std::as_const(list)) {
-        version.append(component.toInt());
+        bool ok = false;
+        int value = component.toInt(&ok);
+        if (!ok) {
+            break;
+        }
+        version.append(value);
     }
 }
 
-QString AutoUpdateChecker::getExpectedAssetSuffix()
+QString AutoUpdateChecker::getExpectedAssetSuffix() const
 {
 #if defined(Q_OS_WIN32)
     return isPortableInstall() ? QStringLiteral(".zip") : QStringLiteral(".exe");
@@ -153,7 +172,7 @@ QString AutoUpdateChecker::getCurrentBuildArch() const
     return buildArch.toLower();
 }
 
-int AutoUpdateChecker::compareVersion(QVector<int>& version1, QVector<int>& version2) {
+int AutoUpdateChecker::compareVersion(const QVector<int>& version1, const QVector<int>& version2) {
     for (int i = 0;; i++) {
         int v1Val = 0;
         int v2Val = 0;

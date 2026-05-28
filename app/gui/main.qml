@@ -91,10 +91,6 @@ ApplicationWindow {
         text: ToolTip.toolTip.text
     }
 
-    // This configures the maximum width of the singleton attached QML ToolTip. If left unconstrained,
-    // it will never insert a line break and just extend on forever.
-    ToolTip.toolTip.contentWidth: Math.min(tooltipTextLayoutHelper.width, 400)
-
     function goBack() {
         if (clearOnBack) {
             // Pop all items except the first one
@@ -111,7 +107,9 @@ ApplicationWindow {
         anchors.fill: parent
         focus: true
 
-        ToolTip.toolTip.contentWidth: ToolTip.toolTip.implicitContentWidth < 400 ? ToolTip.toolTip.implicitContentWidth : 400
+        // This configures the maximum width of the singleton attached QML ToolTip. If left unconstrained,
+        // it will never insert a line break and just extend on forever.
+        ToolTip.toolTip.contentWidth: Math.min(tooltipTextLayoutHelper.width, 400)
         ToolTip.toolTip.margins: 8
 
         ToolTip.toolTip.onVisibleChanged: {

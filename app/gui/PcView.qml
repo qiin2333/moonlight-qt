@@ -689,12 +689,12 @@ CenteredGridView {
 
     DropArea {
         anchors.fill: parent
-        onEntered: {
+        onEntered: function(drag) {
             drag.accept(Qt.LinkAction)
             dragBorder.visible = true
         }
         onExited: dragBorder.visible = false
-        onDropped: {
+        onDropped: function(drop) {
             dragBorder.visible = false
             if (drop.hasUrls) {
                 // 获取拖入的第一个文件路径
@@ -746,7 +746,7 @@ CenteredGridView {
         propagateComposedEvents: true
         z: -1  // 确保这个MouseArea位于PC条目之下
         
-        onClicked: {
+        onClicked: function(mouse) {
             if (mouse.button === Qt.RightButton) {
                 if (backgroundImage.currentImageUrl) {
                     console.log("右键菜单被触发")
@@ -759,7 +759,7 @@ CenteredGridView {
     // 添加上下文菜单
     NavigableMenu {
         id: backgroundContextMenu
-        property int lastRefreshTime: 0  // 明确声明属性
+        property real lastRefreshTime: 0  // Date.now() is a 13-digit millisecond timestamp
         
         NavigableMenuItem {
             parentMenu: backgroundContextMenu
@@ -864,7 +864,7 @@ CenteredGridView {
 
     ImageUtils {
         id: imageUtils
-        onSaveCompleted: {
+        onSaveCompleted: function(success, message) {
             if (success) {
                 saveNotification.text = "图片已保存到: " + message
                 // 自动关闭通知
