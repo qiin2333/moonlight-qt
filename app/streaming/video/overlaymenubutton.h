@@ -20,7 +20,6 @@ class OverlayMenuButton : public QRasterWindow {
 
 public:
     using ClickCallback = std::function<void()>;
-    using HideCallback = std::function<void()>;
 
     enum class Placement {
         TopRight,
@@ -32,8 +31,8 @@ public:
     ~OverlayMenuButton() override;
 
     void setClickCallback(ClickCallback cb) { m_ClickCallback = std::move(cb); }
-    void setHideCallback(HideCallback cb) { m_HideCallback = std::move(cb); }
     void setAutoHideOnLeave(bool autoHide) { m_AutoHideOnLeave = autoHide; }
+    void setInputTransparent(bool transparent);
 
     /**
      * Reposition the button relative to the given parent rect (SDL pixel coords).
@@ -53,9 +52,10 @@ public:
     /**
      * Hide the button.
      */
-    void hideButton(bool notify = true);
+    void hideButton();
 
     bool isButtonVisible() const { return m_ButtonVisible; }
+    bool containsGlobalPixelPoint(int globalX, int globalY) const;
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -67,10 +67,10 @@ private:
     void drawCrescentMoon(QPainter& p, qreal cx, qreal cy, qreal radius);
 
     ClickCallback m_ClickCallback;
-    HideCallback m_HideCallback;
     bool m_Hovered;
     bool m_ButtonVisible;
     bool m_AutoHideOnLeave;
+    bool m_InputTransparent;
 
     // Button size (logical pixels)
     static constexpr int kButtonSize = 36;

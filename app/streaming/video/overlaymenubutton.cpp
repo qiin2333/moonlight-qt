@@ -9,9 +9,10 @@ OverlayMenuButton::OverlayMenuButton(QWindow* parent)
     : QRasterWindow(parent),
       m_Hovered(false),
       m_ButtonVisible(false),
-      m_AutoHideOnLeave(false)
+      m_AutoHideOnLeave(false),
+      m_InputTransparent(true)
 {
-    setFlags(OverlayWindowUtils::nonActivatingToolFlags());
+    setInputTransparent(false);
 
     QSurfaceFormat fmt;
     fmt.setAlphaBufferSize(8);
@@ -22,6 +23,17 @@ OverlayMenuButton::OverlayMenuButton(QWindow* parent)
 
 OverlayMenuButton::~OverlayMenuButton()
 {
+}
+
+void OverlayMenuButton::setInputTransparent(bool transparent)
+{
+    if (m_InputTransparent == transparent) {
+        return;
+    }
+
+    m_InputTransparent = transparent;
+    setFlags(OverlayWindowUtils::nonActivatingToolFlags(
+        transparent ? Qt::WindowTransparentForInput : Qt::WindowFlags()));
 }
 
 void OverlayMenuButton::repositionTo(int parentX, int parentY, int parentW, int parentH,
@@ -80,17 +92,23 @@ void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int pa
     requestUpdate();
 }
 
-void OverlayMenuButton::hideButton(bool notify)
+void OverlayMenuButton::hideButton()
 {
-    bool wasVisible = m_ButtonVisible;
     m_Hovered = false;
     m_ButtonVisible = false;
     setOpacity(0.35);
     hide();
+}
 
-    if (notify && wasVisible && m_HideCallback) {
-        m_HideCallback();
+bool OverlayMenuButton::containsGlobalPixelPoint(int globalX, int globalY) const
+{
+    if (!m_ButtonVisible) {
+        return false;
     }
+
+    qreal dpr = screen() ? screen()->devicePixelRatio() : 1.0;
+    QPoint logicalPoint(qRound(globalX / dpr), qRound(globalY / dpr));
+    return geometry().contains(logicalPoint);
 }
 
 void OverlayMenuButton::drawCrescentMoon(QPainter& p, qreal cx, qreal cy, qreal radius)

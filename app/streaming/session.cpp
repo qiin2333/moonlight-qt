@@ -1677,7 +1677,7 @@ void Session::showQtOverlayMenu()
     m_MenuPanel->updateGamepadMouseState(m_InputHandler->isMouseEmulationActive());
 
     if (m_MenuButton) {
-        m_MenuButton->hideButton(false);
+        m_MenuButton->hideButton();
     }
 
     // Show menu based on user preference
@@ -1914,9 +1914,7 @@ void Session::showQtOverlayButton(int cursorY)
     }
 
     m_MenuButton->setAutoHideOnLeave(isEdgeOverlayMenuPosition());
-    if (isEdgeOverlayMenuPosition()) {
-        releaseCaptureForQtOverlay();
-    }
+    m_MenuButton->setInputTransparent(isEdgeOverlayMenuPosition());
     m_MenuButton->showButton(wx, wy, ww, wh, placement, cursorY);
 }
 
@@ -2766,12 +2764,6 @@ void Session::exec()
         m_MenuButton->setClickCallback([this]() {
             showQtOverlayMenu();
         });
-        m_MenuButton->setHideCallback([this]() {
-            if (isEdgeOverlayMenuPosition() &&
-                    (!m_MenuPanel || !m_MenuPanel->isMenuVisible())) {
-                restoreCaptureAfterQtOverlay("edge overlay button hide");
-            }
-        });
         if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
             showQtOverlayButton();
         }
@@ -3138,6 +3130,19 @@ void Session::exec()
                 break;
             }
 
+            if (event.type == SDL_MOUSEBUTTONDOWN &&
+                    event.button.button == SDL_BUTTON_LEFT &&
+                    m_MenuButton && m_MenuButton->isButtonVisible() &&
+                    isEdgeOverlayMenuPosition()) {
+                int wx, wy;
+                SDL_GetWindowPosition(m_Window, &wx, &wy);
+                if (m_MenuButton->containsGlobalPixelPoint(wx + event.button.x,
+                                                           wy + event.button.y)) {
+                    showQtOverlayMenu();
+                    break;
+                }
+            }
+
             m_InputHandler->handleMouseButtonEvent(&event.button);
             break;
         }
@@ -3164,7 +3169,12 @@ void Session::exec()
                         break;
                     }
                     else if (m_MenuButton && m_MenuButton->isButtonVisible()) {
-                        m_MenuButton->hideButton();
+                        int wx, wy;
+                        SDL_GetWindowPosition(m_Window, &wx, &wy);
+                        if (!m_MenuButton->containsGlobalPixelPoint(wx + event.motion.x,
+                                                                    wy + event.motion.y)) {
+                            m_MenuButton->hideButton();
+                        }
                     }
                 }
             }
@@ -3290,7 +3300,7 @@ DispatchDeferredCleanup:
 
     // Destroy the Qt overlay menu button
     if (m_MenuButton) {
-        m_MenuButton->hideButton(false);
+        m_MenuButton->hideButton();
         delete m_MenuButton;
         m_MenuButton = nullptr;
     }
