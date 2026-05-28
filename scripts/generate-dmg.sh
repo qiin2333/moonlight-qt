@@ -52,6 +52,11 @@ if [ -z "$MOONLIGHT_ARCH" ]; then
   fi
 fi
 
+# Enable LTO for official builds
+export CFLAGS=-flto=thin
+export CXXFLAGS=-flto=thin
+export LDFLAGS=-flto=thin
+
 echo "Configuring the project for architecture: $MOONLIGHT_ARCH"
 pushd $BUILD_FOLDER
 qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="$MOONLIGHT_ARCH" || fail "Qmake failed!"
