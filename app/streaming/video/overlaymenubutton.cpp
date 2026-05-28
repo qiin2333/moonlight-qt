@@ -8,10 +8,9 @@
 OverlayMenuButton::OverlayMenuButton(QWindow* parent)
     : QRasterWindow(parent),
       m_Hovered(false),
-      m_ButtonVisible(false),
-      m_AutoHideOnLeave(false)
+      m_ButtonVisible(false)
 {
-    setFlags(OverlayWindowUtils::nonActivatingToolFlags());
+        setFlags(OverlayWindowUtils::nonActivatingToolFlags());
 
     QSurfaceFormat fmt;
     fmt.setAlphaBufferSize(8);
@@ -24,57 +23,29 @@ OverlayMenuButton::~OverlayMenuButton()
 {
 }
 
-void OverlayMenuButton::repositionTo(int parentX, int parentY, int parentW, int parentH,
-                                     Placement placement, int cursorY)
+void OverlayMenuButton::repositionTo(int parentX, int parentY, int parentW, int /*parentH*/)
 {
 #ifdef Q_OS_MACOS
     int qpX = parentX;
     int qpY = parentY;
     int qpW = parentW;
-    int qpH = parentH;
-    int qpCursorY = cursorY;
 #else
     qreal dpr = screen() ? screen()->devicePixelRatio() : 1.0;
     int qpX = qRound(parentX / dpr);
     int qpY = qRound(parentY / dpr);
     int qpW = qRound(parentW / dpr);
-    int qpH = qRound(parentH / dpr);
-    int qpCursorY = cursorY >= 0 ? qRound(cursorY / dpr) : -1;
 #endif
 
-    int x;
-    int y;
-
-    switch (placement) {
-    case Placement::LeftEdge:
-        x = qpX;
-        y = qpCursorY >= 0 ? qpY + qpCursorY - kButtonSize / 2 : qpY + (qpH - kButtonSize) / 2;
-        break;
-    case Placement::RightEdge:
-        x = qpX + qpW - kButtonSize;
-        y = qpCursorY >= 0 ? qpY + qpCursorY - kButtonSize / 2 : qpY + (qpH - kButtonSize) / 2;
-        break;
-    case Placement::TopRight:
-    default:
-        x = qpX + qpW - kButtonSize - kMargin;
-        y = qpY + kMargin;
-        break;
-    }
-
-    int minY = qpY + kMargin;
-    int maxY = qpY + qpH - kButtonSize - kMargin;
-    if (maxY < minY) {
-        maxY = minY;
-    }
-    y = qBound(minY, y, maxY);
+    // Position at top-right corner of the streaming window
+    int x = qpX + qpW - kButtonSize - kMargin;
+    int y = qpY + kMargin;
 
     setGeometry(x, y, kButtonSize, kButtonSize);
 }
 
-void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int parentH,
-                                   Placement placement, int cursorY)
+void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int parentH)
 {
-    repositionTo(parentX, parentY, parentW, parentH, placement, cursorY);
+    repositionTo(parentX, parentY, parentW, parentH);
     m_ButtonVisible = true;
     OverlayWindowUtils::showWithoutActivating(this);
     requestUpdate();
@@ -82,9 +53,7 @@ void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int pa
 
 void OverlayMenuButton::hideButton()
 {
-    m_Hovered = false;
     m_ButtonVisible = false;
-    setOpacity(0.35);
     hide();
 }
 
@@ -160,10 +129,6 @@ bool OverlayMenuButton::event(QEvent* ev)
 {
     if (ev->type() == QEvent::Leave) {
         m_Hovered = false;
-        if (m_AutoHideOnLeave) {
-            hideButton();
-            return true;
-        }
         setOpacity(0.35);
         requestUpdate();
     }
