@@ -156,6 +156,12 @@ void Session::clStageFailed(int stage, int errorCode)
 
     char failingPorts[128];
     LiStringifyPortFlags(portFlags, ", ", failingPorts, sizeof(failingPorts));
+
+    // Suppress the failure popup while we're silently retrying a reconnect
+    if (s_ActiveSession->m_SuppressConnectionErrorDialog) {
+        return;
+    }
+
     emit s_ActiveSession->stageFailed(QString::fromLocal8Bit(LiGetStageName(stage)), errorCode, QString(failingPorts));
 }
 
@@ -164,48 +170,48 @@ void Session::clConnectionTerminated(int errorCode)
     unsigned int portFlags = LiGetPortFlagsFromTerminationErrorCode(errorCode);
     s_ActiveSession->m_PortTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443, portFlags);
 
-    // Display the termination dialog if this was not intended
+    // Decide whether this looks like a transient network interruption that we
+    // should try to silently reconnect from, rather than tearing down the
+    // session and dropping the user back to the app grid.
+    bool recoverable;
     switch (errorCode) {
     case ML_ERROR_GRACEFUL_TERMINATION:
-        break;
-
-    case ML_ERROR_NO_VIDEO_TRAFFIC:
-        s_ActiveSession->m_UnexpectedTermination = true;
-
-        char ports[128];
-        SDL_assert(portFlags != 0);
-        LiStringifyPortFlags(portFlags, ", ", ports, sizeof(ports));
-        emit s_ActiveSession->displayLaunchError(tr("No video received from host.") + "\n\n"+
-                                                 tr("Check your firewall and port forwarding rules for port(s): %1").arg(ports));
-        break;
-
-    case ML_ERROR_NO_VIDEO_FRAME:
-        s_ActiveSession->m_UnexpectedTermination = true;
-        emit s_ActiveSession->displayLaunchError(tr("Your network connection isn't performing well. Reduce your video bitrate setting or try a faster connection."));
-        break;
-
     case ML_ERROR_PROTECTED_CONTENT:
-    case ML_ERROR_UNEXPECTED_EARLY_TERMINATION:
-        s_ActiveSession->m_UnexpectedTermination = true;
-        emit s_ActiveSession->displayLaunchError(tr("Something went wrong on your host PC when starting the stream.") + "\n\n" +
-                                                 tr("Make sure you don't have any DRM-protected content open on your host PC. You can also try restarting your host PC."));
-        break;
-
     case ML_ERROR_FRAME_CONVERSION:
-        s_ActiveSession->m_UnexpectedTermination = true;
-        emit s_ActiveSession->displayLaunchError(tr("The host PC reported a fatal video encoding error.") + "\n\n" +
-                                                 tr("Try disabling HDR mode, changing the streaming resolution, or changing your host PC's display resolution."));
+        // Graceful quit or host-side fatal errors: don't try to reconnect.
+        recoverable = false;
         break;
-
     default:
-        s_ActiveSession->m_UnexpectedTermination = true;
-
-        // We'll assume large errors are hex values
-        bool hexError = qAbs(errorCode) > 1000;
-        emit s_ActiveSession->displayLaunchError(tr("Connection terminated") + "\n\n" +
-                                                 tr("Error code: %1").arg(errorCode, hexError ? 8 : 0, hexError ? 16 : 10, QChar('0')));
+        // NO_VIDEO_TRAFFIC / NO_VIDEO_FRAME / UNEXPECTED_EARLY_TERMINATION and
+        // unknown codes are treated as recoverable network problems.
+        recoverable = true;
         break;
     }
+
+    // Only attempt reconnect if we were actively streaming (window exists) and
+    // the user didn't request to quit. We must not be mid-reconnect already.
+    if (recoverable &&
+        s_ActiveSession->m_Window != nullptr &&
+        !s_ActiveSession->m_ShouldExit &&
+        !s_ActiveSession->m_ConnectionInterrupted) {
+
+        s_ActiveSession->m_LastTerminationErrorCode = errorCode;
+        s_ActiveSession->m_ConnectionInterrupted = true;
+
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Connection interrupted (error %d); attempting to reconnect",
+                    errorCode);
+
+        // Wake the main loop so it can begin the reconnect flow
+        SDL_Event event;
+        event.type = SDL_QUIT;
+        event.quit.timestamp = SDL_GetTicks();
+        SDL_PushEvent(&event);
+        return;
+    }
+
+    // Display the termination dialog if this was not intended
+    s_ActiveSession->displayTerminationError(errorCode);
 
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                  "Connection terminated: %d",
@@ -217,6 +223,56 @@ void Session::clConnectionTerminated(int errorCode)
     event.quit.timestamp = SDL_GetTicks();
     SDL_PushEvent(&event);
 }
+
+void Session::displayTerminationError(int errorCode)
+{
+    unsigned int portFlags = LiGetPortFlagsFromTerminationErrorCode(errorCode);
+
+    switch (errorCode) {
+    case ML_ERROR_GRACEFUL_TERMINATION:
+        break;
+
+    case ML_ERROR_NO_VIDEO_TRAFFIC:
+        m_UnexpectedTermination = true;
+
+        {
+            char ports[128];
+            SDL_assert(portFlags != 0);
+            LiStringifyPortFlags(portFlags, ", ", ports, sizeof(ports));
+            emit displayLaunchError(tr("No video received from host.") + "\n\n"+
+                                    tr("Check your firewall and port forwarding rules for port(s): %1").arg(ports));
+        }
+        break;
+
+    case ML_ERROR_NO_VIDEO_FRAME:
+        m_UnexpectedTermination = true;
+        emit displayLaunchError(tr("Your network connection isn't performing well. Reduce your video bitrate setting or try a faster connection."));
+        break;
+
+    case ML_ERROR_PROTECTED_CONTENT:
+    case ML_ERROR_UNEXPECTED_EARLY_TERMINATION:
+        m_UnexpectedTermination = true;
+        emit displayLaunchError(tr("Something went wrong on your host PC when starting the stream.") + "\n\n" +
+                                tr("Make sure you don't have any DRM-protected content open on your host PC. You can also try restarting your host PC."));
+        break;
+
+    case ML_ERROR_FRAME_CONVERSION:
+        m_UnexpectedTermination = true;
+        emit displayLaunchError(tr("The host PC reported a fatal video encoding error.") + "\n\n" +
+                                tr("Try disabling HDR mode, changing the streaming resolution, or changing your host PC's display resolution."));
+        break;
+
+    default:
+        m_UnexpectedTermination = true;
+
+        // We'll assume large errors are hex values
+        bool hexError = qAbs(errorCode) > 1000;
+        emit displayLaunchError(tr("Connection terminated") + "\n\n" +
+                                tr("Error code: %1").arg(errorCode, hexError ? 8 : 0, hexError ? 16 : 10, QChar('0')));
+        break;
+    }
+}
+
 
 void Session::clLogMessage(const char* format, ...)
 {
@@ -649,6 +705,9 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_MouseEmulationRefCount(0),
       m_FlushingWindowEventsRef(0),
       m_ShouldExit(false),
+      m_ConnectionInterrupted(false),
+      m_SuppressConnectionErrorDialog(false),
+      m_LastTerminationErrorCode(0),
       m_AsyncConnectionSuccess(false),
       m_PortTestResults(0),
       m_OpusDecoder(nullptr),
@@ -2072,6 +2131,136 @@ public:
     Session* m_Session;
 };
 
+bool Session::tryReconnect()
+{
+    // The decoder can only be used between LiStartConnection() and
+    // LiStopConnection(), so tear it down before stopping the dead connection.
+    SDL_LockMutex(m_DecoderLock);
+    delete m_VideoDecoder;
+    m_VideoDecoder = nullptr;
+    SDL_UnlockMutex(m_DecoderLock);
+
+    // Stop ABR feedback (startConnectionAsync() restarts it) and the dead connection
+    stopSunshineAbr();
+    LiStopConnection();
+
+    // Total time budget for reconnect attempts before giving up
+    const Uint32 graceMs = 60 * 1000;
+    const Uint32 startTicks = SDL_GetTicks();
+    int backoffMs = 1000;
+
+    // Suppress connection error dialogs during silent retries
+    m_SuppressConnectionErrorDialog = true;
+
+    bool reconnected = false;
+    bool cancelled = false;
+
+    // Returns true if the user wants to cancel the reconnect (close/quit/Esc)
+    auto isCancelEvent = [](const SDL_Event& ev) -> bool {
+        if (ev.type == SDL_QUIT) {
+            return true;
+        }
+        if (ev.type == SDL_WINDOWEVENT && ev.window.event == SDL_WINDOWEVENT_CLOSE) {
+            return true;
+        }
+        if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE) {
+            return true;
+        }
+        return false;
+    };
+
+    while (!cancelled && SDL_GetTicks() - startTicks < graceMs) {
+        // Update the on-screen indicator (re-shown each attempt so it stays up)
+        Uint32 remainingMs = graceMs - (SDL_GetTicks() - startTicks);
+        showStreamingToast(tr("Connection interrupted. Reconnecting... (%1s)")
+                               .arg((remainingMs + 999) / 1000),
+                           2500);
+
+        // Run the connection start on a worker thread and pump events while we wait
+        m_AsyncConnectionSuccess = false;
+        AsyncConnectionStartThread thread(this);
+        thread.start();
+
+        while (thread.isRunning()) {
+            SDL_Event ev;
+            while (SDL_PollEvent(&ev)) {
+                if (isCancelEvent(ev)) {
+                    cancelled = true;
+                }
+            }
+            if (cancelled) {
+                // Abort the in-progress connection attempt
+                LiInterruptConnection();
+            }
+            QCoreApplication::processEvents();
+            SDL_Delay(10);
+        }
+        thread.wait();
+
+        if (cancelled) {
+            break;
+        }
+
+        if (m_AsyncConnectionSuccess) {
+            reconnected = true;
+            break;
+        }
+
+        // Failed: clean up the partial attempt and back off before retrying
+        LiStopConnection();
+
+        Uint32 backoffUntil = SDL_GetTicks() + backoffMs;
+        while (SDL_GetTicks() < backoffUntil &&
+               SDL_GetTicks() - startTicks < graceMs) {
+            SDL_Event ev;
+            while (SDL_PollEvent(&ev)) {
+                if (isCancelEvent(ev)) {
+                    cancelled = true;
+                    break;
+                }
+            }
+            if (cancelled) {
+                break;
+            }
+            QCoreApplication::processEvents();
+            SDL_Delay(10);
+        }
+
+        // Exponential backoff, capped at 8 seconds
+        backoffMs = (backoffMs * 2 > 8000) ? 8000 : backoffMs * 2;
+    }
+
+    m_SuppressConnectionErrorDialog = false;
+
+    if (reconnected) {
+        // moonlight-common-c has already called drSetup() with the new video
+        // format. Recreate the decoder through the normal reset path.
+        SDL_Event resetEvent = {};
+        resetEvent.type = SDL_RENDER_DEVICE_RESET;
+        SDL_PushEvent(&resetEvent);
+
+        // Streaming is healthy again, so a subsequent SDL_QUIT is expected
+        // to mean a real termination rather than another reconnect.
+        m_UnexpectedTermination = false;
+
+        // startConnectionAsync() may have requested a mic toggle for the
+        // initial-launch path. The mic capture is client-side and was never
+        // torn down, so don't toggle it off on reconnect.
+        m_PendingMicToggle = false;
+
+        showStreamingToast(tr("Reconnected"), 1500);
+        return true;
+    }
+
+    if (cancelled) {
+        // User asked to quit during reconnect; honor it without an error dialog
+        m_ShouldExit = true;
+        m_UnexpectedTermination = false;
+    }
+
+    return false;
+}
+
 namespace {
 
 struct HostConnectionInfoSnapshot
@@ -2262,10 +2451,14 @@ bool Session::startConnectionAsync()
                         qPrintable(e.toQString()));
         }
     } catch (const GfeHttpResponseException& e) {
-        emit displayLaunchError(tr("Host returned error: %1").arg(e.toQString()));
+        if (!m_SuppressConnectionErrorDialog) {
+            emit displayLaunchError(tr("Host returned error: %1").arg(e.toQString()));
+        }
         return false;
     } catch (const QtNetworkReplyException& e) {
-        emit displayLaunchError(e.toQString());
+        if (!m_SuppressConnectionErrorDialog) {
+            emit displayLaunchError(e.toQString());
+        }
         return false;
     }
 
@@ -2772,6 +2965,23 @@ void Session::exec()
 #endif
         switch (event.type) {
         case SDL_QUIT:
+            // If the connection was interrupted by a transient network problem
+            // (rather than a user-initiated quit), try to silently reconnect
+            // before tearing the session down.
+            if (m_ConnectionInterrupted && !m_ShouldExit) {
+                m_ConnectionInterrupted = false;
+                if (tryReconnect()) {
+                    // Streaming resumed; keep running the event loop
+                    continue;
+                }
+
+                // Reconnect gave up or was cancelled. Show the original
+                // termination error (unless the user asked to quit) and
+                // fall through to cleanup.
+                if (!m_ShouldExit) {
+                    displayTerminationError(m_LastTerminationErrorCode);
+                }
+            }
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "Quit event received");
             goto DispatchDeferredCleanup;

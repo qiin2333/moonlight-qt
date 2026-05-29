@@ -157,6 +157,13 @@ private:
 
     bool startConnectionAsync();
 
+    // Attempt to silently re-establish a streaming session after an
+    // unexpected network interruption. Returns true if streaming resumed.
+    bool tryReconnect();
+
+    // Emit the appropriate error dialog for a connection termination code.
+    void displayTerminationError(int errorCode);
+
     bool validateLaunch(SDL_Window* testWindow);
 
     void emitLaunchWarning(QString text);
@@ -293,6 +300,11 @@ private:
     int m_FlushingWindowEventsRef;
     QStringList m_LaunchWarnings;
     bool m_ShouldExit;
+
+    // Graceful reconnect state
+    bool m_ConnectionInterrupted;        // set by clConnectionTerminated for recoverable errors
+    bool m_SuppressConnectionErrorDialog; // suppress error dialogs during reconnect attempts
+    int m_LastTerminationErrorCode;      // stored to show final error if reconnect gives up
 
     bool m_AsyncConnectionSuccess;
     int m_PortTestResults;
