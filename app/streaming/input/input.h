@@ -251,6 +251,13 @@ private:
     SDL_TimerID m_LongPressTimer;
     int m_StreamWidth;
     int m_StreamHeight;
+
+    // Win-key stuck-key watchdog (Win32 only; 0 on other platforms).
+    // The Windows shell frequently swallows KEYUP for VK_LWIN / VK_RWIN,
+    // so we poll the physical key state to reconcile m_KeysDown with reality.
+    SDL_TimerID m_WinKeyWatchdogTimer = 0;
+    void pollWinKeyPhysicalState();
+
     bool m_AbsoluteMouseMode;
     bool m_AbsoluteTouchMode;
     bool m_DisabledTouchFeedback;

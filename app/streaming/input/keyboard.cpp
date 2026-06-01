@@ -375,12 +375,25 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 break;
             case SDL_SCANCODE_LGUI:
                 if (!isSystemKeyCaptureActive()) {
+                    // The Win key was swallowed by the shell, but we still
+                    // want m_KeysDown to reflect physical state so the
+                    // raiseAllKeys() / Win-key watchdog can clean up later.
+                    if (event->state == SDL_PRESSED) {
+                        m_KeysDown.insert(0x5B);
+                    } else {
+                        m_KeysDown.remove(0x5B);
+                    }
                     return;
                 }
                 keyCode = m_SwapWinAltKeys ? 0xA4 : 0x5B;
                 break;
             case SDL_SCANCODE_RGUI:
                 if (!isSystemKeyCaptureActive()) {
+                    if (event->state == SDL_PRESSED) {
+                        m_KeysDown.insert(0x5C);
+                    } else {
+                        m_KeysDown.remove(0x5C);
+                    }
                     return;
                 }
                 keyCode = m_SwapWinAltKeys ? 0xA5 : 0x5C;

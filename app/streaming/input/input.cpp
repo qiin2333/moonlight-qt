@@ -211,6 +211,14 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     SDL_zero(m_LastTouchDownEvent);
     SDL_zero(m_LastTouchUpEvent);
     SDL_zero(m_TouchDownEvent);
+
+#ifdef Q_OS_WIN32
+    // Background watchdog: even if the user closed the Start menu via mouse
+    // and never produces a SDL KEYUP for VK_LWIN/VK_RWIN, this timer will
+    // notice the physical release within ~50 ms and synthesize the missing
+    // KEY_ACTION_UP to the host.
+    m_WinKeyWatchdogTimer = SDL_AddTimer(50, winKeyWatchdogCallback, this);
+#endif
 }
 
 SdlInputHandler::~SdlInputHandler()
@@ -234,6 +242,13 @@ SdlInputHandler::~SdlInputHandler()
     SDL_RemoveTimer(m_LeftButtonReleaseTimer);
     SDL_RemoveTimer(m_RightButtonReleaseTimer);
     SDL_RemoveTimer(m_DragTimer);
+
+#ifdef Q_OS_WIN32
+    if (m_WinKeyWatchdogTimer != 0) {
+        SDL_RemoveTimer(m_WinKeyWatchdogTimer);
+        m_WinKeyWatchdogTimer = 0;
+    }
+#endif
 
 #if !SDL_VERSION_ATLEAST(2, 0, 9)
     SDL_QuitSubSystem(SDL_INIT_HAPTIC);
@@ -292,6 +307,44 @@ void SdlInputHandler::raiseAllKeys()
     m_KeysDown.clear();
 }
 
+#ifdef Q_OS_WIN32
+// Synthesize a Win-key UP and clear it from m_KeysDown if the user has
+// physically released the key but the entry is still tracked (e.g. the
+// Windows shell swallowed the KEYUP event).
+static void reconcileStuckWinKey(SdlInputHandler* self, short vkCode)
+{
+    int physVk = (vkCode == 0x5B) ? VK_LWIN : VK_RWIN;
+    if ((GetAsyncKeyState(physVk) & 0x8000) != 0) {
+        // Still physically held - do nothing, the user really is holding it.
+        return;
+    }
+    if (!self->m_KeysDown.contains(vkCode)) {
+        return;
+    }
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Reconciling stuck Win key (vk=0x%X)", vkCode);
+    LiSendKeyboardEvent(vkCode, KEY_ACTION_UP, 0);
+    self->m_KeysDown.remove(vkCode);
+}
+
+void SdlInputHandler::pollWinKeyPhysicalState()
+{
+    if (m_KeysDown.contains(0x5B)) {
+        reconcileStuckWinKey(this, 0x5B);
+    }
+    if (m_KeysDown.contains(0x5C)) {
+        reconcileStuckWinKey(this, 0x5C);
+    }
+}
+
+static Uint32 winKeyWatchdogCallback(Uint32 /*interval*/, void* userdata)
+{
+    auto* self = static_cast<SdlInputHandler*>(userdata);
+    self->pollWinKeyPhysicalState();
+    return 50;  // re-arm at 20 Hz
+}
+#endif
+
 void SdlInputHandler::notifyMouseLeave()
 {
     // SDL on Windows doesn't send the mouse button up until the mouse re-enters the window
@@ -325,6 +378,15 @@ void SdlInputHandler::notifyFocusLost()
     // Raise all keys that are currently pressed. If we don't do this, certain keys
     // used in shortcuts that cause focus loss (such as Alt+Tab) may get stuck down.
     raiseAllKeys();
+
+#ifdef Q_OS_WIN32
+    // One-shot reconciliation for the Win keys: the shell often eats the
+    // KEYUP for VK_LWIN/VK_RWIN around the time focus changes. Even after
+    // raiseAllKeys() the host may still see them as down if the user pressed
+    // Win while keyboard capture was inactive (in which case m_KeysDown never
+    // recorded them - in that case this is a no-op for those keys).
+    pollWinKeyPhysicalState();
+#endif
 }
 
 void SdlInputHandler::notifyFocusGained()
@@ -335,6 +397,10 @@ void SdlInputHandler::notifyFocusGained()
     if (SDL_GetWindowWMInfo(m_Window, &info) && info.subsystem == SDL_SYSWM_WINDOWS) {
         ImmAssociateContext(info.info.win.window, NULL);
     }
+
+    // When we regain focus the user may have released the Win key while we
+    // didn't have focus. Force a reconciliation so the host state catches up.
+    pollWinKeyPhysicalState();
 #endif
 }
 
