@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $extractDir = Join-Path $WorkspaceDir 'extract'
 $backupDir = Join-Path $WorkspaceDir 'backup'
+$workspaceFullPath = [System.IO.Path]::GetFullPath($WorkspaceDir).TrimEnd('\', '/')
 
 function Get-RequiredFreeBytes {
     param([string]$ArchivePath)
@@ -66,8 +67,11 @@ function Get-ReplacedItems {
     param([string]$Path)
 
     Get-ChildItem -LiteralPath $Path -Force | Where-Object {
+        $itemFullPath = [System.IO.Path]::GetFullPath($_.FullName).TrimEnd('\', '/')
+
         $_.Name -ne 'Moonlight Game Streaming Project' -and
-        $_.Name -notlike 'Moonlight-*.log'
+        $_.Name -notlike 'Moonlight-*.log' -and
+        ![string]::Equals($itemFullPath, $workspaceFullPath, [System.StringComparison]::OrdinalIgnoreCase)
     }
 }
 
@@ -123,16 +127,22 @@ catch {
     $_ | Out-File -LiteralPath $logPath -Append -Encoding utf8
 }
 finally {
+    try {
+        Set-Location -LiteralPath $InstallDir
+    }
+    catch {
+    }
+
     if (Test-Path -LiteralPath $extractDir) {
-        Remove-Item -LiteralPath $extractDir -Recurse -Force
+        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     if ($backupDir -and (Test-Path -LiteralPath $backupDir)) {
-        Remove-Item -LiteralPath $backupDir -Recurse -Force
+        Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    $workspaceDir = Split-Path -LiteralPath $ZipPath -Parent
+    $workspaceDir = [System.IO.Path]::GetDirectoryName($ZipPath)
     if (Test-Path -LiteralPath $workspaceDir) {
-        Remove-Item -LiteralPath $workspaceDir -Recurse -Force
+        Remove-Item -LiteralPath $workspaceDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

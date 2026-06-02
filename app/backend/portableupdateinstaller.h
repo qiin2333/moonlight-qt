@@ -28,7 +28,6 @@ private slots:
 private:
     bool isPortableInstall() const;
     QString getPortableUpdaterExecutable() const;
-    bool hasLikelyWritableInstallDir() const;
     bool ensureWritableInstallDir(QString& errorMessage) const;
     QString createPortableUpdateWorkspace() const;
     QString materializePortableUpdateScript(const QString& workspace) const;
