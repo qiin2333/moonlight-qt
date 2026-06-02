@@ -5,7 +5,6 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
-#include <QFileInfo>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QProcess>
@@ -28,8 +27,7 @@ bool PortableUpdateInstaller::supportsInAppUpdate() const
 {
 #if defined(Q_OS_WIN32)
     return isPortableInstall() &&
-            !getPortableUpdaterExecutable().isEmpty() &&
-            hasLikelyWritableInstallDir();
+            !getPortableUpdaterExecutable().isEmpty();
 #else
     return false;
 #endif
@@ -137,15 +135,6 @@ QString PortableUpdateInstaller::getPortableUpdaterExecutable() const
 #endif
 }
 
-bool PortableUpdateInstaller::hasLikelyWritableInstallDir() const
-{
-#if defined(Q_OS_WIN32)
-    return QFileInfo(Path::getPortableRootDir()).isWritable();
-#else
-    return false;
-#endif
-}
-
 bool PortableUpdateInstaller::ensureWritableInstallDir(QString& errorMessage) const
 {
 #if defined(Q_OS_WIN32)
@@ -153,7 +142,7 @@ bool PortableUpdateInstaller::ensureWritableInstallDir(QString& errorMessage) co
     probeFile.setAutoRemove(true);
 
     if (!probeFile.open()) {
-        errorMessage = tr("The current Moonlight folder is not writable. Move the portable build to a writable location or run it with sufficient permissions.");
+        errorMessage = tr("The current Moonlight folder is not writable. Move the portable build to a writable location, run Moonlight with sufficient permissions, or download and install the update manually.");
         return false;
     }
 
@@ -360,7 +349,7 @@ void PortableUpdateInstaller::handlePortableUpdateDownloadFinished()
               << "-ExePath" << exePath;
 
     if (updaterExecutable.isEmpty() ||
-            !QProcess::startDetached(updaterExecutable, arguments, m_PortableUpdateWorkspace)) {
+            !QProcess::startDetached(updaterExecutable, arguments, installDir)) {
         resetPortableUpdateState(true);
         emit onPortableUpdateFailed(tr("Unable to launch the portable updater."));
         return;
