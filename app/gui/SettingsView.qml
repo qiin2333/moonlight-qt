@@ -14,6 +14,14 @@ Flickable {
     topMargin: 60
     signal languageChanged()
 
+    readonly property bool useCuteChineseTitleFont: StreamingPreferences.language === StreamingPreferences.LANG_ZH_CN ||
+                                                   StreamingPreferences.language === StreamingPreferences.LANG_ZH_TW ||
+                                                   (StreamingPreferences.language === StreamingPreferences.LANG_AUTO &&
+                                                    Qt.locale().name.indexOf("zh") === 0)
+    property font defaultTitleFont: Qt.font({ bold: true, pointSize: 13 })
+    property font cuteChineseTitleFont: Qt.font({ family: "YouYuan", bold: true, pointSize: 13 })
+    property font groupBoxTitleFont: useCuteChineseTitleFont ? cuteChineseTitleFont : defaultTitleFont
+
     boundsBehavior: Flickable.OvershootBounds
 
     contentWidth: settingsColumn1.width > settingsColumn2.width ? settingsColumn1.width : settingsColumn2.width
@@ -129,11 +137,7 @@ Flickable {
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
             title: "<b><font color=\"#FFA5D2\">⚙ " + qsTr("Basic Settings") + "</font></b>"
-            font {
-                family: "YouYuan"
-                bold: true
-                pointSize: 13
-            }
+            font: settingsPage.groupBoxTitleFont
 
             Column {
                 anchors.fill: parent
@@ -1130,11 +1134,7 @@ Flickable {
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
             title: "<b><font color=\"#FFA5D2\">🎵 " + qsTr("Audio Settings") + "</font></b>"
-            font {
-                family: "YouYuan"
-                bold: true
-                pointSize: 13
-            }
+            font: settingsPage.groupBoxTitleFont
 
             Column {
                 anchors.fill: parent
@@ -1241,11 +1241,7 @@ Flickable {
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
             title: "<b><font color=\"#FFA5D2\">🖥️ " + qsTr("Host Settings") + "</font></b>"
-            font {
-                family: "YouYuan"
-                bold: true
-                pointSize: 13
-            }
+            font: settingsPage.groupBoxTitleFont
 
             Column {
                 anchors.fill: parent
@@ -1401,11 +1397,7 @@ Flickable {
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
             title: "<b><font color=\"#FFA5D2\">🎨 " + qsTr("UI Settings") + "</font></b>"
-            font {
-                family: "YouYuan"
-                bold: true
-                pointSize: 13
-            }
+            font: settingsPage.groupBoxTitleFont
 
             Column {
                 anchors.fill: parent
@@ -1776,11 +1768,7 @@ Flickable {
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
             title: "<b><font color=\"#FFA5D2\">⌨️ " + qsTr("Input Settings") + "</font></b>"
-            font {
-                family: "YouYuan"
-                bold: true
-                pointSize: 13
-            }
+            font: settingsPage.groupBoxTitleFont
 
             Column {
                 anchors.fill: parent
@@ -1958,11 +1946,7 @@ Flickable {
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
             title: "<b><font color=\"#FFA5D2\">🎮 " + qsTr("Gamepad Settings") + "</font></b>"
-            font {
-                family: "YouYuan"
-                bold: true
-                pointSize: 13
-            }
+            font: settingsPage.groupBoxTitleFont
 
             Column {
                 anchors.fill: parent
@@ -2101,11 +2085,7 @@ Flickable {
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12
             title: "<b><font color=\"#FFA5D2\">⚗️ " + qsTr("Advanced Settings") + "</font></b>"
-            font {
-                family: "YouYuan"
-                bold: true
-                pointSize: 13
-            }
+            font: settingsPage.groupBoxTitleFont
 
             Column {
                 anchors.fill: parent

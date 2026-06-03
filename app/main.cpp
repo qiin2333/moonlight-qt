@@ -14,6 +14,7 @@
 #include <QTemporaryFile>
 #include <QRegularExpression>
 #include <QFontDatabase>
+#include <QLocale>
 #include <QFileInfo>
 #include <QStandardPaths>
 
@@ -89,6 +90,19 @@ static QString getStartupApplicationDir(const char* argv0)
 #include "gui/sdlgamepadkeynavigation.h"
 #include "imageutils.h"
 #include "streaming/macpermissions.h"
+
+static bool shouldUseChineseWindowsUiFont(StreamingPreferences::Language language)
+{
+    switch (language) {
+    case StreamingPreferences::LANG_ZH_CN:
+    case StreamingPreferences::LANG_ZH_TW:
+        return true;
+    case StreamingPreferences::LANG_AUTO:
+        return QLocale::system().language() == QLocale::Chinese;
+    default:
+        return false;
+    }
+}
 
 #if defined(Q_OS_WIN32)
 #define IS_UNSPECIFIED_HANDLE(x) ((x) == INVALID_HANDLE_VALUE || (x) == NULL)
@@ -933,14 +947,25 @@ int main(int argc, char *argv[])
     // gamepad-only navigation.
     QCursor().setPos(0xFFFF, 0xFFFF);
 #elif defined(Q_OS_WIN32)
-    // Set Microsoft YaHei as the default font for Windows to improve Chinese text rendering
-    QFont defaultFont("Microsoft YaHei", 9);
-    if (QFontDatabase::families().contains("Microsoft YaHei")) {
+    const QStringList fontFamilies = QFontDatabase::families();
+    QString defaultFontFamily = QStringLiteral("Segoe UI");
+
+    if (shouldUseChineseWindowsUiFont(StreamingPreferences::get()->language)) {
+        if (fontFamilies.contains(QStringLiteral("Microsoft YaHei UI"))) {
+            defaultFontFamily = QStringLiteral("Microsoft YaHei UI");
+        }
+        else if (fontFamilies.contains(QStringLiteral("Microsoft YaHei"))) {
+            defaultFontFamily = QStringLiteral("Microsoft YaHei");
+        }
+    }
+
+    QFont defaultFont(defaultFontFamily, 9);
+    defaultFont.setStyleHint(QFont::SansSerif);
+    if (fontFamilies.contains(defaultFontFamily)) {
         app.setFont(defaultFont);
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Set default font to Microsoft YaHei");
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Set default font to %s", qPrintable(defaultFontFamily));
     } else {
-        // Fallback to system default if Microsoft YaHei is not available
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Microsoft YaHei font not found, using system default");
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "%s font not found, using system default", qPrintable(defaultFontFamily));
     }
 #elif !SDL_VERSION_ATLEAST(2, 0, 11) && defined(Q_OS_LINUX) && (defined(__arm__) || defined(__aarch64__))
     if (qgetenv("SDL_VIDEO_GL_DRIVER").isEmpty() && QGuiApplication::platformName() == "eglfs") {
