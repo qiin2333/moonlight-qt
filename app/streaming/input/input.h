@@ -215,6 +215,13 @@ private:
     static
     Uint32 dragTimerCallback(Uint32 interval, void* param);
 
+#ifdef Q_OS_WIN32
+    // SDL Win32 message hook used to capture WM_APPCOMMAND (consumer-control
+    // "media" keys) which Windows does not deliver as WM_KEYDOWN events.
+    static
+    void windowsMessageHook(void* userdata, void* hWnd, unsigned int message, Uint64 wParam, Sint64 lParam);
+#endif
+
     SDL_Window* m_Window;
     bool m_MultiController;
     bool m_GamepadMouse;
