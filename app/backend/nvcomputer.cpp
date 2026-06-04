@@ -369,10 +369,25 @@ NvComputer::ReachabilityType NvComputer::getActiveAddressReachability() const
             return ReachabilityType::RI_UNKNOWN;
         }
 
+        if (m_HasActiveAddressReachability &&
+                m_ActiveAddressReachabilityAddress == activeAddress) {
+            return m_ActiveAddressReachability;
+        }
+
         // Grab a copy of the active address to avoid having to hold
         // the computer lock while doing socket operations
         copyOfActiveAddress = activeAddress;
     }
+
+    auto cacheResult = [this, &copyOfActiveAddress](ReachabilityType result) {
+        QWriteLocker writeLocker(&lock);
+        if (activeAddress == copyOfActiveAddress) {
+            m_ActiveAddressReachabilityAddress = copyOfActiveAddress;
+            m_ActiveAddressReachability = result;
+            m_HasActiveAddressReachability = true;
+        }
+        return result;
+    };
 
     QTcpSocket s;
     s.setProxy(QNetworkProxy::NoProxy);
@@ -400,19 +415,19 @@ NvComputer::ReachabilityType NvComputer::getActiveAddressReachability() const
                     if (nic.type() == QNetworkInterface::Virtual ||
                             nic.type() == QNetworkInterface::Ppp) {
                         // Treat PPP and virtual interfaces as likely VPNs
-                        return ReachabilityType::RI_VPN;
+                        return cacheResult(ReachabilityType::RI_VPN);
                     }
 
                     if (nic.maximumTransmissionUnit() != 0 && nic.maximumTransmissionUnit() < 1500) {
                         // Treat MTUs under 1500 as likely VPNs
-                        return ReachabilityType::RI_VPN;
+                        return cacheResult(ReachabilityType::RI_VPN);
                     }
 #endif
 
                     if (nic.flags() & QNetworkInterface::IsPointToPoint) {
                         // Treat point-to-point links as likely VPNs.
                         // This check detects OpenVPN on Unix-like OSes.
-                        return ReachabilityType::RI_VPN;
+                        return cacheResult(ReachabilityType::RI_VPN);
                     }
 
 #ifdef Q_OS_WINDOWS
@@ -424,44 +439,44 @@ NvComputer::ReachabilityType NvComputer::getActiveAddressReachability() const
                         //  - WireguardNT VPNs
                         //  - All WinTun-based VPNs (such as Slack Nebula)
                         //  - OpenVPN with tap-windows6
-                        return ReachabilityType::RI_VPN;
+                        return cacheResult(ReachabilityType::RI_VPN);
                     }
 #endif
 
                     if (nic.hardwareAddress().startsWith("00:FF", Qt::CaseInsensitive)) {
                         // OpenVPN TAP interfaces have a MAC address starting with 00:FF on Windows
-                        return ReachabilityType::RI_VPN;
+                        return cacheResult(ReachabilityType::RI_VPN);
                     }
 
                     if (nic.humanReadableName().startsWith("ZeroTier")) {
                         // ZeroTier interfaces always start with "ZeroTier"
-                        return ReachabilityType::RI_VPN;
+                        return cacheResult(ReachabilityType::RI_VPN);
                     }
 
                     if (nic.humanReadableName().contains("VPN")) {
                         // This one is just a final VPN heuristic if all else fails
-                        return ReachabilityType::RI_VPN;
+                        return cacheResult(ReachabilityType::RI_VPN);
                     }
 
                     // Didn't meet any of our VPN heuristics. Let's see if the peer address is on-link.
                     Q_ASSERT(addr.prefixLength() >= 0);
                     if (addr.prefixLength() >= 0 && s.localAddress().isInSubnet(s.peerAddress(), addr.prefixLength())) {
-                        return ReachabilityType::RI_LAN;
+                        return cacheResult(ReachabilityType::RI_LAN);
                     }
 
                     // Default to unknown if nothing else matched
-                    return ReachabilityType::RI_UNKNOWN;
+                    return cacheResult(ReachabilityType::RI_UNKNOWN);
                 }
             }
         }
 
         qWarning() << "No match found for address:" << s.localAddress();
-        return ReachabilityType::RI_UNKNOWN;
+        return cacheResult(ReachabilityType::RI_UNKNOWN);
     }
     else {
         // If we fail to connect, just pretend that it's not a VPN
         qWarning() << "Unable to check for reachability within 3 seconds";
-        return ReachabilityType::RI_UNKNOWN;
+        return cacheResult(ReachabilityType::RI_UNKNOWN);
     }
 }
 
@@ -599,7 +614,13 @@ bool NvComputer::update(const NvComputer& that)
     ASSIGN_IF_CHANGED(pairState);
     ASSIGN_IF_CHANGED(serverCodecModeSupport);
     ASSIGN_IF_CHANGED(currentGameId);
-    ASSIGN_IF_CHANGED(activeAddress);
+    if (this->activeAddress != that.activeAddress) {
+        this->activeAddress = that.activeAddress;
+        this->m_HasActiveAddressReachability = false;
+        this->m_ActiveAddressReachabilityAddress = NvAddress();
+        this->m_ActiveAddressReachability = RI_UNKNOWN;
+        changed = true;
+    }
     ASSIGN_IF_CHANGED(state);
     ASSIGN_IF_CHANGED(gfeVersion);
     ASSIGN_IF_CHANGED(appVersion);

@@ -131,4 +131,7 @@ public:
 private:
     uint16_t externalPort;
     QVector<NvAddress> m_TestedAddresses;
+    mutable bool m_HasActiveAddressReachability = false;
+    mutable NvAddress m_ActiveAddressReachabilityAddress;
+    mutable ReachabilityType m_ActiveAddressReachability = RI_UNKNOWN;
 };

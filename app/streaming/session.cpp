@@ -2435,7 +2435,7 @@ bool Session::startConnectionAsync()
                       remoteStreamConfig);
 
         try {
-            updateHostConnectionInfoFromServerInfo(http.getServerInfo(NvHTTP::NVLL_NONE),
+            updateHostConnectionInfoFromServerInfo(http.getServerInfo(NvHTTP::NVLL_NONE, true),
                                                    m_Computer,
                                                    &hostConnectionInfo,
                                                    resumingSession);
