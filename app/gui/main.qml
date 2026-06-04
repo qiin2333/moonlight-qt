@@ -249,7 +249,7 @@ ApplicationWindow {
         z: 1
         
         background: Rectangle {
-            color: "transparent"
+            color: stackView.currentItem instanceof PcView ? Qt.rgba(0, 0, 0, 0.32) : "transparent"
         }
 
         Label {

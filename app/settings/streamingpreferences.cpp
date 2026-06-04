@@ -70,6 +70,7 @@
 #define SER_OVERLAYMENUPOS "overlaymenuposition"
 #define SER_HDRMODE "hdrmode"
 #define SER_AUTOUPDATECHECK "autoupdatecheck"
+#define SER_BACKGROUNDIMAGE "backgroundimage"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -163,6 +164,7 @@ void StreamingPreferences::reload()
     overlayMenuPosition = static_cast<OverlayMenuPosition>(settings.value(SER_OVERLAYMENUPOS,
                                                            static_cast<int>(OverlayMenuPosition::OMP_RIGHT_EDGE)).toInt());
     autoUpdateCheck = settings.value(SER_AUTOUPDATECHECK, true).toBool();
+    enableBackgroundImage = settings.value(SER_BACKGROUNDIMAGE, true).toBool();
 
     streamResolutionScale = settings.value(SER_STREAMRESOLUTIONSCALE, false).toBool();
     streamResolutionScaleRatio = settings.value(SER_STREAMRESOLUTIONSCALERATIO, 100).toInt();
@@ -417,6 +419,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_MICROPHONE, enableMicrophone);
     settings.setValue(SER_OVERLAYMENUPOS, static_cast<int>(overlayMenuPosition));
     settings.setValue(SER_AUTOUPDATECHECK, autoUpdateCheck);
+    settings.setValue(SER_BACKGROUNDIMAGE, enableBackgroundImage);
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)
