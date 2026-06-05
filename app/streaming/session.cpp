@@ -188,10 +188,12 @@ void Session::clConnectionTerminated(int errorCode)
         break;
     }
 
-    // Only attempt reconnect if we were actively streaming (window exists) and
-    // the user didn't request to quit. We must not be mid-reconnect already.
+    // Only attempt reconnect if video actually started and the user didn't request
+    // to quit. A window alone is not enough here: startup failures can create the
+    // SDL window, then terminate before the first frame and otherwise loop forever
+    // behind a black screen.
     if (recoverable &&
-        s_ActiveSession->m_Window != nullptr &&
+        s_ActiveSession->m_HasReceivedVideo &&
         !s_ActiveSession->m_ShouldExit &&
         !s_ActiveSession->m_ConnectionInterrupted) {
 
@@ -500,6 +502,8 @@ int Session::drSetup(int videoFormat, int width, int height, int frameRate, void
 
 int Session::drSubmitDecodeUnit(PDECODE_UNIT du)
 {
+    s_ActiveSession->m_HasReceivedVideo = true;
+
     // Use a lock since we'll be yanking this decoder out
     // from underneath the session when we initiate destruction.
     // We need to destroy the decoder on the main thread to satisfy
@@ -707,6 +711,7 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_ShouldExit(false),
       m_ConnectionInterrupted(false),
       m_SuppressConnectionErrorDialog(false),
+      m_HasReceivedVideo(false),
       m_LastTerminationErrorCode(0),
       m_AsyncConnectionSuccess(false),
       m_PortTestResults(0),
@@ -2178,6 +2183,7 @@ bool Session::tryReconnect()
 
         // Run the connection start on a worker thread and pump events while we wait
         m_AsyncConnectionSuccess = false;
+        m_HasReceivedVideo = false;
         AsyncConnectionStartThread thread(this);
         thread.start();
 
