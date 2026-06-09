@@ -187,6 +187,8 @@ private:
     void showQtOverlayMenu();
     void hideQtOverlayMenu();
     void toggleQtOverlayMenu();
+    bool isStreamingWindowVisible() const;
+    void syncQtOverlayWindowsWithSdlWindowState();
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void showStreamingToast(const QString& message, int durationMs = 2000);

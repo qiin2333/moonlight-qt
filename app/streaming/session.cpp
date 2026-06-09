@@ -1721,6 +1721,7 @@ void Session::toggleFullscreen()
 void Session::showQtOverlayMenu()
 {
     if (!m_MenuPanel || m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) return;
+    if (!isStreamingWindowVisible()) return;
 
     // Check if overlay menu is disabled before releasing mouse capture
     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_DISABLED) {
@@ -1791,6 +1792,48 @@ void Session::toggleQtOverlayMenu()
     } else {
         showQtOverlayMenu();
     }
+}
+
+bool Session::isStreamingWindowVisible() const
+{
+    if (m_Window == nullptr) {
+        return false;
+    }
+
+    Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
+    return (windowFlags & SDL_WINDOW_SHOWN) &&
+           !(windowFlags & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED));
+}
+
+void Session::syncQtOverlayWindowsWithSdlWindowState()
+{
+    if (!isStreamingWindowVisible()) {
+        if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+            m_MenuPanel->closeMenu();
+        }
+        if (m_MenuButton) {
+            m_MenuButton->hideButton();
+        }
+        if (m_Toast && m_Toast->isVisible()) {
+            m_Toast->hide();
+        }
+        return;
+    }
+
+    if (!m_MenuButton) {
+        return;
+    }
+
+    if (m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_BUTTON ||
+        (m_MenuPanel && (m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()))) {
+        m_MenuButton->hideButton();
+        return;
+    }
+
+    int wx, wy, ww, wh;
+    SDL_GetWindowPosition(m_Window, &wx, &wy);
+    SDL_GetWindowSize(m_Window, &ww, &wh);
+    m_MenuButton->showButton(wx, wy, ww, wh);
 }
 
 void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
@@ -2865,17 +2908,13 @@ void Session::exec()
         // we defer capture restoration to after the action completes.
         // See dispatchQtMenuAction() for those cases.
         if (m_WasCapturedBeforeMenu && !m_DeferCaptureRestore) {
-            m_InputHandler->setCaptureActive(true);
+            if (isStreamingWindowVisible()) {
+                m_InputHandler->setCaptureActive(true);
+            }
             m_WasCapturedBeforeMenu = false;
         }
 
-        // Re-show the floating menu button if in button mode
-        if (m_MenuButton && m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
-            int wx, wy, ww, wh;
-            SDL_GetWindowPosition(m_Window, &wx, &wy);
-            SDL_GetWindowSize(m_Window, &ww, &wh);
-            m_MenuButton->showButton(wx, wy, ww, wh);
-        }
+        syncQtOverlayWindowsWithSdlWindowState();
 
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Qt overlay menu closed, capture %s",
@@ -3054,14 +3093,13 @@ void Session::exec()
             case SDL_WINDOWEVENT_LEAVE:
                 m_InputHandler->notifyMouseLeave();
                 break;
+            case SDL_WINDOWEVENT_HIDDEN:
+            case SDL_WINDOWEVENT_MINIMIZED:
+            case SDL_WINDOWEVENT_RESTORED:
+            case SDL_WINDOWEVENT_SHOWN:
+            case SDL_WINDOWEVENT_MOVED:
             case SDL_WINDOWEVENT_SIZE_CHANGED:
-                // Reposition floating menu button if visible
-                if (m_MenuButton && m_MenuButton->isButtonVisible()) {
-                    int wx, wy, ww, wh;
-                    SDL_GetWindowPosition(m_Window, &wx, &wy);
-                    SDL_GetWindowSize(m_Window, &ww, &wh);
-                    m_MenuButton->repositionTo(wx, wy, ww, wh);
-                }
+                syncQtOverlayWindowsWithSdlWindowState();
                 break;
             }
 
