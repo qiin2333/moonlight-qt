@@ -30,7 +30,8 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_PendingMouseButtonsAllUpOnVideoRegionLeave(false),
       m_PointerRegionLockActive(false),
       m_PointerRegionLockToggledByUser(false),
-      m_FakeCaptureActive(false),
+      m_FakeMouseCaptureActive(false),
+      m_KeyboardCaptureActive(false),
       m_CaptureSystemKeysMode(prefs.captureSysKeysMode),
       m_MouseCursorCapturedVisibilityState(prefs.showLocalCursor ? SDL_ENABLE : SDL_DISABLE),
       m_LongPressTimer(0),
@@ -345,7 +346,7 @@ bool SdlInputHandler::isCaptureActive()
     }
 
     // Some platforms don't support SDL_SetRelativeMouseMode
-    return m_FakeCaptureActive;
+    return m_FakeMouseCaptureActive;
 }
 
 void SdlInputHandler::updateKeyboardGrabState()
@@ -368,6 +369,8 @@ void SdlInputHandler::updateKeyboardGrabState()
     // SDL 2.0.18 adds keyboard grab on macOS (if built with non-AppStore APIs).
     SDL_SetWindowKeyboardGrab(m_Window, shouldGrab ? SDL_TRUE : SDL_FALSE);
 #endif
+
+    m_KeyboardCaptureActive = shouldGrab;
 }
 
 bool SdlInputHandler::isSystemKeyCaptureActive()
@@ -380,15 +383,12 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
         return false;
     }
 
+    // NB: We used to check SDL_WINDOW_KEYBOARD_GRABBED here, but this isn't
+    // always set when capture "fails" on SDL3, even though the user may have
+    // configured the compositor to pass through system keys to us anyway.
+    // See issues #1776 and #1900 for details.
     Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
-    if (!(windowFlags & SDL_WINDOW_INPUT_FOCUS)
-#if SDL_VERSION_ATLEAST(2, 0, 15)
-            || !(windowFlags & SDL_WINDOW_KEYBOARD_GRABBED)
-#else
-            || !(windowFlags & SDL_WINDOW_INPUT_GRABBED)
-#endif
-            )
-    {
+    if (!(windowFlags & SDL_WINDOW_INPUT_FOCUS) || !m_KeyboardCaptureActive) {
         return false;
     }
 
@@ -407,7 +407,7 @@ void SdlInputHandler::setCaptureActive(bool active)
         if (m_AbsoluteMouseMode || SDL_SetRelativeMouseMode(SDL_TRUE) < 0) {
             // Relative mouse mode didn't work or was disabled, so we'll just hide the cursor
             SDL_ShowCursor(m_MouseCursorCapturedVisibilityState);
-            m_FakeCaptureActive = true;
+            m_FakeMouseCaptureActive = true;
         }
 
         // Synchronize the client and host cursor when activating absolute capture
@@ -437,10 +437,10 @@ void SdlInputHandler::setCaptureActive(bool active)
         }
     }
     else {
-        if (m_FakeCaptureActive) {
+        if (m_FakeMouseCaptureActive) {
             // Display the cursor again
             SDL_ShowCursor(SDL_ENABLE);
-            m_FakeCaptureActive = false;
+            m_FakeMouseCaptureActive = false;
         }
         else {
             SDL_SetRelativeMouseMode(SDL_FALSE);
