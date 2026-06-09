@@ -1,5 +1,7 @@
 #include "overlaymenupanel.h"
 
+#include "overlaywindowutils.h"
+
 #include <QScreen>
 #include <QGuiApplication>
 #include <QCoreApplication>
@@ -21,8 +23,7 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
       m_AnchorMode(AnchorMode::RightEdge),
       m_CursorX(0), m_CursorY(0)
 {
-    setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
-             | Qt::WindowDoesNotAcceptFocus);
+        setFlags(OverlayWindowUtils::nonActivatingToolFlags());
 
     QSurfaceFormat fmt;
     fmt.setAlphaBufferSize(8);
@@ -332,8 +333,7 @@ void OverlayMenuPanel::showInternal()
     setPosition(m_TargetX + slideDistance * slideDir, y());
     setOpacity(0.0);
 
-    show();
-    raise();
+    OverlayWindowUtils::showWithoutActivating(this);
 
     // Animate slide
     m_SlideAnim->setDuration(220);
@@ -349,11 +349,6 @@ void OverlayMenuPanel::showInternal()
 
     m_SlideAnim->start();
     m_OpacityAnim->start();
-
-    // Warp cursor into center of the content area (excluding shadow)
-    QRect contentRect(m_TargetX + m_ShadowMargin, y() + m_ShadowMargin,
-                       m_MenuWidth, height() - 2 * m_ShadowMargin);
-    QCursor::setPos(contentRect.center());
 
     forceRepaint();
 }
@@ -435,12 +430,6 @@ void OverlayMenuPanel::navigateToLevel(int level)
     // Reset grace period so Leave event won't close the menu immediately
     // (the mouse may be outside the resized window after navigation)
     m_ShowTimer.start();
-
-    // Warp cursor into the new menu if it's now outside
-    QPoint globalPos = QCursor::pos();
-    if (!geometry().contains(globalPos)) {
-        QCursor::setPos(geometry().center());
-    }
 
     if (goingForward) {
         // Forward: content slides in from right
