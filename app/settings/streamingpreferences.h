@@ -251,6 +251,7 @@ public:
     int customScreenMode;
     int customVddScreenMode;
     bool enableMicrophone;
+    OverlayMenuPosition overlayMenuPosition;
     bool autoUpdateCheck;
     bool resolutionMatchWindow;
 

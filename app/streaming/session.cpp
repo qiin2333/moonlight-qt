@@ -36,6 +36,7 @@
 #define SDL_CODE_GAMECONTROLLER_SET_MOTION_EVENT_STATE 103
 #define SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED 104
 #define SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS 105
+#define SDL_CODE_RESOLUTION_CHANGED 106
 
 #include <openssl/rand.h>
 
@@ -359,7 +360,7 @@ void Session::clResolutionChanged(uint32_t width, uint32_t height)
 {
     // Called by moonlight-common-c on the control-stream receive thread when the host
     // echoes back a resolution-change confirm (0x5507) or pushes a host-initiated change.
-    // We clear the in-flight gate so the debounce loop can send the next queued request.
+    // Marshal to the session/main thread via SDL event so decoder recreation runs there.
     Session* session = s_ActiveSession;
     if (session == nullptr) {
         return;
@@ -367,7 +368,13 @@ void Session::clResolutionChanged(uint32_t width, uint32_t height)
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "Host confirmed resolution change: %ux%u", width, height);
-    session->m_ResolutionRequestInFlight.store(false, std::memory_order_release);
+
+    SDL_Event resEvent = {};
+    resEvent.type = SDL_USEREVENT;
+    resEvent.user.code = SDL_CODE_RESOLUTION_CHANGED;
+    resEvent.user.data1 = (void*)(uintptr_t)width;
+    resEvent.user.data2 = (void*)(uintptr_t)height;
+    SDL_PushEvent(&resEvent);
 }
 
 void Session::clRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger, uint16_t rightTrigger)
@@ -2369,6 +2376,7 @@ void updateHostConnectionInfoFromServerInfo(const QString& serverInfo,
     QString refreshedCodecSupport = NvHTTP::getXmlString(serverInfo, "ServerCodecModeSupport");
     QString refreshedAppVersion = NvHTTP::getXmlString(serverInfo, "appversion");
     QString refreshedGfeVersion = NvHTTP::getXmlString(serverInfo, "GfeVersion");
+    QString refreshedClientResChange = NvHTTP::getXmlString(serverInfo, "ClientResolutionChange");
 
     if (!refreshedCodecSupport.isEmpty()) {
         int refreshedServerCodecModeSupport = refreshedCodecSupport.toInt();
@@ -2397,6 +2405,18 @@ void updateHostConnectionInfoFromServerInfo(const QString& serverInfo,
     QWriteLocker lock(&computer->lock);
     computer->serverCodecModeSupport = snapshot->serverCodecModeSupport;
     computer->currentGameId = snapshot->currentGameId;
+
+    if (!refreshedClientResChange.isEmpty()) {
+        bool newVal = (refreshedClientResChange == "1");
+        if (newVal != computer->supportsClientResolutionChange) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Host ClientResolutionChange capability changed after %s: %d -> %d",
+                        resumingSession ? "resume" : "launch",
+                        (int)computer->supportsClientResolutionChange,
+                        (int)newVal);
+        }
+        computer->supportsClientResolutionChange = newVal;
+    }
 
     if (!snapshot->appVersion.isEmpty()) {
         computer->appVersion = snapshot->appVersion;
@@ -2990,18 +3010,22 @@ void Session::exec()
     constexpr Uint32 RESOLUTION_REQUEST_TIMEOUT_MS = 2000;
     Uint32 m_ResolutionRequestSentTicks = 0;
     auto processResolutionDebounce = [this, &m_ResolutionRequestSentTicks]() {
-        if (m_ResizeDebounceTargetTicks == 0) {
-            return;
-        }
-
         const Uint32 now = SDL_GetTicks();
 
-        // Clear stale in-flight gate if host did not respond within the timeout.
+        // Timeout check runs unconditionally so a stale in-flight gate is cleared
+        // even after the debounce target has already been consumed (i.e. when
+        // m_ResizeDebounceTargetTicks == 0 after a prior send).
         if (m_ResolutionRequestInFlight.load(std::memory_order_acquire) &&
+                m_ResolutionRequestSentTicks != 0 &&
                 now - m_ResolutionRequestSentTicks >= RESOLUTION_REQUEST_TIMEOUT_MS) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Client-driven resolution: in-flight timeout, unblocking gate");
             m_ResolutionRequestInFlight.store(false, std::memory_order_release);
+        }
+
+        // Nothing pending — nothing more to do.
+        if (m_ResizeDebounceTargetTicks == 0) {
+            return;
         }
 
         // Debounce has not yet settled.
@@ -3009,19 +3033,28 @@ void Session::exec()
             return;
         }
 
-        // Debounce settled. Consume so we don't re-fire next iteration.
-        m_ResizeDebounceTargetTicks = 0;
-
-        // Suppress if a previous request is still in-flight.
+        // If a previous request is still in-flight, keep the desired size queued
+        // by re-arming the debounce at a short retry interval rather than dropping it.
         if (m_ResolutionRequestInFlight.load(std::memory_order_acquire)) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Client-driven resolution: skipping send, previous request in-flight");
+                        "Client-driven resolution: in-flight, re-queuing resize for later");
+            m_ResizeDebounceTargetTicks = now + 200;
             return;
         }
 
+        // Debounce settled and no request in-flight. Consume the pending resize.
+        m_ResizeDebounceTargetTicks = 0;
+
         // Read physical pixel size (HiDPI-aware).
         int physW = 0, physH = 0;
+#if SDL_VERSION_ATLEAST(2, 26, 0)
         SDL_GetWindowSizeInPixels(m_Window, &physW, &physH);
+#else
+        // SDL < 2.26: SDL_GetWindowSizeInPixels is unavailable; fall back to the
+        // logical window size. HiDPI scaling will not be accounted for, but the
+        // request is still useful on normal-DPI displays.
+        SDL_GetWindowSize(m_Window, &physW, &physH);
+#endif
         if (physW <= 0 || physH <= 0) {
             return; // window not ready
         }
@@ -3142,6 +3175,33 @@ void Session::exec()
                 m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.user.data1,
                                                     (DualSenseOutputReport *)event.user.data2);
                 break;
+            case SDL_CODE_RESOLUTION_CHANGED:
+            {
+                // Marshalled from clResolutionChanged (control-stream receive thread).
+                // Update active stream dimensions, clear the in-flight gate, then trigger
+                // decoder recreation so the new resolution takes effect immediately.
+                int newW = (int)(uintptr_t)event.user.data1;
+                int newH = (int)(uintptr_t)event.user.data2;
+
+                SDL_LockMutex(m_DecoderLock);
+                m_ActiveVideoWidth = newW;
+                m_ActiveVideoHeight = newH;
+                SDL_UnlockMutex(m_DecoderLock);
+
+                // Clear in-flight gate so the debounce loop can queue the next request.
+                m_ResolutionRequestInFlight.store(false, std::memory_order_release);
+
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "Applying host resolution change: %dx%d — recreating decoder",
+                            newW, newH);
+
+                // Synthesise an SDL_RENDER_DEVICE_RESET to reuse the existing decoder
+                // recreation path (lines below in SDL_RENDER_DEVICE_RESET case).
+                SDL_Event resetEvent = {};
+                resetEvent.type = SDL_RENDER_DEVICE_RESET;
+                SDL_PushEvent(&resetEvent);
+                break;
+            }
             default:
                 SDL_assert(false);
             }
