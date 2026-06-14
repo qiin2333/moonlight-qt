@@ -825,6 +825,23 @@ Flickable {
                     ToolTip.text: qsTr("Allows Sunshine to automatically adjust stream bitrate up to the selected video bitrate when the host supports ABR.")
                 }
 
+                CheckBox {
+                    id: resolutionMatchWindowCheck
+                    width: parent.width
+                    hoverEnabled: true
+                    text: qsTr("Match stream resolution to window size")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.resolutionMatchWindow
+                    onCheckedChanged: {
+                        StreamingPreferences.resolutionMatchWindow = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 8000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Automatically send a resolution change request to the host when the streaming window is resized (windowed mode only). Requires a compatible Sunshine host.")
+                }
+
                 Label {
                     width: parent.width
                     id: windowModeTitle

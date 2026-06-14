@@ -106,6 +106,10 @@ public:
     int serverCodecModeSupport;
     QString gpuModel;
     bool isSupportedServerVersion;
+    // True when the host advertised <ClientResolutionChange>1</ClientResolutionChange>
+    // in /serverinfo — indicates AlkaidLab Sunshine fork with 0x5506 support.
+    // ASSUMPTION: exact XML tag name is "ClientResolutionChange" (must match FoundationHost PR).
+    bool supportsClientResolutionChange;
 
     // Persisted traits
     NvAddress localAddress;

@@ -70,7 +70,7 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     Session::clSetMotionEventState,
     Session::clSetControllerLED,
     Session::clSetAdaptiveTriggers,
-    nullptr, // resolutionChanged (unused on Qt client)
+    Session::clResolutionChanged,
     Session::clClipboardData
 };
 
@@ -353,6 +353,21 @@ void Session::clClipboardData(const char* data, int length)
 
     // Marshals to GUI thread internally; safe to call from the recv thread.
     session->m_ClipboardSync->handleIncomingFrame(data, length);
+}
+
+void Session::clResolutionChanged(uint32_t width, uint32_t height)
+{
+    // Called by moonlight-common-c on the control-stream receive thread when the host
+    // echoes back a resolution-change confirm (0x5507) or pushes a host-initiated change.
+    // We clear the in-flight gate so the debounce loop can send the next queued request.
+    Session* session = s_ActiveSession;
+    if (session == nullptr) {
+        return;
+    }
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Host confirmed resolution change: %ux%u", width, height);
+    session->m_ResolutionRequestInFlight.store(false, std::memory_order_release);
 }
 
 void Session::clRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger, uint16_t rightTrigger)
@@ -728,7 +743,9 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
             m_AbrCurrentBitrateKbps(std::make_shared<std::atomic_int>(0)),
       m_Toast(nullptr),
       m_MenuCloseTicks(0),
-      m_MicStream(nullptr)
+      m_MicStream(nullptr),
+      m_ResizeDebounceTargetTicks(0),
+      m_ResolutionRequestInFlight(false)
 {
     memset(&m_LastAbrVideoStats, 0, sizeof(m_LastAbrVideoStats));
     m_ClipboardSync = nullptr;
@@ -2969,9 +2986,68 @@ void Session::exec()
         }
     };
 
+    // In-flight timeout: if the host does not echo a resolutionChanged within 2 s, unblock the gate.
+    constexpr Uint32 RESOLUTION_REQUEST_TIMEOUT_MS = 2000;
+    Uint32 m_ResolutionRequestSentTicks = 0;
+    auto processResolutionDebounce = [this, &m_ResolutionRequestSentTicks]() {
+        if (m_ResizeDebounceTargetTicks == 0) {
+            return;
+        }
+
+        const Uint32 now = SDL_GetTicks();
+
+        // Clear stale in-flight gate if host did not respond within the timeout.
+        if (m_ResolutionRequestInFlight.load(std::memory_order_acquire) &&
+                now - m_ResolutionRequestSentTicks >= RESOLUTION_REQUEST_TIMEOUT_MS) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Client-driven resolution: in-flight timeout, unblocking gate");
+            m_ResolutionRequestInFlight.store(false, std::memory_order_release);
+        }
+
+        // Debounce has not yet settled.
+        if ((int)(now - m_ResizeDebounceTargetTicks) < 0) {
+            return;
+        }
+
+        // Debounce settled. Consume so we don't re-fire next iteration.
+        m_ResizeDebounceTargetTicks = 0;
+
+        // Suppress if a previous request is still in-flight.
+        if (m_ResolutionRequestInFlight.load(std::memory_order_acquire)) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Client-driven resolution: skipping send, previous request in-flight");
+            return;
+        }
+
+        // Read physical pixel size (HiDPI-aware).
+        int physW = 0, physH = 0;
+        SDL_GetWindowSizeInPixels(m_Window, &physW, &physH);
+        if (physW <= 0 || physH <= 0) {
+            return; // window not ready
+        }
+
+        // Round to even (encoder requirement) and clamp to minimum.
+        physW = qMax(256, physW & ~1);
+        physH = qMax(256, physH & ~1);
+
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Client-driven resolution: requesting %dx%d from host", physW, physH);
+
+        int ret = LiSendResolutionChangeRequest((unsigned int)physW, (unsigned int)physH);
+        if (ret == 0) {
+            m_ResolutionRequestInFlight.store(true, std::memory_order_release);
+            m_ResolutionRequestSentTicks = SDL_GetTicks();
+        }
+        else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Client-driven resolution: LiSendResolutionChangeRequest returned %d", ret);
+        }
+    };
+
     SDL_Event event;
     for (;;) {
         processSunshineAbrFeedback();
+        processResolutionDebounce();
 
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
         // SDL 2.0.18 has a proper wait event implementation that uses platform
@@ -3100,6 +3176,16 @@ void Session::exec()
             case SDL_WINDOWEVENT_MOVED:
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 syncQtOverlayWindowsWithSdlWindowState();
+                // Arm debounce for client-driven resolution if the feature is active.
+                // Gate: pref enabled, host capability advertised, NOT in exclusive fullscreen.
+                // Exclusive fullscreen: (windowFlags & FULLSCREEN_DESKTOP) == FULLSCREEN (0x1).
+                // Windowed and borderless-desktop-fullscreen both pass (only exclusive is skipped).
+                if (m_Preferences->resolutionMatchWindow &&
+                        m_Computer->supportsClientResolutionChange &&
+                        (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN_DESKTOP) != SDL_WINDOW_FULLSCREEN) {
+                    // Debounce: reset fire time on each resize; fires 400 ms after the last event.
+                    m_ResizeDebounceTargetTicks = SDL_GetTicks() + 400;
+                }
                 break;
             }
 
