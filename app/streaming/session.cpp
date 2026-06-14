@@ -752,7 +752,10 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_MenuCloseTicks(0),
       m_MicStream(nullptr),
       m_ResizeDebounceTargetTicks(0),
-      m_ResolutionRequestInFlight(false)
+      m_ResolutionRequestInFlight(false),
+      m_ResolutionRequestOutstandingW(0),
+      m_ResolutionRequestOutstandingH(0),
+      m_ResolutionChangeAppliedTicks(0)
 {
     memset(&m_LastAbrVideoStats, 0, sizeof(m_LastAbrVideoStats));
     m_ClipboardSync = nullptr;
@@ -2406,7 +2409,10 @@ void updateHostConnectionInfoFromServerInfo(const QString& serverInfo,
     computer->serverCodecModeSupport = snapshot->serverCodecModeSupport;
     computer->currentGameId = snapshot->currentGameId;
 
-    if (!refreshedClientResChange.isEmpty()) {
+    // Fix #15: always derive and assign, even when the tag is absent in the refresh response
+    // (empty → false), so a host that drops the tag clears the capability instead of keeping
+    // a stale true from the connection-time parse.
+    {
         bool newVal = (refreshedClientResChange == "1");
         if (newVal != computer->supportsClientResolutionChange) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
@@ -3021,6 +3027,8 @@ void Session::exec()
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Client-driven resolution: in-flight timeout, unblocking gate");
             m_ResolutionRequestInFlight.store(false, std::memory_order_release);
+            m_ResolutionRequestOutstandingW = 0;
+            m_ResolutionRequestOutstandingH = 0;
         }
 
         // Nothing pending — nothing more to do.
@@ -3070,11 +3078,90 @@ void Session::exec()
         if (ret == 0) {
             m_ResolutionRequestInFlight.store(true, std::memory_order_release);
             m_ResolutionRequestSentTicks = SDL_GetTicks();
+            m_ResolutionRequestOutstandingW = physW;
+            m_ResolutionRequestOutstandingH = physH;
         }
         else {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Client-driven resolution: LiSendResolutionChangeRequest returned %d", ret);
         }
+    };
+
+    // Shared decoder recreation helper — caller must hold m_DecoderLock on entry and on
+    // successful return; on failure returns false (caller must unlock + goto cleanup).
+    // Mirrors the SDL_RENDER_DEVICE_RESET path exactly, enabling SDL_CODE_RESOLUTION_CHANGED
+    // to perform an atomic swap (Fix #8) without duplicating the logic.
+    auto recreateDecoder = [&]() -> bool {
+        // Destroy the old decoder while the lock is held so drSubmitDecodeUnit cannot
+        // submit frames to it after the dimensions have been updated.
+        delete m_VideoDecoder;
+        m_VideoDecoder = nullptr;
+
+        // Insert a barrier to discard any additional window events
+        // that could cause the renderer to be recreated again.
+        // We don't use SDL_FlushEvent() here because it could cause
+        // important events to be lost.
+        flushWindowEvents();
+
+        // Update the window display mode based on our current monitor
+        // NB: Avoid a useless modeset by only doing this if it changed.
+        if (currentDisplayIndex != SDL_GetWindowDisplayIndex(m_Window)) {
+            currentDisplayIndex = SDL_GetWindowDisplayIndex(m_Window);
+            updateOptimalWindowDisplayMode();
+        }
+
+        // Now that the old decoder is dead, flush any events it may
+        // have queued to reset itself (if this reset was the result
+        // of device loss or an internal error).
+        SDL_PumpEvents();
+        SDL_FlushEvent(SDL_RENDER_DEVICE_RESET);
+
+        {
+            // If the stream exceeds the display refresh rate (plus some slack),
+            // forcefully disable V-sync to allow the stream to render faster
+            // than the display.
+            int displayHz = StreamUtils::getDisplayRefreshRate(m_Window);
+            bool enableVsync = m_Preferences->enableVsync;
+            if (displayHz + 5 < m_StreamConfig.fps) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "Disabling V-sync because refresh rate limit exceeded");
+                enableVsync = false;
+            }
+
+            // Choose a new decoder (hopefully the same one, but possibly
+            // not if a GPU was removed or something).
+            if (!chooseDecoder(m_Preferences->videoDecoderSelection,
+                               m_Window, m_ActiveVideoFormat, m_ActiveVideoWidth,
+                               m_ActiveVideoHeight, m_ActiveVideoFrameRate,
+                               enableVsync,
+                               enableVsync && m_Preferences->framePacing,
+                               m_Preferences->videoEnhancement,
+                               m_Preferences->ignoreAspectRatio,
+                               false,
+                               s_ActiveSession->m_VideoDecoder)) {
+                return false;
+            }
+
+            // As of SDL 2.0.12, SDL_RecreateWindow() doesn't carry over mouse capture
+            // or mouse hiding state to the new window. By capturing after the decoder
+            // is set up, this ensures the window re-creation is already done.
+            if (needsPostDecoderCreationCapture) {
+                m_InputHandler->setCaptureActive(true);
+                needsPostDecoderCreationCapture = false;
+            }
+        }
+
+        // Request an IDR frame to complete the reset
+        LiRequestIdrFrame();
+
+        // Set HDR mode. We may miss the callback if we're in the middle
+        // of recreating our decoder at the time the HDR transition happens.
+        m_VideoDecoder->setHdrMode(LiGetCurrentHostDisplayHdrMode());
+
+        // After a window resize, we need to reset the pointer lock region
+        m_InputHandler->updatePointerRegionLock();
+
+        return true;
     };
 
     SDL_Event event;
@@ -3178,28 +3265,49 @@ void Session::exec()
             case SDL_CODE_RESOLUTION_CHANGED:
             {
                 // Marshalled from clResolutionChanged (control-stream receive thread).
-                // Update active stream dimensions, clear the in-flight gate, then trigger
-                // decoder recreation so the new resolution takes effect immediately.
                 int newW = (int)(uintptr_t)event.user.data1;
                 int newH = (int)(uintptr_t)event.user.data2;
 
-                SDL_LockMutex(m_DecoderLock);
-                m_ActiveVideoWidth = newW;
-                m_ActiveVideoHeight = newH;
-                SDL_UnlockMutex(m_DecoderLock);
-
-                // Clear in-flight gate so the debounce loop can queue the next request.
-                m_ResolutionRequestInFlight.store(false, std::memory_order_release);
+                // Fix #9: only acknowledge our outstanding client request when the echoed
+                // size matches exactly.  A mismatch means this is a host-initiated change —
+                // still apply the decoder swap, but leave the in-flight gate so the
+                // debounce can complete for the real outstanding request.
+                if (m_ResolutionRequestInFlight.load(std::memory_order_acquire) &&
+                        newW == m_ResolutionRequestOutstandingW &&
+                        newH == m_ResolutionRequestOutstandingH) {
+                    m_ResolutionRequestInFlight.store(false, std::memory_order_release);
+                    m_ResolutionRequestOutstandingW = 0;
+                    m_ResolutionRequestOutstandingH = 0;
+                }
 
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                             "Applying host resolution change: %dx%d — recreating decoder",
                             newW, newH);
 
-                // Synthesise an SDL_RENDER_DEVICE_RESET to reuse the existing decoder
-                // recreation path (lines below in SDL_RENDER_DEVICE_RESET case).
-                SDL_Event resetEvent = {};
-                resetEvent.type = SDL_RENDER_DEVICE_RESET;
-                SDL_PushEvent(&resetEvent);
+                // Fix #11: update input handler's cached stream dimensions on the main thread
+                // before the decoder swap so absolute mouse/touch mapping and the pointer-region
+                // lock immediately use the new aspect ratio.
+                m_InputHandler->updateStreamDimensions(newW, newH);
+
+                // Fix #8: hold m_DecoderLock across the dim-update + decoder swap so that
+                // drSubmitDecodeUnit cannot submit a new-size frame to the stale decoder.
+                // (drSubmitDecodeUnit uses TryLock and returns DR_OK when locked, so it is safe.)
+                SDL_LockMutex(m_DecoderLock);
+                m_ActiveVideoWidth = newW;
+                m_ActiveVideoHeight = newH;
+                if (!recreateDecoder()) {
+                    SDL_UnlockMutex(m_DecoderLock);
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                                 "Failed to recreate decoder after resolution change");
+                    emit displayLaunchError(tr("Unable to initialize video decoder. Please check your streaming settings and try again."));
+                    goto DispatchDeferredCleanup;
+                }
+
+                // Fix #16: record when this resolution change was applied so the SIZE_CHANGED
+                // debounce gate suppresses spurious events from the SDL_CreateRenderer call.
+                m_ResolutionChangeAppliedTicks = SDL_GetTicks();
+
+                SDL_UnlockMutex(m_DecoderLock);
                 break;
             }
             default:
@@ -3237,12 +3345,18 @@ void Session::exec()
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 syncQtOverlayWindowsWithSdlWindowState();
                 // Arm debounce for client-driven resolution if the feature is active.
-                // Gate: pref enabled, host capability advertised, NOT in exclusive fullscreen.
-                // Exclusive fullscreen: (windowFlags & FULLSCREEN_DESKTOP) == FULLSCREEN (0x1).
-                // Windowed and borderless-desktop-fullscreen both pass (only exclusive is skipped).
+                // Gate: pref enabled, host capability advertised, windowed mode only
+                // (both exclusive fullscreen 0x1 and borderless 0x1001 are excluded).
                 if (m_Preferences->resolutionMatchWindow &&
                         m_Computer->supportsClientResolutionChange &&
-                        (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN_DESKTOP) != SDL_WINDOW_FULLSCREEN) {
+                        // Fix #10: (flags & FULLSCREEN_DESKTOP) == 0 excludes both exclusive
+                        // fullscreen (0x1) and borderless/desktop fullscreen (0x1001), keeping
+                        // the feature windowed-only as intended.
+                        (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN_DESKTOP) == 0 &&
+                        // Fix #16: suppress re-arming for a short window after applying a
+                        // host resolution change so spurious SIZE_CHANGED events emitted by
+                        // SDL_CreateRenderer do not bounce back as a new outbound request.
+                        SDL_GetTicks() - m_ResolutionChangeAppliedTicks >= 500) {
                     // Debounce: reset fire time on each resize; fires 400 ms after the last event.
                     m_ResizeDebounceTargetTicks = SDL_GetTicks() + 400;
                 }
@@ -3360,76 +3474,13 @@ void Session::exec()
 
             SDL_LockMutex(m_DecoderLock);
 
-            // Destroy the old decoder
-            delete m_VideoDecoder;
-
-            // Insert a barrier to discard any additional window events
-            // that could cause the renderer to be and recreated again.
-            // We don't use SDL_FlushEvent() here because it could cause
-            // important events to be lost.
-            flushWindowEvents();
-
-            // Update the window display mode based on our current monitor
-            // NB: Avoid a useless modeset by only doing this if it changed.
-            if (currentDisplayIndex != SDL_GetWindowDisplayIndex(m_Window)) {
-                currentDisplayIndex = SDL_GetWindowDisplayIndex(m_Window);
-                updateOptimalWindowDisplayMode();
+            if (!recreateDecoder()) {
+                SDL_UnlockMutex(m_DecoderLock);
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                             "Failed to recreate decoder after reset");
+                emit displayLaunchError(tr("Unable to initialize video decoder. Please check your streaming settings and try again."));
+                goto DispatchDeferredCleanup;
             }
-
-            // Now that the old decoder is dead, flush any events it may
-            // have queued to reset itself (if this reset was the result
-            // of device loss or an internal error).
-            SDL_PumpEvents();
-            SDL_FlushEvent(SDL_RENDER_DEVICE_RESET);
-
-            {
-                // If the stream exceeds the display refresh rate (plus some slack),
-                // forcefully disable V-sync to allow the stream to render faster
-                // than the display.
-                int displayHz = StreamUtils::getDisplayRefreshRate(m_Window);
-                bool enableVsync = m_Preferences->enableVsync;
-                if (displayHz + 5 < m_StreamConfig.fps) {
-                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                                "Disabling V-sync because refresh rate limit exceeded");
-                    enableVsync = false;
-                }
-
-                // Choose a new decoder (hopefully the same one, but possibly
-                // not if a GPU was removed or something).
-                if (!chooseDecoder(m_Preferences->videoDecoderSelection,
-                                   m_Window, m_ActiveVideoFormat, m_ActiveVideoWidth,
-                                   m_ActiveVideoHeight, m_ActiveVideoFrameRate,
-                                   enableVsync,
-                                   enableVsync && m_Preferences->framePacing,
-                                   m_Preferences->videoEnhancement,
-                                   m_Preferences->ignoreAspectRatio,
-                                   false,
-                                   s_ActiveSession->m_VideoDecoder)) {
-                    SDL_UnlockMutex(m_DecoderLock);
-                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                                 "Failed to recreate decoder after reset");
-                    emit displayLaunchError(tr("Unable to initialize video decoder. Please check your streaming settings and try again."));
-                    goto DispatchDeferredCleanup;
-                }
-
-                // As of SDL 2.0.12, SDL_RecreateWindow() doesn't carry over mouse capture
-                // or mouse hiding state to the new window. By capturing after the decoder
-                // is set up, this ensures the window re-creation is already done.
-                if (needsPostDecoderCreationCapture) {
-                    m_InputHandler->setCaptureActive(true);
-                    needsPostDecoderCreationCapture = false;
-                }
-            }
-
-            // Request an IDR frame to complete the reset
-            LiRequestIdrFrame();
-
-            // Set HDR mode. We may miss the callback if we're in the middle
-            // of recreating our decoder at the time the HDR transition happens.
-            m_VideoDecoder->setHdrMode(LiGetCurrentHostDisplayHdrMode());
-
-            // After a window resize, we need to reset the pointer lock region
-            m_InputHandler->updatePointerRegionLock();
 
             SDL_UnlockMutex(m_DecoderLock);
             break;

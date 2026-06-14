@@ -276,6 +276,13 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 #endif
 }
 
+void SdlInputHandler::updateStreamDimensions(int streamWidth, int streamHeight)
+{
+    m_StreamWidth = streamWidth;
+    m_StreamHeight = streamHeight;
+}
+
+
 void SdlInputHandler::raiseAllKeys()
 {
     if (m_KeysDown.isEmpty()) {

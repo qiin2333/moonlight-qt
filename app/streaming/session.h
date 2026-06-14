@@ -347,6 +347,14 @@ private:
     // m_ResolutionRequestInFlight is cleared by clResolutionChanged or a short timeout.
     Uint32 m_ResizeDebounceTargetTicks;
     std::atomic_bool m_ResolutionRequestInFlight;
+    // Outstanding requested dimensions (Fix #9): set on send, zeroed on timeout or echo match.
+    // SDL_CODE_RESOLUTION_CHANGED only clears m_ResolutionRequestInFlight when the echoed
+    // size equals these, preventing a stale echo from cancelling a newer outstanding request.
+    int m_ResolutionRequestOutstandingW;
+    int m_ResolutionRequestOutstandingH;
+    // Timestamp of the last host-echo decoder reset (Fix #16): used to suppress spurious
+    // debounce re-arms from SIZE_CHANGED events emitted by SDL_CreateRenderer.
+    Uint32 m_ResolutionChangeAppliedTicks;
 
     static CONNECTION_LISTENER_CALLBACKS k_ConnCallbacks;
     static Session* s_ActiveSession;
