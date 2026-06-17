@@ -10,9 +10,24 @@
 #include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
+#ifdef Q_OS_DARWIN
+class MetalVulkanTextureFactory {
+public:
+    MetalVulkanTextureFactory(pl_vulkan vulkan);
+    ~MetalVulkanTextureFactory();
+
+    bool mapVideoToolboxToPlacebo(const AVFrame *frame, pl_frame* mappedFrame);
+    void unmapVideoToolboxFromPlacebo(pl_frame* mappedFrame);
+
+private:
+    pl_vulkan m_Vulkan;
+    /* CVMetalTextureCacheRef */ void* m_TextureCache = nullptr;
+};
+#endif
+
 class PlVkRenderer : public IFFmpegRenderer {
 public:
-    PlVkRenderer(bool hwaccel = false, IFFmpegRenderer *backendRenderer = nullptr);
+    PlVkRenderer(AVHWDeviceType hwDeviceType = AV_HWDEVICE_TYPE_NONE, IFFmpegRenderer *backendRenderer = nullptr);
     virtual ~PlVkRenderer() override;
     virtual bool initialize(PDECODER_PARAMETERS params) override;
     virtual bool prepareDecoderContext(AVCodecContext* context, AVDictionary** options) override;
@@ -35,6 +50,7 @@ private:
     static void overlayUploadComplete(void* opaque);
 
     bool mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFrame);
+    void unmapAvFrameFromPlacebo(const AVFrame *frame, pl_frame* mappedFrame);
     bool populateQueues(int videoFormat);
     bool chooseVulkanDevice(PDECODER_PARAMETERS params, bool hdrOutputRequired);
     bool tryInitializeDevice(VkPhysicalDevice device, VkPhysicalDeviceProperties* deviceProps,
@@ -46,7 +62,11 @@ private:
 
     // The backend renderer if we're frontend-only
     IFFmpegRenderer* m_Backend;
-    bool m_HwAccelBackend;
+    AVHWDeviceType m_HwDeviceType;
+
+#ifdef Q_OS_DARWIN
+    std::unique_ptr<MetalVulkanTextureFactory> m_MetalTextureFactory;
+#endif
 
     // SDL state
     SDL_Window* m_Window = nullptr;
