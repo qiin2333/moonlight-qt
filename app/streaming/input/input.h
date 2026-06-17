@@ -152,6 +152,11 @@ public:
 
     void updatePointerRegionLock();
 
+    // Called on the main thread after a dynamic resolution change so that absolute
+    // mouse/touch mapping and the pointer-region lock use the correct aspect ratio.
+    void updateStreamDimensions(int streamWidth, int streamHeight);
+
+
     static
     QString getUnmappedGamepads();
 

@@ -255,6 +255,9 @@ private:
     void clClipboardData(const char* data, int length);
 
     static
+    void clResolutionChanged(uint32_t width, uint32_t height);
+
+    static
     int arInit(int audioConfiguration,
                const POPUS_MULTISTREAM_CONFIGURATION opusConfig,
                void* arContext, int arFlags);
@@ -338,6 +341,20 @@ private:
     OverlayToast* m_Toast;           // Qt-based toast notification
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
     class ClipboardSync* m_ClipboardSync; // Bidirectional clipboard sync (Sunshine 0x5508); nullptr when stream not active
+
+    // Client-driven resolution: debounce timestamp (0 = no pending resize), in-flight gate.
+    // m_ResizeDebounceTargetTicks is the SDL_GetTicks() value at which the debounce fires.
+    // m_ResolutionRequestInFlight is cleared by clResolutionChanged or a short timeout.
+    Uint32 m_ResizeDebounceTargetTicks;
+    std::atomic_bool m_ResolutionRequestInFlight;
+    // Outstanding requested dimensions (Fix #9): set on send, zeroed on timeout or echo match.
+    // SDL_CODE_RESOLUTION_CHANGED only clears m_ResolutionRequestInFlight when the echoed
+    // size equals these, preventing a stale echo from cancelling a newer outstanding request.
+    int m_ResolutionRequestOutstandingW;
+    int m_ResolutionRequestOutstandingH;
+    // Timestamp of the last host-echo decoder reset (Fix #16): used to suppress spurious
+    // debounce re-arms from SIZE_CHANGED events emitted by SDL_CreateRenderer.
+    Uint32 m_ResolutionChangeAppliedTicks;
 
     static CONNECTION_LISTENER_CALLBACKS k_ConnCallbacks;
     static Session* s_ActiveSession;

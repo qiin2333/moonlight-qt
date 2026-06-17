@@ -61,6 +61,7 @@ NvComputer::NvComputer(QSettings& settings)
     this->pendingQuit = false;
     this->gpuModel = nullptr;
     this->isSupportedServerVersion = true;
+    this->supportsClientResolutionChange = false;
     this->externalPort = this->remoteAddress.port();
     this->activeHttpsPort = 0;
 }
@@ -214,6 +215,9 @@ NvComputer::NvComputer(NvHTTP& http, QString serverInfo)
     this->state = NvComputer::CS_ONLINE;
     this->pendingQuit = false;
     this->isSupportedServerVersion = CompatFetcher::isGfeVersionSupported(this->gfeVersion);
+    // AlkaidLab Sunshine fork advertises this tag when 0x5506 dynamic-parameter support is present.
+    // ASSUMPTION: tag name is "ClientResolutionChange"; must match the FoundationHost serverinfo emission.
+    this->supportsClientResolutionChange = NvHTTP::getXmlString(serverInfo, "ClientResolutionChange") == "1";
 }
 
 bool NvComputer::wake() const
@@ -628,6 +632,7 @@ bool NvComputer::update(const NvComputer& that)
     ASSIGN_IF_CHANGED(isNvidiaServerSoftware);
     ASSIGN_IF_CHANGED(maxLumaPixelsHEVC);
     ASSIGN_IF_CHANGED(gpuModel);
+    ASSIGN_IF_CHANGED(supportsClientResolutionChange);
     ASSIGN_IF_CHANGED_AND_NONNULL(serverCert);
     ASSIGN_IF_CHANGED_AND_NONEMPTY(displayModes);
 
