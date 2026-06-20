@@ -7,6 +7,7 @@
 #include <QQueue>
 #include <QString>
 #include <QStringList>
+#include <QUrl>
 #include <cstdint>
 
 class NvComputer;
@@ -22,11 +23,12 @@ class QSslError;
 // payload, little-endian) over Limelight control packet 0x5508
 // (LiSendClipboardData / ConnListenerClipboardData).
 //
-// Supports kind=1 (UTF-8 text), kind=2 (PNG image), and kind=3 (REF JSON
+// Supports kind=1 (UTF-8 text), kind=2 (PNG image), kind=3 (REF JSON
 // pointing to an out-of-band blob transferred over HTTPS via the Sunshine
-// /api/v1/clipboard/blob endpoints) in both directions. Payloads above the
-// 65 KB single-packet cap are switched to KIND_REF transparently.
-// File / other payloads are accepted on the wire but ignored.
+// /api/v1/clipboard/blob endpoints) in both directions, and kind=4
+// (FILE_OFFER JSON) host-to-client file downloads. Payloads above the 65 KB
+// single-packet cap are switched to KIND_REF transparently. Unknown payloads
+// are accepted on the wire but ignored.
 //
 // Echo suppression: when we either write a payload to the local clipboard
 // (because the host pushed it) or send a payload to the host (because we
@@ -50,6 +52,7 @@ public:
         KIND_TEXT = 1,
         KIND_PNG  = 2,
         KIND_REF  = 3,
+        KIND_FILE_OFFER = 4,
     };
 
     static constexpr uint8_t WIRE_VERSION = 1;
@@ -60,6 +63,7 @@ public:
     // Mirrors the cross-client cap (64 MiB) shared with the Android and
     // HarmonyOS clients. The service-side blob store accepts up to this much.
     static constexpr qint64  MAX_BLOB_BYTES   = 64LL * 1024 * 1024;
+    static constexpr qint64  MAX_FILE_TRANSFER_BYTES = 4LL * 1024 * 1024 * 1024;
     static constexpr int     ECHO_TTL_MS  = 5000;
     static constexpr int     ECHO_MAX     = 16;
     // Mirror the Android client's cap (32 Mpx) so a stray full-screen capture
@@ -120,12 +124,21 @@ private:
 
     // Out-of-band blob helpers. Both run on the GUI thread; the
     // QNetworkAccessManager event-loop callbacks land back on the GUI thread.
+    bool buildApiUrl(const QString& path, QUrl& outUrl) const;
     bool buildBlobUrl(const QString& tail, QUrl& outUrl) const;
     QNetworkAccessManager* nam();
     void uploadAndSendRef(const QByteArray& payload, const QString& mime);
     void fetchRefAndApply(const QString& id, const QString& mime, qint64 advertisedSize);
+    void fetchFileOffer(const QByteArray& payload);
+    void downloadFileOffer(const QString& id,
+                           const QString& name,
+                           qint64 advertisedSize,
+                           const QString& downloadPath);
     void applyInboundText(const QByteArray& payload);
     void applyInboundPng(const QByteArray& payload);
+
+    static QString sanitizeFileName(const QString& name);
+    static QString uniqueDownloadPath(const QString& fileName);
 
     NvComputer* m_Computer = nullptr;
     QNetworkAccessManager* m_Nam = nullptr;
