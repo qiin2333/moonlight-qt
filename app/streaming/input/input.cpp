@@ -216,6 +216,12 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
 
 SdlInputHandler::~SdlInputHandler()
 {
+#ifdef Q_OS_WIN32
+    // Remove the WM_APPCOMMAND message hook installed in setWindow(). It
+    // captures "this", so it must be cleared before we're destroyed.
+    SDL_SetWindowsMessageHook(nullptr, nullptr);
+#endif
+
     for (int i = 0; i < MAX_GAMEPADS; i++) {
         if (m_GamepadState[i].mouseEmulationTimer != 0) {
             Session::get()->notifyMouseEmulationMode(false);
@@ -273,8 +279,78 @@ void SdlInputHandler::setWindow(SDL_Window *window)
     if (SDL_GetWindowWMInfo(m_Window, &info) && info.subsystem == SDL_SYSWM_WINDOWS) {
         ImmAssociateContext(info.info.win.window, NULL);
     }
+
+    // Media transport keys (play/pause, stop, next/prev) and volume keys are
+    // delivered by Windows as WM_APPCOMMAND messages rather than WM_KEYDOWN, so
+    // SDL never produces a key event for them and handleKeyEvent() never sees
+    // them. Install a Win32 message hook to capture WM_APPCOMMAND and forward
+    // the equivalent VK_MEDIA_*/VK_VOLUME_* code to the host ourselves.
+    SDL_SetWindowsMessageHook(SdlInputHandler::windowsMessageHook, this);
 #endif
 }
+
+#ifdef Q_OS_WIN32
+void SdlInputHandler::windowsMessageHook(void* userdata, void* hWnd, unsigned int message, Uint64 wParam, Sint64 lParam)
+{
+    Q_UNUSED(hWnd);
+    Q_UNUSED(wParam);
+
+    if (message != WM_APPCOMMAND) {
+        return;
+    }
+
+    auto me = reinterpret_cast<SdlInputHandler*>(userdata);
+
+    // Only forward media keys while we're actively sending input to the host,
+    // so the user's local media keys keep working when they've released capture.
+    if (me == nullptr || !me->isCaptureActive()) {
+        return;
+    }
+
+    short keyCode;
+    switch (GET_APPCOMMAND_LPARAM((LPARAM)lParam)) {
+    case APPCOMMAND_MEDIA_PLAY_PAUSE:
+        keyCode = VK_MEDIA_PLAY_PAUSE;
+        break;
+    case APPCOMMAND_MEDIA_PLAY:
+        keyCode = VK_MEDIA_PLAY_PAUSE;
+        break;
+    case APPCOMMAND_MEDIA_PAUSE:
+        keyCode = VK_MEDIA_PLAY_PAUSE;
+        break;
+    case APPCOMMAND_MEDIA_STOP:
+        keyCode = VK_MEDIA_STOP;
+        break;
+    case APPCOMMAND_MEDIA_NEXTTRACK:
+        keyCode = VK_MEDIA_NEXT_TRACK;
+        break;
+    case APPCOMMAND_MEDIA_PREVIOUSTRACK:
+        keyCode = VK_MEDIA_PREV_TRACK;
+        break;
+    case APPCOMMAND_VOLUME_MUTE:
+        keyCode = VK_VOLUME_MUTE;
+        break;
+    case APPCOMMAND_VOLUME_DOWN:
+        keyCode = VK_VOLUME_DOWN;
+        break;
+    case APPCOMMAND_VOLUME_UP:
+        keyCode = VK_VOLUME_UP;
+        break;
+    default:
+        // Not a key we forward; let Windows handle it normally.
+        return;
+    }
+
+    // WM_APPCOMMAND is a single discrete event (no separate key-up), so we
+    // synthesize a press and release. We send the raw VK code with the
+    // non-normalized flag so the host injects it directly rather than trying to
+    // re-interpret it against the keyboard layout (these keys have no scancode).
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Forwarding WM_APPCOMMAND media key: 0x%x", keyCode);
+    LiSendKeyboardEvent2(0x8000 | keyCode, KEY_ACTION_DOWN, 0, SS_KBE_FLAG_NON_NORMALIZED);
+    LiSendKeyboardEvent2(0x8000 | keyCode, KEY_ACTION_UP, 0, SS_KBE_FLAG_NON_NORMALIZED);
+}
+#endif
 
 void SdlInputHandler::raiseAllKeys()
 {
