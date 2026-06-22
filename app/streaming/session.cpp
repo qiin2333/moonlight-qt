@@ -106,7 +106,7 @@ public:
     virtual void run() override
     {
         try {
-            NvHTTP http(m_Address, m_HttpsPort, m_ServerCert, nullptr, m_Uuid);
+            NvHTTP http(m_Address, m_HttpsPort, m_ServerCert, true, nullptr, m_Uuid);
             QJsonObject response = http.sendAbrFeedback(m_PacketLoss,
                                                         m_RttMs,
                                                         m_DecodeFps,

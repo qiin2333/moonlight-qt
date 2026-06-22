@@ -28,9 +28,10 @@
 #define XML_NAME_EQUALS(x, y) ((x) == (u##y))
 #endif
 
-NvHTTP::NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert, QNetworkAccessManager* nam, QString uuid) :
+NvHTTP::NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert, bool useTrueUid, QNetworkAccessManager* nam, QString uuid) :
     m_Nam(nam ? nam : new QNetworkAccessManager(this)),
     m_ServerCert(serverCert),
+    m_UseTrueUid(useTrueUid),
     m_Uuid(uuid)
 {
     m_BaseUrlHttp.setScheme("http");
@@ -45,9 +46,8 @@ NvHTTP::NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert
 }
 
 NvHTTP::NvHTTP(NvComputer* computer, QNetworkAccessManager* nam) :
-    NvHTTP(computer->activeAddress, computer->activeHttpsPort, computer->serverCert, nam, computer->uuid)
+    NvHTTP(computer->activeAddress, computer->activeHttpsPort, computer->serverCert, !computer->isNvidiaServerSoftware, nam, computer->uuid)
 {
-
 }
 
 void NvHTTP::setServerCert(QSslCertificate serverCert)
@@ -70,6 +70,16 @@ void NvHTTP::setAddress(NvAddress address)
 void NvHTTP::setHttpsPort(uint16_t port)
 {
     m_BaseUrlHttps.setPort(port);
+}
+
+void NvHTTP::setTrueUid(bool useTrueUid)
+{
+    m_UseTrueUid = useTrueUid;
+}
+
+void NvHTTP::setHostUuid(QString uuid)
+{
+    m_Uuid = uuid;
 }
 
 NvAddress NvHTTP::address()
@@ -634,10 +644,6 @@ NvHTTP::openConnection(QUrl baseUrl,
     QUrl url(baseUrl);
     url.setPath("/" + command);
 
-    // Use a common UID for Moonlight clients to allow them to quit
-    // games for each other (otherwise GFE gets screwed up and it requires
-    // manual intervention to solve).
-    
     // Get clientname - prefer pairname if available, otherwise use local hostname
     QString clientname = QHostInfo::localHostName().toUtf8();
     if (!m_Uuid.isEmpty()) {
@@ -648,9 +654,10 @@ NvHTTP::openConnection(QUrl baseUrl,
     }
 
     qInfo() << "clientname:" << clientname;
-    
-    url.setQuery("uniqueid=0123456789ABCDEF&uuid=" +
-                 QUuid::createUuid().toRfc4122().toHex() +
+
+    // Use a placeholder UID for GFE allow them to quit games for each other.
+    url.setQuery("uniqueid=" + (m_UseTrueUid ? IdentityManager::get()->getUniqueId() : "0123456789ABCDEF") +
+                 "&uuid=" + QUuid::createUuid().toRfc4122().toHex() +
                  "&clientname=" + clientname +
                  ((arguments != nullptr) ? ("&" + arguments) : ""));
 
