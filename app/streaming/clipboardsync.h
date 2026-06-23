@@ -16,6 +16,7 @@ class QMimeData;
 class QNetworkAccessManager;
 class QNetworkReply;
 class QSslError;
+class QTimer;
 
 struct ClipboardSyncHostContext
 {
@@ -103,6 +104,12 @@ private slots:
     // QClipboard::dataChanged -> emitted on GUI thread.
     void onLocalClipboardChanged();
 
+#ifdef Q_OS_MACOS
+    // macOS does not reliably emit QClipboard::dataChanged for external
+    // pasteboard changes while the helper is a background accessory process.
+    void pollPasteboardChangeCount();
+#endif
+
     // Queued slot used by handleIncomingFrame() to deliver to GUI thread.
     void onIncomingFrame(QByteArray frame);
 
@@ -151,6 +158,11 @@ private:
 
     bool m_Active = false;
     QQueue<QPair<uint64_t, qint64>> m_EchoCache; // (hash, timestamp_ms)
+
+#ifdef Q_OS_MACOS
+    QTimer* m_PasteboardPollTimer = nullptr;
+    int m_LastPasteboardChangeCount = -1;
+#endif
 
     // Counter for self-writes pending QClipboard::dataChanged callbacks.
     // Some Windows clipboard hooks (e.g. IME composition managers) cause a
