@@ -2,6 +2,7 @@
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 
 namespace ClipboardIpc {
 namespace {
@@ -151,7 +152,16 @@ bool decodeLine(const QByteArray& line, Message& outMessage, QString& outError)
     }
 
     outMessage.type = stringToType(obj.value(QStringLiteral("type")).toString());
-    outMessage.sequence = static_cast<quint32>(obj.value(QStringLiteral("sequence")).toInt());
+    QJsonValue sequenceValue = obj.value(QStringLiteral("sequence"));
+    double sequence = sequenceValue.toDouble(-1);
+    if (!sequenceValue.isDouble() ||
+            sequence < 0 ||
+            sequence > 4294967295.0 ||
+            static_cast<double>(static_cast<quint32>(sequence)) != sequence) {
+        outError = QStringLiteral("invalid sequence number");
+        return false;
+    }
+    outMessage.sequence = static_cast<quint32>(sequence);
     if (outMessage.type == MessageType::Unknown) {
         outError = QStringLiteral("unknown message type");
         return false;

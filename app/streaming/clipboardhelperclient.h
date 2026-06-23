@@ -31,6 +31,7 @@ public:
 
 private:
     static constexpr int MAX_QUEUED_HOST_FRAMES = 32;
+    static constexpr int MAX_PENDING_STDIN_BYTES = 4 * 1024 * 1024;
     static constexpr int MAX_RESTART_ATTEMPTS = 3;
     static constexpr quint32 RESTART_DELAY_MS = 1000;
 
@@ -42,9 +43,12 @@ private:
     void flushQueuedHostFrames();
     void readHelperOutput();
     void readHelperErrors();
+    void logHelperStderrLine(const QByteArray& line);
     void processProtocolLine(const QByteArray& line);
     void handleProtocolError(const QString& error);
-    void writeLine(const QByteArray& line);
+    void restartHelper(const char* reason);
+    bool flushProcessInput();
+    bool writeLine(const QByteArray& line);
     quint32 nextSequence();
 
     NvComputer* m_Computer;
@@ -54,6 +58,7 @@ private:
     QQueue<QByteArray> m_InboundFrames;
     QByteArray m_StdoutBuffer;
     QByteArray m_StderrBuffer;
+    QByteArray m_StdinBuffer;
     bool m_Enabled;
     bool m_Disabled;
     bool m_StopRequested;

@@ -152,8 +152,6 @@ int main(int argc, char* argv[])
     QObject::connect(&stdinThread, &StdinReaderThread::lineReceived,
                      &controller, &ClipboardHelperController::handleLine,
                      Qt::QueuedConnection);
-    QObject::connect(&app, &QCoreApplication::aboutToQuit,
-                     &stdinThread, &QThread::requestInterruption);
 
     stdinThread.start();
     int rc = app.exec();

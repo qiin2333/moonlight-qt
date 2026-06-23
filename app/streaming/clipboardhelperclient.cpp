@@ -80,6 +80,7 @@ bool ClipboardHelperClient::startProcess()
     m_HelperReady = false;
     m_StdoutBuffer.clear();
     m_StderrBuffer.clear();
+    m_StdinBuffer.clear();
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "Clipboard helper started: %s",
                 m_HelperPath.toUtf8().constData());
@@ -101,8 +102,11 @@ void ClipboardHelperClient::stop()
 
     if (m_Process->state() != QProcess::NotRunning) {
         writeLine(ClipboardIpc::encodeStop(nextSequence()));
-        m_Process->closeWriteChannel();
-        if (!m_Process->waitForFinished(1000)) {
+        flushProcessInput();
+        if (m_Process != nullptr) {
+            m_Process->closeWriteChannel();
+        }
+        if (m_Process != nullptr && !m_Process->waitForFinished(1000)) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Clipboard helper did not exit cleanly; killing it");
             m_Process->kill();
@@ -110,8 +114,10 @@ void ClipboardHelperClient::stop()
         }
     }
 
-    delete m_Process;
-    m_Process = nullptr;
+    if (m_Process != nullptr) {
+        delete m_Process;
+        m_Process = nullptr;
+    }
 }
 
 void ClipboardHelperClient::updateHostContext()
@@ -155,9 +161,14 @@ void ClipboardHelperClient::processPendingMessages()
         delete m_Process;
         m_Process = nullptr;
         m_HelperReady = false;
+        m_StdinBuffer.clear();
         if (!m_StopRequested) {
             scheduleRestart("unexpected exit");
         }
+        return;
+    }
+
+    if (!flushProcessInput()) {
         return;
     }
 
@@ -272,8 +283,7 @@ bool ClipboardHelperClient::sendCurrentConfig()
 
     m_HelperReady = false;
     m_ConfigSequence = nextSequence();
-    writeLine(ClipboardIpc::encodeConfigure(m_ConfigSequence, config));
-    return true;
+    return writeLine(ClipboardIpc::encodeConfigure(m_ConfigSequence, config));
 }
 
 void ClipboardHelperClient::flushQueuedHostFrames()
@@ -294,7 +304,9 @@ void ClipboardHelperClient::flushQueuedHostFrames()
     }
 
     while (!frames.isEmpty()) {
-        writeLine(ClipboardIpc::encodeHostFrame(nextSequence(), frames.dequeue()));
+        if (!writeLine(ClipboardIpc::encodeHostFrame(nextSequence(), frames.dequeue()))) {
+            return;
+        }
     }
 }
 
@@ -344,11 +356,30 @@ void ClipboardHelperClient::readHelperErrors()
             line.chop(1);
         }
         if (!line.isEmpty()) {
-            SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
-                         "Clipboard helper: %s",
-                         line.constData());
+            logHelperStderrLine(line);
         }
     }
+}
+
+void ClipboardHelperClient::logHelperStderrLine(const QByteArray& line)
+{
+    if (line.startsWith("ClipboardSync WARN:")) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Clipboard helper: %s",
+                    line.constData());
+        return;
+    }
+
+    if (line.startsWith("ClipboardSync INFO:")) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Clipboard helper: %s",
+                    line.constData());
+        return;
+    }
+
+    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                 "Clipboard helper: %s",
+                 line.constData());
 }
 
 void ClipboardHelperClient::processProtocolLine(const QByteArray& line)
@@ -400,24 +431,72 @@ void ClipboardHelperClient::handleProtocolError(const QString& error)
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                 "Clipboard helper protocol error: %s",
                 error.toUtf8().constData());
+    restartHelper("protocol error");
 }
 
-void ClipboardHelperClient::writeLine(const QByteArray& line)
+void ClipboardHelperClient::restartHelper(const char* reason)
+{
+    m_HelperReady = false;
+    m_StdoutBuffer.clear();
+    m_StderrBuffer.clear();
+    m_StdinBuffer.clear();
+
+    if (m_Process != nullptr) {
+        if (m_Process->state() != QProcess::NotRunning) {
+            m_Process->kill();
+            m_Process->waitForFinished(1000);
+        }
+        delete m_Process;
+        m_Process = nullptr;
+    }
+
+    scheduleRestart(reason);
+}
+
+bool ClipboardHelperClient::flushProcessInput()
 {
     if (m_Process == nullptr || m_Process->state() == QProcess::NotRunning) {
-        return;
+        return false;
+    }
+
+    while (!m_StdinBuffer.isEmpty()) {
+        qint64 written = m_Process->write(m_StdinBuffer.constData(), m_StdinBuffer.size());
+        if (written < 0) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Clipboard helper pipe write failed: %s",
+                        m_Process->errorString().toUtf8().constData());
+            restartHelper("pipe write failed");
+            return false;
+        }
+
+        if (written == 0) {
+            break;
+        }
+
+        m_StdinBuffer.remove(0, static_cast<int>(written));
+    }
+
+    m_Process->waitForBytesWritten(0);
+    return true;
+}
+
+bool ClipboardHelperClient::writeLine(const QByteArray& line)
+{
+    if (m_Process == nullptr || m_Process->state() == QProcess::NotRunning) {
+        return false;
     }
 
     QByteArray out = line;
     out.append('\n');
-    qint64 written = m_Process->write(out);
-    if (written != out.size()) {
+    if (m_StdinBuffer.size() + out.size() > MAX_PENDING_STDIN_BYTES) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Clipboard helper pipe write failed: wrote %lld of %d bytes",
-                    static_cast<long long>(written),
-                    out.size());
+                    "Clipboard helper stdin backlog exceeded protocol limit");
+        restartHelper("pipe backlog exceeded");
+        return false;
     }
-    m_Process->waitForBytesWritten(0);
+
+    m_StdinBuffer.append(out);
+    return flushProcessInput();
 }
 
 quint32 ClipboardHelperClient::nextSequence()
