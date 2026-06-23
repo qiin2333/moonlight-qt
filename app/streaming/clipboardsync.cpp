@@ -105,18 +105,21 @@ void ClipboardSync::start()
         return;
     }
 
-    connect(cb, &QClipboard::dataChanged,
-            this, &ClipboardSync::onLocalClipboardChanged,
-            Qt::UniqueConnection);
-
 #ifdef Q_OS_MACOS
     m_LastPasteboardChangeCount = ClipboardHelperPasteboardChangeCount();
+    connect(cb, &QClipboard::dataChanged,
+            this, &ClipboardSync::onMacClipboardDataChanged,
+            Qt::UniqueConnection);
     if (m_PasteboardPollTimer == nullptr) {
         m_PasteboardPollTimer = new QTimer(this);
         connect(m_PasteboardPollTimer, &QTimer::timeout,
                 this, &ClipboardSync::pollPasteboardChangeCount);
     }
     m_PasteboardPollTimer->start(500);
+#else
+    connect(cb, &QClipboard::dataChanged,
+            this, &ClipboardSync::onLocalClipboardChanged,
+            Qt::UniqueConnection);
 #endif
 
     m_Active = true;
@@ -131,8 +134,13 @@ void ClipboardSync::stop()
 
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb != nullptr) {
+#ifdef Q_OS_MACOS
+        disconnect(cb, &QClipboard::dataChanged,
+                   this, &ClipboardSync::onMacClipboardDataChanged);
+#else
         disconnect(cb, &QClipboard::dataChanged,
                    this, &ClipboardSync::onLocalClipboardChanged);
+#endif
     }
 
     m_EchoCache.clear();
@@ -161,6 +169,16 @@ void ClipboardSync::handleIncomingFrame(const char* data, int length)
 }
 
 #ifdef Q_OS_MACOS
+void ClipboardSync::onMacClipboardDataChanged()
+{
+    int changeCount = ClipboardHelperPasteboardChangeCount();
+    if (changeCount >= 0) {
+        m_LastPasteboardChangeCount = changeCount;
+    }
+
+    onLocalClipboardChanged();
+}
+
 void ClipboardSync::pollPasteboardChangeCount()
 {
     if (!m_Active) {

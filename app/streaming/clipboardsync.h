@@ -101,6 +101,12 @@ signals:
     void outboundFrame(QByteArray frame);
 
 private slots:
+#ifdef Q_OS_MACOS
+    // QClipboard::dataChanged wrapper that keeps the native pasteboard
+    // changeCount baseline in sync before processing the clipboard.
+    void onMacClipboardDataChanged();
+#endif
+
     // QClipboard::dataChanged -> emitted on GUI thread.
     void onLocalClipboardChanged();
 
