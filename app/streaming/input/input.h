@@ -132,7 +132,8 @@ public:
 
     int getAttachedGamepadMask();
 
-    void raiseAllKeys();
+    void raiseAllKeys(bool clearKeys = true);
+    bool hasKeysDown() const { return !m_KeysDown.isEmpty(); }
 
     void notifyMouseLeave();
 

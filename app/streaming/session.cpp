@@ -1,5 +1,5 @@
 #include "session.h"
-#include "clipboardsync.h"
+#include "clipboardhelperclient.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
@@ -347,12 +347,12 @@ void Session::clSetHdrMode(bool enabled)
 void Session::clClipboardData(const char* data, int length)
 {
     Session* session = s_ActiveSession;
-    if (session == nullptr || session->m_ClipboardSync == nullptr) {
+    if (session == nullptr || session->m_ClipboardHelper == nullptr) {
         return;
     }
 
-    // Marshals to GUI thread internally; safe to call from the recv thread.
-    session->m_ClipboardSync->handleIncomingFrame(data, length);
+    // Queues internally; safe to call from the recv thread.
+    session->m_ClipboardHelper->handleIncomingFrame(data, length);
 }
 
 void Session::clRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger, uint16_t rightTrigger)
@@ -731,7 +731,7 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_MicStream(nullptr)
 {
     memset(&m_LastAbrVideoStats, 0, sizeof(m_LastAbrVideoStats));
-    m_ClipboardSync = nullptr;
+    m_ClipboardHelper = nullptr;
 }
 
 Session::~Session()
@@ -739,10 +739,10 @@ Session::~Session()
     // NB: This may not get destroyed for a long time! Don't put any non-trivial cleanup here.
     // Use Session::exec() or DeferredSessionCleanupTask instead.
 
-    if (m_ClipboardSync != nullptr) {
-        m_ClipboardSync->stop();
-        delete m_ClipboardSync;
-        m_ClipboardSync = nullptr;
+    if (m_ClipboardHelper != nullptr) {
+        m_ClipboardHelper->stop();
+        delete m_ClipboardHelper;
+        m_ClipboardHelper = nullptr;
     }
 
     SDL_DestroyMutex(m_DecoderLock);
@@ -2181,6 +2181,13 @@ public:
 
 bool Session::tryReconnect()
 {
+    // Release any locally tracked pressed keys before tearing down the dead connection.
+    // If the old control stream is still partly alive, this gives the host one last
+    // chance to clear stuck key state before reconnecting.
+    if (m_InputHandler != nullptr) {
+        m_InputHandler->raiseAllKeys(false);
+    }
+
     // The decoder can only be used between LiStartConnection() and
     // LiStopConnection(), so tear it down before stopping the dead connection.
     SDL_LockMutex(m_DecoderLock);
@@ -2252,6 +2259,12 @@ bool Session::tryReconnect()
 
         if (m_AsyncConnectionSuccess) {
             reconnected = true;
+            if (m_ClipboardHelper != nullptr) {
+                m_ClipboardHelper->updateHostContext();
+            }
+            if (m_InputHandler != nullptr) {
+                m_InputHandler->raiseAllKeys();
+            }
             break;
         }
 
@@ -2623,13 +2636,15 @@ void Session::start()
     // We're now active
     s_ActiveSession = this;
 
-    // Construct the clipboard sync helper on the GUI thread before the
-    // control receive thread can possibly invoke clClipboardData(). It is
-    // started after a successful connection in clConnectionStatusUpdate.
-    if (m_ClipboardSync == nullptr) {
-        m_ClipboardSync = new ClipboardSync(m_Computer, this);
-        m_ClipboardSync->start();
+#ifndef STEAM_LINK
+    // Construct the clipboard sync helper process before the control receive
+    // thread can possibly invoke clClipboardData(). Host frames are queued by
+    // ClipboardHelperClient and flushed from the SDL loop.
+    if (m_ClipboardHelper == nullptr) {
+        m_ClipboardHelper = new ClipboardHelperClient(m_Computer, this);
+        m_ClipboardHelper->start();
     }
+#endif
 
     // Initialize the gamepad code with our preferences
     // NB: m_InputHandler must be initialize before starting the connection.
@@ -2713,11 +2728,20 @@ void Session::exec()
 {
     // If the connection failed, clean up and abort the connection.
     if (!m_AsyncConnectionSuccess) {
+        if (m_ClipboardHelper != nullptr) {
+            m_ClipboardHelper->stop();
+            delete m_ClipboardHelper;
+            m_ClipboardHelper = nullptr;
+        }
         delete m_InputHandler;
         m_InputHandler = nullptr;
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
         QThreadPool::globalInstance()->start(new DeferredSessionCleanupTask(this));
         return;
+    }
+
+    if (m_ClipboardHelper != nullptr) {
+        m_ClipboardHelper->updateHostContext();
     }
 
     // Pump the Qt event loop one last time before we create our SDL window
@@ -2800,6 +2824,11 @@ void Session::exec()
                          "SDL_CreateWindow() failed: %s",
                          SDL_GetError());
 
+            if (m_ClipboardHelper != nullptr) {
+                m_ClipboardHelper->stop();
+                delete m_ClipboardHelper;
+                m_ClipboardHelper = nullptr;
+            }
             delete m_InputHandler;
             m_InputHandler = nullptr;
             SDL_QuitSubSystem(SDL_INIT_VIDEO);
@@ -2937,23 +2966,30 @@ void Session::exec()
     // Switch to async logging mode when we enter the SDL loop
     StreamUtils::enterAsyncLoggingMode();
 
-    // Hijack this thread to be the SDL main thread. We still need to pump Qt
-    // periodically while streaming because ClipboardSync relies on Qt's event
-    // loop for QClipboard notifications, queued inbound frames, and QNAM blob
-    // callbacks. Without this, PNG clipboard sync can stall on every platform.
-    constexpr Uint32 QT_EVENT_PUMP_INTERVAL_MS = 10;
+    // Hijack this thread to be the SDL main thread. Pump Qt only for visible
+    // streaming UI; clipboard sync runs in a helper process with its own Qt
+    // event loop and is serviced via pipe polling below.
+    constexpr Uint32 QT_UI_EVENT_PUMP_INTERVAL_MS = 10;
     Uint32 lastQtEventPumpTicks = 0;
     auto processQtEventsDuringStream = [this, &lastQtEventPumpTicks](bool force = false) {
         const bool qtUiVisible = (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
                                  (m_Toast && m_Toast->isVisible());
+        if (!qtUiVisible) {
+            return;
+        }
+
         const Uint32 now = SDL_GetTicks();
-        if (!force && !qtUiVisible && now - lastQtEventPumpTicks < QT_EVENT_PUMP_INTERVAL_MS) {
+        if (!force && now - lastQtEventPumpTicks < QT_UI_EVENT_PUMP_INTERVAL_MS) {
             return;
         }
         lastQtEventPumpTicks = now;
-        QCoreApplication::processEvents(qtUiVisible
-                                        ? QEventLoop::AllEvents
-                                        : QEventLoop::ExcludeUserInputEvents);
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+    };
+
+    auto processClipboardHelperMessages = [this]() {
+        if (m_ClipboardHelper != nullptr) {
+            m_ClipboardHelper->processPendingMessages();
+        }
     };
 
     constexpr Uint32 ABR_FEEDBACK_INTERVAL_MS = 3000;
@@ -2972,6 +3008,7 @@ void Session::exec()
     SDL_Event event;
     for (;;) {
         processSunshineAbrFeedback();
+        processClipboardHelperMessages();
 
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
         // SDL 2.0.18 has a proper wait event implementation that uses platform
@@ -2983,8 +3020,10 @@ void Session::exec()
         // NB: This behavior was introduced in SDL 2.0.16, but had a few critical
         // issues that could cause indefinite timeouts, delayed joystick detection,
         // and other problems.
-        if (!SDL_WaitEventTimeout(&event, 1000)) {
+        int waitTimeoutMs = (m_ClipboardHelper != nullptr && m_ClipboardHelper->isRunning()) ? 100 : 1000;
+        if (!SDL_WaitEventTimeout(&event, waitTimeoutMs)) {
             presence.runCallbacks();
+            processClipboardHelperMessages();
             processQtEventsDuringStream(true);
             processSunshineAbrFeedback();
             continue;
@@ -3003,6 +3042,7 @@ void Session::exec()
             SDL_Delay(10);
 #endif
             presence.runCallbacks();
+            processClipboardHelperMessages();
             processQtEventsDuringStream();
             processSunshineAbrFeedback();
             continue;
@@ -3424,6 +3464,7 @@ void Session::exec()
             break;
         }
 
+        processClipboardHelperMessages();
         processQtEventsDuringStream();
 
         // Deferred microphone toggle — runs outside processEvents() to avoid
@@ -3449,6 +3490,13 @@ void Session::exec()
 DispatchDeferredCleanup:
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();
+
+    if (m_ClipboardHelper != nullptr) {
+        m_ClipboardHelper->processPendingMessages();
+        m_ClipboardHelper->stop();
+        delete m_ClipboardHelper;
+        m_ClipboardHelper = nullptr;
+    }
 
     // Destroy the Qt overlay menu panel
     if (m_MenuPanel) {

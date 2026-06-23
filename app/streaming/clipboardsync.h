@@ -5,22 +5,33 @@
 #include <QMutex>
 #include <QPair>
 #include <QQueue>
+#include <QSslCertificate>
+#include <QSslKey>
 #include <QString>
 #include <QStringList>
 #include <cstdint>
 
-class NvComputer;
 class QImage;
 class QMimeData;
 class QNetworkAccessManager;
 class QNetworkReply;
 class QSslError;
 
-// ClipboardSync owns the bidirectional clipboard sync state for an active
-// streaming session against an AlkaidLab Sunshine fork host. It implements
-// the v1 wire format (u8 version=1, u8 kind, u32 token, u32 length, bytes
-// payload, little-endian) over Limelight control packet 0x5508
-// (LiSendClipboardData / ConnListenerClipboardData).
+struct ClipboardSyncHostContext
+{
+    QString address;
+    quint16 httpsPort = 0;
+    QSslCertificate serverCertificate;
+    QSslCertificate clientCertificate;
+    QSslKey clientPrivateKey;
+};
+
+// ClipboardSync owns the local clipboard state inside the clipboard helper
+// process. It implements the v1 wire format (u8 version=1, u8 kind, u32
+// token, u32 length, bytes payload, little-endian) used by the Limelight
+// control packet 0x5508, but it does not talk to Limelight directly. The
+// helper process reports outbound frames to the main process via IPC, and the
+// main process forwards them through LiSendClipboardData().
 //
 // Supports kind=1 (UTF-8 text), kind=2 (PNG image), and kind=3 (REF JSON
 // pointing to an out-of-band blob transferred over HTTPS via the Sunshine
@@ -38,9 +49,8 @@ class QSslError;
 // Threading:
 //   * Construct on the GUI thread.
 //   * start() / stop() must run on the GUI thread.
-//   * handleIncomingFrame() may be called from any thread (specifically the
-//     moonlight-common-c control receive thread). It marshals the payload
-//     onto the GUI thread via a queued metacall.
+//   * handleIncomingFrame() may be called from any thread. It marshals the
+//     payload onto the helper GUI thread via a queued metacall.
 class ClipboardSync : public QObject
 {
     Q_OBJECT
@@ -66,8 +76,11 @@ public:
     // doesn't try to PNG-encode a 100 MB bitmap and stall the GUI thread.
     static constexpr qint64  MAX_IMAGE_PIXELS = 32LL * 1024 * 1024;
 
-    explicit ClipboardSync(NvComputer* computer = nullptr, QObject* parent = nullptr);
+    explicit ClipboardSync(const ClipboardSyncHostContext& hostContext = ClipboardSyncHostContext(),
+                           QObject* parent = nullptr);
     ~ClipboardSync() override;
+
+    void setHostContext(const ClipboardSyncHostContext& hostContext);
 
     // Start watching the local clipboard and accepting inbound payloads.
     // Must be called on the GUI thread.
@@ -79,6 +92,12 @@ public:
     // Called from the control receive thread when the host pushes a 0x5508
     // payload. Buffer is only valid for the duration of the call; we copy.
     void handleIncomingFrame(const char* data, int length);
+
+signals:
+    // Emitted when local clipboard changes need to be sent to the host. The
+    // owner decides how to deliver the frame, which lets the clipboard engine
+    // run in a helper process without direct access to the Limelight session.
+    void outboundFrame(QByteArray frame);
 
 private slots:
     // QClipboard::dataChanged -> emitted on GUI thread.
@@ -127,7 +146,7 @@ private:
     void applyInboundText(const QByteArray& payload);
     void applyInboundPng(const QByteArray& payload);
 
-    NvComputer* m_Computer = nullptr;
+    ClipboardSyncHostContext m_HostContext;
     QNetworkAccessManager* m_Nam = nullptr;
 
     bool m_Active = false;

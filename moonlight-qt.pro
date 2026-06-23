@@ -7,6 +7,10 @@ SUBDIRS = \
 
 # Build the dependencies in parallel before the final app
 app.depends = qmdnsengine moonlight-common-c h264bitstream
+!config_SL {
+    SUBDIRS += clipboard-helper
+    app.depends += clipboard-helper
+}
 win32:!winrt {
     SUBDIRS += AntiHooking
     app.depends += AntiHooking
