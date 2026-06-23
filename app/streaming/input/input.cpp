@@ -276,21 +276,45 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 #endif
 }
 
-void SdlInputHandler::raiseAllKeys()
+void SdlInputHandler::raiseAllKeys(bool clearKeys)
 {
     if (m_KeysDown.isEmpty()) {
         return;
     }
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Raising %d keys",
-                (int)m_KeysDown.count());
+                "Raising %d keys%s",
+                (int)m_KeysDown.count(),
+                clearKeys ? "" : " (keeping local state for retry)");
 
-    for (auto keyDown : std::as_const(m_KeysDown)) {
-        LiSendKeyboardEvent(keyDown, KEY_ACTION_UP, 0);
+    int failedCount = 0;
+    auto keysDown = m_KeysDown;
+
+    for (auto keyDown : std::as_const(keysDown)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                     "Raising key: vk=0x%04x",
+                     (int)keyDown);
+
+        int rc = LiSendKeyboardEvent(keyDown, KEY_ACTION_UP, 0);
+        if (rc == 0) {
+            if (clearKeys) {
+                m_KeysDown.remove(keyDown);
+            }
+        }
+        else {
+            failedCount++;
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "LiSendKeyboardEvent failed while raising key: rc=%d vk=0x%04x",
+                        rc,
+                        (int)keyDown);
+        }
     }
 
-    m_KeysDown.clear();
+    if (clearKeys && failedCount != 0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Keeping %d keys marked down for a later retry",
+                    failedCount);
+    }
 }
 
 void SdlInputHandler::notifyMouseLeave()
@@ -315,11 +339,19 @@ void SdlInputHandler::notifyMouseLeave()
 
 void SdlInputHandler::notifyFocusLost()
 {
+    Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Input focus lost: windowFlags=0x%08x keysDown=%d capture=%d",
+                (unsigned int)windowFlags,
+                (int)m_KeysDown.count(),
+                isCaptureActive() ? 1 : 0);
+
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.
     // Doing this while the window is full-screen breaks the transition out of FS
     // (desktop and exclusive), so we must check for that before releasing mouse capture.
-    if (!(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN) && !m_AbsoluteMouseMode) {
+    if (!(windowFlags & SDL_WINDOW_FULLSCREEN) && !m_AbsoluteMouseMode) {
         setCaptureActive(false);
     }
 

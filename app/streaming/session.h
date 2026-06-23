@@ -337,7 +337,7 @@ private:
     OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
-    class ClipboardSync* m_ClipboardSync; // Bidirectional clipboard sync (Sunshine 0x5508); nullptr when stream not active
+    class ClipboardHelperClient* m_ClipboardHelper; // Bidirectional clipboard sync helper process; nullptr when stream not active
 
     static CONNECTION_LISTENER_CALLBACKS k_ConnCallbacks;
     static Session* s_ActiveSession;
