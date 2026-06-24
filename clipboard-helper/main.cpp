@@ -13,6 +13,10 @@
 #include <iostream>
 #include <string>
 
+#ifdef Q_OS_MACOS
+extern "C" void ClipboardHelperSetBackgroundActivationPolicy();
+#endif
+
 class StdinReaderThread : public QThread
 {
     Q_OBJECT
@@ -144,6 +148,9 @@ private:
 int main(int argc, char* argv[])
 {
     QGuiApplication app(argc, argv);
+#ifdef Q_OS_MACOS
+    ClipboardHelperSetBackgroundActivationPolicy();
+#endif
     QCoreApplication::setApplicationName(QStringLiteral("Moonlight Clipboard Helper"));
     QCoreApplication::setOrganizationName(QStringLiteral("Moonlight Game Streaming Project"));
 

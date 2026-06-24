@@ -16,10 +16,15 @@
 #include <QRegularExpression>
 #include <QSslConfiguration>
 #include <QSslError>
+#include <QTimer>
 #include <QUrl>
 #include <QtEndian>
 
 #include <cstring>
+
+#ifdef Q_OS_MACOS
+extern "C" int ClipboardHelperPasteboardChangeCount();
+#endif
 
 namespace {
 bool isImageLikeMimeFormat(const QString& format)
@@ -100,9 +105,22 @@ void ClipboardSync::start()
         return;
     }
 
+#ifdef Q_OS_MACOS
+    m_LastPasteboardChangeCount = ClipboardHelperPasteboardChangeCount();
+    connect(cb, &QClipboard::dataChanged,
+            this, &ClipboardSync::onMacClipboardDataChanged,
+            Qt::UniqueConnection);
+    if (m_PasteboardPollTimer == nullptr) {
+        m_PasteboardPollTimer = new QTimer(this);
+        connect(m_PasteboardPollTimer, &QTimer::timeout,
+                this, &ClipboardSync::pollPasteboardChangeCount);
+    }
+    m_PasteboardPollTimer->start(500);
+#else
     connect(cb, &QClipboard::dataChanged,
             this, &ClipboardSync::onLocalClipboardChanged,
             Qt::UniqueConnection);
+#endif
 
     m_Active = true;
     ClipboardLog::info("ClipboardSync: started (text + PNG, bidirectional)");
@@ -116,12 +134,23 @@ void ClipboardSync::stop()
 
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb != nullptr) {
+#ifdef Q_OS_MACOS
+        disconnect(cb, &QClipboard::dataChanged,
+                   this, &ClipboardSync::onMacClipboardDataChanged);
+#else
         disconnect(cb, &QClipboard::dataChanged,
                    this, &ClipboardSync::onLocalClipboardChanged);
+#endif
     }
 
     m_EchoCache.clear();
     m_PendingSelfWrites = 0;
+#ifdef Q_OS_MACOS
+    if (m_PasteboardPollTimer != nullptr) {
+        m_PasteboardPollTimer->stop();
+    }
+    m_LastPasteboardChangeCount = -1;
+#endif
     m_Active = false;
 
     ClipboardLog::info("ClipboardSync: stopped");
@@ -138,6 +167,42 @@ void ClipboardSync::handleIncomingFrame(const char* data, int length)
     QMetaObject::invokeMethod(this, "onIncomingFrame", Qt::QueuedConnection,
                               Q_ARG(QByteArray, frame));
 }
+
+#ifdef Q_OS_MACOS
+void ClipboardSync::onMacClipboardDataChanged()
+{
+    int changeCount = ClipboardHelperPasteboardChangeCount();
+    if (changeCount >= 0) {
+        m_LastPasteboardChangeCount = changeCount;
+    }
+
+    onLocalClipboardChanged();
+}
+
+void ClipboardSync::pollPasteboardChangeCount()
+{
+    if (!m_Active) {
+        return;
+    }
+
+    int changeCount = ClipboardHelperPasteboardChangeCount();
+    if (changeCount < 0) {
+        return;
+    }
+
+    if (m_LastPasteboardChangeCount < 0) {
+        m_LastPasteboardChangeCount = changeCount;
+        return;
+    }
+
+    if (changeCount == m_LastPasteboardChangeCount) {
+        return;
+    }
+
+    m_LastPasteboardChangeCount = changeCount;
+    onLocalClipboardChanged();
+}
+#endif
 
 void ClipboardSync::onIncomingFrame(QByteArray frame)
 {

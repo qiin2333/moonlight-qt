@@ -14,6 +14,8 @@ SOURCES += \
     ../app/streaming/clipboardipc.cpp \
     ../app/streaming/clipboardsync.cpp
 
+macx:SOURCES += macos.mm
+
 HEADERS += \
     ../app/streaming/clipboardipc.h \
     ../app/streaming/clipboardlogging.h \
