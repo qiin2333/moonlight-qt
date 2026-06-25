@@ -421,6 +421,7 @@ bool PlVkRenderer::isExtensionSupportedByPhysicalDevice(VkPhysicalDevice device,
 bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
 {
     m_Window = params->window;
+    m_MaxVideoFps = params->frameRate;
 
     unsigned int instanceExtensionCount = 0;
     if (!SDL_Vulkan_GetInstanceExtensions(params->window, &instanceExtensionCount, nullptr)) {
@@ -491,18 +492,17 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
     // Ignores aspect ratio to fill the entire screen
     m_IgnoreAspectRatio = params->ignoreAspectRatio;
 
-    VkPresentModeKHR presentMode;
     if (params->enableVsync) {
         // FIFO mode improves frame pacing compared with Mailbox, especially for
         // platforms like X11 that lack a VSyncSource implementation for Pacer.
-        presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        m_VkPresentMode = VK_PRESENT_MODE_FIFO_KHR;
     }
     else {
         // We want immediate mode for V-Sync disabled if possible
         if (isPresentModeSupportedByPhysicalDevice(m_Vulkan->phys_device, VK_PRESENT_MODE_IMMEDIATE_KHR)) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "Using Immediate present mode with V-Sync disabled");
-            presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+            m_VkPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
         }
         else {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
@@ -512,41 +512,26 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
             if (isPresentModeSupportedByPhysicalDevice(m_Vulkan->phys_device, VK_PRESENT_MODE_FIFO_RELAXED_KHR)) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                             "Using FIFO Relaxed present mode with V-Sync disabled");
-                presentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+                m_VkPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
             }
             // Mailbox at least provides non-blocking behavior
             else if (isPresentModeSupportedByPhysicalDevice(m_Vulkan->phys_device, VK_PRESENT_MODE_MAILBOX_KHR)) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                             "Using Mailbox present mode with V-Sync disabled");
-                presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+                m_VkPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
             }
             // FIFO is always supported
             else {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                             "Using FIFO present mode with V-Sync disabled");
-                presentMode = VK_PRESENT_MODE_FIFO_KHR;
+                m_VkPresentMode = VK_PRESENT_MODE_FIFO_KHR;
             }
         }
     }
 
-    pl_vulkan_swapchain_params vkSwapchainParams = {};
-    vkSwapchainParams.surface = m_VkSurface;
-    vkSwapchainParams.present_mode = presentMode;
-    vkSwapchainParams.swapchain_depth = 1; // No queued frames
-#if PL_API_VER >= 338
-    vkSwapchainParams.disable_10bit_sdr = true; // Some drivers don't dither 10-bit SDR output correctly
-#endif
-
-    {
-        // Don't let Qt take DRM master from us during pl_vulkan_create_swapchain()
-        DrmMasterLocker locker;
-
-        m_Swapchain = pl_vulkan_create_swapchain(m_Vulkan, &vkSwapchainParams);
-        if (m_Swapchain == nullptr) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                         "pl_vulkan_create_swapchain() failed");
-            return false;
-        }
+    // Start with a swapchain that is double-buffered for lowest display latency
+    if (!createSwapchain(1)) {
+        return false;
     }
 
     m_Renderer = pl_renderer_create(m_Log, m_Vulkan->gpu);
@@ -578,7 +563,7 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
         vkDeviceContext->nb_enabled_inst_extensions = m_PlVkInstance->num_extensions;
         vkDeviceContext->enabled_dev_extensions = m_Vulkan->extensions;
         vkDeviceContext->nb_enabled_dev_extensions = m_Vulkan->num_extensions;
-#if LIBAVUTIL_VERSION_INT > AV_VERSION_INT(58, 9, 100)
+#if LIBAVUTIL_VERSION_INT > AV_VERSION_INT(58, 9, 100) && LIBAVUTIL_VERSION_MAJOR < 62
         vkDeviceContext->lock_queue = lockQueue;
         vkDeviceContext->unlock_queue = unlockQueue;
 #endif
@@ -622,6 +607,35 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
     }
 #endif
 
+    return true;
+}
+
+
+bool PlVkRenderer::createSwapchain(int depth)
+{
+    pl_swapchain_destroy(&m_Swapchain);
+
+    pl_vulkan_swapchain_params vkSwapchainParams = {};
+    vkSwapchainParams.surface = m_VkSurface;
+    vkSwapchainParams.present_mode = m_VkPresentMode;
+    vkSwapchainParams.swapchain_depth = depth;
+#if PL_API_VER >= 338
+    vkSwapchainParams.disable_10bit_sdr = true; // Some drivers don't dither 10-bit SDR output correctly
+#endif
+
+    {
+        // Don't let Qt take DRM master from us during pl_vulkan_create_swapchain()
+        DrmMasterLocker locker;
+
+        m_Swapchain = pl_vulkan_create_swapchain(m_Vulkan, &vkSwapchainParams);
+        if (m_Swapchain == nullptr) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "pl_vulkan_create_swapchain() failed");
+            return false;
+        }
+    }
+
+    m_SwapchainDepth = depth;
     return true;
 }
 
@@ -690,6 +704,8 @@ void PlVkRenderer::unmapAvFrameFromPlacebo(const AVFrame *frame, pl_frame* mappe
         m_MetalTextureFactory->unmapVideoToolboxFromPlacebo(mappedFrame);
     }
     else
+#else
+    Q_UNUSED(frame)
 #endif
     {
         pl_unmap_avframe(m_Vulkan->gpu, mappedFrame);
@@ -898,7 +914,19 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
     if (!pl_color_space_equal(&mappedFrame.color, &m_LastColorspace)) {
         m_LastColorspace = mappedFrame.color;
         SDL_assert(pl_color_space_equal(&mappedFrame.color, &m_LastColorspace));
-        pl_swapchain_colorspace_hint(m_Swapchain, &mappedFrame.color);
+
+#ifdef Q_OS_DARWIN
+        // There is a gamma mismatch on macOS between what libplacebo thinks BT.709
+        // should use and what the Metal layer actually displays. Use sRGB for the
+        // swapchain when the incoming frames are BT.709 as a workaround.
+        if (pl_color_space_equal(&mappedFrame.color, &pl_color_space_bt709)) {
+            pl_swapchain_colorspace_hint(m_Swapchain, &pl_color_space_srgb);
+        }
+        else
+#endif
+        {
+            pl_swapchain_colorspace_hint(m_Swapchain, &mappedFrame.color);
+        }
     }
 
     // Reserve enough space to avoid allocating under the overlay lock
@@ -982,6 +1010,10 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
     targetFrame.crop.x1 = dst.x + dst.w;
     targetFrame.crop.y1 = dst.y + dst.h;
 
+#ifdef PLVK_USE_DYNAMIC_SWAPCHAIN_DEPTH
+    Uint32 renderStartTime = SDL_GetTicks();
+#endif
+
     // Render the video image and overlays into the swapchain buffer
     targetFrame.num_overlays = (int)overlays.size();
     targetFrame.overlays = overlays.data();
@@ -1003,6 +1035,32 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
         SDL_PushEvent(&event);
         goto UnmapExit;
     }
+
+#ifdef PLVK_USE_DYNAMIC_SWAPCHAIN_DEPTH
+    // Trigger a switch to triple-buffered mode if our frame presentation time
+    // exceeds 110% of the frame interval for half a second of frames.
+    if (SDL_GetTicks() - renderStartTime > (1100U / m_MaxVideoFps)) {
+        m_DelayedPresents++;
+    }
+    else if (m_DelayedPresents > 0) {
+        m_DelayedPresents--;
+    }
+
+    if (m_DelayedPresents == m_MaxVideoFps / 2 && m_SwapchainDepth < 2) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Switching to triple-buffered swapchain after delayed presentations");
+        if (!createSwapchain(2)) {
+            // Recreate the renderer
+            SDL_Event event;
+            event.type = SDL_RENDER_DEVICE_RESET;
+            SDL_PushEvent(&event);
+            goto UnmapExit;
+        }
+
+        // Restore the swapchain's colorspace from the previous swapchain frame
+        pl_swapchain_colorspace_hint(m_Swapchain, &targetFrame.color);
+    }
+#endif
 
 #ifdef Q_OS_WIN32
     // On Windows, we swap buffers here instead of waitToRender()

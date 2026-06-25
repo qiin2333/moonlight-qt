@@ -89,6 +89,16 @@ if [ "$GITHUB_ACTIONS" == "true" ]; then
   fi
 fi
 
+echo Copying clipboard helper into app bundle
+HELPER_BINARY=$BUILD_FOLDER/clipboard-helper/moonlight-clipboard-helper
+if [ ! -f "$HELPER_BINARY" ]; then
+  HELPER_BINARY=$BUILD_FOLDER/clipboard-helper/$BUILD_CONFIG/moonlight-clipboard-helper
+fi
+if [ ! -f "$HELPER_BINARY" ]; then
+  HELPER_BINARY=$BUILD_FOLDER/clipboard-helper/$(echo "$BUILD_CONFIG" | tr '[:upper:]' '[:lower:]')/moonlight-clipboard-helper
+fi
+cp "$HELPER_BINARY" $BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/ || fail "Clipboard helper copy failed!"
+
 macdeployqt $BUILD_FOLDER/app/Moonlight.app $EXTRA_ARGS -qmldir=$SOURCE_ROOT/app/gui -appstore-compliant || fail "macdeployqt failed!"
 
 echo Removing dSYM files from app bundle

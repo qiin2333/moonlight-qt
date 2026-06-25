@@ -32,7 +32,7 @@ public:
 private:
     bool tryPollComputer(QNetworkAccessManager* nam, NvAddress address, bool& changed)
     {
-        NvHTTP http(address, 0, m_Computer->serverCert, nam);
+        NvHTTP http(address, 0, m_Computer->serverCert, !m_Computer->isNvidiaServerSoftware, nam, m_Computer->uuid);
 
         QString serverInfo;
         try {
@@ -830,7 +830,8 @@ private:
 
     void run()
     {
-        NvHTTP http(m_Address, 0, QSslCertificate());
+        // Use the placeholder UID for the initial poll, then we'll switch to the real one if it's not GFE
+        NvHTTP http(m_Address, 0, QSslCertificate(), false);
 
         if (m_Mdns) {
             if (m_MdnsIpv6Address.isNull()) {
@@ -858,6 +859,8 @@ private:
 
         // Create initial newComputer using HTTP serverinfo with no pinned cert
         NvComputer* newComputer = new NvComputer(http, serverInfo);
+        http.setTrueUid(!newComputer->isNvidiaServerSoftware);
+        http.setHostUuid(newComputer->uuid);
 
         // Check if we have a record of this host UUID to pull the pinned cert
         NvComputer* existingComputer;

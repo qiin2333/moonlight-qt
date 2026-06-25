@@ -43,12 +43,14 @@ jobs:
       run: ./setup-deps.ps1
 
     - name: Install Qt
-      uses: jurplel/install-qt-action@v3
+      uses: jdpurcell/install-qt-action@v5
       with:
+        arch: win64_msvc2022_64
+        host: windows
+        target: desktop
         version: '6.8.3'
-        arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia qtimageformats'
-        cache: true
+        use-naqt: true
 
     - name: Setup build environment
       shell: cmd
