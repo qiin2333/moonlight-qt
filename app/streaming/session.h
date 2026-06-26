@@ -192,6 +192,7 @@ private:
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void showStreamingToast(const QString& message, int durationMs = 2000);
+    void updateFileMappingMenuState();
 #ifdef Q_OS_WIN32
     void queryDisplayHdrBrightness(float& maxNits, float& minNits, float& maxFullNits);
 #endif
@@ -277,6 +278,9 @@ private:
     void startSunshineAbr();
     void stopSunshineAbr();
     void sendSunshineAbrFeedback();
+    void startFileMappingUxProbe();
+    void processFileMappingUxProbeResult();
+    void startFileMappingSmokeProbe();
 
     static
     int drSubmitDecodeUnit(PDECODE_UNIT du);
@@ -336,6 +340,11 @@ private:
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
     OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification
+    OverlayMenuPanel::FileMappingState m_FileMappingState;
+    QString m_FileMappingDetail;
+    QString m_FileMappingToast;
+    bool m_FileMappingToastPending;
+    std::shared_ptr<struct FileMappingProbeState> m_FileMappingProbeState;
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
     class ClipboardHelperClient* m_ClipboardHelper; // Bidirectional clipboard sync helper process; nullptr when stream not active
 

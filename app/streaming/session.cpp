@@ -1,5 +1,6 @@
 #include "session.h"
 #include "clipboardhelperclient.h"
+#include "filemappingclient.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
@@ -43,12 +44,18 @@
 #include <QCoreApplication>
 #include <QThreadPool>
 #include <QRunnable>
+#include <QReadLocker>
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QImage>
 #include <QGuiApplication>
 #include <QCursor>
 #include <QScreen>
+#include <QtGlobal>
+#include <QMutex>
+#include <QMutexLocker>
+
+#include <utility>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QQuickOpenGLUtils>
@@ -139,6 +146,135 @@ private:
     std::shared_ptr<std::atomic_bool> m_InFlight;
     std::shared_ptr<std::atomic_int> m_CurrentBitrateKbps;
 };
+
+struct FileMappingProbeState {
+    QMutex lock;
+    bool pending = false;
+    bool available = false;
+    bool error = false;
+    QString detail;
+    QString message;
+};
+
+class FileMappingCapabilityTask : public QRunnable
+{
+public:
+    FileMappingCapabilityTask(NvComputer computer,
+                              std::shared_ptr<FileMappingProbeState> state,
+                              int timeoutMs)
+        : m_Computer(std::move(computer)),
+          m_State(std::move(state)),
+          m_TimeoutMs(timeoutMs)
+    {
+    }
+
+    virtual void run() override
+    {
+        FileMappingClient client(&m_Computer);
+        FileMappingClient::Capability capability = client.fetchCapability(m_TimeoutMs);
+
+        bool available = false;
+        bool error = false;
+        QString detail;
+        QString message;
+
+        if (!capability.ok) {
+            error = !capability.error.isEmpty();
+            detail = error ? QObject::tr("Error") : QObject::tr("Not shared");
+            message = capability.error.isEmpty()
+                    ? QObject::tr("No host folders are shared. On the host PC, right-click a folder and share it with Moonlight.")
+                    : QObject::tr("Host file sharing could not be checked: %1").arg(capability.error);
+        }
+        else if (!capability.enabled) {
+            detail = QObject::tr("Not shared");
+            message = QObject::tr("No host folders are shared. On the host PC, right-click a folder and share it with Moonlight.");
+        }
+        else if (!capability.listening || capability.sessionUrl.isEmpty()) {
+            error = true;
+            detail = QObject::tr("Starting");
+            message = capability.error.isEmpty()
+                    ? QObject::tr("Host file sharing is enabled but not ready yet.")
+                    : capability.error;
+        }
+        else {
+            available = true;
+            detail = QObject::tr("Ready");
+            message = QObject::tr("Host files are ready. Shared folders are read-only in this session.");
+        }
+
+        QMutexLocker locker(&m_State->lock);
+        m_State->pending = true;
+        m_State->available = available;
+        m_State->error = error;
+        m_State->detail = detail;
+        m_State->message = message;
+    }
+
+private:
+    NvComputer m_Computer;
+    std::shared_ptr<FileMappingProbeState> m_State;
+    int m_TimeoutMs;
+};
+
+class FileMappingSmokeTask : public QRunnable
+{
+public:
+    FileMappingSmokeTask(NvComputer computer,
+                         QString mappingId,
+                         QString path,
+                         quint64 offset,
+                         quint32 length,
+                         int timeoutMs)
+        : m_Computer(std::move(computer)),
+          m_MappingId(std::move(mappingId)),
+          m_Path(std::move(path)),
+          m_Offset(offset),
+          m_Length(length),
+          m_TimeoutMs(timeoutMs)
+    {
+    }
+
+    virtual void run() override
+    {
+        FileMappingClient client(&m_Computer);
+        FileMappingClient::SmokeResult result = client.smokeRead(m_MappingId,
+                                                                 m_Path,
+                                                                 m_Offset,
+                                                                 m_Length,
+                                                                 m_TimeoutMs);
+        if (!result.ok) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "File mapping smoke failed: mapping=%s path=%s error=%s",
+                        m_MappingId.toUtf8().constData(),
+                        m_Path.toUtf8().constData(),
+                        result.error.toUtf8().constData());
+            return;
+        }
+
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "File mapping smoke passed: mapping=%s path=%s",
+                    m_MappingId.toUtf8().constData(),
+                    m_Path.toUtf8().constData());
+    }
+
+private:
+    NvComputer m_Computer;
+    QString m_MappingId;
+    QString m_Path;
+    quint64 m_Offset;
+    quint32 m_Length;
+    int m_TimeoutMs;
+};
+
+int readBoundedEnvInt(const char* name, int fallback, int minimum, int maximum)
+{
+    bool ok = false;
+    int value = qEnvironmentVariableIntValue(name, &ok);
+    if (!ok) {
+        return fallback;
+    }
+    return qBound(minimum, value, maximum);
+}
 
 void Session::clStageStarting(int stage)
 {
@@ -727,6 +863,11 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
             m_AbrFeedbackInFlight(std::make_shared<std::atomic_bool>(false)),
             m_AbrCurrentBitrateKbps(std::make_shared<std::atomic_int>(0)),
       m_Toast(nullptr),
+      m_FileMappingState(OverlayMenuPanel::FileMappingState::Unknown),
+      m_FileMappingDetail(tr("Checking")),
+      m_FileMappingToast(),
+      m_FileMappingToastPending(false),
+      m_FileMappingProbeState(nullptr),
       m_MenuCloseTicks(0),
       m_MicStream(nullptr)
 {
@@ -1748,6 +1889,7 @@ void Session::showQtOverlayMenu()
     m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
     m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
     m_MenuPanel->updateGamepadMouseState(m_InputHandler->isMouseEmulationActive());
+    updateFileMappingMenuState();
 
     // Show menu based on user preference
     switch (m_Preferences->overlayMenuPosition) {
@@ -1874,6 +2016,19 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
         combo = SdlInputHandler::KeyComboTogglePointerRegionLock;
         break;
 
+    case OverlayMenuPanel::MenuAction::ShowHostFiles:
+        if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Checking ||
+            m_FileMappingState == OverlayMenuPanel::FileMappingState::Unknown) {
+            showStreamingToast(tr("Checking host file sharing..."), 2000);
+        }
+        else if (!m_FileMappingToast.isEmpty()) {
+            showStreamingToast(m_FileMappingToast, 3500);
+        }
+        else {
+            showStreamingToast(tr("Host file sharing is not available."), 3000);
+        }
+        return;
+
     // --- Microphone toggle ---
     // Deferred: toggle mic outside processEvents() to avoid QAudioSource heap corruption
     case OverlayMenuPanel::MenuAction::ToggleMicrophone:
@@ -1960,6 +2115,13 @@ void Session::showStreamingToast(const QString& message, int durationMs)
     SDL_GetWindowSize(m_Window, &ww, &wh);
     m_Toast->showToast(wx, wy, ww, wh, message, durationMs);
     QCoreApplication::processEvents();
+}
+
+void Session::updateFileMappingMenuState()
+{
+    if (m_MenuPanel) {
+        m_MenuPanel->updateFileMappingState(m_FileMappingState, m_FileMappingDetail);
+    }
 }
 
 void Session::requestRuntimeBitrateChange(int bitrateKbps)
@@ -2099,6 +2261,119 @@ void Session::stopSunshineAbr()
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Sunshine ABR disable failed: unknown error");
     }
+}
+
+void Session::startFileMappingUxProbe()
+{
+    m_FileMappingState = OverlayMenuPanel::FileMappingState::Checking;
+    m_FileMappingDetail = tr("Checking");
+    m_FileMappingToast = tr("Checking host file sharing...");
+    m_FileMappingToastPending = false;
+    updateFileMappingMenuState();
+
+    if (m_Computer == nullptr) {
+        m_FileMappingState = OverlayMenuPanel::FileMappingState::Unavailable;
+        m_FileMappingDetail = tr("Unavailable");
+        m_FileMappingToast = tr("Host file sharing is not available.");
+        updateFileMappingMenuState();
+        return;
+    }
+
+    NvComputer computerSnapshot;
+    {
+        QReadLocker locker(&m_Computer->lock);
+        computerSnapshot = *m_Computer;
+    }
+
+    m_FileMappingProbeState = std::make_shared<FileMappingProbeState>();
+    QThreadPool::globalInstance()->start(new FileMappingCapabilityTask(std::move(computerSnapshot),
+                                                                       m_FileMappingProbeState,
+                                                                       2500));
+}
+
+void Session::processFileMappingUxProbeResult()
+{
+    if (!m_FileMappingProbeState) {
+        return;
+    }
+
+    bool available = false;
+    bool error = false;
+    QString detail;
+    QString message;
+    {
+        QMutexLocker locker(&m_FileMappingProbeState->lock);
+        if (!m_FileMappingProbeState->pending) {
+            return;
+        }
+        m_FileMappingProbeState->pending = false;
+        available = m_FileMappingProbeState->available;
+        error = m_FileMappingProbeState->error;
+        detail = m_FileMappingProbeState->detail;
+        message = m_FileMappingProbeState->message;
+    }
+
+    m_FileMappingState = available ? OverlayMenuPanel::FileMappingState::Available :
+                         error ? OverlayMenuPanel::FileMappingState::Error :
+                         OverlayMenuPanel::FileMappingState::Unavailable;
+    m_FileMappingDetail = detail;
+    m_FileMappingToast = message;
+    m_FileMappingToastPending = available;
+    updateFileMappingMenuState();
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "File mapping UX probe: state=%d detail=%s message=%s",
+                static_cast<int>(m_FileMappingState),
+                m_FileMappingDetail.toUtf8().constData(),
+                m_FileMappingToast.toUtf8().constData());
+
+    if (m_FileMappingToastPending) {
+        m_FileMappingToastPending = false;
+        showStreamingToast(m_FileMappingToast, 2500);
+    }
+}
+
+void Session::startFileMappingSmokeProbe()
+{
+    if (qEnvironmentVariableIntValue("MOONLIGHT_FILE_MAPPING_SMOKE") == 0) {
+        return;
+    }
+
+    if (m_Computer == nullptr) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "File mapping smoke skipped: no active computer");
+        return;
+    }
+
+    const QString mappingId = QString::fromLocal8Bit(qgetenv("MOONLIGHT_FILE_MAPPING_SMOKE_MAPPING")).trimmed();
+    const QString path = QString::fromLocal8Bit(qgetenv("MOONLIGHT_FILE_MAPPING_SMOKE_PATH")).trimmed();
+    if (mappingId.isEmpty() || path.isEmpty()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "File mapping smoke skipped: set MOONLIGHT_FILE_MAPPING_SMOKE_MAPPING and MOONLIGHT_FILE_MAPPING_SMOKE_PATH");
+        return;
+    }
+
+    const int timeoutMs = readBoundedEnvInt("MOONLIGHT_FILE_MAPPING_SMOKE_TIMEOUT_MS", 5000, 1000, 60000);
+    const int offset = readBoundedEnvInt("MOONLIGHT_FILE_MAPPING_SMOKE_OFFSET", 0, 0, 1024 * 1024 * 1024);
+    const int length = readBoundedEnvInt("MOONLIGHT_FILE_MAPPING_SMOKE_LENGTH", 4096, 1, 1024 * 1024);
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Starting file mapping smoke probe: mapping=%s path=%s",
+                mappingId.toUtf8().constData(),
+                path.toUtf8().constData());
+
+    NvComputer computerSnapshot;
+    {
+        QReadLocker locker(&m_Computer->lock);
+        computerSnapshot = *m_Computer;
+    }
+
+    QThreadPool::globalInstance()->start(new FileMappingSmokeTask(std::move(computerSnapshot),
+                                                                  mappingId,
+                                                                  path,
+                                                                  static_cast<quint64>(offset),
+                                                                  static_cast<quint32>(length),
+                                                                  timeoutMs));
 }
 
 void Session::sendSunshineAbrFeedback()
@@ -2590,6 +2865,8 @@ bool Session::startConnectionAsync()
 
     emit connectionStarted();
     startSunshineAbr();
+    startFileMappingUxProbe();
+    startFileMappingSmokeProbe();
     if (m_Preferences->enableMicrophone) {
         // Use the deferred mic toggle mechanism instead of QueuedConnection to avoid
         // heap corruption when creating QAudioSource within nested event loops (processEvents).
@@ -3008,6 +3285,7 @@ void Session::exec()
     SDL_Event event;
     for (;;) {
         processSunshineAbrFeedback();
+        processFileMappingUxProbeResult();
         processClipboardHelperMessages();
 
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
@@ -3024,6 +3302,7 @@ void Session::exec()
         if (!SDL_WaitEventTimeout(&event, waitTimeoutMs)) {
             presence.runCallbacks();
             processClipboardHelperMessages();
+            processFileMappingUxProbeResult();
             processQtEventsDuringStream(true);
             processSunshineAbrFeedback();
             continue;
@@ -3043,6 +3322,7 @@ void Session::exec()
 #endif
             presence.runCallbacks();
             processClipboardHelperMessages();
+            processFileMappingUxProbeResult();
             processQtEventsDuringStream();
             processSunshineAbrFeedback();
             continue;
@@ -3465,6 +3745,7 @@ void Session::exec()
         }
 
         processClipboardHelperMessages();
+        processFileMappingUxProbeResult();
         processQtEventsDuringStream();
 
         // Deferred microphone toggle — runs outside processEvents() to avoid
