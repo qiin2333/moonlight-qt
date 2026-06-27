@@ -284,6 +284,11 @@ rem This must be done after WiX harvesting and signing, since the VCRT dlls are 
 rem and should not be harvested for inclusion in the full installer
 copy "%VC_REDIST_DLL_PATH%\*.dll" %DEPLOY_FOLDER%
 if !ERRORLEVEL! NEQ 0 goto Error
+if /I "%ARCH%"=="arm64" (
+    rem The ARM64 MSVC redist can include an x64-only vcruntime140_1.dll. Moonlight
+    rem and the bundled ARM64 DLLs do not import it, and shipping it breaks launch.
+    del /f /q "%DEPLOY_FOLDER%\vcruntime140_1.dll"
+)
 
 rem Portable packages should be portable by default. CI_VERSION is only used to
 rem pin artifact versions, so use an explicit opt-out when a CI/debug package
