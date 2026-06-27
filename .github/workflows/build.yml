@@ -130,7 +130,8 @@ jobs:
         set "PATH=%Qt6_DIR%\bin;%PATH%"
         call scripts\build-arch.bat release arm64
         if errorlevel 1 exit /b %ERRORLEVEL%
-        powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-pe-machine.ps1 -Path build\installer-arm64-release\MoonlightPortable-arm64-%VERSION%.zip -ExpectedMachine 0xAA64
+        for %%f in (build\installer-arm64-release\MoonlightPortable-arm64-*.zip) do powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-pe-machine.ps1 -Path "%%f" -ExpectedMachine 0xAA64
+        if errorlevel 1 exit /b %ERRORLEVEL%
 
     - name: Generate universal installer
       shell: cmd
