@@ -61,11 +61,25 @@ if !ERRORLEVEL! EQU 0 (
 )
 
 rem Find Qt path to determine our architecture
-for /F %%i in ('where qmake') do set QT_PATH=%%i
+set QT_PATH=
+if /I "%QMAKE_CMD%"=="call qmake.bat" (
+    for /F "delims=" %%i in ('where qmake.bat') do if not defined QT_PATH set "QT_PATH=%%i"
+) else (
+    if /I "%QMAKE_CMD%"=="call host-qmake.bat" (
+        for /F "delims=" %%i in ('where host-qmake.bat') do if not defined QT_PATH set "QT_PATH=%%i"
+    ) else (
+        for /F "delims=" %%i in ('where qmake.exe') do if not defined QT_PATH set "QT_PATH=%%i"
+    )
+)
+if not defined QT_PATH (
+    echo Unable to resolve QMake path.
+    goto Error
+)
 
 rem Strip the qmake filename off the end to get the Qt bin directory itself
 set QT_PATH=%QT_PATH:\qmake.exe=%
 set QT_PATH=%QT_PATH:\qmake.bat=%
+set QT_PATH=%QT_PATH:\host-qmake.bat=%
 set QT_PATH=%QT_PATH:\qmake.cmd=%
 
 echo QT_PATH=%QT_PATH%
@@ -80,12 +94,12 @@ if /I "%BUILD_ARCH%"=="arm64" (
         echo Using windeployqt.exe from HOSTBIN_PATH
         set WINDEPLOYQT_CMD=!HOSTBIN_PATH!\windeployqt.exe --qtpaths %QT_PATH%\host-qtpaths.bat
     ) else (
-        if exist %QT_PATH%\windeployqt.exe (
-            echo Using windeployqt.exe from QT_PATH
-            set WINDEPLOYQT_CMD=windeployqt.exe
-        ) else (
+        if exist %QT_PATH%\qtpaths.bat (
             echo Using windeployqt.exe from HOSTBIN_PATH
             set WINDEPLOYQT_CMD=!HOSTBIN_PATH!\windeployqt.exe --qtpaths %QT_PATH%\qtpaths.bat
+        ) else (
+            echo Using windeployqt.exe from QT_PATH
+            set WINDEPLOYQT_CMD=%QT_PATH%\windeployqt.exe
         )
     )
 ) else (
