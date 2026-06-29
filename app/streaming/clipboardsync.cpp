@@ -4,6 +4,9 @@
 #include <QBuffer>
 #include <QClipboard>
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
 #include <QJsonDocument>
@@ -14,8 +17,10 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
+#include <QSharedPointer>
 #include <QSslConfiguration>
 #include <QSslError>
+#include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
 #include <QtEndian>
@@ -73,6 +78,12 @@ bool looksLikePngBytes(const QByteArray& bytes)
     static const unsigned char kMagic[8] = { 0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a };
     return bytes.size() >= 8
             && memcmp(bytes.constData(), kMagic, sizeof(kMagic)) == 0;
+}
+
+bool isValidOfferId(const QString& id)
+{
+    static const QRegularExpression idRegex(QStringLiteral("^[a-f0-9]{64}$"));
+    return idRegex.match(id).hasMatch();
 }
 }
 
@@ -251,6 +262,11 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
             return;
         }
         fetchRefAndApply(id, mime, size);
+        return;
+    }
+
+    if (kind == KIND_FILE_OFFER) {
+        fetchFileOffer(payload);
         return;
     }
 
@@ -792,7 +808,7 @@ QNetworkAccessManager* ClipboardSync::nam()
     return m_Nam;
 }
 
-bool ClipboardSync::buildBlobUrl(const QString& tail, QUrl& outUrl) const
+bool ClipboardSync::buildApiUrl(const QString& path, QUrl& outUrl) const
 {
     if (m_HostContext.address.isEmpty() ||
             m_HostContext.httpsPort == 0 ||
@@ -803,8 +819,13 @@ bool ClipboardSync::buildBlobUrl(const QString& tail, QUrl& outUrl) const
     if (host.contains(':')) {
         host = QString("[%1]").arg(host); // bracketed IPv6
     }
-    outUrl = QUrl(QString("https://%1:%2/api/v1/clipboard%3").arg(host).arg(m_HostContext.httpsPort).arg(tail));
+    outUrl = QUrl(QString("https://%1:%2%3").arg(host).arg(m_HostContext.httpsPort).arg(path));
     return outUrl.isValid();
+}
+
+bool ClipboardSync::buildBlobUrl(const QString& tail, QUrl& outUrl) const
+{
+    return buildApiUrl(QStringLiteral("/api/v1/clipboard") + tail, outUrl);
 }
 
 void ClipboardSync::uploadAndSendRef(const QByteArray& payload, const QString& mime)
@@ -862,6 +883,216 @@ void ClipboardSync::uploadAndSendRef(const QByteArray& payload, const QString& m
                      static_cast<int>(frame.size()));
         emit outboundFrame(frame);
     });
+}
+
+QString ClipboardSync::sanitizeFileName(const QString& name)
+{
+    QString out = QFileInfo(name).fileName().trimmed();
+    out.replace(QRegularExpression(QStringLiteral("[\\\\/:*?\"<>|\\x00-\\x1F]")), QStringLiteral("_"));
+    while (out.endsWith(QLatin1Char('.')) || out.endsWith(QLatin1Char(' '))) {
+        out.chop(1);
+    }
+    if (out.isEmpty()) {
+        out = QStringLiteral("download");
+    }
+
+    const QString upper = out.toUpper();
+    static const QStringList reserved {
+        QStringLiteral("CON"), QStringLiteral("PRN"), QStringLiteral("AUX"), QStringLiteral("NUL"),
+        QStringLiteral("COM1"), QStringLiteral("COM2"), QStringLiteral("COM3"), QStringLiteral("COM4"),
+        QStringLiteral("COM5"), QStringLiteral("COM6"), QStringLiteral("COM7"), QStringLiteral("COM8"),
+        QStringLiteral("COM9"), QStringLiteral("LPT1"), QStringLiteral("LPT2"), QStringLiteral("LPT3"),
+        QStringLiteral("LPT4"), QStringLiteral("LPT5"), QStringLiteral("LPT6"), QStringLiteral("LPT7"),
+        QStringLiteral("LPT8"), QStringLiteral("LPT9")
+    };
+    if (reserved.contains(upper)) {
+        out.prepend(QLatin1Char('_'));
+    }
+
+    if (out.size() > 180) {
+        out = out.left(180);
+        while (out.endsWith(QLatin1Char('.')) || out.endsWith(QLatin1Char(' '))) {
+            out.chop(1);
+        }
+    }
+    return out.isEmpty() ? QStringLiteral("download") : out;
+}
+
+QString ClipboardSync::uniqueDownloadPath(const QString& fileName)
+{
+    QString baseDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    if (baseDir.isEmpty()) {
+        baseDir = QDir::homePath();
+    }
+
+    QDir dir(baseDir);
+    dir.mkpath(QStringLiteral("Sunshine Transfers"));
+    dir.cd(QStringLiteral("Sunshine Transfers"));
+
+    const QFileInfo info(fileName);
+    QString stem = info.completeBaseName();
+    QString suffix = info.completeSuffix();
+    if (stem.isEmpty()) {
+        stem = QStringLiteral("download");
+    }
+
+    for (int i = 0; i < 1000; ++i) {
+        QString candidate;
+        if (i == 0) {
+            candidate = fileName;
+        }
+        else if (suffix.isEmpty()) {
+            candidate = QStringLiteral("%1 (%2)").arg(stem).arg(i);
+        }
+        else {
+            candidate = QStringLiteral("%1 (%2).%3").arg(stem).arg(i).arg(suffix);
+        }
+
+        const QString path = dir.filePath(candidate);
+        if (!QFileInfo::exists(path) && !QFileInfo::exists(path + QStringLiteral(".part"))) {
+            return path;
+        }
+    }
+
+    return dir.filePath(QStringLiteral("%1-%2").arg(stem).arg(QDateTime::currentMSecsSinceEpoch()));
+}
+
+void ClipboardSync::fetchFileOffer(const QByteArray& payload)
+{
+    QJsonParseError jerr{};
+    QJsonDocument doc = QJsonDocument::fromJson(payload, &jerr);
+    if (jerr.error != QJsonParseError::NoError || !doc.isObject()) {
+        ClipboardLog::warn("ClipboardSync: dropping file offer with bad JSON (%s)",
+                    jerr.errorString().toUtf8().constData());
+        return;
+    }
+
+    const QJsonObject obj = doc.object();
+    const QString type = obj.value(QStringLiteral("type")).toString();
+    const QString id = obj.value(QStringLiteral("id")).toString();
+    const QString name = sanitizeFileName(obj.value(QStringLiteral("name")).toString());
+    const qint64 size = static_cast<qint64>(obj.value(QStringLiteral("size")).toDouble(-1));
+    const QString downloadUrl = obj.value(QStringLiteral("download_url")).toString();
+    const QString expectedPath = QStringLiteral("/api/v1/file-transfer/") + id;
+
+    if (!type.isEmpty() && type != QStringLiteral("file")) {
+        ClipboardLog::warn("ClipboardSync: dropping unsupported file offer type '%s'",
+                    type.toUtf8().constData());
+        return;
+    }
+    if (!isValidOfferId(id)) {
+        ClipboardLog::warn("ClipboardSync: dropping file offer with invalid id");
+        return;
+    }
+    if (size < 0 || size > MAX_FILE_TRANSFER_BYTES) {
+        ClipboardLog::warn("ClipboardSync: dropping file offer size %lld (cap %lld)",
+                    static_cast<long long>(size),
+                    static_cast<long long>(MAX_FILE_TRANSFER_BYTES));
+        return;
+    }
+    if (!downloadUrl.isEmpty() && downloadUrl != expectedPath) {
+        ClipboardLog::warn("ClipboardSync: dropping file offer with unexpected download_url");
+        return;
+    }
+
+    downloadFileOffer(id, name, size, expectedPath);
+}
+
+void ClipboardSync::downloadFileOffer(const QString& id,
+                                      const QString& name,
+                                      qint64 advertisedSize,
+                                      const QString& downloadPath)
+{
+    QUrl url;
+    if (!buildApiUrl(downloadPath, url)) {
+        ClipboardLog::warn("ClipboardSync: cannot download file offer (no host context)");
+        return;
+    }
+
+    const QString finalPath = uniqueDownloadPath(name);
+    const QString partPath = finalPath + QStringLiteral(".part");
+    QFile::remove(partPath);
+
+    QNetworkRequest req(url);
+    QSslConfiguration sslConfig(QSslConfiguration::defaultConfiguration());
+    sslConfig.setLocalCertificate(m_HostContext.clientCertificate);
+    sslConfig.setPrivateKey(m_HostContext.clientPrivateKey);
+    req.setSslConfiguration(sslConfig);
+
+    QNetworkReply* reply = nam()->get(req);
+    QFile* file = new QFile(partPath, reply);
+    if (!file->open(QIODevice::WriteOnly)) {
+        ClipboardLog::warn("ClipboardSync: cannot open file transfer target '%s': %s",
+                    partPath.toUtf8().constData(),
+                    file->errorString().toUtf8().constData());
+        reply->abort();
+        reply->deleteLater();
+        return;
+    }
+
+    auto bytesWritten = QSharedPointer<qint64>::create(0);
+    auto writeFailed = QSharedPointer<bool>::create(false);
+
+    connect(reply, &QNetworkReply::readyRead, this,
+            [reply, file, bytesWritten, writeFailed]() {
+                const QByteArray chunk = reply->readAll();
+                if (chunk.isEmpty()) {
+                    return;
+                }
+                if (*bytesWritten + chunk.size() > ClipboardSync::MAX_FILE_TRANSFER_BYTES) {
+                    *writeFailed = true;
+                    reply->abort();
+                    return;
+                }
+                const qint64 n = file->write(chunk);
+                if (n != chunk.size()) {
+                    *writeFailed = true;
+                    reply->abort();
+                    return;
+                }
+                *bytesWritten += n;
+            });
+
+    connect(reply, &QNetworkReply::finished, this,
+            [reply, file, finalPath, partPath, name, id, advertisedSize, bytesWritten, writeFailed]() {
+                const QNetworkReply::NetworkError err = reply->error();
+                const QString errString = reply->errorString();
+                if (!file->flush()) {
+                    *writeFailed = true;
+                }
+                file->close();
+
+                bool ok = err == QNetworkReply::NoError && !*writeFailed;
+                if (ok && advertisedSize >= 0 && *bytesWritten != advertisedSize) {
+                    ClipboardLog::warn("ClipboardSync: file transfer size mismatch for %s (got %lld, advertised %lld)",
+                                name.toUtf8().constData(),
+                                static_cast<long long>(*bytesWritten),
+                                static_cast<long long>(advertisedSize));
+                    ok = false;
+                }
+
+                if (ok) {
+                    ok = QFile::rename(partPath, finalPath);
+                }
+
+                if (ok) {
+                    ClipboardLog::info("ClipboardSync: downloaded file offer %s (%lld bytes, id=%s) to %s",
+                                name.toUtf8().constData(),
+                                static_cast<long long>(*bytesWritten),
+                                id.toUtf8().constData(),
+                                finalPath.toUtf8().constData());
+                }
+                else {
+                    QFile::remove(partPath);
+                    ClipboardLog::warn("ClipboardSync: file transfer failed for %s: %s",
+                                name.toUtf8().constData(),
+                                err == QNetworkReply::NoError
+                                    ? "local write/rename failed"
+                                    : errString.toUtf8().constData());
+                }
+
+                reply->deleteLater();
+            });
 }
 
 void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime, qint64 advertisedSize)
