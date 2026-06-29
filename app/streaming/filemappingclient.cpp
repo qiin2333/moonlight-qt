@@ -259,7 +259,7 @@ FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappi
 
     QSslSocket socket;
     socket.setSslConfiguration(sslConfiguration());
-    connect(&socket, &QSslSocket::sslErrors, this, [&](const QList<QSslError>& errors) {
+    connect(&socket, static_cast<void (QSslSocket::*)(const QList<QSslError>&)>(&QSslSocket::sslErrors), this, [&](const QList<QSslError>& errors) {
         if (isPinnedCertificateError(errors)) {
             socket.ignoreSslErrors(errors);
         }
