@@ -103,11 +103,8 @@ jobs:
         
         rem Build with standard configuration and correct architecture
         echo Building with CI optimizations...
-        scripts\build-arch.bat release x64
-        if !ERRORLEVEL! NEQ 0 (
-          echo Build failed with error !ERRORLEVEL!
-          exit /b !ERRORLEVEL!
-        )
+        call scripts\build-arch.bat release x64
+        if errorlevel 1 exit /b %ERRORLEVEL%
         
         echo Build Windows x64 completed successfully!
 
@@ -131,17 +128,16 @@ jobs:
         rem this, windeployqt would deploy x64 Qt DLLs into the ARM64 portable
         rem package, producing 0xc000007b on launch (qiin2333/moonlight-qt#71).
         set "PATH=%Qt6_DIR%\bin;%PATH%"
-        copy /y scripts\appveyor\qmake.bat %Qt6_DIR%\bin\
-        copy /y scripts\appveyor\qtpaths.bat %Qt6_DIR%\bin\
-        copy /y scripts\appveyor\target_qt.conf %Qt6_DIR%\bin\
-        scripts\build-arch.bat release arm64
-        copy /y build\installer-arm64-release\MoonlightPortable-arm64-$($env:VERSION).zip artifacts\MoonlightPortable-arm64.zip
-        copy /y build\symbols-arm64-Release\MoonlightDebuggingSymbols-arm64-$($env:VERSION).zip artifacts\MoonlightDebuggingSymbols-arm64.zip
+        call scripts\build-arch.bat release arm64
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        for %%f in (build\installer-arm64-release\MoonlightPortable-arm64-*.zip) do powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-pe-machine.ps1 -Path "%%f" -ExpectedMachine 0xAA64
+        if errorlevel 1 exit /b %ERRORLEVEL%
 
     - name: Generate universal installer
       shell: cmd
       run: |
-        scripts\generate-bundle.bat release
+        call scripts\generate-bundle.bat release
+        if errorlevel 1 exit /b %ERRORLEVEL%
 
     - name: Upload portable artifact
       uses: actions/upload-artifact@v4
