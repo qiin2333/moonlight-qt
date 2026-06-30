@@ -112,7 +112,8 @@ Flickable {
 
         Image {
             anchors.fill: parent
-            source: pcViewPage.currentBgUrl || "qrc:/res/gura.png"
+            visible: StreamingPreferences.enableBackgroundImage
+            source: visible ? (pcViewPage.currentBgUrl || "qrc:/res/gura.png") : ""
             opacity: 0.35
             fillMode: Image.PreserveAspectCrop
         }
@@ -1633,6 +1634,23 @@ Flickable {
                     onActivated : {
                         StreamingPreferences.uiDisplayMode = uiDisplayModeListModel.get(currentIndex).val
                     }
+                }
+
+                CheckBox {
+                    id: backgroundImageCheck
+                    width: parent.width
+                    hoverEnabled: true
+                    text: qsTr("Enable background wallpaper")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.enableBackgroundImage
+                    onCheckedChanged: {
+                        StreamingPreferences.enableBackgroundImage = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Download and display a wallpaper on the PC list and settings pages.")
                 }
 
                 CheckBox {

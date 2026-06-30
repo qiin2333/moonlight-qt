@@ -192,6 +192,7 @@ public:
     Q_PROPERTY(bool enableMicrophone MEMBER enableMicrophone NOTIFY enableMicrophoneChanged)
     Q_PROPERTY(OverlayMenuPosition overlayMenuPosition MEMBER overlayMenuPosition NOTIFY overlayMenuPositionChanged)
     Q_PROPERTY(bool autoUpdateCheck MEMBER autoUpdateCheck NOTIFY autoUpdateCheckChanged)
+    Q_PROPERTY(bool enableBackgroundImage MEMBER enableBackgroundImage NOTIFY enableBackgroundImageChanged)
 
     Q_INVOKABLE bool retranslate();
 
@@ -252,6 +253,7 @@ public:
     bool enableMicrophone;
     OverlayMenuPosition overlayMenuPosition;
     bool autoUpdateCheck;
+    bool enableBackgroundImage;
 
 signals:
     void displayModeChanged();
@@ -307,6 +309,7 @@ signals:
     void enableMicrophoneChanged();
     void overlayMenuPositionChanged();
     void autoUpdateCheckChanged();
+    void enableBackgroundImageChanged();
 
 private:
     explicit StreamingPreferences(QQmlEngine *qmlEngine);
