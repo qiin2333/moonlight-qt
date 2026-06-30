@@ -49,13 +49,14 @@ Current landed skeleton:
 - `file-mapping/vfs`: platform-neutral VFS item, handle, and read interface.
 - `file-mapping/mount`: provider-neutral mount session and provider interface.
 - `file-mapping/file-mapping.pri`: qmake integration for the Qt app build.
+- `app/streaming/filemappingprotocoladapter.*`: Qt streaming-side adapter from the existing Sunshine WSS client to the platform-neutral protocol facade.
 
 Current non-goals:
 
 - No behavior change to the existing overlay Host Files readiness probe.
 - No macOS File Provider extension yet.
 - No Windows/Linux mount helpers yet.
-- No migration of `app/streaming/filemappingclient.*` yet.
+- `app/streaming/filemappingclient.*` is still the concrete Sunshine WSS implementation; it is now reusable through the protocol facade, but not moved into `file-mapping/protocol` yet.
 
 ## First Implementation Target
 

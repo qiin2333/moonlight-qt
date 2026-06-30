@@ -165,6 +165,11 @@ FileMappingClient::FileMappingClient(NvComputer* computer, QObject* parent)
 {
 }
 
+FileMappingClient::~FileMappingClient()
+{
+    closeSession();
+}
+
 FileMappingClient::Capability FileMappingClient::fetchCapability(int timeoutMs)
 {
     Capability capability;
@@ -233,43 +238,44 @@ FileMappingClient::Capability FileMappingClient::fetchCapability(int timeoutMs)
     return capability;
 }
 
-FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappingId,
-                                                            const QString& path,
-                                                            quint64 offset,
-                                                            quint32 length,
-                                                            int timeoutMs)
+bool FileMappingClient::connectSession(const Capability& capability, int timeoutMs, QString* error)
 {
-    SmokeResult result;
-    Capability capability = fetchCapability(timeoutMs);
     if (!capability.ok || !capability.enabled || !capability.listening) {
-        result.error = tr("File mapping capability is unavailable: ok=%1 enabled=%2 listening=%3 port=%4 error=%5")
-                       .arg(capability.ok)
-                       .arg(capability.enabled)
-                       .arg(capability.listening)
-                       .arg(capability.port)
-                       .arg(capability.error);
-        return result;
+        if (error != nullptr) {
+            *error = tr("File mapping capability is unavailable: ok=%1 enabled=%2 listening=%3 port=%4 error=%5")
+                    .arg(capability.ok)
+                    .arg(capability.enabled)
+                    .arg(capability.listening)
+                    .arg(capability.port)
+                    .arg(capability.error);
+        }
+        return false;
     }
 
     QUrl sessionUrl;
     if (!buildSessionUrl(capability, sessionUrl)) {
-        result.error = tr("File mapping session URL is invalid");
-        return result;
+        if (error != nullptr) {
+            *error = tr("File mapping session URL is invalid");
+        }
+        return false;
     }
 
-    QSslSocket socket;
-    socket.setSslConfiguration(sslConfiguration());
-    connect(&socket, static_cast<void (QSslSocket::*)(const QList<QSslError>&)>(&QSslSocket::sslErrors), this, [&](const QList<QSslError>& errors) {
+    closeSession();
+    m_Socket = new QSslSocket(this);
+    m_Socket->setSslConfiguration(sslConfiguration());
+    connect(m_Socket, static_cast<void (QSslSocket::*)(const QList<QSslError>&)>(&QSslSocket::sslErrors), this, [this](const QList<QSslError>& errors) {
         if (isPinnedCertificateError(errors)) {
-            socket.ignoreSslErrors(errors);
+            m_Socket->ignoreSslErrors(errors);
         }
     });
 
-    socket.connectToHostEncrypted(sessionUrl.host(), static_cast<quint16>(sessionUrl.port(443)));
-    if (!socket.waitForEncrypted(timeoutMs)) {
-        socket.abort();
-        result.error = socket.errorString().isEmpty() ? tr("Timed out while opening file mapping TLS connection") : socket.errorString();
-        return result;
+    m_Socket->connectToHostEncrypted(sessionUrl.host(), static_cast<quint16>(sessionUrl.port(443)));
+    if (!m_Socket->waitForEncrypted(timeoutMs)) {
+        if (error != nullptr) {
+            *error = m_Socket->errorString().isEmpty() ? tr("Timed out while opening file mapping TLS connection") : m_Socket->errorString();
+        }
+        closeSession();
+        return false;
     }
 
     QByteArray nonce(16, Qt::Uninitialized);
@@ -300,39 +306,47 @@ FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappi
     request += "Sec-WebSocket-Version: 13\r\n";
     request += "\r\n";
 
-    if (socket.write(request) != request.size() || !socket.waitForBytesWritten(timeoutMs)) {
-        result.error = socket.errorString().isEmpty() ? tr("Failed to write file mapping WebSocket upgrade request") : socket.errorString();
-        socket.abort();
-        return result;
+    if (m_Socket->write(request) != request.size() || !m_Socket->waitForBytesWritten(timeoutMs)) {
+        if (error != nullptr) {
+            *error = m_Socket->errorString().isEmpty() ? tr("Failed to write file mapping WebSocket upgrade request") : m_Socket->errorString();
+        }
+        closeSession();
+        return false;
     }
 
-    QByteArray buffer;
-    while (!buffer.contains("\r\n\r\n")) {
-        if (buffer.size() > 64 * 1024) {
-            result.error = tr("File mapping WebSocket upgrade response is too large");
-            socket.abort();
-            return result;
+    m_WsBuffer.clear();
+    while (!m_WsBuffer.contains("\r\n\r\n")) {
+        if (m_WsBuffer.size() > 64 * 1024) {
+            if (error != nullptr) {
+                *error = tr("File mapping WebSocket upgrade response is too large");
+            }
+            closeSession();
+            return false;
         }
-        if (!socket.waitForReadyRead(timeoutMs)) {
-            result.error = socket.errorString().isEmpty() ? tr("Timed out waiting for file mapping WebSocket upgrade") : socket.errorString();
-            socket.abort();
-            return result;
+        if (!m_Socket->waitForReadyRead(timeoutMs)) {
+            if (error != nullptr) {
+                *error = m_Socket->errorString().isEmpty() ? tr("Timed out waiting for file mapping WebSocket upgrade") : m_Socket->errorString();
+            }
+            closeSession();
+            return false;
         }
-        buffer += socket.readAll();
+        m_WsBuffer += m_Socket->readAll();
     }
 
-    const int headerEnd = buffer.indexOf("\r\n\r\n");
-    const QByteArray headers = buffer.left(headerEnd);
-    buffer.remove(0, headerEnd + 4);
+    const int headerEnd = m_WsBuffer.indexOf("\r\n\r\n");
+    const QByteArray headers = m_WsBuffer.left(headerEnd);
+    m_WsBuffer.remove(0, headerEnd + 4);
 
     QList<QByteArray> headerLines = headers.split('\n');
     if (headerLines.isEmpty() ||
             !(headerLines.first().trimmed().startsWith("HTTP/1.1 101") ||
               headerLines.first().trimmed().startsWith("HTTP/1.0 101"))) {
-        result.error = tr("File mapping WebSocket upgrade was rejected: %1")
-                       .arg(QString::fromUtf8(headerLines.value(0).trimmed()));
-        socket.abort();
-        return result;
+        if (error != nullptr) {
+            *error = tr("File mapping WebSocket upgrade was rejected: %1")
+                    .arg(QString::fromUtf8(headerLines.value(0).trimmed()));
+        }
+        closeSession();
+        return false;
     }
 
     QByteArray acceptHeader;
@@ -353,17 +367,12 @@ FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappi
                                           QCryptographicHash::Sha1)
                                           .toBase64();
     if (acceptHeader != expectedAccept) {
-        result.error = tr("File mapping WebSocket accept header is invalid");
-        socket.abort();
-        return result;
-    }
-
-    auto sendAndWait = [&](const QJsonObject& message, QJsonObject& out) -> QString {
-        if (!writeWsText(socket, QJsonDocument(message).toJson(QJsonDocument::Compact))) {
-            return socket.errorString().isEmpty() ? tr("Failed to write file mapping WebSocket message") : socket.errorString();
+        if (error != nullptr) {
+            *error = tr("File mapping WebSocket accept header is invalid");
         }
-        return readWsText(socket, buffer, out, timeoutMs);
-    };
+        closeSession();
+        return false;
+    }
 
     QJsonObject hello {
         { QStringLiteral("type"), QStringLiteral("hello") },
@@ -372,54 +381,91 @@ FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappi
         { QStringLiteral("client_uuid"), capability.clientUuid.isEmpty() ? clientUuid() : capability.clientUuid },
         { QStringLiteral("mappings"), QJsonArray {} }
     };
-    result.error = sendAndWait(hello, result.hello);
-    if (!result.error.isEmpty()) {
-        socket.close();
-        return result;
+    QString sendError;
+    if (!sendAndWait(hello, m_LastHello, timeoutMs, &sendError)) {
+        if (error != nullptr) {
+            *error = sendError;
+        }
+        closeSession();
+        return false;
     }
-    result.error = rpcReplyError(result.hello);
-    if (!result.error.isEmpty()) {
-        socket.close();
-        return result;
+    sendError = rpcReplyError(m_LastHello);
+    if (!sendError.isEmpty()) {
+        if (error != nullptr) {
+            *error = sendError;
+        }
+        closeSession();
+        return false;
     }
 
-    QJsonObject list {
+    m_NextRequestId = 1;
+    m_SessionConnected = true;
+    return true;
+}
+
+FileMappingClient::RpcResult FileMappingClient::list(const QString& mappingId, const QString& path, int timeoutMs)
+{
+    return sendRpc({
         { QStringLiteral("type"), QStringLiteral("list") },
-        { QStringLiteral("id"), 1 },
         { QStringLiteral("mapping"), mappingId },
-        { QStringLiteral("path"), QString() }
-    };
-    result.error = sendAndWait(list, result.list);
-    if (!result.error.isEmpty()) {
-        socket.close();
-        return result;
-    }
-    result.error = rpcReplyError(result.list);
-    if (!result.error.isEmpty()) {
-        socket.close();
-        return result;
-    }
+        { QStringLiteral("path"), path }
+    }, timeoutMs);
+}
 
-    QJsonObject read {
+FileMappingClient::RpcResult FileMappingClient::stat(const QString& mappingId, const QString& path, int timeoutMs)
+{
+    return sendRpc({
+        { QStringLiteral("type"), QStringLiteral("stat") },
+        { QStringLiteral("mapping"), mappingId },
+        { QStringLiteral("path"), path }
+    }, timeoutMs);
+}
+
+FileMappingClient::RpcResult FileMappingClient::read(const QString& mappingId,
+                                                     const QString& path,
+                                                     quint64 offset,
+                                                     quint32 length,
+                                                     int timeoutMs)
+{
+    return sendRpc({
         { QStringLiteral("type"), QStringLiteral("read") },
-        { QStringLiteral("id"), 2 },
         { QStringLiteral("mapping"), mappingId },
         { QStringLiteral("path"), path },
         { QStringLiteral("offset"), static_cast<double>(offset) },
         { QStringLiteral("length"), static_cast<int>(length) }
-    };
-    result.error = sendAndWait(read, result.read);
-    if (!result.error.isEmpty()) {
-        socket.close();
-        return result;
-    }
-    result.error = rpcReplyError(result.read);
-    if (!result.error.isEmpty()) {
-        socket.close();
+    }, timeoutMs);
+}
+
+FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappingId,
+                                                            const QString& path,
+                                                            quint64 offset,
+                                                            quint32 length,
+                                                            int timeoutMs)
+{
+    SmokeResult result;
+    Capability capability = fetchCapability(timeoutMs);
+    if (!connectSession(capability, timeoutMs, &result.error)) {
         return result;
     }
 
-    result.ok = result.hello.value(QStringLiteral("type")).toString() == QStringLiteral("hello") &&
+    result.hello = m_LastHello;
+    RpcResult listResult = list(mappingId, QString(), timeoutMs);
+    result.list = listResult.reply;
+    if (!listResult.ok) {
+        result.error = listResult.error;
+        closeSession();
+        return result;
+    }
+
+    RpcResult readResult = read(mappingId, path, offset, length, timeoutMs);
+    result.read = readResult.reply;
+    if (!readResult.ok) {
+        result.error = readResult.error;
+        closeSession();
+        return result;
+    }
+
+    result.ok = m_LastHello.value(QStringLiteral("type")).toString() == QStringLiteral("hello") &&
                 result.list.value(QStringLiteral("type")).toString() == QStringLiteral("result") &&
                 result.read.value(QStringLiteral("type")).toString() == QStringLiteral("result");
     if (!result.ok) {
@@ -428,8 +474,69 @@ FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappi
                             compactJsonForLog(result.list),
                             compactJsonForLog(result.read));
     }
-    socket.close();
+    closeSession();
     return result;
+}
+
+bool FileMappingClient::sendAndWait(const QJsonObject& message, QJsonObject& out, int timeoutMs, QString* error)
+{
+    if (m_Socket == nullptr) {
+        if (error != nullptr) {
+            *error = tr("File mapping WebSocket session is not connected");
+        }
+        return false;
+    }
+    if (!writeWsText(*m_Socket, QJsonDocument(message).toJson(QJsonDocument::Compact))) {
+        if (error != nullptr) {
+            *error = m_Socket->errorString().isEmpty() ? tr("Failed to write file mapping WebSocket message") : m_Socket->errorString();
+        }
+        return false;
+    }
+
+    QString readError = readWsText(*m_Socket, m_WsBuffer, out, timeoutMs);
+    if (!readError.isEmpty()) {
+        if (error != nullptr) {
+            *error = readError;
+        }
+        return false;
+    }
+    return true;
+}
+
+FileMappingClient::RpcResult FileMappingClient::sendRpc(QJsonObject message, int timeoutMs)
+{
+    RpcResult result;
+    if (!m_SessionConnected) {
+        result.error = tr("File mapping WebSocket session is not connected");
+        return result;
+    }
+
+    message.insert(QStringLiteral("id"), static_cast<double>(m_NextRequestId++));
+    if (!sendAndWait(message, result.reply, timeoutMs, &result.error)) {
+        return result;
+    }
+
+    result.error = rpcReplyError(result.reply);
+    result.ok = result.error.isEmpty() &&
+                result.reply.value(QStringLiteral("type")).toString() == QStringLiteral("result") &&
+                result.reply.value(QStringLiteral("ok")).toBool(true);
+    if (!result.ok && result.error.isEmpty()) {
+        result.error = tr("Unexpected file mapping RPC response: %1").arg(compactJsonForLog(result.reply));
+    }
+    return result;
+}
+
+void FileMappingClient::closeSession()
+{
+    m_SessionConnected = false;
+    m_WsBuffer.clear();
+    m_LastHello = {};
+    m_NextRequestId = 1;
+    if (m_Socket != nullptr) {
+        m_Socket->close();
+        delete m_Socket;
+        m_Socket = nullptr;
+    }
 }
 
 bool FileMappingClient::buildCapabilityUrl(QUrl& outUrl) const

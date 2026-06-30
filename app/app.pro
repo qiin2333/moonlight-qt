@@ -214,6 +214,7 @@ SOURCES += \
     streaming/input/reltouch.cpp \
     streaming/session.cpp \
     streaming/filemappingclient.cpp \
+    streaming/filemappingprotocoladapter.cpp \
     streaming/clipboardhelperclient.cpp \
     streaming/clipboardipc.cpp \
     streaming/audio/audio.cpp \
@@ -262,6 +263,7 @@ HEADERS += \
     streaming/input/input.h \
     streaming/session.h \
     streaming/filemappingclient.h \
+    streaming/filemappingprotocoladapter.h \
     streaming/clipboardhelperclient.h \
     streaming/clipboardipc.h \
     streaming/audio/renderers/renderer.h \
