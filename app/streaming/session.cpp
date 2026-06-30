@@ -2260,9 +2260,12 @@ bool Session::openFileMappingMountPath()
 
 #if defined(Q_OS_MACOS)
     if (QProcess::startDetached(QStringLiteral("/usr/bin/open"),
-                                { QStringLiteral("-a"),
-                                  QStringLiteral("Finder"),
-                                  m_FileMappingMountPath })) {
+                                { QStringLiteral("-R"),
+                                  QDir(m_FileMappingMountPath).filePath(QStringLiteral("README.txt")) })) {
+        return true;
+    }
+    if (QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+                                { m_FileMappingMountPath })) {
         return true;
     }
 #endif

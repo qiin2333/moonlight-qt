@@ -20,6 +20,11 @@ QString skippedFileText(const QString& reason)
 {
     return QStringLiteral("This host file was not copied into the Finder snapshot.\n\nReason: %1\n\nTry opening a smaller folder or increase the Moonlight file mapping mirror limits for testing.\n").arg(reason);
 }
+
+QString revealMarkerPath(const QString& rootPath)
+{
+    return QDir(rootPath).filePath(QStringLiteral("README.txt"));
+}
 } // namespace
 
 MacOSFinderMirrorProvider::MacOSFinderMirrorProvider()
@@ -133,9 +138,12 @@ MountError MacOSFinderMirrorProvider::reveal(const MountId& id)
     bool opened = false;
 #if defined(Q_OS_MACOS)
     opened = QProcess::startDetached(QStringLiteral("/usr/bin/open"),
-                                     { QStringLiteral("-a"),
-                                       QStringLiteral("Finder"),
-                                       current.displayPath });
+                                     { QStringLiteral("-R"),
+                                       revealMarkerPath(current.displayPath) });
+    if (!opened) {
+        opened = QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+                                         { current.displayPath });
+    }
 #endif
     if (!opened) {
         opened = QDesktopServices::openUrl(QUrl::fromLocalFile(current.displayPath));
@@ -207,16 +215,14 @@ QString MacOSFinderMirrorProvider::uniqueChildPath(const QString& parentPath, co
 
 QString MacOSFinderMirrorProvider::cacheRootPath(const MountRequest& request)
 {
-    QString base = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    if (!base.isEmpty()) {
-        base = QDir(base).filePath(QStringLiteral("Moonlight Host Files"));
+    QString base = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    if (base.isEmpty()) {
+        base = QDir::homePath();
     }
     if (base.isEmpty()) {
-        base = QDir::homePath() + QStringLiteral("/Moonlight Host Files");
+        base = QDir::tempPath();
     }
-    if (base.isEmpty()) {
-        base = QDir::tempPath() + QStringLiteral("/Moonlight Host Files");
-    }
+    base = QDir(base).filePath(QStringLiteral("Moonlight Host Files"));
 
     const QString host = safeName(request.hostName.isEmpty() ? request.hostUuid : request.hostName,
                                   QStringLiteral("host"));
