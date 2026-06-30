@@ -1,11 +1,15 @@
 #include "session.h"
 #include "clipboardhelperclient.h"
 #include "filemappingclient.h"
+#include "filemappingprotocoladapter.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
 #include "backend/nvhttp.h"
 #include "backend/identitymanager.h"
+#include "mount/mount_coordinator.h"
+#include "mount/mount_provider_factory.h"
+#include "vfs/protocol_remote_vfs.h"
 
 #include <Limelight.h>
 #include "SDL_compat.h"
@@ -42,6 +46,8 @@
 
 #include <QtEndian>
 #include <QCoreApplication>
+#include <QDesktopServices>
+#include <QDir>
 #include <QThreadPool>
 #include <QRunnable>
 #include <QReadLocker>
@@ -54,6 +60,8 @@
 #include <QtGlobal>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QUuid>
+#include <QUrl>
 
 #include <utility>
 
@@ -156,6 +164,15 @@ struct FileMappingProbeState {
     QString message;
 };
 
+struct FileMappingMountState {
+    QMutex lock;
+    bool pending = false;
+    bool ok = false;
+    QString detail;
+    QString message;
+    QString displayPath;
+};
+
 class FileMappingCapabilityTask : public QRunnable
 {
 public:
@@ -220,6 +237,90 @@ public:
 private:
     NvComputer m_Computer;
     std::shared_ptr<FileMappingProbeState> m_State;
+    int m_TimeoutMs;
+};
+
+class FileMappingMountTask : public QRunnable
+{
+public:
+    FileMappingMountTask(NvComputer computer,
+                         QString sessionId,
+                         std::shared_ptr<FileMappingMountState> state,
+                         int timeoutMs)
+        : m_Computer(std::move(computer)),
+          m_SessionId(std::move(sessionId)),
+          m_State(std::move(state)),
+          m_TimeoutMs(timeoutMs)
+    {
+    }
+
+    virtual void run() override
+    {
+        bool ok = false;
+        QString detail = QObject::tr("Error");
+        QString message = QObject::tr("Host files could not be opened.");
+        QString displayPath;
+
+        auto client = std::make_shared<FileMappingProtocolAdapter>(m_Computer);
+        FileMapping::Capability capability = client->fetchCapability(m_TimeoutMs);
+        if (!capability.error.ok()) {
+            message = QObject::tr("Host file sharing could not be checked: %1").arg(capability.error.message);
+        }
+        else if (!capability.enabled) {
+            detail = QObject::tr("Not shared");
+            message = QObject::tr("No host folders are shared. On the host PC, right-click a folder and share it with Moonlight.");
+        }
+        else if (!capability.listening || capability.port == 0) {
+            detail = QObject::tr("Starting");
+            message = QObject::tr("Host file sharing is enabled but not ready yet.");
+        }
+        else if (capability.sessionToken.isEmpty()) {
+            detail = QObject::tr("Retry");
+            message = QObject::tr("Host file sharing is waiting for a session token. Try again in a moment.");
+        }
+        else {
+            FileMapping::Error connectError = client->connectSession(capability, m_TimeoutMs);
+            if (!connectError.ok()) {
+                message = QObject::tr("Host files could not be connected: %1").arg(connectError.message);
+            }
+            else {
+                auto vfs = std::make_shared<FileMapping::ProtocolRemoteVfs>(client, m_TimeoutMs);
+                FileMapping::MountCoordinator coordinator(FileMapping::createDefaultMountProviders());
+                FileMapping::MountRequest request;
+                request.hostUuid = m_Computer.uuid;
+                request.hostName = m_Computer.name;
+                request.sessionId = m_SessionId;
+                request.vfs = vfs;
+
+                FileMapping::MountResult mount = coordinator.ensureMounted(request);
+                if (mount.ok() && mount.status.state == FileMapping::MountState::Mounted) {
+                    ok = true;
+                    detail = QObject::tr("Open");
+                    displayPath = mount.status.displayPath;
+                    message = mount.status.message.isEmpty()
+                            ? QObject::tr("Host files are ready in Finder.")
+                            : mount.status.message;
+                }
+                else {
+                    message = mount.error.message.isEmpty()
+                            ? QObject::tr("Host files could not be prepared.")
+                            : mount.error.message;
+                }
+            }
+        }
+
+        QMutexLocker locker(&m_State->lock);
+        m_State->pending = true;
+        m_State->ok = ok;
+        m_State->detail = detail;
+        m_State->message = message;
+        m_State->displayPath = displayPath;
+    }
+
+private:
+    NvComputer m_Computer;
+    QString m_SessionId;
+    std::shared_ptr<FileMappingMountState> m_State;
     int m_TimeoutMs;
 };
 
@@ -875,6 +976,9 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_FileMappingToast(),
       m_FileMappingToastPending(false),
       m_FileMappingProbeState(nullptr),
+      m_FileMappingMountState(nullptr),
+      m_FileMappingMountPath(),
+      m_FileMappingSessionId(QUuid::createUuid().toString(QUuid::WithoutBraces)),
       m_MenuCloseTicks(0),
       m_MicStream(nullptr)
 {
@@ -2028,6 +2132,17 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
             m_FileMappingState == OverlayMenuPanel::FileMappingState::Unknown) {
             showStreamingToast(tr("Checking host file sharing..."), 2000);
         }
+        else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Mounting) {
+            showStreamingToast(tr("Preparing host files..."), 2000);
+        }
+        else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Open &&
+                 !m_FileMappingMountPath.isEmpty()) {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+            showStreamingToast(tr("Opening host files..."), 2000);
+        }
+        else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Available) {
+            startFileMappingMount();
+        }
         else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Error ||
                  m_FileMappingState == OverlayMenuPanel::FileMappingState::Unavailable) {
             showStreamingToast(m_FileMappingToast.isEmpty()
@@ -2035,9 +2150,6 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
                                : m_FileMappingToast + tr(" Retrying..."),
                                4500);
             startFileMappingUxProbe();
-        }
-        else if (!m_FileMappingToast.isEmpty()) {
-            showStreamingToast(m_FileMappingToast, 3500);
         }
         else {
             showStreamingToast(tr("Host file sharing is not available."), 3000);
@@ -2345,6 +2457,98 @@ void Session::processFileMappingUxProbeResult()
     if (m_FileMappingToastPending) {
         m_FileMappingToastPending = false;
         showStreamingToast(m_FileMappingToast, 2500);
+    }
+}
+
+void Session::startFileMappingMount()
+{
+    if (m_FileMappingMountState) {
+        showStreamingToast(tr("Preparing host files..."), 2000);
+        return;
+    }
+
+    if (!m_FileMappingMountPath.isEmpty()) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+        showStreamingToast(tr("Opening host files..."), 2000);
+        return;
+    }
+
+    m_FileMappingState = OverlayMenuPanel::FileMappingState::Mounting;
+    m_FileMappingDetail = tr("Preparing");
+    m_FileMappingToast = tr("Preparing host files...");
+    m_FileMappingToastPending = false;
+    updateFileMappingMenuState();
+    showStreamingToast(m_FileMappingToast, 2000);
+
+    if (m_Computer == nullptr) {
+        m_FileMappingState = OverlayMenuPanel::FileMappingState::Unavailable;
+        m_FileMappingDetail = tr("Unavailable");
+        m_FileMappingToast = tr("Host file sharing is not available.");
+        updateFileMappingMenuState();
+        return;
+    }
+
+    NvComputer computerSnapshot;
+    {
+        QReadLocker locker(&m_Computer->lock);
+        computerSnapshot = *m_Computer;
+    }
+
+    m_FileMappingMountState = std::make_shared<FileMappingMountState>();
+    QThreadPool::globalInstance()->start(new FileMappingMountTask(std::move(computerSnapshot),
+                                                                  m_FileMappingSessionId,
+                                                                  m_FileMappingMountState,
+                                                                  8000));
+}
+
+void Session::processFileMappingMountResult()
+{
+    if (!m_FileMappingMountState) {
+        return;
+    }
+
+    bool ok = false;
+    QString detail;
+    QString message;
+    QString displayPath;
+    {
+        QMutexLocker locker(&m_FileMappingMountState->lock);
+        if (!m_FileMappingMountState->pending) {
+            return;
+        }
+        m_FileMappingMountState->pending = false;
+        ok = m_FileMappingMountState->ok;
+        detail = m_FileMappingMountState->detail;
+        message = m_FileMappingMountState->message;
+        displayPath = m_FileMappingMountState->displayPath;
+    }
+    m_FileMappingMountState.reset();
+
+    if (ok && !displayPath.isEmpty()) {
+        m_FileMappingMountPath = displayPath;
+        m_FileMappingState = OverlayMenuPanel::FileMappingState::Open;
+        m_FileMappingDetail = detail.isEmpty() ? tr("Open") : detail;
+        m_FileMappingToast = message.isEmpty() ? tr("Host files are ready in Finder.") : message;
+        updateFileMappingMenuState();
+        QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+        showStreamingToast(m_FileMappingToast, 3000);
+    }
+    else {
+        m_FileMappingMountPath.clear();
+        m_FileMappingState = OverlayMenuPanel::FileMappingState::Error;
+        m_FileMappingDetail = detail.isEmpty() ? tr("Error") : detail;
+        m_FileMappingToast = message.isEmpty() ? tr("Host files could not be opened.") : message;
+        updateFileMappingMenuState();
+        showStreamingToast(m_FileMappingToast, 4500);
+    }
+}
+
+void Session::cleanupFileMappingMount()
+{
+    m_FileMappingMountState.reset();
+    if (!m_FileMappingMountPath.isEmpty()) {
+        QDir(m_FileMappingMountPath).removeRecursively();
+        m_FileMappingMountPath.clear();
     }
 }
 
@@ -3301,6 +3505,7 @@ void Session::exec()
     for (;;) {
         processSunshineAbrFeedback();
         processFileMappingUxProbeResult();
+        processFileMappingMountResult();
         processClipboardHelperMessages();
 
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
@@ -3318,6 +3523,7 @@ void Session::exec()
             presence.runCallbacks();
             processClipboardHelperMessages();
             processFileMappingUxProbeResult();
+            processFileMappingMountResult();
             processQtEventsDuringStream(true);
             processSunshineAbrFeedback();
             continue;
@@ -3338,6 +3544,7 @@ void Session::exec()
             presence.runCallbacks();
             processClipboardHelperMessages();
             processFileMappingUxProbeResult();
+            processFileMappingMountResult();
             processQtEventsDuringStream();
             processSunshineAbrFeedback();
             continue;
@@ -3761,6 +3968,7 @@ void Session::exec()
 
         processClipboardHelperMessages();
         processFileMappingUxProbeResult();
+        processFileMappingMountResult();
         processQtEventsDuringStream();
 
         // Deferred microphone toggle — runs outside processEvents() to avoid
@@ -3793,6 +4001,8 @@ DispatchDeferredCleanup:
         delete m_ClipboardHelper;
         m_ClipboardHelper = nullptr;
     }
+
+    cleanupFileMappingMount();
 
     // Destroy the Qt overlay menu panel
     if (m_MenuPanel) {

@@ -1,5 +1,6 @@
 #include "mount_provider_factory.h"
 
+#include "macos_finder_mirror_provider.h"
 #include "unavailable_mount_provider.h"
 
 #include <QtGlobal>
@@ -52,10 +53,14 @@ QList<MountProviderPtr> createDefaultMountProviders()
 {
     QList<MountProviderPtr> providers;
     const MountProviderKind nativeKind = platformNativeMountProviderKind();
+#if defined(Q_OS_MACOS)
+    providers.append(std::make_shared<MacOSFinderMirrorProvider>());
+#else
     providers.append(std::make_shared<UnavailableMountProvider>(
                          nativeKind,
                          nativeProviderName(nativeKind),
                          nativeUnavailableMessage(nativeKind)));
+#endif
     providers.append(std::make_shared<UnavailableMountProvider>(
                          MountProviderKind::Fallback,
                          nativeProviderName(MountProviderKind::Fallback),

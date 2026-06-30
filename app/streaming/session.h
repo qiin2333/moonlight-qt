@@ -280,6 +280,9 @@ private:
     void sendSunshineAbrFeedback();
     void startFileMappingUxProbe();
     void processFileMappingUxProbeResult();
+    void startFileMappingMount();
+    void processFileMappingMountResult();
+    void cleanupFileMappingMount();
     void startFileMappingSmokeProbe();
 
     static
@@ -345,6 +348,9 @@ private:
     QString m_FileMappingToast;
     bool m_FileMappingToastPending;
     std::shared_ptr<struct FileMappingProbeState> m_FileMappingProbeState;
+    std::shared_ptr<struct FileMappingMountState> m_FileMappingMountState;
+    QString m_FileMappingMountPath;
+    QString m_FileMappingSessionId;
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
     class ClipboardHelperClient* m_ClipboardHelper; // Bidirectional clipboard sync helper process; nullptr when stream not active
 

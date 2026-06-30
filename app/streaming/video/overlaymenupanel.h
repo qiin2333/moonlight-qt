@@ -62,6 +62,8 @@ public:
         Checking,
         Unavailable,
         Available,
+        Mounting,
+        Open,
         Error
     };
 

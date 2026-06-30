@@ -149,7 +149,8 @@ void OverlayMenuPanel::buildMenuLevels()
                          MenuAction::MenuActionMax, 2, true, false, false});
     top.items.push_back({tr("Host Files"),    m_FileMappingDetail, MenuItemType::Action,
                          MenuAction::ShowHostFiles, 0, true,
-                         m_FileMappingState == FileMappingState::Available, true});   // separator
+                         m_FileMappingState == FileMappingState::Available ||
+                         m_FileMappingState == FileMappingState::Open, true});   // separator
     top.items.push_back({tr("Toggle Fullscreen"), QString(), MenuItemType::Action,
                          MenuAction::ToggleFullScreen, 0, true, false, false});
     top.items.push_back({tr("Microphone"),    QString(),  MenuItemType::Toggle,
@@ -283,7 +284,8 @@ void OverlayMenuPanel::updateFileMappingState(FileMappingState state, const QStr
     for (auto& item : m_MenuLevels[0].items) {
         if (item.action == MenuAction::ShowHostFiles) {
             item.detail = detail;
-            item.toggleState = state == FileMappingState::Available;
+            item.toggleState = state == FileMappingState::Available ||
+                               state == FileMappingState::Open;
             forceRepaint();
             break;
         }
