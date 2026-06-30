@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProcess>
 #include <QStandardPaths>
 #include <QUrl>
 
@@ -129,7 +130,17 @@ MountError MacOSFinderMirrorProvider::reveal(const MountId& id)
         return MountError::make(ErrorKind::NotFound, QStringLiteral("Host files are not mounted for this session."));
     }
 
-    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(current.displayPath))) {
+    bool opened = false;
+#if defined(Q_OS_MACOS)
+    opened = QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+                                     { QStringLiteral("-a"),
+                                       QStringLiteral("Finder"),
+                                       current.displayPath });
+#endif
+    if (!opened) {
+        opened = QDesktopServices::openUrl(QUrl::fromLocalFile(current.displayPath));
+    }
+    if (!opened) {
         return MountError::make(ErrorKind::Internal, QStringLiteral("Could not open host files in Finder."));
     }
 
@@ -196,15 +207,21 @@ QString MacOSFinderMirrorProvider::uniqueChildPath(const QString& parentPath, co
 
 QString MacOSFinderMirrorProvider::cacheRootPath(const MountRequest& request)
 {
-    QString base = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QString base = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    if (!base.isEmpty()) {
+        base = QDir(base).filePath(QStringLiteral("Moonlight Host Files"));
+    }
     if (base.isEmpty()) {
-        base = QDir::tempPath() + QStringLiteral("/Moonlight");
+        base = QDir::homePath() + QStringLiteral("/Moonlight Host Files");
+    }
+    if (base.isEmpty()) {
+        base = QDir::tempPath() + QStringLiteral("/Moonlight Host Files");
     }
 
     const QString host = safeName(request.hostName.isEmpty() ? request.hostUuid : request.hostName,
                                   QStringLiteral("host"));
     const QString session = safeName(request.sessionId, QStringLiteral("session"));
-    return QDir(base).filePath(QStringLiteral("host-files/%1-%2").arg(host, session));
+    return QDir(base).filePath(QStringLiteral("%1-%2").arg(host, session));
 }
 
 MacOSFinderMirrorProvider::MirrorLimits MacOSFinderMirrorProvider::limitsFromEnvironment()

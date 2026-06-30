@@ -193,6 +193,7 @@ private:
     void requestRuntimeBitrateChange(int bitrateKbps);
     void showStreamingToast(const QString& message, int durationMs = 2000);
     void updateFileMappingMenuState();
+    bool openFileMappingMountPath();
 #ifdef Q_OS_WIN32
     void queryDisplayHdrBrightness(float& maxNits, float& minNits, float& maxFullNits);
 #endif

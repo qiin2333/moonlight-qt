@@ -56,6 +56,7 @@
 #include <QImage>
 #include <QGuiApplication>
 #include <QCursor>
+#include <QProcess>
 #include <QScreen>
 #include <QtGlobal>
 #include <QMutex>
@@ -2137,7 +2138,7 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
         }
         else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Open &&
                  !m_FileMappingMountPath.isEmpty()) {
-            QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+            openFileMappingMountPath();
             showStreamingToast(tr("Opening host files..."), 2000);
         }
         else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Available) {
@@ -2249,6 +2250,24 @@ void Session::updateFileMappingMenuState()
     if (m_MenuPanel) {
         m_MenuPanel->updateFileMappingState(m_FileMappingState, m_FileMappingDetail);
     }
+}
+
+bool Session::openFileMappingMountPath()
+{
+    if (m_FileMappingMountPath.isEmpty()) {
+        return false;
+    }
+
+#if defined(Q_OS_MACOS)
+    if (QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+                                { QStringLiteral("-a"),
+                                  QStringLiteral("Finder"),
+                                  m_FileMappingMountPath })) {
+        return true;
+    }
+#endif
+
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
 }
 
 void Session::requestRuntimeBitrateChange(int bitrateKbps)
@@ -2468,7 +2487,7 @@ void Session::startFileMappingMount()
     }
 
     if (!m_FileMappingMountPath.isEmpty()) {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+        openFileMappingMountPath();
         showStreamingToast(tr("Opening host files..."), 2000);
         return;
     }
@@ -2530,7 +2549,7 @@ void Session::processFileMappingMountResult()
         m_FileMappingDetail = detail.isEmpty() ? tr("Open") : detail;
         m_FileMappingToast = message.isEmpty() ? tr("Host files are ready in Finder.") : message;
         updateFileMappingMenuState();
-        QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+        openFileMappingMountPath();
         showStreamingToast(m_FileMappingToast, 3000);
     }
     else {
