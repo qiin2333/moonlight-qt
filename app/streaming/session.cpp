@@ -189,11 +189,18 @@ public:
             detail = QObject::tr("Not shared");
             message = QObject::tr("No host folders are shared. On the host PC, right-click a folder and share it with Moonlight.");
         }
-        else if (!capability.listening || capability.sessionUrl.isEmpty()) {
+        else if (!capability.listening || capability.port == 0) {
             error = true;
             detail = QObject::tr("Starting");
             message = capability.error.isEmpty()
                     ? QObject::tr("Host file sharing is enabled but not ready yet.")
+                    : capability.error;
+        }
+        else if (capability.sessionToken.isEmpty()) {
+            error = true;
+            detail = QObject::tr("Retry");
+            message = capability.error.isEmpty()
+                    ? QObject::tr("Host file sharing is waiting for a session token. Try again in a moment.")
                     : capability.error;
         }
         else {
@@ -2020,6 +2027,14 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
         if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Checking ||
             m_FileMappingState == OverlayMenuPanel::FileMappingState::Unknown) {
             showStreamingToast(tr("Checking host file sharing..."), 2000);
+        }
+        else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Error ||
+                 m_FileMappingState == OverlayMenuPanel::FileMappingState::Unavailable) {
+            showStreamingToast(m_FileMappingToast.isEmpty()
+                               ? tr("Host file sharing is not available. Retrying...")
+                               : m_FileMappingToast + tr(" Retrying..."),
+                               4500);
+            startFileMappingUxProbe();
         }
         else if (!m_FileMappingToast.isEmpty()) {
             showStreamingToast(m_FileMappingToast, 3500);

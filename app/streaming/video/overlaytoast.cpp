@@ -50,8 +50,13 @@ void OverlayToast::showToast(int parentX, int parentY, int parentW, int parentH,
     // Calculate dimensions
     QFontMetrics fm(m_Font);
     int textWidth = fm.horizontalAdvance(m_Message) + m_HorizPadding * 2;
-    int toastWidth = qMin(textWidth, 500);
-    if (toastWidth < 120) toastWidth = 120;
+    int toastWidth = qMin(textWidth, 560);
+    if (toastWidth < 160) toastWidth = 160;
+
+    QRect textRect = fm.boundingRect(QRect(0, 0, toastWidth - m_HorizPadding * 2, 200),
+                                     Qt::AlignCenter | Qt::TextWordWrap,
+                                     m_Message);
+    m_ToastHeight = qMin(qMax(textRect.height() + m_VertPadding * 2, 40), 140);
 
 #ifdef Q_OS_MACOS
     // On macOS, SDL and Qt both use points (logical coordinates)
@@ -112,6 +117,6 @@ void OverlayToast::paintEvent(QPaintEvent*)
     // White text centered
     p.setFont(m_Font);
     p.setPen(Qt::white);
-    p.drawText(QRect(m_HorizPadding, 0, w - m_HorizPadding * 2, h),
-               Qt::AlignCenter, m_Message);
+    p.drawText(QRect(m_HorizPadding, m_VertPadding, w - m_HorizPadding * 2, h - m_VertPadding * 2),
+               Qt::AlignCenter | Qt::TextWordWrap, m_Message);
 }

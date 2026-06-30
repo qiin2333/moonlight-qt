@@ -48,6 +48,7 @@ public:
 
 private:
     bool buildCapabilityUrl(QUrl& outUrl) const;
+    bool buildSessionUrl(const Capability& capability, QUrl& outUrl) const;
     QNetworkAccessManager* nam();
     QSslConfiguration sslConfiguration() const;
     bool isPinnedCertificateError(const QList<QSslError>& errors) const;

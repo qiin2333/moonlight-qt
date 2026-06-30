@@ -241,7 +241,7 @@ FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappi
 {
     SmokeResult result;
     Capability capability = fetchCapability(timeoutMs);
-    if (!capability.ok || !capability.enabled || !capability.listening || capability.sessionUrl.isEmpty()) {
+    if (!capability.ok || !capability.enabled || !capability.listening) {
         result.error = tr("File mapping capability is unavailable: ok=%1 enabled=%2 listening=%3 port=%4 error=%5")
                        .arg(capability.ok)
                        .arg(capability.enabled)
@@ -251,8 +251,8 @@ FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappi
         return result;
     }
 
-    QUrl sessionUrl(capability.sessionUrl);
-    if (!sessionUrl.isValid() || sessionUrl.scheme() != QStringLiteral("wss") || sessionUrl.host().isEmpty()) {
+    QUrl sessionUrl;
+    if (!buildSessionUrl(capability, sessionUrl)) {
         result.error = tr("File mapping session URL is invalid");
         return result;
     }
@@ -454,6 +454,45 @@ bool FileMappingClient::buildCapabilityUrl(QUrl& outUrl) const
     query.addQueryItem(QStringLiteral("client_uuid"), clientUuid());
     outUrl.setQuery(query);
     return outUrl.isValid();
+}
+
+bool FileMappingClient::buildSessionUrl(const Capability& capability, QUrl& outUrl) const
+{
+    if (!capability.sessionUrl.isEmpty()) {
+        outUrl = QUrl(capability.sessionUrl);
+    }
+    else {
+        if (m_Computer == nullptr || m_Computer->activeAddress.isNull() || capability.port == 0) {
+            return false;
+        }
+
+        QString endpoint = capability.sessionEndpoint.isEmpty()
+                ? QStringLiteral("/api/v1/file-mapping/session")
+                : capability.sessionEndpoint;
+        if (!endpoint.startsWith('/')) {
+            endpoint.prepend('/');
+        }
+
+        outUrl = QUrl();
+        outUrl.setScheme(QStringLiteral("wss"));
+        outUrl.setHost(m_Computer->activeAddress.address());
+        outUrl.setPort(capability.port);
+        outUrl.setPath(endpoint);
+    }
+
+    if (!outUrl.isValid() || outUrl.scheme() != QStringLiteral("wss") || outUrl.host().isEmpty()) {
+        return false;
+    }
+
+    if (!capability.sessionToken.isEmpty()) {
+        QUrlQuery query(outUrl);
+        if (!query.hasQueryItem(QStringLiteral("token"))) {
+            query.addQueryItem(QStringLiteral("token"), capability.sessionToken);
+            outUrl.setQuery(query);
+        }
+    }
+
+    return true;
 }
 
 QNetworkAccessManager* FileMappingClient::nam()
