@@ -615,6 +615,45 @@ Use VFS core with native document/file UI:
 - iOS/iPadOS can reuse File Provider concepts later.
 - Android can expose a DocumentsProvider-style surface.
 
+## Validation Loop
+
+Avoid validating Finder/Explorer UX by repeatedly publishing blind test builds.
+
+Every user-visible file mapping action should leave a diagnostic trail:
+
+- overlay action received
+- readiness probe requested and completed
+- capability fields: enabled, listening, port, token presence
+- session connection result
+- root mapping count
+- mount provider result and display path
+- platform reveal command result
+- cleanup path
+
+Desktop builds write these events to:
+
+```text
+~/Moonlight Host Files/Moonlight File Mapping Diagnostics.log
+```
+
+macOS Finder reveal can be tested without Sunshine by running the mirror E2E harness:
+
+```text
+file_mapping_mirror_e2e --reveal --keep
+```
+
+Expected result:
+
+- the harness prints `file_mapping_mirror_e2e=passed`
+- Finder reveals the generated `README.txt` on macOS
+- the generated snapshot remains under `~/Moonlight Host Files/<host-session>` for inspection
+
+Release a new user-test build only after:
+
+- the mirror E2E passes
+- the app object compile passes for touched streaming code
+- runtime diagnostics prove which layer was reached in a real stream
+
 ## Open Questions
 
 - Should each active stream create a temporary File Provider domain, or should each host have a persistent domain that becomes online/offline?

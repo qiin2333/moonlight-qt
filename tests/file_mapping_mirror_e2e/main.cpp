@@ -140,6 +140,9 @@ int main(int argc, char* argv[])
 
     QTextStream out(stdout);
     QTextStream err(stderr);
+    const QStringList args = QCoreApplication::arguments();
+    const bool keepSnapshot = args.contains(QStringLiteral("--keep"));
+    const bool revealSnapshot = args.contains(QStringLiteral("--reveal"));
 
     auto vfs = std::make_shared<FakeRemoteVfs>();
     MountRequest request;
@@ -170,8 +173,16 @@ int main(int argc, char* argv[])
     ok &= require(QFileInfo::exists(QDir(docs).filePath(QStringLiteral("large.bin.moonlight-skipped.txt"))), QStringLiteral("large file skip marker missing"), err);
     ok &= require(QFileInfo::exists(QDir(rootPath).filePath(QStringLiteral("Moonlight skipped files.txt"))), QStringLiteral("warnings file missing"), err);
 
-    coordinator.unmount(request.hostUuid, request.sessionId);
-    ok &= require(!QFileInfo::exists(rootPath), QStringLiteral("snapshot folder was not removed on unmount"), err);
+    if (revealSnapshot) {
+        MountError reveal = provider->reveal(result.id);
+        ok &= require(reveal.ok(), QStringLiteral("reveal failed: %1").arg(reveal.message), err);
+        out << "reveal=" << (reveal.ok() ? QStringLiteral("passed") : QStringLiteral("failed")) << '\n';
+    }
+
+    if (!keepSnapshot) {
+        coordinator.unmount(request.hostUuid, request.sessionId);
+        ok &= require(!QFileInfo::exists(rootPath), QStringLiteral("snapshot folder was not removed on unmount"), err);
+    }
 
     if (!ok) {
         return 1;
@@ -179,5 +190,6 @@ int main(int argc, char* argv[])
 
     out << "file_mapping_mirror_e2e=passed\n";
     out << "snapshot_path=" << rootPath << '\n';
+    out << "kept=" << (keepSnapshot ? QStringLiteral("true") : QStringLiteral("false")) << '\n';
     return 0;
 }

@@ -56,8 +56,11 @@
 #include <QImage>
 #include <QGuiApplication>
 #include <QCursor>
+#include <QDateTime>
+#include <QFile>
 #include <QProcess>
 #include <QScreen>
+#include <QStandardPaths>
 #include <QtGlobal>
 #include <QMutex>
 #include <QMutexLocker>
@@ -163,6 +166,7 @@ struct FileMappingProbeState {
     bool error = false;
     QString detail;
     QString message;
+    QString diagnosticsPath;
 };
 
 struct FileMappingMountState {
@@ -172,7 +176,84 @@ struct FileMappingMountState {
     QString detail;
     QString message;
     QString displayPath;
+    QString diagnosticsPath;
 };
+
+QString fileMappingStateName(OverlayMenuPanel::FileMappingState state)
+{
+    switch (state) {
+    case OverlayMenuPanel::FileMappingState::Unknown:
+        return QStringLiteral("unknown");
+    case OverlayMenuPanel::FileMappingState::Checking:
+        return QStringLiteral("checking");
+    case OverlayMenuPanel::FileMappingState::Unavailable:
+        return QStringLiteral("unavailable");
+    case OverlayMenuPanel::FileMappingState::Available:
+        return QStringLiteral("available");
+    case OverlayMenuPanel::FileMappingState::Mounting:
+        return QStringLiteral("mounting");
+    case OverlayMenuPanel::FileMappingState::Open:
+        return QStringLiteral("open");
+    case OverlayMenuPanel::FileMappingState::Error:
+        return QStringLiteral("error");
+    }
+    return QStringLiteral("unknown");
+}
+
+QString fileMappingDiagnosticsDirectory()
+{
+    QString base = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    if (base.isEmpty()) {
+        base = QDir::homePath();
+    }
+    if (base.isEmpty()) {
+        base = QDir::tempPath();
+    }
+    return QDir(base).filePath(QStringLiteral("Moonlight Host Files"));
+}
+
+QString fileMappingDiagnosticsPath()
+{
+    return QDir(fileMappingDiagnosticsDirectory()).filePath(QStringLiteral("Moonlight File Mapping Diagnostics.log"));
+}
+
+QString singleLineDiagnosticValue(QString value)
+{
+    value.replace(QLatin1Char('\r'), QLatin1Char(' '));
+    value.replace(QLatin1Char('\n'), QLatin1Char(' '));
+    return value;
+}
+
+QString appendFileMappingDiagnostic(const QString& event,
+                                    const QString& detail = QString(),
+                                    const QString& hostUuid = QString(),
+                                    const QString& sessionId = QString())
+{
+    const QString dir = fileMappingDiagnosticsDirectory();
+    QDir().mkpath(dir);
+
+    const QString path = fileMappingDiagnosticsPath();
+    const QString line = QStringLiteral("%1 event=%2 host=%3 session=%4 detail=%5\n")
+            .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs),
+                 singleLineDiagnosticValue(event),
+                 singleLineDiagnosticValue(hostUuid),
+                 singleLineDiagnosticValue(sessionId),
+                 singleLineDiagnosticValue(detail));
+
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        file.write(line.toUtf8());
+    }
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "File mapping diagnostic: event=%s host=%s session=%s detail=%s path=%s",
+                event.toUtf8().constData(),
+                hostUuid.toUtf8().constData(),
+                sessionId.toUtf8().constData(),
+                detail.toUtf8().constData(),
+                path.toUtf8().constData());
+    return path;
+}
 
 class FileMappingCapabilityTask : public QRunnable
 {
@@ -188,6 +269,12 @@ public:
 
     virtual void run() override
     {
+        QString diagnosticsPath = appendFileMappingDiagnostic(
+                QStringLiteral("ux_probe.start"),
+                QStringLiteral("timeout_ms=%1").arg(m_TimeoutMs),
+                m_Computer.uuid,
+                QString());
+
         FileMappingClient client(&m_Computer);
         FileMappingClient::Capability capability = client.fetchCapability(m_TimeoutMs);
 
@@ -227,12 +314,26 @@ public:
             message = QObject::tr("Host files are ready. Shared folders are read-only in this session.");
         }
 
+        diagnosticsPath = appendFileMappingDiagnostic(
+                QStringLiteral("ux_probe.result"),
+                QStringLiteral("ok=%1 enabled=%2 listening=%3 port=%4 token=%5 detail=%6 message=%7")
+                        .arg(capability.ok ? QStringLiteral("true") : QStringLiteral("false"),
+                             capability.enabled ? QStringLiteral("true") : QStringLiteral("false"),
+                             capability.listening ? QStringLiteral("true") : QStringLiteral("false"))
+                        .arg(capability.port)
+                        .arg(capability.sessionToken.isEmpty() ? QStringLiteral("missing") : QStringLiteral("present"),
+                             detail,
+                             message),
+                m_Computer.uuid,
+                QString());
+
         QMutexLocker locker(&m_State->lock);
         m_State->pending = true;
         m_State->available = available;
         m_State->error = error;
         m_State->detail = detail;
         m_State->message = message;
+        m_State->diagnosticsPath = diagnosticsPath;
     }
 
 private:
@@ -261,9 +362,25 @@ public:
         QString detail = QObject::tr("Error");
         QString message = QObject::tr("Host files could not be opened.");
         QString displayPath;
+        QString diagnosticsPath = appendFileMappingDiagnostic(
+                QStringLiteral("mount_task.start"),
+                QStringLiteral("timeout_ms=%1").arg(m_TimeoutMs),
+                m_Computer.uuid,
+                m_SessionId);
 
         auto client = std::make_shared<FileMappingProtocolAdapter>(m_Computer);
         FileMapping::Capability capability = client->fetchCapability(m_TimeoutMs);
+        diagnosticsPath = appendFileMappingDiagnostic(
+                QStringLiteral("mount_task.capability"),
+                QStringLiteral("error_ok=%1 enabled=%2 listening=%3 port=%4 token=%5 error=%6")
+                        .arg(capability.error.ok() ? QStringLiteral("true") : QStringLiteral("false"),
+                             capability.enabled ? QStringLiteral("true") : QStringLiteral("false"),
+                             capability.listening ? QStringLiteral("true") : QStringLiteral("false"))
+                        .arg(capability.port)
+                        .arg(capability.sessionToken.isEmpty() ? QStringLiteral("missing") : QStringLiteral("present"),
+                             capability.error.message),
+                m_Computer.uuid,
+                m_SessionId);
         if (!capability.error.ok()) {
             message = QObject::tr("Host file sharing could not be checked: %1").arg(capability.error.message);
         }
@@ -281,31 +398,61 @@ public:
         }
         else {
             FileMapping::Error connectError = client->connectSession(capability, m_TimeoutMs);
+            diagnosticsPath = appendFileMappingDiagnostic(
+                    QStringLiteral("mount_task.connect"),
+                    QStringLiteral("ok=%1 error=%2")
+                            .arg(connectError.ok() ? QStringLiteral("true") : QStringLiteral("false"),
+                                 connectError.message),
+                    m_Computer.uuid,
+                    m_SessionId);
             if (!connectError.ok()) {
                 message = QObject::tr("Host files could not be connected: %1").arg(connectError.message);
             }
             else {
                 auto vfs = std::make_shared<FileMapping::ProtocolRemoteVfs>(client, m_TimeoutMs);
-                FileMapping::MountCoordinator coordinator(FileMapping::createDefaultMountProviders());
-                FileMapping::MountRequest request;
-                request.hostUuid = m_Computer.uuid;
-                request.hostName = m_Computer.name;
-                request.sessionId = m_SessionId;
-                request.vfs = vfs;
-
-                FileMapping::MountResult mount = coordinator.ensureMounted(request);
-                if (mount.ok() && mount.status.state == FileMapping::MountState::Mounted) {
-                    ok = true;
-                    detail = QObject::tr("Open");
-                    displayPath = mount.status.displayPath;
-                    message = mount.status.message.isEmpty()
-                            ? QObject::tr("Host files are ready in Finder.")
-                            : mount.status.message;
+                FileMapping::ChildrenResult root = vfs->children(FileMapping::VfsItemId::root());
+                diagnosticsPath = appendFileMappingDiagnostic(
+                        QStringLiteral("mount_task.root_list"),
+                        root.ok()
+                                ? QStringLiteral("ok=true mappings=%1").arg(root.items.size())
+                                : QStringLiteral("ok=false error=%1").arg(root.error.message),
+                        m_Computer.uuid,
+                        m_SessionId);
+                if (!root.ok()) {
+                    message = QObject::tr("Host files root could not be listed: %1").arg(root.error.message);
                 }
                 else {
-                    message = mount.error.message.isEmpty()
-                            ? QObject::tr("Host files could not be prepared.")
-                            : mount.error.message;
+                    FileMapping::MountCoordinator coordinator(FileMapping::createDefaultMountProviders());
+                    FileMapping::MountRequest request;
+                    request.hostUuid = m_Computer.uuid;
+                    request.hostName = m_Computer.name;
+                    request.sessionId = m_SessionId;
+                    request.vfs = vfs;
+
+                    FileMapping::MountResult mount = coordinator.ensureMounted(request);
+                    diagnosticsPath = appendFileMappingDiagnostic(
+                            QStringLiteral("mount_task.mount"),
+                            QStringLiteral("ok=%1 state=%2 display_path=%3 error=%4 message=%5")
+                                    .arg(mount.ok() ? QStringLiteral("true") : QStringLiteral("false"))
+                                    .arg(static_cast<int>(mount.status.state))
+                                    .arg(mount.status.displayPath,
+                                         mount.error.message,
+                                         mount.status.message),
+                            m_Computer.uuid,
+                            m_SessionId);
+                    if (mount.ok() && mount.status.state == FileMapping::MountState::Mounted) {
+                        ok = true;
+                        detail = QObject::tr("Open");
+                        displayPath = mount.status.displayPath;
+                        message = mount.status.message.isEmpty()
+                                ? QObject::tr("Host files are ready in Finder.")
+                                : mount.status.message;
+                    }
+                    else {
+                        message = mount.error.message.isEmpty()
+                                ? QObject::tr("Host files could not be prepared.")
+                                : mount.error.message;
+                    }
                 }
             }
         }
@@ -316,6 +463,7 @@ public:
         m_State->detail = detail;
         m_State->message = message;
         m_State->displayPath = displayPath;
+        m_State->diagnosticsPath = diagnosticsPath;
     }
 
 private:
@@ -2129,6 +2277,14 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
         break;
 
     case OverlayMenuPanel::MenuAction::ShowHostFiles:
+        appendFileMappingDiagnostic(
+                QStringLiteral("overlay.click_host_files"),
+                QStringLiteral("state=%1 detail=%2 mount_path=%3")
+                        .arg(fileMappingStateName(m_FileMappingState),
+                             m_FileMappingDetail,
+                             m_FileMappingMountPath),
+                m_Computer ? m_Computer->uuid : QString(),
+                m_FileMappingSessionId);
         if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Checking ||
             m_FileMappingState == OverlayMenuPanel::FileMappingState::Unknown) {
             showStreamingToast(tr("Checking host file sharing..."), 2000);
@@ -2255,22 +2411,55 @@ void Session::updateFileMappingMenuState()
 bool Session::openFileMappingMountPath()
 {
     if (m_FileMappingMountPath.isEmpty()) {
+        appendFileMappingDiagnostic(
+                QStringLiteral("finder_reveal.skip"),
+                QStringLiteral("empty_mount_path"),
+                m_Computer ? m_Computer->uuid : QString(),
+                m_FileMappingSessionId);
         return false;
     }
+
+    const QString markerPath = QDir(m_FileMappingMountPath).filePath(QStringLiteral("README.txt"));
+    appendFileMappingDiagnostic(
+            QStringLiteral("finder_reveal.start"),
+            QStringLiteral("mount_path=%1 marker=%2 marker_exists=%3")
+                    .arg(m_FileMappingMountPath,
+                         markerPath,
+                         QFileInfo::exists(markerPath) ? QStringLiteral("true") : QStringLiteral("false")),
+            m_Computer ? m_Computer->uuid : QString(),
+            m_FileMappingSessionId);
 
 #if defined(Q_OS_MACOS)
     if (QProcess::startDetached(QStringLiteral("/usr/bin/open"),
                                 { QStringLiteral("-R"),
-                                  QDir(m_FileMappingMountPath).filePath(QStringLiteral("README.txt")) })) {
+                                  markerPath })) {
+        appendFileMappingDiagnostic(
+                QStringLiteral("finder_reveal.open_r"),
+                QStringLiteral("ok=true marker=%1").arg(markerPath),
+                m_Computer ? m_Computer->uuid : QString(),
+                m_FileMappingSessionId);
         return true;
     }
     if (QProcess::startDetached(QStringLiteral("/usr/bin/open"),
                                 { m_FileMappingMountPath })) {
+        appendFileMappingDiagnostic(
+                QStringLiteral("finder_reveal.open_folder"),
+                QStringLiteral("ok=true mount_path=%1").arg(m_FileMappingMountPath),
+                m_Computer ? m_Computer->uuid : QString(),
+                m_FileMappingSessionId);
         return true;
     }
 #endif
 
-    return QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+    const bool opened = QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+    appendFileMappingDiagnostic(
+            QStringLiteral("finder_reveal.desktop_services"),
+            QStringLiteral("ok=%1 mount_path=%2")
+                    .arg(opened ? QStringLiteral("true") : QStringLiteral("false"),
+                         m_FileMappingMountPath),
+            m_Computer ? m_Computer->uuid : QString(),
+            m_FileMappingSessionId);
+    return opened;
 }
 
 void Session::requestRuntimeBitrateChange(int bitrateKbps)
@@ -2414,6 +2603,12 @@ void Session::stopSunshineAbr()
 
 void Session::startFileMappingUxProbe()
 {
+    appendFileMappingDiagnostic(
+            QStringLiteral("ux_probe.request"),
+            QStringLiteral("current_state=%1").arg(fileMappingStateName(m_FileMappingState)),
+            m_Computer ? m_Computer->uuid : QString(),
+            m_FileMappingSessionId);
+
     m_FileMappingState = OverlayMenuPanel::FileMappingState::Checking;
     m_FileMappingDetail = tr("Checking");
     m_FileMappingToast = tr("Checking host file sharing...");
@@ -2424,6 +2619,11 @@ void Session::startFileMappingUxProbe()
         m_FileMappingState = OverlayMenuPanel::FileMappingState::Unavailable;
         m_FileMappingDetail = tr("Unavailable");
         m_FileMappingToast = tr("Host file sharing is not available.");
+        appendFileMappingDiagnostic(
+                QStringLiteral("ux_probe.no_computer"),
+                m_FileMappingToast,
+                QString(),
+                m_FileMappingSessionId);
         updateFileMappingMenuState();
         return;
     }
@@ -2450,6 +2650,7 @@ void Session::processFileMappingUxProbeResult()
     bool error = false;
     QString detail;
     QString message;
+    QString diagnosticsPath;
     {
         QMutexLocker locker(&m_FileMappingProbeState->lock);
         if (!m_FileMappingProbeState->pending) {
@@ -2460,6 +2661,7 @@ void Session::processFileMappingUxProbeResult()
         error = m_FileMappingProbeState->error;
         detail = m_FileMappingProbeState->detail;
         message = m_FileMappingProbeState->message;
+        diagnosticsPath = m_FileMappingProbeState->diagnosticsPath;
     }
 
     m_FileMappingState = available ? OverlayMenuPanel::FileMappingState::Available :
@@ -2471,10 +2673,11 @@ void Session::processFileMappingUxProbeResult()
     updateFileMappingMenuState();
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "File mapping UX probe: state=%d detail=%s message=%s",
+                "File mapping UX probe: state=%d detail=%s message=%s diagnostics=%s",
                 static_cast<int>(m_FileMappingState),
                 m_FileMappingDetail.toUtf8().constData(),
-                m_FileMappingToast.toUtf8().constData());
+                m_FileMappingToast.toUtf8().constData(),
+                diagnosticsPath.toUtf8().constData());
 
     if (m_FileMappingToastPending) {
         m_FileMappingToastPending = false;
@@ -2484,6 +2687,15 @@ void Session::processFileMappingUxProbeResult()
 
 void Session::startFileMappingMount()
 {
+    appendFileMappingDiagnostic(
+            QStringLiteral("mount.request"),
+            QStringLiteral("current_state=%1 existing_task=%2 mount_path=%3")
+                    .arg(fileMappingStateName(m_FileMappingState),
+                         m_FileMappingMountState ? QStringLiteral("true") : QStringLiteral("false"),
+                         m_FileMappingMountPath),
+            m_Computer ? m_Computer->uuid : QString(),
+            m_FileMappingSessionId);
+
     if (m_FileMappingMountState) {
         showStreamingToast(tr("Preparing host files..."), 2000);
         return;
@@ -2506,6 +2718,11 @@ void Session::startFileMappingMount()
         m_FileMappingState = OverlayMenuPanel::FileMappingState::Unavailable;
         m_FileMappingDetail = tr("Unavailable");
         m_FileMappingToast = tr("Host file sharing is not available.");
+        appendFileMappingDiagnostic(
+                QStringLiteral("mount.no_computer"),
+                m_FileMappingToast,
+                QString(),
+                m_FileMappingSessionId);
         updateFileMappingMenuState();
         return;
     }
@@ -2533,6 +2750,7 @@ void Session::processFileMappingMountResult()
     QString detail;
     QString message;
     QString displayPath;
+    QString diagnosticsPath;
     {
         QMutexLocker locker(&m_FileMappingMountState->lock);
         if (!m_FileMappingMountState->pending) {
@@ -2543,8 +2761,20 @@ void Session::processFileMappingMountResult()
         detail = m_FileMappingMountState->detail;
         message = m_FileMappingMountState->message;
         displayPath = m_FileMappingMountState->displayPath;
+        diagnosticsPath = m_FileMappingMountState->diagnosticsPath;
     }
     m_FileMappingMountState.reset();
+
+    appendFileMappingDiagnostic(
+            QStringLiteral("mount.result"),
+            QStringLiteral("ok=%1 detail=%2 message=%3 display_path=%4 diagnostics=%5")
+                    .arg(ok ? QStringLiteral("true") : QStringLiteral("false"),
+                         detail,
+                         message,
+                         displayPath,
+                         diagnosticsPath),
+            m_Computer ? m_Computer->uuid : QString(),
+            m_FileMappingSessionId);
 
     if (ok && !displayPath.isEmpty()) {
         m_FileMappingMountPath = displayPath;
@@ -2552,8 +2782,11 @@ void Session::processFileMappingMountResult()
         m_FileMappingDetail = detail.isEmpty() ? tr("Open") : detail;
         m_FileMappingToast = message.isEmpty() ? tr("Host files are ready in Finder.") : message;
         updateFileMappingMenuState();
-        openFileMappingMountPath();
-        showStreamingToast(m_FileMappingToast, 3000);
+        const bool opened = openFileMappingMountPath();
+        showStreamingToast(opened
+                           ? m_FileMappingToast
+                           : tr("Host files are ready, but Finder did not open. Check ~/Moonlight Host Files."),
+                           3000);
     }
     else {
         m_FileMappingMountPath.clear();
@@ -2567,6 +2800,11 @@ void Session::processFileMappingMountResult()
 
 void Session::cleanupFileMappingMount()
 {
+    appendFileMappingDiagnostic(
+            QStringLiteral("mount.cleanup"),
+            QStringLiteral("mount_path=%1").arg(m_FileMappingMountPath),
+            m_Computer ? m_Computer->uuid : QString(),
+            m_FileMappingSessionId);
     m_FileMappingMountState.reset();
     if (!m_FileMappingMountPath.isEmpty()) {
         QDir(m_FileMappingMountPath).removeRecursively();
