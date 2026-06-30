@@ -1,0 +1,66 @@
+#include "mount_provider_factory.h"
+
+#include "unavailable_mount_provider.h"
+
+#include <QtGlobal>
+
+#include <memory>
+
+namespace FileMapping {
+namespace {
+QString nativeProviderName(MountProviderKind kind)
+{
+    switch (kind) {
+    case MountProviderKind::MacFileProvider:
+        return QStringLiteral("macOS File Provider");
+    case MountProviderKind::WindowsWinFsp:
+        return QStringLiteral("Windows Explorer integration");
+    case MountProviderKind::LinuxFuse:
+        return QStringLiteral("Linux FUSE integration");
+    case MountProviderKind::MobileDocumentProvider:
+        return QStringLiteral("Mobile document provider");
+    case MountProviderKind::MacFuse:
+        return QStringLiteral("macFUSE integration");
+    case MountProviderKind::Fallback:
+        return QStringLiteral("Moonlight file browser");
+    }
+    return QStringLiteral("Host files integration");
+}
+
+QString nativeUnavailableMessage(MountProviderKind kind)
+{
+    return QStringLiteral("%1 is not available in this build yet.").arg(nativeProviderName(kind));
+}
+} // namespace
+
+MountProviderKind platformNativeMountProviderKind()
+{
+#if defined(Q_OS_MACOS)
+    return MountProviderKind::MacFileProvider;
+#elif defined(Q_OS_WIN)
+    return MountProviderKind::WindowsWinFsp;
+#elif defined(Q_OS_LINUX)
+    return MountProviderKind::LinuxFuse;
+#elif defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    return MountProviderKind::MobileDocumentProvider;
+#else
+    return MountProviderKind::Fallback;
+#endif
+}
+
+QList<MountProviderPtr> createDefaultMountProviders()
+{
+    QList<MountProviderPtr> providers;
+    const MountProviderKind nativeKind = platformNativeMountProviderKind();
+    providers.append(std::make_shared<UnavailableMountProvider>(
+                         nativeKind,
+                         nativeProviderName(nativeKind),
+                         nativeUnavailableMessage(nativeKind)));
+    providers.append(std::make_shared<UnavailableMountProvider>(
+                         MountProviderKind::Fallback,
+                         nativeProviderName(MountProviderKind::Fallback),
+                         QStringLiteral("Moonlight's built-in host files browser is not available yet.")));
+    return providers;
+}
+
+} // namespace FileMapping
