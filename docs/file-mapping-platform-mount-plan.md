@@ -47,6 +47,7 @@ Current landed skeleton:
 
 - `file-mapping/protocol`: platform-neutral protocol facade and message/error types.
 - `file-mapping/vfs`: platform-neutral VFS item, handle, and read interface.
+- `file-mapping/vfs/protocol_remote_vfs.*`: protocol-backed VFS implementation for root mappings, folder enumeration, stat, open, and read handles.
 - `file-mapping/mount`: provider-neutral mount session and provider interface.
 - `file-mapping/file-mapping.pri`: qmake integration for the Qt app build.
 - `app/streaming/filemappingprotocoladapter.*`: Qt streaming-side adapter from the existing Sunshine WSS client to the platform-neutral protocol facade.
@@ -494,6 +495,7 @@ Risk controls:
 - Add module directories and interfaces.
 - Move current Qt file-mapping client behind protocol-client facade.
 - Add mock VFS provider with local test data.
+- Add protocol-backed VFS provider for the real Sunshine RPC path.
 - Add documentation and compile-only stubs.
 
 Exit criteria:

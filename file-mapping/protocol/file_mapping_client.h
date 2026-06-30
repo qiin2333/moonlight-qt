@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include <QList>
 #include <QString>
 
 #include "file_mapping_messages.h"
@@ -14,6 +15,7 @@ public:
 
     virtual Capability fetchCapability(int timeoutMs) = 0;
     virtual Error connectSession(const Capability& capability, int timeoutMs) = 0;
+    virtual QList<RemoteMapping> mappings() const = 0;
     virtual ListResult list(const QString& mappingId, const QString& path, int timeoutMs) = 0;
     virtual StatResult stat(const QString& mappingId, const QString& path, int timeoutMs) = 0;
     virtual ReadResult read(const QString& mappingId,

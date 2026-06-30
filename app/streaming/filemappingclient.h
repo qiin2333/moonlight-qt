@@ -51,6 +51,7 @@ public:
 
     Capability fetchCapability(int timeoutMs = 3000);
     bool connectSession(const Capability& capability, int timeoutMs, QString* error = nullptr);
+    QJsonObject lastHello() const { return m_LastHello; }
     RpcResult list(const QString& mappingId, const QString& path, int timeoutMs = 5000);
     RpcResult stat(const QString& mappingId, const QString& path, int timeoutMs = 5000);
     RpcResult read(const QString& mappingId,

@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QList>
 #include <QString>
+#include <QStringList>
 
 #include "file_mapping_errors.h"
 
@@ -19,6 +20,14 @@ struct Capability {
     QString sessionToken;
     QString clientUuid;
     Error error;
+};
+
+struct RemoteMapping {
+    QString id;
+    QString displayName;
+    QString side;
+    QString mode;
+    QStringList capabilities;
 };
 
 struct RemoteEntry {

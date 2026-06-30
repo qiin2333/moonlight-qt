@@ -89,6 +89,42 @@ FileMapping::RemoteStat statFromJson(const QJsonObject& reply)
     stat.size = static_cast<quint64>(reply.value(QStringLiteral("size")).toDouble(0));
     return stat;
 }
+
+QStringList stringListFromJson(const QJsonArray& array)
+{
+    QStringList out;
+    out.reserve(array.size());
+    for (const QJsonValue& value : array) {
+        if (value.isString()) {
+            out.append(value.toString());
+        }
+    }
+    return out;
+}
+
+QList<FileMapping::RemoteMapping> mappingsFromHello(const QJsonObject& hello)
+{
+    QList<FileMapping::RemoteMapping> mappings;
+    const QJsonArray items = hello.value(QStringLiteral("mappings")).toArray();
+    mappings.reserve(items.size());
+    for (const QJsonValue& value : items) {
+        if (!value.isObject()) {
+            continue;
+        }
+        const QJsonObject item = value.toObject();
+        FileMapping::RemoteMapping mapping;
+        mapping.id = item.value(QStringLiteral("id")).toString();
+        if (mapping.id.isEmpty()) {
+            continue;
+        }
+        mapping.displayName = item.value(QStringLiteral("name")).toString(mapping.id);
+        mapping.side = item.value(QStringLiteral("side")).toString();
+        mapping.mode = item.value(QStringLiteral("mode")).toString();
+        mapping.capabilities = stringListFromJson(item.value(QStringLiteral("capabilities")).toArray());
+        mappings.append(std::move(mapping));
+    }
+    return mappings;
+}
 } // namespace
 
 FileMappingProtocolAdapter::FileMappingProtocolAdapter(NvComputer computer)
@@ -105,6 +141,8 @@ FileMapping::Capability FileMappingProtocolAdapter::fetchCapability(int timeoutM
 
 FileMapping::Error FileMappingProtocolAdapter::connectSession(const FileMapping::Capability& capability, int timeoutMs)
 {
+    m_Mappings.clear();
+
     FileMappingClient::Capability legacyCapability;
     legacyCapability.ok = capability.error.ok();
     legacyCapability.enabled = capability.enabled;
@@ -120,7 +158,13 @@ FileMapping::Error FileMappingProtocolAdapter::connectSession(const FileMapping:
     if (!client().connectSession(legacyCapability, timeoutMs, &error)) {
         return mapRpcError(error);
     }
+    m_Mappings = mappingsFromHello(client().lastHello());
     return FileMapping::Error::none();
+}
+
+QList<FileMapping::RemoteMapping> FileMappingProtocolAdapter::mappings() const
+{
+    return m_Mappings;
 }
 
 FileMapping::ListResult FileMappingProtocolAdapter::list(const QString& mappingId, const QString& path, int timeoutMs)
