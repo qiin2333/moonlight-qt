@@ -89,63 +89,97 @@ bool writeWsText(QSslSocket& socket, const QByteArray& payload)
 
 QString readWsText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, int timeoutMs)
 {
-    if (!waitForBytes(socket, buffer, 2, timeoutMs)) {
-        return QObject::tr("Timed out waiting for WebSocket frame header");
-    }
+    QByteArray payload;
+    bool messageStarted = false;
 
-    quint8 first = static_cast<quint8>(buffer[0]);
-    quint8 second = static_cast<quint8>(buffer[1]);
-    buffer.remove(0, 2);
-
-    const quint8 opcode = first & 0x0f;
-    if (opcode == 0x8) {
-        return QObject::tr("WebSocket closed by host");
-    }
-    if (opcode != 0x1) {
-        return QObject::tr("Unexpected WebSocket opcode %1").arg(opcode);
-    }
-
-    quint64 length = second & 0x7f;
-    if (length == 126) {
+    for (;;) {
         if (!waitForBytes(socket, buffer, 2, timeoutMs)) {
-            return QObject::tr("Timed out waiting for WebSocket extended length");
+            return QObject::tr("Timed out waiting for WebSocket frame header");
         }
-        length = (static_cast<quint8>(buffer[0]) << 8) | static_cast<quint8>(buffer[1]);
+
+        quint8 first = static_cast<quint8>(buffer[0]);
+        quint8 second = static_cast<quint8>(buffer[1]);
         buffer.remove(0, 2);
-    }
-    else if (length == 127) {
-        if (!waitForBytes(socket, buffer, 8, timeoutMs)) {
-            return QObject::tr("Timed out waiting for WebSocket extended length");
-        }
-        length = 0;
-        for (int i = 0; i < 8; ++i) {
-            length = (length << 8) | static_cast<quint8>(buffer[i]);
-        }
-        buffer.remove(0, 8);
-    }
 
-    const bool masked = (second & 0x80) != 0;
-    QByteArray mask;
-    if (masked) {
-        if (!waitForBytes(socket, buffer, 4, timeoutMs)) {
-            return QObject::tr("Timed out waiting for WebSocket mask");
+        const bool fin = (first & 0x80) != 0;
+        const quint8 opcode = first & 0x0f;
+        if ((first & 0x70) != 0) {
+            return QObject::tr("Unsupported WebSocket frame flags");
         }
-        mask = buffer.left(4);
-        buffer.remove(0, 4);
-    }
 
-    if (length > 16 * 1024 * 1024) {
-        return QObject::tr("WebSocket frame is too large");
-    }
-    if (!waitForBytes(socket, buffer, static_cast<int>(length), timeoutMs)) {
-        return QObject::tr("Timed out waiting for WebSocket payload");
-    }
+        quint64 length = second & 0x7f;
+        if (length == 126) {
+            if (!waitForBytes(socket, buffer, 2, timeoutMs)) {
+                return QObject::tr("Timed out waiting for WebSocket extended length");
+            }
+            length = (static_cast<quint8>(buffer[0]) << 8) | static_cast<quint8>(buffer[1]);
+            buffer.remove(0, 2);
+        }
+        else if (length == 127) {
+            if (!waitForBytes(socket, buffer, 8, timeoutMs)) {
+                return QObject::tr("Timed out waiting for WebSocket extended length");
+            }
+            length = 0;
+            for (int i = 0; i < 8; ++i) {
+                length = (length << 8) | static_cast<quint8>(buffer[i]);
+            }
+            buffer.remove(0, 8);
+        }
 
-    QByteArray payload = buffer.left(static_cast<int>(length));
-    buffer.remove(0, static_cast<int>(length));
-    if (masked) {
-        for (int i = 0; i < payload.size(); ++i) {
-            payload[i] = static_cast<char>(static_cast<quint8>(payload[i]) ^ static_cast<quint8>(mask[i % 4]));
+        const bool masked = (second & 0x80) != 0;
+        QByteArray mask;
+        if (masked) {
+            if (!waitForBytes(socket, buffer, 4, timeoutMs)) {
+                return QObject::tr("Timed out waiting for WebSocket mask");
+            }
+            mask = buffer.left(4);
+            buffer.remove(0, 4);
+        }
+
+        if (length > 16 * 1024 * 1024 ||
+                payload.size() + length > 16 * 1024 * 1024) {
+            return QObject::tr("WebSocket message is too large");
+        }
+        if (!waitForBytes(socket, buffer, static_cast<int>(length), timeoutMs)) {
+            return QObject::tr("Timed out waiting for WebSocket payload");
+        }
+
+        QByteArray framePayload = buffer.left(static_cast<int>(length));
+        buffer.remove(0, static_cast<int>(length));
+        if (masked) {
+            for (int i = 0; i < framePayload.size(); ++i) {
+                framePayload[i] = static_cast<char>(static_cast<quint8>(framePayload[i]) ^ static_cast<quint8>(mask[i % 4]));
+            }
+        }
+
+        if (opcode == 0x8) {
+            return QObject::tr("WebSocket closed by host");
+        }
+        if (opcode == 0x9 || opcode == 0xa) {
+            if (!fin || length > 125) {
+                return QObject::tr("Invalid WebSocket control frame");
+            }
+            continue;
+        }
+        if (opcode == 0x1) {
+            if (messageStarted) {
+                return QObject::tr("Unexpected WebSocket text frame");
+            }
+            messageStarted = true;
+            payload += framePayload;
+        }
+        else if (opcode == 0x0) {
+            if (!messageStarted) {
+                return QObject::tr("Unexpected WebSocket continuation frame");
+            }
+            payload += framePayload;
+        }
+        else {
+            return QObject::tr("Unexpected WebSocket opcode %1").arg(opcode);
+        }
+
+        if (fin) {
+            break;
         }
     }
 
