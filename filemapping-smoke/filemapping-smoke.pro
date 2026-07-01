@@ -43,7 +43,8 @@ SOURCES += \
     ../app/backend/nvhttp.cpp \
     ../app/backend/nvpairingmanager.cpp \
     ../app/settings/compatfetcher.cpp \
-    ../app/streaming/filemappingclient.cpp
+    ../app/streaming/filemappingclient.cpp \
+    ../app/streaming/filemappingwebsocket.cpp
 
 HEADERS += \
     ../app/backend/identitymanager.h \
@@ -53,4 +54,5 @@ HEADERS += \
     ../app/backend/nvhttp.h \
     ../app/backend/nvpairingmanager.h \
     ../app/settings/compatfetcher.h \
-    ../app/streaming/filemappingclient.h
+    ../app/streaming/filemappingclient.h \
+    ../app/streaming/filemappingwebsocket.h
