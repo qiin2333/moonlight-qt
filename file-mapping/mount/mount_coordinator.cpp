@@ -46,6 +46,8 @@ MountResult MountCoordinator::ensureMounted(const MountRequest& request)
     }
 
     MountResult lastResult = unavailableResult(QStringLiteral("No host files mount provider is available."));
+    MountResult firstConcreteFailure;
+    bool hasConcreteFailure = false;
     for (const MountProviderPtr& provider : m_Providers) {
         if (!provider) {
             continue;
@@ -54,6 +56,10 @@ MountResult MountCoordinator::ensureMounted(const MountRequest& request)
         MountResult result = provider->mount(request);
         lastResult = result;
         if (!result.ok()) {
+            if (!hasConcreteFailure && result.error.kind != ErrorKind::Unsupported) {
+                firstConcreteFailure = result;
+                hasConcreteFailure = true;
+            }
             continue;
         }
 
@@ -65,6 +71,9 @@ MountResult MountCoordinator::ensureMounted(const MountRequest& request)
         return result;
     }
 
+    if (hasConcreteFailure) {
+        return firstConcreteFailure;
+    }
     return lastResult;
 }
 

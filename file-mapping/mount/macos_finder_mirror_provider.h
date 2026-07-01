@@ -21,11 +21,11 @@ public:
 
 private:
     struct MirrorLimits {
-        int maxDepth = 8;
-        int maxFiles = 512;
-        quint64 maxBytes = 512ULL * 1024ULL * 1024ULL;
-        quint64 maxFileBytes = 256ULL * 1024ULL * 1024ULL;
-        quint32 chunkBytes = 256U * 1024U;
+        int maxDepth = 4;
+        int maxFiles = 128;
+        quint64 maxBytes = 32ULL * 1024ULL * 1024ULL;
+        quint64 maxFileBytes = 8ULL * 1024ULL * 1024ULL;
+        quint32 chunkBytes = 64U * 1024U;
     };
 
     struct MirrorState {
