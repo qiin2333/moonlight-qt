@@ -2141,6 +2141,26 @@ bool Session::openFileMappingMountPath()
                 m_FileMappingSessionId);
         return true;
     }
+#elif defined(Q_OS_WIN32) || defined(Q_OS_WIN)
+    if (QFileInfo::exists(markerPath) &&
+            QProcess::startDetached(QStringLiteral("explorer.exe"),
+                                    { QStringLiteral("/select,%1").arg(QDir::toNativeSeparators(markerPath)) })) {
+        appendFileMappingDiagnostic(
+                QStringLiteral("explorer_reveal.open_select"),
+                QStringLiteral("ok=true marker=%1").arg(markerPath),
+                m_Computer ? m_Computer->uuid : QString(),
+                m_FileMappingSessionId);
+        return true;
+    }
+    if (QProcess::startDetached(QStringLiteral("explorer.exe"),
+                                { QDir::toNativeSeparators(m_FileMappingMountPath) })) {
+        appendFileMappingDiagnostic(
+                QStringLiteral("explorer_reveal.open_folder"),
+                QStringLiteral("ok=true mount_path=%1").arg(m_FileMappingMountPath),
+                m_Computer ? m_Computer->uuid : QString(),
+                m_FileMappingSessionId);
+        return true;
+    }
 #endif
 
     const bool opened = QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
@@ -2472,12 +2492,12 @@ void Session::processFileMappingMountResult()
         m_FileMappingMountPath = displayPath;
         m_FileMappingState = OverlayMenuPanel::FileMappingState::Open;
         m_FileMappingDetail = detail.isEmpty() ? tr("Open") : detail;
-        m_FileMappingToast = message.isEmpty() ? tr("Host files are ready in Finder.") : message;
+        m_FileMappingToast = message.isEmpty() ? tr("Host files are ready.") : message;
         updateFileMappingMenuState();
         const bool opened = openFileMappingMountPath();
         showStreamingToast(opened
                            ? m_FileMappingToast
-                           : tr("Host files are ready, but Finder did not open. Check ~/Moonlight Host Files."),
+                           : tr("Host files are ready, but the folder did not open. Check %1.").arg(m_FileMappingMountPath),
                            3000);
     }
     else {

@@ -1,5 +1,6 @@
 #include "mount/macos_finder_mirror_provider.h"
 #include "mount/mount_coordinator.h"
+#include "mount/windows_explorer_mirror_provider.h"
 #include "vfs/remote_vfs.h"
 
 #include <QCoreApplication>
@@ -151,7 +152,11 @@ int main(int argc, char* argv[])
     request.sessionId = QStringLiteral("e2e-session");
     request.vfs = vfs;
 
+#if defined(Q_OS_WIN32) || defined(Q_OS_WIN)
+    auto provider = std::make_shared<WindowsExplorerMirrorProvider>();
+#else
     auto provider = std::make_shared<MacOSFinderMirrorProvider>();
+#endif
     MountCoordinator coordinator({ provider });
     MountResult result = coordinator.ensureMounted(request);
     if (!require(result.ok(), QStringLiteral("mount failed: %1").arg(result.error.message), err)) {

@@ -216,7 +216,7 @@ public:
                         detail = QObject::tr("Open");
                         displayPath = mount.status.displayPath;
                         message = mount.status.message.isEmpty()
-                                ? QObject::tr("Host files are ready in Finder.")
+                                ? QObject::tr("Host files are ready.")
                                 : mount.status.message;
                     }
                     else {

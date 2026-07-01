@@ -18,7 +18,7 @@ QString errorMessage(const Error& error)
 
 QString skippedFileText(const QString& reason)
 {
-    return QStringLiteral("This host file was not copied into the Finder snapshot.\n\nReason: %1\n\nTry opening a smaller folder or increase the Moonlight file mapping mirror limits for testing.\n").arg(reason);
+    return QStringLiteral("This host file was not copied into the local snapshot.\n\nReason: %1\n\nTry opening a smaller folder or increase the Moonlight file mapping mirror limits for testing.\n").arg(reason);
 }
 
 QString revealMarkerPath(const QString& rootPath)
@@ -72,14 +72,14 @@ MountResult MacOSFinderMirrorProvider::mount(const MountRequest& request)
     const QString rootPath = cacheRootPath(request);
     QDir root(rootPath);
     if (root.exists() && !root.removeRecursively()) {
-        result.error = MountError::make(ErrorKind::Internal, QStringLiteral("Could not refresh the local Finder snapshot."));
+        result.error = MountError::make(ErrorKind::Internal, QStringLiteral("Could not refresh the local host files snapshot."));
         result.status.state = MountState::Error;
         result.status.message = result.error.message;
         return result;
     }
 
     if (!QDir().mkpath(rootPath)) {
-        result.error = MountError::make(ErrorKind::Internal, QStringLiteral("Could not create the local Finder snapshot."));
+        result.error = MountError::make(ErrorKind::Internal, QStringLiteral("Could not create the local host files snapshot."));
         result.status.state = MountState::Error;
         result.status.message = result.error.message;
         return result;
@@ -105,7 +105,7 @@ MountResult MacOSFinderMirrorProvider::mount(const MountRequest& request)
 
     if (!counters.warnings.isEmpty()) {
         writeTextFile(rootPath + QStringLiteral("/Moonlight skipped files.txt"),
-                      QStringLiteral("Some host files were not copied into this Finder snapshot:\n\n") +
+                      QStringLiteral("Some host files were not copied into this local snapshot:\n\n") +
                       counters.warnings.join(QLatin1Char('\n')) +
                       QStringLiteral("\n"));
     }
@@ -116,8 +116,8 @@ MountResult MacOSFinderMirrorProvider::mount(const MountRequest& request)
     status.state = MountState::Mounted;
     status.displayPath = rootPath;
     status.message = counters.warnings.isEmpty()
-            ? QStringLiteral("Host files are ready in Finder.")
-            : QStringLiteral("Host files are ready in Finder. Some large or deep items were skipped.");
+            ? QStringLiteral("Host files are ready.")
+            : QStringLiteral("Host files are ready. Some large or deep items were skipped.");
 
     MountId id;
     id.value = rootPath;

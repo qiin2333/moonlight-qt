@@ -9,7 +9,8 @@ SOURCES += \
     $$PWD/mount/mount_provider.cpp \
     $$PWD/mount/mount_provider_factory.cpp \
     $$PWD/mount/mount_session.cpp \
-    $$PWD/mount/unavailable_mount_provider.cpp
+    $$PWD/mount/unavailable_mount_provider.cpp \
+    $$PWD/mount/windows_explorer_mirror_provider.cpp
 
 HEADERS += \
     $$PWD/protocol/file_mapping_client.h \
@@ -25,4 +26,5 @@ HEADERS += \
     $$PWD/mount/mount_provider.h \
     $$PWD/mount/mount_provider_factory.h \
     $$PWD/mount/mount_session.h \
-    $$PWD/mount/unavailable_mount_provider.h
+    $$PWD/mount/unavailable_mount_provider.h \
+    $$PWD/mount/windows_explorer_mirror_provider.h
