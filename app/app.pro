@@ -216,6 +216,7 @@ SOURCES += \
     streaming/filemappingclient.cpp \
     streaming/filemappingwebsocket.cpp \
     streaming/filemappingprotocoladapter.cpp \
+    streaming/filemappingux.cpp \
     streaming/clipboardhelperclient.cpp \
     streaming/clipboardipc.cpp \
     streaming/audio/audio.cpp \
@@ -266,6 +267,7 @@ HEADERS += \
     streaming/filemappingclient.h \
     streaming/filemappingwebsocket.h \
     streaming/filemappingprotocoladapter.h \
+    streaming/filemappingux.h \
     streaming/clipboardhelperclient.h \
     streaming/clipboardipc.h \
     streaming/audio/renderers/renderer.h \

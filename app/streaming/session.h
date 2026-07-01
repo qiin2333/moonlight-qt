@@ -20,6 +20,11 @@
 #include "micstream.h"
 #endif
 
+namespace FileMappingUx {
+struct ProbeState;
+struct MountState;
+}
+
 class SupportedVideoFormatList : public QList<int>
 {
 public:
@@ -348,8 +353,8 @@ private:
     QString m_FileMappingDetail;
     QString m_FileMappingToast;
     bool m_FileMappingToastPending;
-    std::shared_ptr<struct FileMappingProbeState> m_FileMappingProbeState;
-    std::shared_ptr<struct FileMappingMountState> m_FileMappingMountState;
+    std::shared_ptr<FileMappingUx::ProbeState> m_FileMappingProbeState;
+    std::shared_ptr<FileMappingUx::MountState> m_FileMappingMountState;
     QString m_FileMappingMountPath;
     QString m_FileMappingSessionId;
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
