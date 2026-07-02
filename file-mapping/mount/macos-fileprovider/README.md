@@ -10,7 +10,7 @@ The first implementation phase is intentionally split:
 
 - Qt provider selection lives in `file-mapping/mount/mac_file_provider_mount_provider.*`.
 - The native File Provider extension lives under `MoonlightFileProviderExtension/`.
-- qmake packaging is not wired yet. The extension files are scaffolded here so the macOS target can be added without touching the platform-neutral VFS and mount coordinator again.
+- macOS packaging builds the extension with `scripts/build-macos-fileprovider-extension.sh` and copies it to `Moonlight.app/Contents/PlugIns/`.
 
 Provider order on macOS should be:
 
@@ -52,3 +52,15 @@ M1 is complete when a macOS build can:
 
 M2 replaces the mock enumerator with real `RemoteVfs::children()` data.
 M3 implements file content materialization through `RemoteVfs::open/read/close`.
+
+## Build Notes
+
+`scripts/generate-dmg.sh` invokes the extension build after `macdeployqt` and before app signing.
+
+Signed builds can set:
+
+```text
+MOONLIGHT_FILE_PROVIDER_APP_GROUP=group.com.moonlight-stream.Moonlight.FileProvider
+```
+
+If the variable is missing, the extension is still bundled for CI/test builds, but it is signed without App Group entitlements.

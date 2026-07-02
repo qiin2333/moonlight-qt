@@ -535,7 +535,8 @@ Current progress:
 - Qt provider entry point added.
 - Qt-to-native domain bridge added for `NSFileProviderManager` registration/removal.
 - Static Swift extension scaffold added.
-- qmake packaging/signing for the `.appex` is still pending.
+- macOS DMG packaging now builds and bundles the `.appex`.
+- Full App Group/signing validation on macOS is still pending.
 
 ### M2: Platform VFS Remote Enumeration
 
