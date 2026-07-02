@@ -169,22 +169,24 @@ public:
             QStringLiteral("libosxfuse.dylib"),
         };
 
-        QStringList attempted;
+        QStringList missing;
+        QStringList failed;
         for (const QString& path : candidates) {
             const QFileInfo libraryInfo(path);
             if (libraryInfo.isAbsolute() && !libraryInfo.exists()) {
+                missing.append(path);
                 continue;
             }
             m_Library.setFileName(path);
             if (!m_Library.load()) {
-                attempted.append(QStringLiteral("%1: %2").arg(path, m_Library.errorString()));
+                failed.append(path);
                 continue;
             }
 
             auto fuseMainReal = reinterpret_cast<FuseMainRealFn>(m_Library.resolve("fuse_main_real"));
             auto fuseGetContext = reinterpret_cast<FuseGetContextFn>(m_Library.resolve("fuse_get_context"));
             if (fuseMainReal == nullptr || fuseGetContext == nullptr) {
-                attempted.append(QStringLiteral("%1: missing libfuse2 symbols").arg(path));
+                failed.append(QStringLiteral("%1: missing libfuse2 symbols").arg(path));
                 m_Library.unload();
                 continue;
             }
@@ -196,9 +198,13 @@ public:
             return true;
         }
 
-        m_ErrorMessage = attempted.isEmpty()
-                ? unsupportedMessage()
-                : QStringLiteral("%1 (%2)").arg(unsupportedMessage(), attempted.join(QStringLiteral("; ")));
+        m_ErrorMessage = unsupportedMessage();
+        m_Diagnostics = failed.isEmpty()
+                ? QStringLiteral("No macFUSE library was found in the standard locations.")
+                : QStringLiteral("macFUSE libraries were found but could not be loaded: %1").arg(failed.join(QStringLiteral("; ")));
+        if (!missing.isEmpty()) {
+            m_Diagnostics += QStringLiteral(" Missing paths checked: %1").arg(missing.join(QStringLiteral(", ")));
+        }
         errorMessage = m_ErrorMessage;
         return false;
     }
@@ -218,12 +224,19 @@ public:
         return m_LoadedPath;
     }
 
+    QString diagnostics()
+    {
+        QMutexLocker locker(&m_Lock);
+        return m_Diagnostics;
+    }
+
 private:
     MacFuseRuntime() = default;
 
     QMutex m_Lock;
     bool m_Loaded = false;
     QString m_ErrorMessage;
+    QString m_Diagnostics;
     QString m_LoadedPath;
     QLibrary m_Library;
     FuseMainRealFn m_FuseMainReal = nullptr;
@@ -712,6 +725,10 @@ MountResult MacFuseMountProvider::mount(const MountRequest& request)
         result.error = MountError::make(ErrorKind::Unsupported, errorMessage.isEmpty() ? unsupportedMessage() : errorMessage);
         result.status.state = MountState::Unavailable;
         result.status.message = result.error.message;
+        const QString diagnostics = MacFuseRuntime::instance().diagnostics();
+        if (!diagnostics.isEmpty()) {
+            result.diagnostics.append(diagnostics);
+        }
         return result;
     }
 
