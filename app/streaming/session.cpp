@@ -2520,6 +2520,9 @@ void Session::cleanupFileMappingMount()
             m_FileMappingSessionId);
     m_FileMappingMountState.reset();
     if (!m_FileMappingMountPath.isEmpty()) {
+#if defined(Q_OS_MACOS)
+        QProcess::execute(QStringLiteral("/sbin/umount"), { m_FileMappingMountPath });
+#endif
         QDir(m_FileMappingMountPath).removeRecursively();
         m_FileMappingMountPath.clear();
     }

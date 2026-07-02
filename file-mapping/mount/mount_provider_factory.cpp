@@ -1,5 +1,6 @@
 #include "mount_provider_factory.h"
 
+#include "macfuse_mount_provider.h"
 #include "macos_finder_mirror_provider.h"
 #include "unavailable_mount_provider.h"
 #include "windows_explorer_mirror_provider.h"
@@ -54,6 +55,7 @@ QList<MountProviderPtr> createDefaultMountProviders()
 {
     QList<MountProviderPtr> providers;
 #if defined(Q_OS_MACOS)
+    providers.append(std::make_shared<MacFuseMountProvider>());
     providers.append(std::make_shared<MacOSFinderMirrorProvider>());
 #elif defined(Q_OS_WIN32) || defined(Q_OS_WIN)
     providers.append(std::make_shared<WindowsExplorerMirrorProvider>());
