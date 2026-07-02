@@ -49,5 +49,8 @@ macx {
         DEFINES += MOONLIGHT_MACFUSE_ENABLED
         INCLUDEPATH += $$MACFUSE_INCLUDE
         LIBS += $$MACFUSE_LIB
+        message(macFUSE host file mounting enabled)
+    } else {
+        message(macFUSE host file mounting disabled: headers or library not found; Finder mirror fallback will be used)
     }
 }

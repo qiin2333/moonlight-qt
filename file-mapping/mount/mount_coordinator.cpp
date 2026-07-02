@@ -1,5 +1,7 @@
 #include "mount_coordinator.h"
 
+#include <QStringList>
+
 #include <utility>
 
 namespace FileMapping {
@@ -24,12 +26,17 @@ QList<MountProviderPtr> MountCoordinator::providers() const
 MountResult MountCoordinator::ensureMounted(const MountRequest& request)
 {
     if (request.hostUuid.isEmpty() || request.sessionId.isEmpty()) {
-        return unavailableResult(QStringLiteral("Host files cannot be mounted without an active host session."));
+        MountResult result = unavailableResult(QStringLiteral("Host files cannot be mounted without an active host session."));
+        result.diagnostics.append(QStringLiteral("coordinator unavailable: missing active host session"));
+        return result;
     }
     if (!request.vfs) {
-        return unavailableResult(QStringLiteral("Host files cannot be mounted because the remote file tree is unavailable."));
+        MountResult result = unavailableResult(QStringLiteral("Host files cannot be mounted because the remote file tree is unavailable."));
+        result.diagnostics.append(QStringLiteral("coordinator unavailable: remote file tree missing"));
+        return result;
     }
 
+    QStringList diagnostics;
     const QString key = sessionKey(request);
     auto active = m_ActiveMounts.find(key);
     if (active != m_ActiveMounts.end() && active->provider) {
@@ -39,6 +46,11 @@ MountResult MountCoordinator::ensureMounted(const MountRequest& request)
             MountResult result;
             result.id = active->id;
             result.status = current;
+            result.providerName = active->provider->displayName();
+            result.diagnostics.append(QStringLiteral("provider=\"%1\" reused=true state=%2 display_path=\"%3\"")
+                                      .arg(result.providerName)
+                                      .arg(static_cast<int>(current.state))
+                                      .arg(current.displayPath));
             return result;
         }
         active->provider->unmount(active->id);
@@ -53,7 +65,18 @@ MountResult MountCoordinator::ensureMounted(const MountRequest& request)
             continue;
         }
 
+        const QString providerName = provider->displayName();
         MountResult result = provider->mount(request);
+        result.providerName = providerName;
+        diagnostics.append(QStringLiteral("provider=\"%1\" ok=%2 state=%3 error_kind=%4 error=\"%5\" message=\"%6\" display_path=\"%7\"")
+                           .arg(providerName)
+                           .arg(result.ok() ? QStringLiteral("true") : QStringLiteral("false"))
+                           .arg(static_cast<int>(result.status.state))
+                           .arg(static_cast<int>(result.error.kind))
+                           .arg(result.error.message)
+                           .arg(result.status.message)
+                           .arg(result.status.displayPath));
+        result.diagnostics = diagnostics;
         lastResult = result;
         if (!result.ok()) {
             if (!hasConcreteFailure && result.error.kind != ErrorKind::Unsupported) {
@@ -68,12 +91,15 @@ MountResult MountCoordinator::ensureMounted(const MountRequest& request)
         mounted.id = result.id;
         mounted.status = result.status;
         m_ActiveMounts.insert(key, mounted);
+        result.diagnostics = diagnostics;
         return result;
     }
 
     if (hasConcreteFailure) {
+        firstConcreteFailure.diagnostics = diagnostics;
         return firstConcreteFailure;
     }
+    lastResult.diagnostics = diagnostics;
     return lastResult;
 }
 

@@ -34,7 +34,7 @@ namespace {
 QString unsupportedMessage()
 {
 #if defined(Q_OS_MACOS)
-    return QStringLiteral("macFUSE is not available. Install macFUSE and rebuild Moonlight with macFUSE headers to enable Finder volume mounting.");
+    return QStringLiteral("macFUSE support is not included in this Moonlight build. Finder mirror fallback will be used.");
 #else
     return QStringLiteral("macFUSE mounting is only available on macOS.");
 #endif
@@ -634,6 +634,8 @@ MountResult MacFuseMountProvider::mount(const MountRequest& request)
     result.error = MountError::make(ErrorKind::Unsupported, unsupportedMessage());
     result.status.state = MountState::Unavailable;
     result.status.message = result.error.message;
+    result.providerName = displayName();
+    result.diagnostics.append(QStringLiteral("macFUSE support is not compiled into this Moonlight build"));
     Q_UNUSED(request);
     return result;
 #endif

@@ -203,12 +203,14 @@ public:
                     FileMapping::MountResult mount = coordinator.ensureMounted(request);
                     diagnosticsPath = FileMappingUx::appendDiagnostic(
                             QStringLiteral("mount_task.mount"),
-                            QStringLiteral("ok=%1 state=%2 display_path=%3 error=%4 message=%5")
+                            QStringLiteral("ok=%1 state=%2 provider=%3 display_path=%4 error=%5 message=%6 diagnostics=%7")
                                     .arg(mount.ok() ? QStringLiteral("true") : QStringLiteral("false"))
                                     .arg(static_cast<int>(mount.status.state))
+                                    .arg(mount.providerName)
                                     .arg(mount.status.displayPath,
                                          mount.error.message,
-                                         mount.status.message),
+                                         mount.status.message,
+                                         mount.diagnostics.join(QStringLiteral(" | "))),
                             m_Computer.uuid,
                             m_SessionId);
                     if (mount.ok() && mount.status.state == FileMapping::MountState::Mounted) {

@@ -3,6 +3,7 @@
 #include <memory>
 
 #include <QString>
+#include <QStringList>
 
 #include "mount_errors.h"
 #include "mount_session.h"
@@ -30,6 +31,8 @@ struct MountResult {
     MountError error;
     MountId id;
     MountStatus status;
+    QString providerName;
+    QStringList diagnostics;
 
     bool ok() const { return error.ok(); }
 };
