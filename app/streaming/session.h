@@ -20,6 +20,11 @@
 #include "micstream.h"
 #endif
 
+namespace FileMappingUx {
+struct ProbeState;
+struct MountState;
+}
+
 class SupportedVideoFormatList : public QList<int>
 {
 public:
@@ -192,6 +197,8 @@ private:
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void showStreamingToast(const QString& message, int durationMs = 2000);
+    void updateFileMappingMenuState();
+    bool openFileMappingMountPath();
 #ifdef Q_OS_WIN32
     void queryDisplayHdrBrightness(float& maxNits, float& minNits, float& maxFullNits);
 #endif
@@ -277,6 +284,12 @@ private:
     void startSunshineAbr();
     void stopSunshineAbr();
     void sendSunshineAbrFeedback();
+    void startFileMappingUxProbe();
+    void processFileMappingUxProbeResult();
+    void startFileMappingMount();
+    void processFileMappingMountResult();
+    void cleanupFileMappingMount();
+    void startFileMappingSmokeProbe();
 
     static
     int drSubmitDecodeUnit(PDECODE_UNIT du);
@@ -336,6 +349,14 @@ private:
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
     OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification
+    OverlayMenuPanel::FileMappingState m_FileMappingState;
+    QString m_FileMappingDetail;
+    QString m_FileMappingToast;
+    bool m_FileMappingToastPending;
+    std::shared_ptr<FileMappingUx::ProbeState> m_FileMappingProbeState;
+    std::shared_ptr<FileMappingUx::MountState> m_FileMappingMountState;
+    QString m_FileMappingMountPath;
+    QString m_FileMappingSessionId;
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
     class ClipboardHelperClient* m_ClipboardHelper; // Bidirectional clipboard sync helper process; nullptr when stream not active
 
