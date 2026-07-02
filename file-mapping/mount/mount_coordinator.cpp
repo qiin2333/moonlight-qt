@@ -67,6 +67,7 @@ MountResult MountCoordinator::ensureMounted(const MountRequest& request)
 
         const QString providerName = provider->displayName();
         MountResult result = provider->mount(request);
+        const QStringList providerDiagnostics = result.diagnostics;
         result.providerName = providerName;
         diagnostics.append(QStringLiteral("provider=\"%1\" ok=%2 state=%3 error_kind=%4 error=\"%5\" message=\"%6\" display_path=\"%7\"")
                            .arg(providerName)
@@ -76,6 +77,12 @@ MountResult MountCoordinator::ensureMounted(const MountRequest& request)
                            .arg(result.error.message)
                            .arg(result.status.message)
                            .arg(result.status.displayPath));
+        for (const QString& diagnostic : providerDiagnostics) {
+            if (!diagnostic.isEmpty()) {
+                diagnostics.append(QStringLiteral("provider=\"%1\" diagnostic=\"%2\"")
+                                   .arg(providerName, diagnostic));
+            }
+        }
         result.diagnostics = diagnostics;
         lastResult = result;
         if (!result.ok()) {

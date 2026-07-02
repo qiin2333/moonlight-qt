@@ -1,6 +1,7 @@
 #include "mac_file_provider_bridge.h"
 
 #include <QDir>
+#include <QStringList>
 
 #import <FileProvider/FileProvider.h>
 #import <Foundation/Foundation.h>
@@ -35,9 +36,37 @@ MacFileProviderDomainResult resultFromError(NSError* error, const QString& fallb
     }
 
     result.message = fallbackMessage;
-    result.diagnostics = QStringLiteral("%1 (%2)")
-            .arg(fromNSString(error.localizedDescription))
-            .arg(static_cast<qint64>(error.code));
+    QStringList diagnostics;
+    diagnostics.append(QStringLiteral("domain=%1").arg(fromNSString(error.domain)));
+    diagnostics.append(QStringLiteral("code=%1").arg(static_cast<qint64>(error.code)));
+
+    const QString description = fromNSString(error.localizedDescription);
+    if (!description.isEmpty()) {
+        diagnostics.append(QStringLiteral("description=\"%1\"").arg(description));
+    }
+
+    const QString failureReason = fromNSString(error.localizedFailureReason);
+    if (!failureReason.isEmpty()) {
+        diagnostics.append(QStringLiteral("failure_reason=\"%1\"").arg(failureReason));
+    }
+
+    const QString recoverySuggestion = fromNSString(error.localizedRecoverySuggestion);
+    if (!recoverySuggestion.isEmpty()) {
+        diagnostics.append(QStringLiteral("recovery_suggestion=\"%1\"").arg(recoverySuggestion));
+    }
+
+    id underlyingObject = error.userInfo[NSUnderlyingErrorKey];
+    if ([underlyingObject isKindOfClass:[NSError class]]) {
+        NSError* underlyingError = (NSError*)underlyingObject;
+        diagnostics.append(QStringLiteral("underlying_domain=%1").arg(fromNSString(underlyingError.domain)));
+        diagnostics.append(QStringLiteral("underlying_code=%1").arg(static_cast<qint64>(underlyingError.code)));
+        const QString underlyingDescription = fromNSString(underlyingError.localizedDescription);
+        if (!underlyingDescription.isEmpty()) {
+            diagnostics.append(QStringLiteral("underlying_description=\"%1\"").arg(underlyingDescription));
+        }
+    }
+
+    result.diagnostics = diagnostics.join(QStringLiteral(" "));
     return result;
 }
 } // namespace
