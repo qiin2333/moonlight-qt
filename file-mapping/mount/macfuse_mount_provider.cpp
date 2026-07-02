@@ -4,11 +4,13 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
+#include <QLibrary>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QProcess>
 #include <QSet>
 #include <QStandardPaths>
+#include <QStringList>
 #include <QUrl>
 #include <QWaitCondition>
 
@@ -20,11 +22,8 @@
 #include <thread>
 #include <utility>
 
-#if defined(Q_OS_MACOS) && defined(MOONLIGHT_MACFUSE_ENABLED)
-#define FUSE_USE_VERSION 26
-#include <fuse.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#if defined(Q_OS_MACOS)
+#include "macfuse_runtime_abi.h"
 #include <unistd.h>
 #endif
 
@@ -34,7 +33,7 @@ namespace {
 QString unsupportedMessage()
 {
 #if defined(Q_OS_MACOS)
-    return QStringLiteral("macFUSE support is not included in this Moonlight build. Finder mirror fallback will be used.");
+    return QStringLiteral("macFUSE is not installed or its user-space library could not be loaded. Install macFUSE to mount Host Files as a Finder volume.");
 #else
     return QStringLiteral("macFUSE mounting is only available on macOS.");
 #endif
@@ -131,7 +130,106 @@ int errnoForError(const Error& error)
     return EIO;
 }
 
-#if defined(Q_OS_MACOS) && defined(MOONLIGHT_MACFUSE_ENABLED)
+#if defined(Q_OS_MACOS)
+class MacFuseRuntime
+{
+public:
+    using FuseMainRealFn = int (*)(int, char**, const struct fuse_operations*, size_t, void*);
+    using FuseGetContextFn = struct fuse_context* (*)();
+
+    static MacFuseRuntime& instance()
+    {
+        static MacFuseRuntime runtime;
+        return runtime;
+    }
+
+    bool load(QString& errorMessage)
+    {
+        QMutexLocker locker(&m_Lock);
+        if (m_Loaded) {
+            return true;
+        }
+
+        const QStringList candidates {
+            QStringLiteral("/usr/local/lib/libfuse.dylib"),
+            QStringLiteral("/usr/local/lib/libfuse.2.dylib"),
+            QStringLiteral("/opt/homebrew/lib/libfuse.dylib"),
+            QStringLiteral("/opt/homebrew/lib/libfuse.2.dylib"),
+            QStringLiteral("/usr/local/lib/libosxfuse.dylib"),
+            QStringLiteral("/usr/local/lib/libosxfuse.2.dylib"),
+            QStringLiteral("/opt/homebrew/lib/libosxfuse.dylib"),
+            QStringLiteral("/opt/homebrew/lib/libosxfuse.2.dylib"),
+            QStringLiteral("/Library/Filesystems/macfuse.fs/Contents/Frameworks/libfuse.dylib"),
+            QStringLiteral("/Library/Filesystems/macfuse.fs/Contents/Frameworks/libfuse.2.dylib"),
+            QStringLiteral("/Library/Filesystems/osxfuse.fs/Contents/Frameworks/libfuse.dylib"),
+            QStringLiteral("/Library/Filesystems/osxfuse.fs/Contents/Frameworks/libfuse.2.dylib"),
+            QStringLiteral("libfuse.2.dylib"),
+            QStringLiteral("libfuse.dylib"),
+            QStringLiteral("libosxfuse.2.dylib"),
+            QStringLiteral("libosxfuse.dylib"),
+        };
+
+        QStringList attempted;
+        for (const QString& path : candidates) {
+            const QFileInfo libraryInfo(path);
+            if (libraryInfo.isAbsolute() && !libraryInfo.exists()) {
+                continue;
+            }
+            m_Library.setFileName(path);
+            if (!m_Library.load()) {
+                attempted.append(QStringLiteral("%1: %2").arg(path, m_Library.errorString()));
+                continue;
+            }
+
+            auto fuseMainReal = reinterpret_cast<FuseMainRealFn>(m_Library.resolve("fuse_main_real"));
+            auto fuseGetContext = reinterpret_cast<FuseGetContextFn>(m_Library.resolve("fuse_get_context"));
+            if (fuseMainReal == nullptr || fuseGetContext == nullptr) {
+                attempted.append(QStringLiteral("%1: missing libfuse2 symbols").arg(path));
+                m_Library.unload();
+                continue;
+            }
+
+            m_FuseMainReal = fuseMainReal;
+            m_FuseGetContext = fuseGetContext;
+            m_LoadedPath = path;
+            m_Loaded = true;
+            return true;
+        }
+
+        m_ErrorMessage = attempted.isEmpty()
+                ? unsupportedMessage()
+                : QStringLiteral("%1 (%2)").arg(unsupportedMessage(), attempted.join(QStringLiteral("; ")));
+        errorMessage = m_ErrorMessage;
+        return false;
+    }
+
+    int fuseMain(int argc, char** argv, const struct fuse_operations* operations, void* userData)
+    {
+        return m_FuseMainReal(argc, argv, operations, sizeof(*operations), userData);
+    }
+
+    struct fuse_context* context()
+    {
+        return m_FuseGetContext == nullptr ? nullptr : m_FuseGetContext();
+    }
+
+    QString loadedPath() const
+    {
+        return m_LoadedPath;
+    }
+
+private:
+    MacFuseRuntime() = default;
+
+    QMutex m_Lock;
+    bool m_Loaded = false;
+    QString m_ErrorMessage;
+    QString m_LoadedPath;
+    QLibrary m_Library;
+    FuseMainRealFn m_FuseMainReal = nullptr;
+    FuseGetContextFn m_FuseGetContext = nullptr;
+};
+
 class MacFuseSession
 {
 public:
@@ -164,6 +262,10 @@ public:
 
     bool start(QString& errorMessage)
     {
+        if (!MacFuseRuntime::instance().load(errorMessage)) {
+            return false;
+        }
+
         m_Thread = std::thread([this]() {
             runFuse();
         });
@@ -441,7 +543,7 @@ private:
 
     void runFuse()
     {
-        static struct fuse_operations operations;
+        struct fuse_operations operations;
         memset(&operations, 0, sizeof(operations));
         operations.getattr = &MacFuseSession::getattrCallback;
         operations.readdir = &MacFuseSession::readdirCallback;
@@ -469,14 +571,14 @@ private:
             argv.append(arg.data());
         }
 
-        const int result = fuse_main(static_cast<int>(argv.size()), argv.data(), &operations, this);
+        const int result = MacFuseRuntime::instance().fuseMain(static_cast<int>(argv.size()), argv.data(), &operations, this);
         markStopped(result);
         QDir().rmdir(m_MountPath);
     }
 
     static MacFuseSession* session()
     {
-        struct fuse_context* context = fuse_get_context();
+        struct fuse_context* context = MacFuseRuntime::instance().context();
         return context == nullptr ? nullptr : static_cast<MacFuseSession*>(context->private_data);
     }
 
@@ -563,7 +665,7 @@ QString MacFuseMountProvider::displayName() const
 
 MountStatus MacFuseMountProvider::status(const MountId& id)
 {
-#if defined(Q_OS_MACOS) && defined(MOONLIGHT_MACFUSE_ENABLED)
+#if defined(Q_OS_MACOS)
     QMutexLocker locker(&g_MountsLock);
     auto it = g_Mounts.find(id.value);
     if (it != g_Mounts.end()) {
@@ -580,7 +682,7 @@ MountStatus MacFuseMountProvider::status(const MountId& id)
 MountResult MacFuseMountProvider::mount(const MountRequest& request)
 {
     MountResult result;
-#if defined(Q_OS_MACOS) && defined(MOONLIGHT_MACFUSE_ENABLED)
+#if defined(Q_OS_MACOS)
     if (!request.vfs) {
         result.error = MountError::make(ErrorKind::Unavailable, QStringLiteral("Host files are unavailable."));
         result.status.state = MountState::Unavailable;
@@ -622,6 +724,7 @@ MountResult MacFuseMountProvider::mount(const MountRequest& request)
     status.state = MountState::Mounted;
     status.displayPath = mountPath;
     status.message = QStringLiteral("Host files are mounted in Finder.");
+    result.diagnostics.append(QStringLiteral("macFUSE loaded from %1").arg(MacFuseRuntime::instance().loadedPath()));
 
     MountId id;
     id.value = mountPath;
@@ -635,7 +738,7 @@ MountResult MacFuseMountProvider::mount(const MountRequest& request)
     result.status.state = MountState::Unavailable;
     result.status.message = result.error.message;
     result.providerName = displayName();
-    result.diagnostics.append(QStringLiteral("macFUSE support is not compiled into this Moonlight build"));
+    result.diagnostics.append(QStringLiteral("macFUSE support is only compiled on macOS"));
     Q_UNUSED(request);
     return result;
 #endif
@@ -663,7 +766,7 @@ MountError MacFuseMountProvider::reveal(const MountId& id)
 
 void MacFuseMountProvider::unmount(const MountId& id)
 {
-#if defined(Q_OS_MACOS) && defined(MOONLIGHT_MACFUSE_ENABLED)
+#if defined(Q_OS_MACOS)
     std::shared_ptr<MacFuseSession> session;
     {
         QMutexLocker locker(&g_MountsLock);
