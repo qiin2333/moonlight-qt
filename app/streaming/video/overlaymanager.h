@@ -70,6 +70,7 @@ private:
     int calculateTextBaseline(TTF_Font* font);
     void calculateSegmentMetrics(const std::vector<TextSegment>& segments, OverlayType type, 
                                 int& totalWidth, int& maxHeight, int& maxAscent, int& maxDescent);
+    SDL_Surface* RenderTextOutlinedWrapped(TTF_Font* font, const char* text, SDL_Color textColor, SDL_Color outlineColor, int outlineWidth, int wrapWidth);
 
     struct {
         bool enabled;

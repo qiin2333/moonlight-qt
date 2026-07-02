@@ -928,38 +928,103 @@ Flickable {
                     ToolTip.text: qsTr("Ignores both client and host PC aspect ratios, which is required for displaying Half-SBS (Side-By-Side) 3D signals to AR/XR devices that only support Full-SBS (usually 1920x1080 per eye, meaning a total resolution of 3840x1080)")
                 }
 
-                CheckBox {
-                    id: vsyncCheck
+                Row {
+                    spacing: 5
                     width: parent.width
-                    hoverEnabled: true
-                    text: qsTr("V-Sync")
-                    font.pointSize:  12
-                    checked: StreamingPreferences.enableVsync
-                    onCheckedChanged: {
-                        StreamingPreferences.enableVsync = checked
+
+                    CheckBox {
+                        id: vsyncCheck
+                        hoverEnabled: true
+                        text: qsTr("V-Sync")
+                        font.pointSize:  12
+                        checked: StreamingPreferences.enableVsync
+                        onCheckedChanged: {
+                            StreamingPreferences.enableVsync = checked
+                        }
+
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 5000
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Disabling V-Sync allows sub-frame rendering latency, but it can display visible tearing")
                     }
 
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 5000
-                    ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Disabling V-Sync allows sub-frame rendering latency, but it can display visible tearing")
+                    CheckBox {
+                        id: framePacingCheck
+                        hoverEnabled: true
+                        text: qsTr("Frame pacing")
+                        font.pointSize:  12
+                        enabled: StreamingPreferences.enableVsync
+                        checked: StreamingPreferences.enableVsync && StreamingPreferences.framePacing
+                        onCheckedChanged: {
+                            StreamingPreferences.framePacing = checked
+                        }
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 5000
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Frame pacing reduces micro-stutter by delaying frames that come in too early")
+                    }
                 }
 
                 CheckBox {
-                    id: framePacingCheck
+                    id: enableHdr
                     width: parent.width
-                    hoverEnabled: true
-                    text: qsTr("Frame pacing")
-                    font.pointSize:  12
-                    enabled: StreamingPreferences.enableVsync
-                    checked: StreamingPreferences.enableVsync && StreamingPreferences.framePacing
+                    text: qsTr("Enable HDR")
+                    font.pointSize: 12
+
+                    enabled: SystemProperties.supportsHdr
+                    checked: enabled && StreamingPreferences.enableHdr
                     onCheckedChanged: {
-                        StreamingPreferences.framePacing = checked
+                        StreamingPreferences.enableHdr = checked
                     }
+
+                    // Updating StreamingPreferences.videoCodecConfig is handled above
+
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Frame pacing reduces micro-stutter by delaying frames that come in too early")
+                    ToolTip.text: enabled ?
+                                      qsTr("The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.")
+                                    :
+                                      qsTr("HDR streaming is not supported on this PC.")
+                }
+
+                ComboBox {
+                    id: hdrModeComboBox
+                    width: parent.width
+                    font.pointSize: 12
+                    enabled: enableHdr.checked
+                    textRole: "text"
+                    model: ListModel {
+                        id: hdrModeListModel
+                        ListElement {
+                            text: "HDR10 (PQ)"
+                            val: 1
+                        }
+                        ListElement {
+                            text: "HLG"
+                            val: 2
+                        }
+                    }
+
+                    Component.onCompleted: {
+                        for (var i = 0; i < hdrModeListModel.count; i++) {
+                            if (hdrModeListModel.get(i).val === StreamingPreferences.hdrMode) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                    }
+
+                    onActivated: {
+                        if (enabled) {
+                            StreamingPreferences.hdrMode = hdrModeListModel.get(currentIndex).val
+                        }
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.")
                 }
 
                 CheckBox {
@@ -2204,68 +2269,6 @@ Flickable {
                             StreamingPreferences.videoCodecConfig = codecListModel.get(currentIndex).val
                         }
                     }
-                }
-
-                CheckBox {
-                    id: enableHdr
-                    width: parent.width
-                    text: qsTr("Enable HDR")
-                    font.pointSize: 12
-
-                    enabled: SystemProperties.supportsHdr
-                    checked: enabled && StreamingPreferences.enableHdr
-                    onCheckedChanged: {
-                        StreamingPreferences.enableHdr = checked
-                    }
-
-                    // Updating StreamingPreferences.videoCodecConfig is handled above
-
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 5000
-                    ToolTip.visible: hovered
-                    ToolTip.text: enabled ?
-                                      qsTr("The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.")
-                                    :
-                                      qsTr("HDR streaming is not supported on this PC.")
-                }
-
-                ComboBox {
-                    id: hdrModeComboBox
-                    width: parent.width
-                    font.pointSize: 12
-                    enabled: enableHdr.checked
-                    textRole: "text"
-                    model: ListModel {
-                        id: hdrModeListModel
-                        ListElement {
-                            text: "HDR10 (PQ)"
-                            val: 1
-                        }
-                        ListElement {
-                            text: "HLG"
-                            val: 2
-                        }
-                    }
-
-                    Component.onCompleted: {
-                        for (var i = 0; i < hdrModeListModel.count; i++) {
-                            if (hdrModeListModel.get(i).val === StreamingPreferences.hdrMode) {
-                                currentIndex = i
-                                break
-                            }
-                        }
-                    }
-
-                    onActivated: {
-                        if (enabled) {
-                            StreamingPreferences.hdrMode = hdrModeListModel.get(currentIndex).val
-                        }
-                    }
-
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 5000
-                    ToolTip.visible: hovered
-                    ToolTip.text: qsTr("HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.")
                 }
 
                 CheckBox {

@@ -225,6 +225,44 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
     m_Renderer->notifyOverlayUpdated(type);
 }
 
+SDL_Surface* OverlayManager::RenderTextOutlinedWrapped(TTF_Font* font, const char* text, SDL_Color textColor, SDL_Color outlineColor, int outlineWidth, int wrapWidth)
+{
+    if (text == nullptr || text[0] == '\0') {
+        return nullptr;
+    }
+
+    int oldOutline = TTF_GetFontOutline(font);
+    TTF_SetFontOutline(font, outlineWidth);
+
+    // Disable the outline when wrapping is required because outline and text
+    // surfaces can wrap at different positions.
+    for (const QString& line : QString(text).split('\n')) {
+        int extent, count;
+        QByteArray lineUtf8 = line.toUtf8();
+        if (TTF_MeasureUTF8(font, lineUtf8.constData(), wrapWidth, &extent, &count) == 0 && count < lineUtf8.size()) {
+            TTF_SetFontOutline(font, oldOutline);
+            return TTF_RenderUTF8_Blended_Wrapped(font, text, textColor, wrapWidth);
+        }
+    }
+
+    SDL_Surface* outlineSurface = TTF_RenderUTF8_Blended_Wrapped(font, text, outlineColor, wrapWidth);
+    TTF_SetFontOutline(font, 0);
+    SDL_Surface* textSurface = TTF_RenderUTF8_Blended_Wrapped(font, text, textColor, wrapWidth);
+    TTF_SetFontOutline(font, oldOutline);
+
+    if (outlineSurface == nullptr || textSurface == nullptr) {
+        SDL_FreeSurface(outlineSurface);
+        SDL_FreeSurface(textSurface);
+        return nullptr;
+    }
+
+    SDL_Rect dst = { outlineWidth, outlineWidth, textSurface->w, textSurface->h };
+    SDL_BlitSurface(textSurface, nullptr, outlineSurface, &dst);
+
+    SDL_FreeSurface(textSurface);
+    return outlineSurface;
+}
+
 std::vector<OverlayManager::TextSegment> OverlayManager::parseFormattedText(const char* text)
 {
     std::vector<TextSegment> segments;
@@ -424,6 +462,14 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
     
     // 使用精确的高度计算（考虑ascent和descent）
     int surfaceHeight = maxAscent + maxDescent;
+    int renderedTotalWidth = 0;
+    int renderedMaxHeight = 0;
+    for (SDL_Surface* surface : segmentSurfaces) {
+        renderedTotalWidth += surface->w;
+        renderedMaxHeight = std::max(renderedMaxHeight, surface->h);
+    }
+    totalWidth = std::max(totalWidth, renderedTotalWidth);
+    surfaceHeight = std::max(surfaceHeight, renderedMaxHeight);
     
     // 创建组合表面 - 使用ARGB8888格式（所有渲染器都期望此格式）
     SDL_Surface* combinedSurface = SDL_CreateRGBSurfaceWithFormat(
@@ -506,7 +552,7 @@ SDL_Surface* OverlayManager::renderSmoothTextSegment(TTF_Font* font, const std::
     // 尝试使用最高质量的渲染方法
     
     // 1. 首先尝试使用Blended渲染（最佳抗锯齿效果）
-    surface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
+    surface = RenderTextOutlinedWrapped(font, text.c_str(), color, {0, 0, 0, 255}, 4, 1024);
     
     if (surface != nullptr) {
         return surface;
