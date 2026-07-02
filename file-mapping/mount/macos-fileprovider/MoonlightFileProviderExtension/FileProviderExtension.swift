@@ -73,15 +73,24 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
     }
 }
 
-struct MoonlightFileProviderItem: NSFileProviderItem {
+final class MoonlightFileProviderItem: NSObject, NSFileProviderItem {
     let itemIdentifier: NSFileProviderItemIdentifier
     let parentItemIdentifier: NSFileProviderItemIdentifier
     let filename: String
-    let typeIdentifier: String
     let capabilities: NSFileProviderItemCapabilities
+    let contentType: UTType
 
-    var contentType: UTType {
-        UTType(typeIdentifier) ?? .data
+    init(itemIdentifier: NSFileProviderItemIdentifier,
+         parentItemIdentifier: NSFileProviderItemIdentifier,
+         filename: String,
+         contentType: UTType,
+         capabilities: NSFileProviderItemCapabilities) {
+        self.itemIdentifier = itemIdentifier
+        self.parentItemIdentifier = parentItemIdentifier
+        self.filename = filename
+        self.contentType = contentType
+        self.capabilities = capabilities
+        super.init()
     }
 
     static func mockItem(for identifier: NSFileProviderItemIdentifier) -> MoonlightFileProviderItem {
@@ -89,14 +98,14 @@ struct MoonlightFileProviderItem: NSFileProviderItem {
             return MoonlightFileProviderItem(itemIdentifier: .rootContainer,
                                              parentItemIdentifier: .rootContainer,
                                              filename: "Moonlight Host Files",
-                                             typeIdentifier: UTType.folder.identifier,
+                                             contentType: .folder,
                                              capabilities: [.allowsReading])
         }
 
         return MoonlightFileProviderItem(itemIdentifier: identifier,
                                          parentItemIdentifier: .rootContainer,
                                          filename: identifier.rawValue,
-                                         typeIdentifier: UTType.folder.identifier,
-                                         capabilities: [.allowsReading, .allowsEnumerating])
+                                         contentType: .folder,
+                                         capabilities: [.allowsReading])
     }
 }

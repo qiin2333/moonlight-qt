@@ -19,8 +19,8 @@ final class FileProviderEnumerator: NSObject, NSFileProviderEnumerator {
             let item = MoonlightFileProviderItem(itemIdentifier: NSFileProviderItemIdentifier("mock-shared-folder"),
                                                  parentItemIdentifier: .rootContainer,
                                                  filename: "Shared Folder",
-                                                 typeIdentifier: UTType.folder.identifier,
-                                                 capabilities: [.allowsReading, .allowsEnumerating])
+                                                 contentType: .folder,
+                                                 capabilities: [.allowsReading])
             observer.didEnumerate([item])
         }
         observer.finishEnumerating(upTo: nil)
