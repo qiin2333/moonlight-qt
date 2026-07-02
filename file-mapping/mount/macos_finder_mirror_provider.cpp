@@ -25,6 +25,11 @@ QString revealMarkerPath(const QString& rootPath)
 {
     return QDir(rootPath).filePath(QStringLiteral("README.txt"));
 }
+
+QString normalizePathForCompare(const QString& path)
+{
+    return QDir::cleanPath(path);
+}
 } // namespace
 
 MacOSFinderMirrorProvider::MacOSFinderMirrorProvider()
@@ -85,8 +90,15 @@ MountResult MacOSFinderMirrorProvider::mount(const MountRequest& request)
         return result;
     }
 
+    const QString hostLabel = request.hostName.isEmpty() ? request.hostUuid : request.hostName;
     writeTextFile(rootPath + QStringLiteral("/README.txt"),
-                  QStringLiteral("Moonlight Host Files\n\nThis folder is a read-only snapshot of folders shared by the host for the current streaming session. Large files or very deep folders may be skipped.\n"));
+                  QStringLiteral("Moonlight Host Files\n\n"
+                                 "Host: %1\n"
+                                 "Session: %2\n\n"
+                                 "This folder is a read-only snapshot of folders shared by the host for the current streaming session.\n"
+                                 "To refresh it, choose Host Files in Moonlight again. Large files or very deep folders may be skipped.\n")
+                          .arg(hostLabel.isEmpty() ? QStringLiteral("Unknown host") : hostLabel,
+                               request.sessionId.isEmpty() ? QStringLiteral("current") : request.sessionId));
 
     MirrorCounters counters;
     const MirrorLimits limits = limitsFromEnvironment();
@@ -111,6 +123,7 @@ MountResult MacOSFinderMirrorProvider::mount(const MountRequest& request)
     }
 
     makeReadOnly(rootPath + QStringLiteral("/README.txt"), false);
+    createLatestAlias(rootPath);
 
     MountStatus status;
     status.state = MountState::Mounted;
@@ -137,9 +150,12 @@ MountError MacOSFinderMirrorProvider::reveal(const MountId& id)
 
     bool opened = false;
 #if defined(Q_OS_MACOS)
-    opened = QProcess::startDetached(QStringLiteral("/usr/bin/open"),
-                                     { QStringLiteral("-R"),
-                                       revealMarkerPath(current.displayPath) });
+    const QString markerPath = revealMarkerPath(current.displayPath);
+    if (QFileInfo::exists(markerPath)) {
+        opened = QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+                                         { QStringLiteral("-R"),
+                                           markerPath });
+    }
     if (!opened) {
         opened = QProcess::startDetached(QStringLiteral("/usr/bin/open"),
                                          { current.displayPath });
@@ -163,6 +179,7 @@ void MacOSFinderMirrorProvider::unmount(const MountId& id)
     }
 
     if (!it->rootPath.isEmpty()) {
+        removeLatestAlias(it->rootPath);
         QDir(it->rootPath).removeRecursively();
     }
     m_Mounts.erase(it);
@@ -213,7 +230,7 @@ QString MacOSFinderMirrorProvider::uniqueChildPath(const QString& parentPath, co
     return QDir(parentPath).filePath(safe + QStringLiteral(" copy"));
 }
 
-QString MacOSFinderMirrorProvider::cacheRootPath(const MountRequest& request)
+QString MacOSFinderMirrorProvider::cacheBasePath()
 {
     QString base = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
     if (base.isEmpty()) {
@@ -222,12 +239,52 @@ QString MacOSFinderMirrorProvider::cacheRootPath(const MountRequest& request)
     if (base.isEmpty()) {
         base = QDir::tempPath();
     }
-    base = QDir(base).filePath(QStringLiteral("Moonlight Host Files"));
+    return QDir(base).filePath(QStringLiteral("Moonlight Host Files"));
+}
 
+QString MacOSFinderMirrorProvider::cacheRootPath(const MountRequest& request)
+{
     const QString host = safeName(request.hostName.isEmpty() ? request.hostUuid : request.hostName,
                                   QStringLiteral("host"));
     const QString session = safeName(request.sessionId, QStringLiteral("session"));
-    return QDir(base).filePath(QStringLiteral("%1-%2").arg(host, session));
+    return QDir(cacheBasePath()).filePath(QStringLiteral("%1-%2").arg(host, session));
+}
+
+QString MacOSFinderMirrorProvider::latestAliasPath()
+{
+    return QDir(cacheBasePath()).filePath(QStringLiteral("Latest"));
+}
+
+void MacOSFinderMirrorProvider::createLatestAlias(const QString& rootPath)
+{
+#if defined(Q_OS_MACOS)
+    const QString aliasPath = latestAliasPath();
+    const QFileInfo aliasInfo(aliasPath);
+    if (aliasInfo.isSymLink() || aliasInfo.isFile()) {
+        QFile::remove(aliasPath);
+    }
+    QFile::link(rootPath, aliasPath);
+#else
+    Q_UNUSED(rootPath);
+#endif
+}
+
+void MacOSFinderMirrorProvider::removeLatestAlias(const QString& rootPath)
+{
+#if defined(Q_OS_MACOS)
+    const QString aliasPath = latestAliasPath();
+    const QFileInfo aliasInfo(aliasPath);
+    if (!aliasInfo.isSymLink()) {
+        return;
+    }
+
+    const QString targetPath = aliasInfo.symLinkTarget();
+    if (normalizePathForCompare(targetPath) == normalizePathForCompare(rootPath)) {
+        QFile::remove(aliasPath);
+    }
+#else
+    Q_UNUSED(rootPath);
+#endif
 }
 
 MacOSFinderMirrorProvider::MirrorLimits MacOSFinderMirrorProvider::limitsFromEnvironment()

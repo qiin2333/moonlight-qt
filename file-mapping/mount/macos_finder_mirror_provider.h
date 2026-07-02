@@ -41,7 +41,11 @@ private:
 
     static QString safeName(const QString& name, const QString& fallback);
     static QString uniqueChildPath(const QString& parentPath, const QString& requestedName);
+    static QString cacheBasePath();
     static QString cacheRootPath(const MountRequest& request);
+    static QString latestAliasPath();
+    static void createLatestAlias(const QString& rootPath);
+    static void removeLatestAlias(const QString& rootPath);
     static MirrorLimits limitsFromEnvironment();
     static bool writeTextFile(const QString& path, const QString& text);
     static void makeReadOnly(const QString& path, bool directory);

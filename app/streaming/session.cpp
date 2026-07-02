@@ -2122,9 +2122,10 @@ bool Session::openFileMappingMountPath()
             m_FileMappingSessionId);
 
 #if defined(Q_OS_MACOS)
-    if (QProcess::startDetached(QStringLiteral("/usr/bin/open"),
-                                { QStringLiteral("-R"),
-                                  markerPath })) {
+    if (QFileInfo::exists(markerPath) &&
+            QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+                                    { QStringLiteral("-R"),
+                                      markerPath })) {
         appendFileMappingDiagnostic(
                 QStringLiteral("finder_reveal.open_r"),
                 QStringLiteral("ok=true marker=%1").arg(markerPath),
