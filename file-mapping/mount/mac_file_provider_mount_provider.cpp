@@ -1,5 +1,7 @@
 #include "mac_file_provider_mount_provider.h"
 
+#include "mac_file_provider_bridge.h"
+
 #include <QDesktopServices>
 #include <QDir>
 #include <QProcess>
@@ -56,14 +58,54 @@ MountStatus MacFileProviderMountProvider::status(const MountId& id)
 
 MountResult MacFileProviderMountProvider::mount(const MountRequest& request)
 {
-    Q_UNUSED(request);
-
     MountResult result;
     result.providerName = displayName();
-    result.error = MountError::make(ErrorKind::Unsupported, unavailableMessage());
-    result.status.state = MountState::Unavailable;
-    result.status.message = result.error.message;
-    result.diagnostics.append(QStringLiteral("Apple File Provider extension is planned but not bundled in this build."));
+    if (request.hostUuid.isEmpty() || request.sessionId.isEmpty()) {
+        result.error = MountError::make(ErrorKind::Unavailable, QStringLiteral("Host files cannot be registered without an active host session."));
+        result.status.state = MountState::Unavailable;
+        result.status.message = result.error.message;
+        return result;
+    }
+
+    MacFileProviderDomainRequest domainRequest;
+    domainRequest.identifier = domainIdentifier(request);
+    domainRequest.displayName = request.hostName.isEmpty()
+            ? QStringLiteral("Moonlight Host Files")
+            : QStringLiteral("Moonlight Host Files - %1").arg(request.hostName);
+
+    MacFileProviderDomainResult domainResult = MacFileProviderBridge::registerDomain(domainRequest);
+    if (!domainResult.ok) {
+        result.error = MountError::make(domainResult.unsupported ? ErrorKind::Unsupported : ErrorKind::Internal,
+                                        domainResult.message.isEmpty() ? unavailableMessage() : domainResult.message);
+        result.status.state = domainResult.unsupported ? MountState::Unavailable : MountState::Error;
+        result.status.message = result.error.message;
+        if (!domainResult.diagnostics.isEmpty()) {
+            result.diagnostics.append(domainResult.diagnostics);
+        }
+        return result;
+    }
+
+    MountId id;
+    id.value = domainRequest.identifier;
+
+    MountStatus status;
+    status.state = MountState::Mounted;
+    status.displayPath = domainResult.displayPath.isEmpty()
+            ? displayPathForDomain(domainRequest.displayName)
+            : domainResult.displayPath;
+    status.message = domainResult.message.isEmpty()
+            ? QStringLiteral("Host files are available in Finder.")
+            : domainResult.message;
+
+    DomainState state;
+    state.status = status;
+    m_Domains.insert(id.value, state);
+
+    result.id = id;
+    result.status = status;
+    if (!domainResult.diagnostics.isEmpty()) {
+        result.diagnostics.append(domainResult.diagnostics);
+    }
 
     return result;
 }
@@ -73,6 +115,12 @@ MountError MacFileProviderMountProvider::reveal(const MountId& id)
     MountStatus current = status(id);
     if (current.state != MountState::Mounted || current.displayPath.isEmpty()) {
         return MountError::make(ErrorKind::NotFound, unavailableMessage());
+    }
+
+    MacFileProviderDomainResult domainResult = MacFileProviderBridge::revealDomain(id.value, current.displayPath);
+    if (!domainResult.ok && !domainResult.unsupported) {
+        return MountError::make(ErrorKind::Internal,
+                                domainResult.message.isEmpty() ? QStringLiteral("Could not open the macOS File Provider location.") : domainResult.message);
     }
 
     bool opened = false;
@@ -88,6 +136,7 @@ MountError MacFileProviderMountProvider::reveal(const MountId& id)
 
 void MacFileProviderMountProvider::unmount(const MountId& id)
 {
+    MacFileProviderBridge::unregisterDomain(id.value);
     m_Domains.remove(id.value);
 }
 

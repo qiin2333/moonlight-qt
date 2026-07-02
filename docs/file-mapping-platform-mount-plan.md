@@ -533,6 +533,7 @@ Exit criteria:
 Current progress:
 
 - Qt provider entry point added.
+- Qt-to-native domain bridge added for `NSFileProviderManager` registration/removal.
 - Static Swift extension scaffold added.
 - qmake packaging/signing for the `.appex` is still pending.
 
