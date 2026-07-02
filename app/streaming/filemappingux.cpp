@@ -227,7 +227,7 @@ public:
                                 ? QObject::tr("Host files are ready.")
                                 : mount.status.message;
                         if (fileProviderFallback) {
-                            message = QObject::tr("Host files are ready as a Finder folder. Native Finder integration is not available in this build yet.");
+                            message = QObject::tr("Host files are ready as a Finder folder. Native Finder integration is unavailable in this build.");
                         }
                         else if (macFuseFallback) {
                             message = QObject::tr("Host files are ready as a Finder folder. Install macFUSE to mount them as a Finder volume.");

@@ -15,6 +15,10 @@ struct MacFileProviderDomainResult {
     QString displayPath;
     QString message;
     QString diagnostics;
+    QString errorDomain;
+    qint64 errorCode = 0;
+    QString underlyingErrorDomain;
+    qint64 underlyingErrorCode = 0;
 };
 
 class MacFileProviderBridge

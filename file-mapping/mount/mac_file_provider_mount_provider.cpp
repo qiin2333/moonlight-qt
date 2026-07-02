@@ -4,11 +4,18 @@
 
 #include <QDesktopServices>
 #include <QDir>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QProcess>
 #include <QUrl>
 
 namespace FileMapping {
 namespace {
+QString fileProviderUnavailableMessage()
+{
+    return QStringLiteral("Moonlight's macOS File Provider integration is unavailable in this build.");
+}
+
 QString sanitizeDomainPart(QString value, const QString& fallback)
 {
     value = value.trimmed();
@@ -27,6 +34,76 @@ QString sanitizeDomainPart(QString value, const QString& fallback)
         }
     }
     return sanitized.left(96);
+}
+
+QMutex& unavailableCacheLock()
+{
+    static QMutex lock;
+    return lock;
+}
+
+bool& unavailableCached()
+{
+    static bool cached = false;
+    return cached;
+}
+
+QString& unavailableDiagnostics()
+{
+    static QString diagnostics;
+    return diagnostics;
+}
+
+bool isFileProviderDomain(const QString& domain)
+{
+    return domain == QStringLiteral("NSFileProviderErrorDomain");
+}
+
+bool isCurrentBuildUnavailable(const MacFileProviderDomainResult& result)
+{
+    constexpr qint64 providerUnavailable = -2001;
+    constexpr qint64 providerAppUnavailable = -2014;
+
+    const bool fileProviderError =
+            isFileProviderDomain(result.errorDomain) ||
+            isFileProviderDomain(result.underlyingErrorDomain);
+    if (!fileProviderError) {
+        return false;
+    }
+
+    return result.errorCode == providerUnavailable ||
+            result.errorCode == providerAppUnavailable ||
+            result.underlyingErrorCode == providerUnavailable ||
+            result.underlyingErrorCode == providerAppUnavailable;
+}
+
+void cacheUnavailable(const QString& diagnostics)
+{
+    QMutexLocker locker(&unavailableCacheLock());
+    unavailableCached() = true;
+    unavailableDiagnostics() = diagnostics;
+}
+
+MountResult cachedUnavailableResult(const QString& providerName)
+{
+    MountResult result;
+    result.providerName = providerName;
+    result.error = MountError::make(ErrorKind::Unsupported, fileProviderUnavailableMessage());
+    result.status.state = MountState::Unavailable;
+    result.status.message = result.error.message;
+
+    QMutexLocker locker(&unavailableCacheLock());
+    if (!unavailableDiagnostics().isEmpty()) {
+        result.diagnostics.append(QStringLiteral("Skipping File Provider registration after previous unavailable result: %1")
+                                  .arg(unavailableDiagnostics()));
+    }
+    return result;
+}
+
+bool hasCachedUnavailable()
+{
+    QMutexLocker locker(&unavailableCacheLock());
+    return unavailableCached();
 }
 } // namespace
 
@@ -67,6 +144,10 @@ MountResult MacFileProviderMountProvider::mount(const MountRequest& request)
         return result;
     }
 
+    if (hasCachedUnavailable()) {
+        return cachedUnavailableResult(result.providerName);
+    }
+
     MacFileProviderDomainRequest domainRequest;
     domainRequest.identifier = domainIdentifier(request);
     domainRequest.displayName = request.hostName.isEmpty()
@@ -75,9 +156,14 @@ MountResult MacFileProviderMountProvider::mount(const MountRequest& request)
 
     MacFileProviderDomainResult domainResult = MacFileProviderBridge::registerDomain(domainRequest);
     if (!domainResult.ok) {
-        result.error = MountError::make(domainResult.unsupported ? ErrorKind::Unsupported : ErrorKind::Internal,
-                                        domainResult.message.isEmpty() ? unavailableMessage() : domainResult.message);
-        result.status.state = domainResult.unsupported ? MountState::Unavailable : MountState::Error;
+        const bool unavailableForBuild = domainResult.unsupported || isCurrentBuildUnavailable(domainResult);
+        if (unavailableForBuild && !domainResult.diagnostics.isEmpty()) {
+            cacheUnavailable(domainResult.diagnostics);
+        }
+        result.error = MountError::make(unavailableForBuild ? ErrorKind::Unsupported : ErrorKind::Internal,
+                                        unavailableForBuild ? unavailableMessage() :
+                                                (domainResult.message.isEmpty() ? unavailableMessage() : domainResult.message));
+        result.status.state = unavailableForBuild ? MountState::Unavailable : MountState::Error;
         result.status.message = result.error.message;
         if (!domainResult.diagnostics.isEmpty()) {
             result.diagnostics.append(domainResult.diagnostics);
@@ -154,7 +240,7 @@ QString MacFileProviderMountProvider::displayPathForDomain(const QString& domain
 
 QString MacFileProviderMountProvider::unavailableMessage()
 {
-    return QStringLiteral("Moonlight's macOS File Provider integration is not available in this build yet.");
+    return fileProviderUnavailableMessage();
 }
 
 } // namespace FileMapping

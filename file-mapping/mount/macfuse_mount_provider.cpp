@@ -150,6 +150,12 @@ public:
             return true;
         }
 
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (m_LastFailedProbeMs > 0 && now - m_LastFailedProbeMs < 60000) {
+            errorMessage = m_ErrorMessage.isEmpty() ? unsupportedMessage() : m_ErrorMessage;
+            return false;
+        }
+
         const QStringList candidates {
             QStringLiteral("/usr/local/lib/libfuse.dylib"),
             QStringLiteral("/usr/local/lib/libfuse.2.dylib"),
@@ -205,6 +211,7 @@ public:
         if (!missing.isEmpty()) {
             m_Diagnostics += QStringLiteral(" Missing paths checked: %1").arg(missing.join(QStringLiteral(", ")));
         }
+        m_LastFailedProbeMs = now;
         errorMessage = m_ErrorMessage;
         return false;
     }
@@ -238,6 +245,7 @@ private:
     QString m_ErrorMessage;
     QString m_Diagnostics;
     QString m_LoadedPath;
+    qint64 m_LastFailedProbeMs = 0;
     QLibrary m_Library;
     FuseMainRealFn m_FuseMainReal = nullptr;
     FuseGetContextFn m_FuseGetContext = nullptr;

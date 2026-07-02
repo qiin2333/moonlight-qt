@@ -36,9 +36,11 @@ MacFileProviderDomainResult resultFromError(NSError* error, const QString& fallb
     }
 
     result.message = fallbackMessage;
+    result.errorDomain = fromNSString(error.domain);
+    result.errorCode = static_cast<qint64>(error.code);
     QStringList diagnostics;
-    diagnostics.append(QStringLiteral("domain=%1").arg(fromNSString(error.domain)));
-    diagnostics.append(QStringLiteral("code=%1").arg(static_cast<qint64>(error.code)));
+    diagnostics.append(QStringLiteral("domain=%1").arg(result.errorDomain));
+    diagnostics.append(QStringLiteral("code=%1").arg(result.errorCode));
 
     const QString description = fromNSString(error.localizedDescription);
     if (!description.isEmpty()) {
@@ -58,8 +60,10 @@ MacFileProviderDomainResult resultFromError(NSError* error, const QString& fallb
     id underlyingObject = error.userInfo[NSUnderlyingErrorKey];
     if ([underlyingObject isKindOfClass:[NSError class]]) {
         NSError* underlyingError = (NSError*)underlyingObject;
-        diagnostics.append(QStringLiteral("underlying_domain=%1").arg(fromNSString(underlyingError.domain)));
-        diagnostics.append(QStringLiteral("underlying_code=%1").arg(static_cast<qint64>(underlyingError.code)));
+        result.underlyingErrorDomain = fromNSString(underlyingError.domain);
+        result.underlyingErrorCode = static_cast<qint64>(underlyingError.code);
+        diagnostics.append(QStringLiteral("underlying_domain=%1").arg(result.underlyingErrorDomain));
+        diagnostics.append(QStringLiteral("underlying_code=%1").arg(result.underlyingErrorCode));
         const QString underlyingDescription = fromNSString(underlyingError.localizedDescription);
         if (!underlyingDescription.isEmpty()) {
             diagnostics.append(QStringLiteral("underlying_description=\"%1\"").arg(underlyingDescription));
