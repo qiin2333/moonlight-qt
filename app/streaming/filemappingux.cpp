@@ -217,12 +217,19 @@ public:
                         ok = true;
                         detail = QObject::tr("Open");
                         displayPath = mount.status.displayPath;
-                        const bool macFuseFallback = mount.providerName == QStringLiteral("macOS Finder mirror")
-                                && mount.diagnostics.join(QStringLiteral("\n")).contains(QStringLiteral("macFUSE"), Qt::CaseInsensitive);
+                        const QString mountDiagnostics = mount.diagnostics.join(QStringLiteral("\n"));
+                        const bool finderMirrorFallback = mount.providerName == QStringLiteral("macOS Finder mirror");
+                        const bool fileProviderFallback = finderMirrorFallback
+                                && mountDiagnostics.contains(QStringLiteral("File Provider"), Qt::CaseInsensitive);
+                        const bool macFuseFallback = finderMirrorFallback
+                                && mountDiagnostics.contains(QStringLiteral("macFUSE"), Qt::CaseInsensitive);
                         message = mount.status.message.isEmpty()
                                 ? QObject::tr("Host files are ready.")
                                 : mount.status.message;
-                        if (macFuseFallback) {
+                        if (fileProviderFallback) {
+                            message = QObject::tr("Host files are ready as a Finder folder. Native Finder integration is not available in this build yet.");
+                        }
+                        else if (macFuseFallback) {
                             message = QObject::tr("Host files are ready as a Finder folder. Install macFUSE to mount them as a Finder volume.");
                         }
                     }

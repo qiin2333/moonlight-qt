@@ -51,15 +51,25 @@ Current landed skeleton:
 - `file-mapping/mount`: provider-neutral mount session and provider interface.
 - `file-mapping/mount/mount_coordinator.*`: provider selection, per-session mount tracking, reveal, and unmount coordination.
 - `file-mapping/mount/mount_provider_factory.*`: platform-native provider selection placeholder for macOS, Windows, Linux, and mobile.
+- `file-mapping/mount/mac_file_provider_mount_provider.*`: Qt-side macOS File Provider mount-provider entry point.
+- `file-mapping/mount/macos-fileprovider/`: staged native File Provider extension scaffold for the macOS `.appex` target.
 - `file-mapping/file-mapping.pri`: qmake integration for the Qt app build.
 - `app/streaming/filemappingprotocoladapter.*`: Qt streaming-side adapter from the existing Sunshine WSS client to the platform-neutral protocol facade.
 
 Current non-goals:
 
 - No behavior change to the existing overlay Host Files readiness probe.
-- No macOS File Provider extension yet.
+- No packaged macOS File Provider `.appex` yet.
 - No Windows/Linux mount helpers yet.
 - `app/streaming/filemappingclient.*` is still the concrete Sunshine WSS implementation; it is now reusable through the protocol facade, but not moved into `file-mapping/protocol` yet.
+
+Current macOS provider order:
+
+1. Apple File Provider provider entry point.
+2. macFUSE runtime provider.
+3. Finder mirror fallback.
+
+The File Provider provider currently returns an explicit unsupported result until the native `.appex` target is bundled and signed. This keeps diagnostics honest while preserving the existing macFUSE and mirror fallbacks.
 
 ## First Implementation Target
 
@@ -519,6 +529,12 @@ Exit criteria:
 - Test build shows `Moonlight Host Files` in Finder.
 - Clicking overlay opens Finder.
 - No Sunshine connection required.
+
+Current progress:
+
+- Qt provider entry point added.
+- Static Swift extension scaffold added.
+- qmake packaging/signing for the `.appex` is still pending.
 
 ### M2: Platform VFS Remote Enumeration
 

@@ -38,7 +38,7 @@ MacOSFinderMirrorProvider::MacOSFinderMirrorProvider()
 
 MountProviderKind MacOSFinderMirrorProvider::kind() const
 {
-    return MountProviderKind::MacFileProvider;
+    return MountProviderKind::Fallback;
 }
 
 QString MacOSFinderMirrorProvider::displayName() const
