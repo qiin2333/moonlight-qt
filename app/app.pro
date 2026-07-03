@@ -39,6 +39,8 @@ isEmpty(MOONLIGHT_NUMERIC_VERSION): MOONLIGHT_NUMERIC_VERSION = $$cat(version.tx
 
 TEMPLATE = app
 
+include(../file-mapping/file-mapping.pri)
+
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which has been marked as deprecated (the exact warnings
 # depend on your compiler). Please consult the documentation of the
@@ -211,6 +213,10 @@ SOURCES += \
     streaming/input/mouse.cpp \
     streaming/input/reltouch.cpp \
     streaming/session.cpp \
+    streaming/filemappingclient.cpp \
+    streaming/filemappingwebsocket.cpp \
+    streaming/filemappingprotocoladapter.cpp \
+    streaming/filemappingux.cpp \
     streaming/clipboardhelperclient.cpp \
     streaming/clipboardipc.cpp \
     streaming/audio/audio.cpp \
@@ -258,6 +264,10 @@ HEADERS += \
     settings/streamingpreferences.h \
     streaming/input/input.h \
     streaming/session.h \
+    streaming/filemappingclient.h \
+    streaming/filemappingwebsocket.h \
+    streaming/filemappingprotocoladapter.h \
+    streaming/filemappingux.h \
     streaming/clipboardhelperclient.h \
     streaming/clipboardipc.h \
     streaming/audio/renderers/renderer.h \

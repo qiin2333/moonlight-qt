@@ -40,6 +40,7 @@ public:
         UngrabInput,
         PasteText,
         TogglePointerRegionLock,
+        ShowHostFiles,
         // Microphone
         ToggleMicrophone,
         // Gamepad mouse emulation
@@ -54,6 +55,16 @@ public:
         SetBitrate50000,
         SetBitrate100000,
         MenuActionMax
+    };
+
+    enum class FileMappingState {
+        Unknown,
+        Checking,
+        Unavailable,
+        Available,
+        Mounting,
+        Open,
+        Error
     };
 
     enum class MenuItemType {
@@ -91,6 +102,7 @@ public:
     void updateMicrophoneState(bool enabled);
     void updateBitrateState(int bitrateKbps);
     void updateGamepadMouseState(bool enabled);
+    void updateFileMappingState(FileMappingState state, const QString& detail);
     void setHasGamepads(bool has) {
         if (m_HasGamepads != has) {
             m_HasGamepads = has;
@@ -141,6 +153,8 @@ private:
     int  m_HoveredIndex;
     bool m_Visible;
     bool m_HasGamepads;
+    FileMappingState m_FileMappingState;
+    QString m_FileMappingDetail;
 
     ActionCallback m_ActionCallback;
     CloseCallback  m_CloseCallback;

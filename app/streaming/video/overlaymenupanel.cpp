@@ -14,6 +14,8 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
       m_HoveredIndex(-1),
       m_Visible(false),
       m_HasGamepads(false),
+      m_FileMappingState(FileMappingState::Unknown),
+      m_FileMappingDetail(tr("Checking")),
       m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
       m_ContentOffset(0),
       m_Closing(false),
@@ -144,7 +146,11 @@ void OverlayMenuPanel::buildMenuLevels()
     top.items.push_back({tr("Quick Actions"), QString(),  MenuItemType::SubMenu,
                          MenuAction::MenuActionMax, 1, true, false, false});
     top.items.push_back({tr("Bitrate"),       QString(),  MenuItemType::SubMenu,
-                         MenuAction::MenuActionMax, 2, true, false, true});   // separator
+                         MenuAction::MenuActionMax, 2, true, false, false});
+    top.items.push_back({tr("Host Files"),    m_FileMappingDetail, MenuItemType::Action,
+                         MenuAction::ShowHostFiles, 0, true,
+                         m_FileMappingState == FileMappingState::Available ||
+                         m_FileMappingState == FileMappingState::Open, true});   // separator
     top.items.push_back({tr("Toggle Fullscreen"), QString(), MenuItemType::Action,
                          MenuAction::ToggleFullScreen, 0, true, false, false});
     top.items.push_back({tr("Microphone"),    QString(),  MenuItemType::Toggle,
@@ -265,6 +271,23 @@ void OverlayMenuPanel::updateBitrateState(int bitrateKbps)
                 int kbps = actionToKbps(item.action);
                 item.detail = (kbps == bitrateKbps) ? QString::fromUtf8("\342\234\223") : QString();
             }
+        }
+    }
+}
+
+void OverlayMenuPanel::updateFileMappingState(FileMappingState state, const QString& detail)
+{
+    m_FileMappingState = state;
+    m_FileMappingDetail = detail;
+
+    if (m_MenuLevels.empty()) return;
+    for (auto& item : m_MenuLevels[0].items) {
+        if (item.action == MenuAction::ShowHostFiles) {
+            item.detail = detail;
+            item.toggleState = state == FileMappingState::Available ||
+                               state == FileMappingState::Open;
+            forceRepaint();
+            break;
         }
     }
 }
@@ -609,6 +632,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         }
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE740); // FullScreen
+        case MenuAction::ShowHostFiles:     return QChar(0xE8B7); // Folder
         case MenuAction::ToggleMicrophone:  return QChar(0xE720); // Microphone
         case MenuAction::ToggleGamepadMouse:  return QChar(0xE7FC); // Gamepad
         case MenuAction::Quit:              return QChar(0xE711); // Close/X
@@ -630,6 +654,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         }
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE5D0); // fullscreen
+        case MenuAction::ShowHostFiles:     return QChar(0xE2C7); // folder
         case MenuAction::ToggleMicrophone:  return QChar(0xE029); // mic
         case MenuAction::ToggleGamepadMouse:  return QChar(0xE30F); // games (gamepad)
         case MenuAction::Quit:              return QChar(0xE5CD); // close

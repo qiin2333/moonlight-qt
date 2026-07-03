@@ -63,11 +63,11 @@ OverlayManager::OverlayManager() :
                     TTF_GetError());
         return;
     }
-    
+
     // 设置全局字体渲染质量
     // 启用高质量字体缩放（如果支持）
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");  // 使用高质量线性过滤
-    
+
     // 为更好的字体渲染启用垂直同步（减少闪烁）
     SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 }
@@ -204,24 +204,23 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
         SDL_FreeSurface(oldSurface);
     }
 
-    if (m_Overlays[type].enabled)
-    {
+    if (m_Overlays[type].enabled && m_Overlays[type].text[0] != '\0') {
         // 解析格式化文本
         std::vector<TextSegment> segments = parseFormattedText(m_Overlays[type].text);
-        
+
         // 渲染格式化文本
         SDL_Surface* formattedSurface = renderFormattedText(type, segments);
-        
+
         if (formattedSurface != nullptr) {
             SDL_AtomicSetPtr((void **)&m_Overlays[type].surface, formattedSurface);
         } else {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                        "格式化文本渲染失败");
-            return;
         }
     }
 
-    // Notify the renderer
+    // Notify the renderer even if the enabled overlay has no text yet. Stats
+    // text is populated asynchronously after the first measurement window.
     m_Renderer->notifyOverlayUpdated(type);
 }
 
@@ -229,7 +228,7 @@ std::vector<OverlayManager::TextSegment> OverlayManager::parseFormattedText(cons
 {
     std::vector<TextSegment> segments;
     std::string input(text);
-    
+
     // 支持的格式：
     // ***粗体斜体***, **粗体**, *斜体*
     // {16}指定字号, {+2}相对增大, {-1}相对减小
@@ -237,22 +236,23 @@ std::vector<OverlayManager::TextSegment> OverlayManager::parseFormattedText(cons
     std::regex formatRegex(R"(\{([+-]?\d+)\}|(\*\*\*([^\*]+)\*\*\*)|(\*\*([^\*]+)\*\*)|(\*([^\*]+)\*))");
     std::sregex_iterator iter(input.begin(), input.end(), formatRegex);
     std::sregex_iterator end;
-    
+
     size_t lastEnd = 0;
     int currentFontSize = -1;  // 当前字号，-1表示使用默认
     bool isRelativeSize = false;
-    
+
     for (; iter != end; ++iter) {
         const std::smatch& match = *iter;
-        
+        const size_t matchPosition = static_cast<size_t>(match.position());
+
         // 添加匹配前的普通文本
-        if (match.position() > lastEnd) {
-            std::string normalText = input.substr(lastEnd, match.position() - lastEnd);
+        if (matchPosition > lastEnd) {
+            std::string normalText = input.substr(lastEnd, matchPosition - lastEnd);
             if (!normalText.empty()) {
                 segments.push_back({normalText, false, false, currentFontSize, isRelativeSize});
             }
         }
-        
+
         // 检查是否为字号标记 {数字}
         if (!match[1].str().empty()) {
             std::string sizeStr = match[1].str();
@@ -267,7 +267,7 @@ std::vector<OverlayManager::TextSegment> OverlayManager::parseFormattedText(cons
                     currentFontSize = size;
                     isRelativeSize = false;
                 }
-            } catch (const std::exception& e) {
+            } catch (const std::exception&) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                            "无效的字号格式: %s", sizeStr.c_str());
                 currentFontSize = -1;
@@ -279,7 +279,7 @@ std::vector<OverlayManager::TextSegment> OverlayManager::parseFormattedText(cons
             TextSegment segment;
             segment.fontSize = currentFontSize;
             segment.isRelativeSize = isRelativeSize;
-            
+
             if (!match[3].str().empty()) {
                 // ***粗体斜体***
                 segment.text = match[3].str();
@@ -296,13 +296,13 @@ std::vector<OverlayManager::TextSegment> OverlayManager::parseFormattedText(cons
                 segment.isBold = false;
                 segment.isItalic = true;
             }
-            
+
             segments.push_back(segment);
         }
-        
-        lastEnd = match.position() + match.length();
+
+        lastEnd = matchPosition + match.length();
     }
-    
+
     // 添加最后的普通文本
     if (lastEnd < input.length()) {
         std::string normalText = input.substr(lastEnd);
@@ -310,19 +310,19 @@ std::vector<OverlayManager::TextSegment> OverlayManager::parseFormattedText(cons
             segments.push_back({normalText, false, false, currentFontSize, isRelativeSize});
         }
     }
-    
+
     // 如果没有找到任何格式化标记，返回整个文本作为普通文本
     if (segments.empty()) {
         segments.push_back({input, false, false, -1, false});
     }
-    
+
     return segments;
 }
 
 TTF_Font* OverlayManager::getFontForStyle(OverlayType type, bool isBold, bool isItalic)
 {
     TTF_Font** targetFont;
-    
+
     if (isBold && isItalic) {
         targetFont = &m_Overlays[type].fontBoldItalic;
     } else if (isBold) {
@@ -332,7 +332,7 @@ TTF_Font* OverlayManager::getFontForStyle(OverlayType type, bool isBold, bool is
     } else {
         targetFont = &m_Overlays[type].font;
     }
-    
+
     // 如果字体还没有创建，创建它
     if (*targetFont == nullptr) {
         if (m_FontData.isEmpty()) {
@@ -340,7 +340,7 @@ TTF_Font* OverlayManager::getFontForStyle(OverlayType type, bool isBold, bool is
                          "SDL覆盖层字体数据为空");
             return nullptr;
         }
-        
+
         *targetFont = TTF_OpenFontRW(SDL_RWFromConstMem(m_FontData.constData(), m_FontData.size()),
                                      1,
                                      m_Overlays[type].fontSize);
@@ -350,10 +350,10 @@ TTF_Font* OverlayManager::getFontForStyle(OverlayType type, bool isBold, bool is
                         TTF_GetError());
             return nullptr;
         }
-        
+
         configureFontRendering(*targetFont, isBold, isItalic);
     }
-    
+
     return *targetFont;
 }
 
@@ -362,27 +362,27 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
     if (segments.empty()) {
         return nullptr;
     }
-    
+
     // 使用精确的度量计算来获取文本信息
     int totalWidth, maxHeight, maxAscent, maxDescent;
     calculateSegmentMetrics(segments, type, totalWidth, maxHeight, maxAscent, maxDescent);
-    
+
     if (totalWidth == 0 || maxHeight == 0) {
         return nullptr;
     }
-    
+
     std::vector<SDL_Surface*> segmentSurfaces;
     std::vector<TTF_Font*> temporaryFonts; // 用于跟踪需要清理的临时字体
     std::vector<int> segmentAscents; // 记录每个片段的ascent值
-    
+
     // 渲染所有文本片段
     for (const auto& segment : segments) {
         // 计算实际字号
         int actualFontSize = calculateActualFontSize(type, segment.fontSize, segment.isRelativeSize);
-        
+
         TTF_Font* font;
         bool isTemporaryFont = false;
-        
+
         if (segment.fontSize == -1) {
             // 使用缓存的默认字体
             font = getFontForStyle(type, segment.isBold, segment.isItalic);
@@ -391,26 +391,26 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
             font = getFontForStyleAndSize(type, segment.isBold, segment.isItalic, actualFontSize);
             isTemporaryFont = true;
         }
-        
+
         if (font == nullptr) {
             continue;
         }
-        
+
         if (isTemporaryFont) {
             temporaryFonts.push_back(font);
         }
-        
+
         // 使用优化的平滑文本渲染方法
-        SDL_Surface* surface = renderSmoothTextSegment(font, segment.text, 
-                                                     m_Overlays[type].color, 
+        SDL_Surface* surface = renderSmoothTextSegment(font, segment.text,
+                                                     m_Overlays[type].color,
                                                      m_Overlays[type].bgcolor);
-        
+
         if (surface != nullptr) {
             segmentSurfaces.push_back(surface);
             segmentAscents.push_back(TTF_FontAscent(font));
         }
     }
-    
+
     if (segmentSurfaces.empty()) {
         // 清理临时字体
         for (TTF_Font* font : temporaryFonts) {
@@ -418,13 +418,13 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
         }
         return nullptr;
     }
-    
+
     // 添加内边距。保持固定值，避免硬件 DPI 波动让覆盖层边距忽大忽小。
     int padding = 4;
-    
+
     // 使用精确的高度计算（考虑ascent和descent）
     int surfaceHeight = maxAscent + maxDescent;
-    
+
     // 创建组合表面 - 使用ARGB8888格式（所有渲染器都期望此格式）
     SDL_Surface* combinedSurface = SDL_CreateRGBSurfaceWithFormat(
         0,
@@ -433,7 +433,7 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
         32,
         SDL_PIXELFORMAT_ARGB8888
     );
-    
+
     if (combinedSurface == nullptr) {
         // 清理片段表面和临时字体
         for (SDL_Surface* surface : segmentSurfaces) {
@@ -444,21 +444,21 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
         }
         return nullptr;
     }
-    
+
     // 用背景色填充组合表面
-    SDL_FillRect(combinedSurface, nullptr, 
-                SDL_MapRGBA(combinedSurface->format, 
+    SDL_FillRect(combinedSurface, nullptr,
+                SDL_MapRGBA(combinedSurface->format,
                            m_Overlays[type].bgcolor.r,
                            m_Overlays[type].bgcolor.g,
                            m_Overlays[type].bgcolor.b,
                            m_Overlays[type].bgcolor.a));
-    
+
     // 将所有片段复制到组合表面，使用精确的基线对齐
     int currentX = padding;
     for (size_t i = 0; i < segmentSurfaces.size(); ++i) {
         SDL_Surface* surface = segmentSurfaces[i];
         int segmentAscent = segmentAscents[i];
-        
+
         // 根据对齐方式计算Y偏移
         int yOffset;
         switch (m_Overlays[type].textAlignment) {
@@ -476,22 +476,22 @@ SDL_Surface* OverlayManager::renderFormattedText(OverlayType type, const std::ve
                 yOffset = padding + (maxAscent - segmentAscent);
                 break;
         }
-        
+
         SDL_Rect destRect = {currentX, yOffset, surface->w, surface->h};
-        
+
         // 启用alpha混合以获得更平滑的效果
         SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND);
         SDL_BlitSurface(surface, nullptr, combinedSurface, &destRect);
-        
+
         currentX += surface->w;
         SDL_FreeSurface(surface);
     }
-    
+
     // 清理临时字体
     for (TTF_Font* font : temporaryFonts) {
         TTF_CloseFont(font);
     }
-    
+
     return combinedSurface;
 }
 
@@ -500,76 +500,76 @@ SDL_Surface* OverlayManager::renderSmoothTextSegment(TTF_Font* font, const std::
     if (font == nullptr || text.empty()) {
         return nullptr;
     }
-    
+
     SDL_Surface* surface = nullptr;
-    
+
     // 尝试使用最高质量的渲染方法
-    
+
     // 1. 首先尝试使用Blended渲染（最佳抗锯齿效果）
     surface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
-    
+
     if (surface != nullptr) {
         return surface;
     }
-    
+
     // 2. 如果Blended失败，尝试使用Blended Wrapped（适合长文本）
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                "Blended渲染失败，尝试Blended Wrapped渲染");
-    
+
     surface = TTF_RenderUTF8_Blended_Wrapped(font, text.c_str(), color, 0);
-    
+
     if (surface != nullptr) {
         return surface;
     }
-    
+
     // 3. 如果还是失败，使用Shaded渲染（中等质量）
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                "Blended Wrapped渲染失败，尝试Shaded渲染");
-    
+
     surface = TTF_RenderUTF8_Shaded(font, text.c_str(), color, bgcolor);
-    
+
     if (surface != nullptr) {
         return surface;
     }
-    
+
     // 4. 最后的后备方案：使用Solid渲染（基本质量）
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                "Shaded渲染失败，使用Solid渲染作为后备");
-    
+
     surface = TTF_RenderUTF8_Solid(font, text.c_str(), color);
-    
+
     if (surface == nullptr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                     "所有文本渲染方法都失败了: %s", TTF_GetError());
     }
-    
+
     return surface;
 }
 
 int OverlayManager::calculateActualFontSize(OverlayType type, int requestedSize, bool isRelative)
 {
     int baseFontSize = m_Overlays[type].fontSize;
-    
+
     if (requestedSize == -1) {
         // 使用默认字号
         return baseFontSize;
     }
-    
+
     if (isRelative) {
         // 相对调整：基础字号 + 调整值
         int newSize = baseFontSize + requestedSize;
-        
+
         // 限制字号范围（最小8，最大128）
         if (newSize < 8) newSize = 8;
         if (newSize > 128) newSize = 128;
-        
+
         return newSize;
     } else {
         // 绝对字号：直接使用指定值
         // 同样限制范围
         if (requestedSize < 8) return 8;
         if (requestedSize > 128) return 128;
-        
+
         return requestedSize;
     }
 }
@@ -580,14 +580,14 @@ TTF_Font* OverlayManager::getFontForStyleAndSize(OverlayType type, bool isBold, 
     if (fontSize == -1) {
         return getFontForStyle(type, isBold, isItalic);
     }
-    
+
     // 为不同字号创建临时字体（这里简化处理，实际可以考虑缓存机制）
     if (m_FontData.isEmpty()) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "SDL覆盖层字体数据为空");
         return nullptr;
     }
-    
+
     TTF_Font* tempFont = TTF_OpenFontRW(SDL_RWFromConstMem(m_FontData.constData(), m_FontData.size()),
                                        1, fontSize);
     if (tempFont == nullptr) {
@@ -597,9 +597,9 @@ TTF_Font* OverlayManager::getFontForStyleAndSize(OverlayType type, bool isBold, 
         // 回退到默认字体
         return getFontForStyle(type, isBold, isItalic);
     }
-    
+
     configureFontRendering(tempFont, isBold, isItalic);
-    
+
     return tempFont;
 }
 
@@ -608,10 +608,10 @@ void OverlayManager::setTextAlignment(OverlayType type, TextAlignment alignment)
     if (type >= OverlayMax) {
         return;
     }
-    
+
     bool stateChanged = m_Overlays[type].textAlignment != alignment;
     m_Overlays[type].textAlignment = alignment;
-    
+
     // 如果对齐方式发生变化且覆盖层已启用，重新渲染
     if (stateChanged && m_Overlays[type].enabled) {
         notifyOverlayUpdated(type);
@@ -623,7 +623,7 @@ TextAlignment OverlayManager::getTextAlignment(OverlayType type)
     if (type >= OverlayMax) {
         return TextAlignment::AlignBottom;
     }
-    
+
     return m_Overlays[type].textAlignment;
 }
 
@@ -632,52 +632,52 @@ int OverlayManager::calculateTextBaseline(TTF_Font* font)
     if (font == nullptr) {
         return 0;
     }
-    
+
     // 获取字体的上升高度（基线到顶部的距离）
     return TTF_FontAscent(font);
 }
 
-void OverlayManager::calculateSegmentMetrics(const std::vector<TextSegment>& segments, OverlayType type, 
+void OverlayManager::calculateSegmentMetrics(const std::vector<TextSegment>& segments, OverlayType type,
                                            int& totalWidth, int& maxHeight, int& maxAscent, int& maxDescent)
 {
     totalWidth = 0;
     maxHeight = 0;
     maxAscent = 0;
     maxDescent = 0;
-    
+
     for (const auto& segment : segments) {
         // 计算实际字号
         int actualFontSize = calculateActualFontSize(type, segment.fontSize, segment.isRelativeSize);
-        
+
         TTF_Font* font;
         bool isTemporaryFont = false;
-        
+
         if (segment.fontSize == -1) {
             font = getFontForStyle(type, segment.isBold, segment.isItalic);
         } else {
             font = getFontForStyleAndSize(type, segment.isBold, segment.isItalic, actualFontSize);
             isTemporaryFont = true;
         }
-        
+
         if (font == nullptr) {
             continue;
         }
-        
+
         // 获取文本宽度和高度
         int textWidth, textHeight;
         if (TTF_SizeUTF8(font, segment.text.c_str(), &textWidth, &textHeight) == 0) {
             totalWidth += textWidth;
-            
+
             // 获取字体度量信息
             int ascent = TTF_FontAscent(font);
             int descent = TTF_FontDescent(font);
             int height = TTF_FontHeight(font);
-            
+
             maxHeight = std::max(maxHeight, height);
             maxAscent = std::max(maxAscent, ascent);
             maxDescent = std::max(maxDescent, std::abs(descent)); // descent通常是负数
         }
-        
+
         if (isTemporaryFont) {
             TTF_CloseFont(font);
         }

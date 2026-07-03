@@ -17,7 +17,7 @@ enum OverlayType {
 
 enum TextAlignment {
     AlignTop,        // 顶部对齐
-    AlignCenter,     // 居中对齐 
+    AlignCenter,     // 居中对齐
     AlignBottom      // 底部对齐（默认）
 };
 
@@ -51,7 +51,7 @@ public:
 
 private:
     void notifyOverlayUpdated(OverlayType type);
-    
+
     // 文本格式解析相关方法
     struct TextSegment {
         std::string text;
@@ -60,7 +60,7 @@ private:
         int fontSize;        // 字体大小，-1表示使用默认大小
         bool isRelativeSize; // 是否为相对大小调整
     };
-    
+
     std::vector<TextSegment> parseFormattedText(const char* text);
     SDL_Surface* renderFormattedText(OverlayType type, const std::vector<TextSegment>& segments);
     TTF_Font* getFontForStyle(OverlayType type, bool isBold, bool isItalic);
@@ -68,7 +68,7 @@ private:
     SDL_Surface* renderSmoothTextSegment(TTF_Font* font, const std::string& text, SDL_Color color, SDL_Color bgcolor);
     int calculateActualFontSize(OverlayType type, int requestedSize, bool isRelative);
     int calculateTextBaseline(TTF_Font* font);
-    void calculateSegmentMetrics(const std::vector<TextSegment>& segments, OverlayType type, 
+    void calculateSegmentMetrics(const std::vector<TextSegment>& segments, OverlayType type,
                                 int& totalWidth, int& maxHeight, int& maxAscent, int& maxDescent);
 
     struct {

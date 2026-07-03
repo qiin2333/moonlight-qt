@@ -12,6 +12,20 @@
 
 #define REQUEST_TIMEOUT_MS 5000
 
+namespace {
+QString verifyPairingStage(QString response, const char* stage)
+{
+    try {
+        NvHTTP::verifyResponseStatus(response);
+    }
+    catch (const GfeHttpResponseException& e) {
+        throw GfeHttpResponseException(e.getStatusCode(),
+                                       QStringLiteral("%1: %2").arg(QString::fromLatin1(stage), e.toQString()));
+    }
+    return response;
+}
+}
+
 NvPairingManager::NvPairingManager(NvComputer* computer) :
     m_Http(computer),
     m_Computer(computer)
@@ -237,7 +251,7 @@ NvPairingManager::pair(QString appVersion, QString pin, QSslCertificate& serverC
                                                     "devicename=roth&updateState=1&phrase=getservercert&salt=" +
                                                     salt.toHex() + "&clientcert=" + IdentityManager::get()->getCertificate().toHex(),
                                                     0);
-    NvHTTP::verifyResponseStatus(getCert);
+    verifyPairingStage(getCert, "pair stage 1 getservercert");
     if (NvHTTP::getXmlString(getCert, "paired") != "1")
     {
         qCritical() << "Failed pairing at stage #1";
@@ -279,7 +293,7 @@ NvPairingManager::pair(QString appVersion, QString pin, QSslCertificate& serverC
                                                          "devicename=roth&updateState=1&clientchallenge=" +
                                                          encryptedChallenge.toHex(),
                                                          REQUEST_TIMEOUT_MS);
-    NvHTTP::verifyResponseStatus(challengeXml);
+    verifyPairingStage(challengeXml, "pair stage 2 clientchallenge");
     if (NvHTTP::getXmlString(challengeXml, "paired") != "1")
     {
         qCritical() << "Failed pairing at stage #2";
@@ -310,7 +324,7 @@ NvPairingManager::pair(QString appVersion, QString pin, QSslCertificate& serverC
                                                     "devicename=roth&updateState=1&serverchallengeresp=" +
                                                     encryptedChallengeResponseHash.toHex(),
                                                     REQUEST_TIMEOUT_MS);
-    NvHTTP::verifyResponseStatus(respXml);
+    verifyPairingStage(respXml, "pair stage 3 serverchallengeresp");
     if (NvHTTP::getXmlString(respXml, "paired") != "1")
     {
         qCritical() << "Failed pairing at stage #3";
@@ -357,7 +371,7 @@ NvPairingManager::pair(QString appVersion, QString pin, QSslCertificate& serverC
                                                           "devicename=roth&updateState=1&clientpairingsecret=" +
                                                           clientPairingSecret.toHex(),
                                                           REQUEST_TIMEOUT_MS);
-    NvHTTP::verifyResponseStatus(secretRespXml);
+    verifyPairingStage(secretRespXml, "pair stage 4 clientpairingsecret");
     if (NvHTTP::getXmlString(secretRespXml, "paired") != "1")
     {
         qCritical() << "Failed pairing at stage #4";
@@ -369,7 +383,7 @@ NvPairingManager::pair(QString appVersion, QString pin, QSslCertificate& serverC
                                                              "pair",
                                                              "devicename=roth&updateState=1&phrase=pairchallenge",
                                                              REQUEST_TIMEOUT_MS);
-    NvHTTP::verifyResponseStatus(pairChallengeXml);
+    verifyPairingStage(pairChallengeXml, "pair stage 5 pairchallenge");
     if (NvHTTP::getXmlString(pairChallengeXml, "paired") != "1")
     {
         qCritical() << "Failed pairing at stage #5";

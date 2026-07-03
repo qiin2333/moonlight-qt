@@ -1030,15 +1030,16 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
         if (m_Overlays[i].hasOverlay) {
             // Position the overlay
             overlayParts[i].src = { 0, 0, (float)m_Overlays[i].overlay.tex->params.w, (float)m_Overlays[i].overlay.tex->params.h };
+            float centeredX = targetFrame.crop.x0 + SDL_max(0.0f, (targetFrame.crop.x1 - targetFrame.crop.x0 - overlayParts[i].src.x1) / 2.0f);
             if (i == Overlay::OverlayStatusUpdate) {
-                // Bottom Left
-                overlayParts[i].dst.x0 = 0;
-                overlayParts[i].dst.y0 = SDL_max(0, targetFrame.crop.y1 - overlayParts[i].src.y1);
+                // Bottom center
+                overlayParts[i].dst.x0 = centeredX;
+                overlayParts[i].dst.y0 = SDL_max(targetFrame.crop.y0, targetFrame.crop.y1 - overlayParts[i].src.y1);
             }
             else if (i == Overlay::OverlayDebug) {
-                // Top left
-                overlayParts[i].dst.x0 = 0;
-                overlayParts[i].dst.y0 = 0;
+                // Top center
+                overlayParts[i].dst.x0 = centeredX;
+                overlayParts[i].dst.y0 = targetFrame.crop.y0;
             }
             overlayParts[i].dst.x1 = overlayParts[i].dst.x0 + overlayParts[i].src.x1;
             overlayParts[i].dst.y1 = overlayParts[i].dst.y0 + overlayParts[i].src.y1;

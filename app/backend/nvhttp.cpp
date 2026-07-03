@@ -668,7 +668,7 @@ NvHTTP::openConnection(QUrl baseUrl,
     url.setQuery("uniqueid=" + (m_UseTrueUid ? IdentityManager::get()->getUniqueId() : "0123456789ABCDEF") +
                  "&uuid=" + QUuid::createUuid().toRfc4122().toHex() +
                  "&clientname=" + clientname +
-                 ((arguments != nullptr) ? ("&" + arguments) : ""));
+                 (!arguments.isNull() ? ("&" + arguments) : ""));
 
     QNetworkRequest request(url);
 
