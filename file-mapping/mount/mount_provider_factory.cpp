@@ -37,10 +37,20 @@ QString nativeUnavailableMessage(MountProviderKind kind)
     return QStringLiteral("%1 is not available in this build yet.").arg(nativeProviderName(kind));
 }
 
+bool envFlagEnabled(const char* name)
+{
+    const QByteArray value = qgetenv(name).trimmed().toLower();
+    return value == "1" || value == "true" || value == "yes" || value == "on";
+}
+
 bool experimentalMacFileProviderEnabled()
 {
-    const QByteArray value = qgetenv("MOONLIGHT_EXPERIMENTAL_MAC_FILE_PROVIDER").trimmed().toLower();
-    return value == "1" || value == "true" || value == "yes" || value == "on";
+    return envFlagEnabled("MOONLIGHT_EXPERIMENTAL_MAC_FILE_PROVIDER");
+}
+
+bool experimentalMacFuseEnabled()
+{
+    return envFlagEnabled("MOONLIGHT_EXPERIMENTAL_MACFUSE");
 }
 } // namespace
 
@@ -66,7 +76,9 @@ QList<MountProviderPtr> createDefaultMountProviders()
     if (experimentalMacFileProviderEnabled()) {
         providers.append(std::make_shared<MacFileProviderMountProvider>());
     }
-    providers.append(std::make_shared<MacFuseMountProvider>());
+    if (experimentalMacFuseEnabled()) {
+        providers.append(std::make_shared<MacFuseMountProvider>());
+    }
     providers.append(std::make_shared<MacOSFinderMirrorProvider>());
 #elif defined(Q_OS_WIN32) || defined(Q_OS_WIN)
     providers.append(std::make_shared<WindowsExplorerMirrorProvider>());
