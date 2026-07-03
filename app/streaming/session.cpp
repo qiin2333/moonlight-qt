@@ -45,6 +45,7 @@
 #include <QCoreApplication>
 #include <QDesktopServices>
 #include <QDir>
+#include <QFileInfo>
 #include <QThreadPool>
 #include <QRunnable>
 #include <QReadLocker>
@@ -163,6 +164,30 @@ QString appendFileMappingDiagnostic(const QString& event,
                                     const QString& sessionId = QString())
 {
     return FileMappingUx::appendDiagnostic(event, detail, hostUuid, sessionId);
+}
+
+bool isFileMappingPathInsideDirectory(const QString& path, const QString& directory)
+{
+    const QString target = QDir::cleanPath(QFileInfo(path).canonicalFilePath());
+    const QString base = QDir::cleanPath(QFileInfo(directory).canonicalFilePath());
+    if (target.isEmpty() || base.isEmpty()) {
+        return false;
+    }
+
+#if defined(Q_OS_WIN)
+    return target.compare(base, Qt::CaseInsensitive) == 0 ||
+           target.startsWith(base + QLatin1Char('/'), Qt::CaseInsensitive);
+#else
+    return target == base || target.startsWith(base + QLatin1Char('/'));
+#endif
+}
+
+bool isMoonlightGeneratedFileMappingMirrorPath(const QString& path)
+{
+    if (path.isEmpty() || QFileInfo(path).fileName() == QStringLiteral("Latest")) {
+        return false;
+    }
+    return isFileMappingPathInsideDirectory(path, FileMappingUx::diagnosticsDirectory());
 }
 
 class FileMappingSmokeTask : public QRunnable
@@ -2519,12 +2544,31 @@ void Session::cleanupFileMappingMount()
             m_Computer ? m_Computer->uuid : QString(),
             m_FileMappingSessionId);
     m_FileMappingMountState.reset();
-    if (!m_FileMappingMountPath.isEmpty()) {
+    const QString mountPath = m_FileMappingMountPath;
+    m_FileMappingMountPath.clear();
+    if (!mountPath.isEmpty()) {
+        const bool generatedMirrorPath = isMoonlightGeneratedFileMappingMirrorPath(mountPath);
 #if defined(Q_OS_MACOS)
-        QProcess::execute(QStringLiteral("/sbin/umount"), { m_FileMappingMountPath });
+        if (generatedMirrorPath) {
+            QProcess::execute(QStringLiteral("/sbin/umount"), { mountPath });
+        }
 #endif
-        QDir(m_FileMappingMountPath).removeRecursively();
-        m_FileMappingMountPath.clear();
+        if (generatedMirrorPath) {
+            const bool removed = QDir(mountPath).removeRecursively();
+            appendFileMappingDiagnostic(
+                    removed ? QStringLiteral("mount.cleanup.delete")
+                            : QStringLiteral("mount.cleanup.delete_failed"),
+                    QStringLiteral("mount_path=%1").arg(mountPath),
+                    m_Computer ? m_Computer->uuid : QString(),
+                    m_FileMappingSessionId);
+        }
+        else {
+            appendFileMappingDiagnostic(
+                    QStringLiteral("mount.cleanup.skip_delete"),
+                    QStringLiteral("mount_path=%1 reason=outside_moonlight_mirror").arg(mountPath),
+                    m_Computer ? m_Computer->uuid : QString(),
+                    m_FileMappingSessionId);
+        }
     }
 }
 

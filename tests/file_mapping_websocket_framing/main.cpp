@@ -1,6 +1,7 @@
 #include "streaming/filemappingwebsocket.h"
 
 #include <QCoreApplication>
+#include <QList>
 #include <QTextStream>
 
 namespace {
@@ -35,11 +36,11 @@ bool require(bool condition, const QString& message, QTextStream& err)
     return condition;
 }
 
-bool readMessage(QByteArray& buffer, QByteArray& out, QString& error)
+bool readMessage(QByteArray& buffer, QByteArray& out, QString& error, QList<QByteArray>* pongPayloads = nullptr)
 {
     FileMappingWebSocket::TextMessageReader reader;
     bool needMore = false;
-    error = reader.read(buffer, out, needMore);
+    error = reader.read(buffer, out, needMore, pongPayloads);
     return error.isEmpty() && !needMore;
 }
 } // namespace
@@ -69,8 +70,20 @@ int main(int argc, char* argv[])
     withPing += serverFrame(false, 0x1, R"({"type":)");
     withPing += serverFrame(true, 0x9, QByteArrayLiteral("ping"));
     withPing += serverFrame(true, 0x0, R"("result","id":1})");
-    ok &= require(readMessage(withPing, payload, error), QStringLiteral("ping interleaved read failed: %1").arg(error), err);
+    QList<QByteArray> pongPayloads;
+    ok &= require(readMessage(withPing, payload, error, &pongPayloads), QStringLiteral("ping interleaved read failed: %1").arg(error), err);
     ok &= require(payload == R"({"type":"result","id":1})", QStringLiteral("ping interleaved payload mismatch"), err);
+    ok &= require(pongPayloads == QList<QByteArray> { QByteArrayLiteral("ping") },
+                  QStringLiteral("ping payload was not surfaced for pong"),
+                  err);
+
+    QByteArray withPong;
+    withPong += serverFrame(true, 0xa, QByteArrayLiteral("pong"));
+    withPong += serverFrame(true, 0x1, R"({"type":"result","id":2})");
+    QList<QByteArray> pongControlPayloads;
+    ok &= require(readMessage(withPong, payload, error, &pongControlPayloads), QStringLiteral("pong control read failed: %1").arg(error), err);
+    ok &= require(payload == R"({"type":"result","id":2})", QStringLiteral("pong control payload mismatch"), err);
+    ok &= require(pongControlPayloads.isEmpty(), QStringLiteral("pong control frame requested a reply"), err);
 
     FileMappingWebSocket::TextMessageReader incrementalReader;
     QByteArray partial = serverFrame(false, 0x1, R"({"type":)");

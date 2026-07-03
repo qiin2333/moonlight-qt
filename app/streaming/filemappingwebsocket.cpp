@@ -16,6 +16,41 @@ bool waitForReadyBytes(QSslSocket& socket, QByteArray& buffer, int timeoutMs)
     buffer += socket.readAll();
     return true;
 }
+
+bool writeMaskedFrame(QSslSocket& socket, quint8 opcode, const QByteArray& payload)
+{
+    QByteArray frame;
+    frame.append(static_cast<char>(0x80 | opcode));
+    if (payload.size() < 126) {
+        frame.append(static_cast<char>(0x80 | payload.size()));
+    }
+    else if (payload.size() <= 0xffff) {
+        frame.append(static_cast<char>(0x80 | 126));
+        frame.append(static_cast<char>((payload.size() >> 8) & 0xff));
+        frame.append(static_cast<char>(payload.size() & 0xff));
+    }
+    else {
+        frame.append(static_cast<char>(0x80 | 127));
+        quint64 size = static_cast<quint64>(payload.size());
+        for (int shift = 56; shift >= 0; shift -= 8) {
+            frame.append(static_cast<char>((size >> shift) & 0xff));
+        }
+    }
+
+    QByteArray mask(4, Qt::Uninitialized);
+    quint32 maskValue = QRandomGenerator::global()->generate();
+    mask[0] = static_cast<char>((maskValue >> 24) & 0xff);
+    mask[1] = static_cast<char>((maskValue >> 16) & 0xff);
+    mask[2] = static_cast<char>((maskValue >> 8) & 0xff);
+    mask[3] = static_cast<char>(maskValue & 0xff);
+    frame.append(mask);
+
+    for (int i = 0; i < payload.size(); ++i) {
+        frame.append(static_cast<char>(static_cast<quint8>(payload[i]) ^ static_cast<quint8>(mask[i % 4])));
+    }
+
+    return socket.write(frame) == frame.size() && socket.waitForBytesWritten(3000);
+}
 } // namespace
 
 namespace FileMappingWebSocket {
@@ -93,7 +128,7 @@ QString takeFrame(QByteArray& buffer, Frame& frame, bool& needMore)
     return {};
 }
 
-QString TextMessageReader::read(QByteArray& buffer, QByteArray& out, bool& needMore)
+QString TextMessageReader::read(QByteArray& buffer, QByteArray& out, bool& needMore, QList<QByteArray>* pongPayloads)
 {
     out.clear();
     needMore = false;
@@ -115,6 +150,9 @@ QString TextMessageReader::read(QByteArray& buffer, QByteArray& out, bool& needM
         if (frame.opcode == 0x9 || frame.opcode == 0xa) {
             if (!frame.fin || frame.payload.size() > 125) {
                 return QObject::tr("Invalid WebSocket control frame");
+            }
+            if (frame.opcode == 0x9 && pongPayloads != nullptr) {
+                pongPayloads->append(frame.payload);
             }
             continue;
         }
@@ -150,9 +188,18 @@ QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, i
     QByteArray payload;
     for (;;) {
         bool needMore = false;
-        QString readError = reader.read(buffer, payload, needMore);
+        QList<QByteArray> pongPayloads;
+        QString readError = reader.read(buffer, payload, needMore, &pongPayloads);
         if (!readError.isEmpty()) {
             return readError;
+        }
+        for (const QByteArray& pongPayload : pongPayloads) {
+            if (!writePong(socket, pongPayload)) {
+                const QString socketError = socket.errorString();
+                return socketError.isEmpty()
+                        ? QObject::tr("Failed to write WebSocket pong")
+                        : socketError;
+            }
         }
         if (!needMore) {
             break;
@@ -173,37 +220,15 @@ QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, i
 
 bool writeText(QSslSocket& socket, const QByteArray& payload)
 {
-    QByteArray frame;
-    frame.append(static_cast<char>(0x81));
-    if (payload.size() < 126) {
-        frame.append(static_cast<char>(0x80 | payload.size()));
-    }
-    else if (payload.size() <= 0xffff) {
-        frame.append(static_cast<char>(0x80 | 126));
-        frame.append(static_cast<char>((payload.size() >> 8) & 0xff));
-        frame.append(static_cast<char>(payload.size() & 0xff));
-    }
-    else {
-        frame.append(static_cast<char>(0x80 | 127));
-        quint64 size = static_cast<quint64>(payload.size());
-        for (int shift = 56; shift >= 0; shift -= 8) {
-            frame.append(static_cast<char>((size >> shift) & 0xff));
-        }
-    }
+    return writeMaskedFrame(socket, 0x1, payload);
+}
 
-    QByteArray mask(4, Qt::Uninitialized);
-    quint32 maskValue = QRandomGenerator::global()->generate();
-    mask[0] = static_cast<char>((maskValue >> 24) & 0xff);
-    mask[1] = static_cast<char>((maskValue >> 16) & 0xff);
-    mask[2] = static_cast<char>((maskValue >> 8) & 0xff);
-    mask[3] = static_cast<char>(maskValue & 0xff);
-    frame.append(mask);
-
-    for (int i = 0; i < payload.size(); ++i) {
-        frame.append(static_cast<char>(static_cast<quint8>(payload[i]) ^ static_cast<quint8>(mask[i % 4])));
+bool writePong(QSslSocket& socket, const QByteArray& payload)
+{
+    if (payload.size() > 125) {
+        return false;
     }
-
-    return socket.write(frame) == frame.size() && socket.waitForBytesWritten(3000);
+    return writeMaskedFrame(socket, 0xa, payload);
 }
 
 } // namespace FileMappingWebSocket

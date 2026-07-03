@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QJsonObject>
+#include <QList>
 #include <QSslSocket>
 #include <QString>
 
@@ -18,7 +19,7 @@ struct Frame {
 class TextMessageReader
 {
 public:
-    QString read(QByteArray& buffer, QByteArray& out, bool& needMore);
+    QString read(QByteArray& buffer, QByteArray& out, bool& needMore, QList<QByteArray>* pongPayloads = nullptr);
 
 private:
     QByteArray m_Payload;
@@ -28,5 +29,6 @@ private:
 QString takeFrame(QByteArray& buffer, Frame& frame, bool& needMore);
 QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, int timeoutMs);
 bool writeText(QSslSocket& socket, const QByteArray& payload);
+bool writePong(QSslSocket& socket, const QByteArray& payload);
 
 } // namespace FileMappingWebSocket
