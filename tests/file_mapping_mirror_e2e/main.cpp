@@ -10,6 +10,8 @@
 #include <QHash>
 #include <QTextStream>
 
+#include <utility>
+
 using namespace FileMapping;
 
 namespace {
@@ -113,6 +115,74 @@ private:
     quint64 m_NextHandleId = 0;
 };
 
+class CountingMountProvider : public MountProvider
+{
+public:
+    CountingMountProvider(QString name, bool succeeds)
+        : m_Name(std::move(name)),
+          m_Succeeds(succeeds)
+    {
+    }
+
+    MountProviderKind kind() const override
+    {
+        return MountProviderKind::Fallback;
+    }
+
+    QString displayName() const override
+    {
+        return m_Name;
+    }
+
+    MountStatus status(const MountId& id) override
+    {
+        MountStatus status;
+        status.state = id.value == m_Id.value ? MountState::Mounted : MountState::Unmounted;
+        status.displayPath = status.state == MountState::Mounted ? QStringLiteral("/native") : QString();
+        return status;
+    }
+
+    MountResult mount(const MountRequest&) override
+    {
+        ++m_MountCalls;
+
+        MountResult result;
+        if (!m_Succeeds) {
+            result.error = MountError::make(ErrorKind::Unsupported, QStringLiteral("fake provider unavailable"));
+            result.status.state = MountState::Unavailable;
+            result.status.message = result.error.message;
+            return result;
+        }
+
+        m_Id.value = m_Name;
+        result.id = m_Id;
+        result.status.state = MountState::Mounted;
+        result.status.displayPath = QStringLiteral("/native");
+        result.status.message = QStringLiteral("fake native mount");
+        return result;
+    }
+
+    MountError reveal(const MountId&) override
+    {
+        return MountError::none();
+    }
+
+    void unmount(const MountId&) override
+    {
+    }
+
+    int mountCalls() const
+    {
+        return m_MountCalls;
+    }
+
+private:
+    QString m_Name;
+    bool m_Succeeds;
+    int m_MountCalls = 0;
+    MountId m_Id;
+};
+
 bool readAll(const QString& path, QByteArray& out)
 {
     QFile file(path);
@@ -129,6 +199,22 @@ bool require(bool condition, const QString& message, QTextStream& err)
         err << "FAIL: " << message << '\n';
     }
     return condition;
+}
+
+bool verifyCoordinatorStopsAfterNativeMount(const MountRequest& request, QTextStream& err)
+{
+    auto nativeProvider = std::make_shared<CountingMountProvider>(QStringLiteral("native Finder provider"), true);
+    auto fallbackProvider = std::make_shared<CountingMountProvider>(QStringLiteral("macFUSE fallback provider"), true);
+
+    MountCoordinator coordinator({ nativeProvider, fallbackProvider });
+    const MountResult result = coordinator.ensureMounted(request);
+
+    bool ok = true;
+    ok &= require(result.ok(), QStringLiteral("native provider did not mount: %1").arg(result.error.message), err);
+    ok &= require(result.providerName == nativeProvider->displayName(), QStringLiteral("native provider was not selected"), err);
+    ok &= require(nativeProvider->mountCalls() == 1, QStringLiteral("native provider was not called exactly once"), err);
+    ok &= require(fallbackProvider->mountCalls() == 0, QStringLiteral("fallback provider was called after native mount succeeded"), err);
+    return ok;
 }
 } // namespace
 
@@ -151,6 +237,10 @@ int main(int argc, char* argv[])
     request.hostName = QStringLiteral("Fake Host");
     request.sessionId = QStringLiteral("e2e-session");
     request.vfs = vfs;
+
+    if (!verifyCoordinatorStopsAfterNativeMount(request, err)) {
+        return 1;
+    }
 
 #if defined(Q_OS_WIN32) || defined(Q_OS_WIN)
     auto provider = std::make_shared<WindowsExplorerMirrorProvider>();
