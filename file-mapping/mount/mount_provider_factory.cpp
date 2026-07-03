@@ -6,6 +6,7 @@
 #include "unavailable_mount_provider.h"
 #include "windows_explorer_mirror_provider.h"
 
+#include <QByteArray>
 #include <QtGlobal>
 
 #include <memory>
@@ -35,6 +36,12 @@ QString nativeUnavailableMessage(MountProviderKind kind)
 {
     return QStringLiteral("%1 is not available in this build yet.").arg(nativeProviderName(kind));
 }
+
+bool experimentalMacFileProviderEnabled()
+{
+    const QByteArray value = qgetenv("MOONLIGHT_EXPERIMENTAL_MAC_FILE_PROVIDER").trimmed().toLower();
+    return value == "1" || value == "true" || value == "yes" || value == "on";
+}
 } // namespace
 
 MountProviderKind platformNativeMountProviderKind()
@@ -56,7 +63,9 @@ QList<MountProviderPtr> createDefaultMountProviders()
 {
     QList<MountProviderPtr> providers;
 #if defined(Q_OS_MACOS)
-    providers.append(std::make_shared<MacFileProviderMountProvider>());
+    if (experimentalMacFileProviderEnabled()) {
+        providers.append(std::make_shared<MacFileProviderMountProvider>());
+    }
     providers.append(std::make_shared<MacFuseMountProvider>());
     providers.append(std::make_shared<MacOSFinderMirrorProvider>());
 #elif defined(Q_OS_WIN32) || defined(Q_OS_WIN)
