@@ -80,22 +80,14 @@ public:
         }
 
         if (!device.isFormatSupported(fmt)) {
-            qWarning() << "[MicStream] Requested audio format not supported by default device, attempting fallbacks";
-            QAudioFormat fmt2 = fmt;
-            fmt2.setSampleRate(44100);
-            if (device.isFormatSupported(fmt2)) {
-                fmt = fmt2;
-                qInfo() << "[MicStream] Falling back to 44100 Hz";
-            } else {
-                QAudioFormat fmt3 = fmt;
-                fmt3.setChannelCount(2);
-                if (device.isFormatSupported(fmt3)) {
-                    fmt = fmt3;
-                    qInfo() << "[MicStream] Falling back to stereo 48000";
-                } else {
-                    qWarning() << "[MicStream] No compatible fallback format found; will still attempt start and log errors";
-                }
-            }
+            const QAudioFormat preferredFormat = device.preferredFormat();
+            qWarning() << "[MicStream] Default audio input does not support required format: 48000 Hz mono Int16"
+                       << "device=" << device.description()
+                       << "preferred=" << preferredFormat.sampleRate() << "Hz"
+                       << preferredFormat.channelCount() << "channels"
+                       << "sampleFormat=" << preferredFormat.sampleFormat();
+            cleanupAudioResources();
+            return false;
         }
 
         qInfo() << "[MicStream] Using audio input device:" << device.description()
