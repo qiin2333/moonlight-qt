@@ -12,7 +12,7 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
 
     if (m_NativeTouchpadTransport == NTT_UNKNOWN) {
         uint32_t hostFeatures = LiGetHostFeatureFlags();
-        if (hostFeatures & LI_FF_TOUCHPAD_FRAME_EVENTS) {
+        if (hostFeatures & (LI_FF_TOUCHPAD_FRAME_EVENTS | LI_FF_TOUCHPAD_EVENTS)) {
             m_NativeTouchpadTransport = NTT_FRAME;
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "Native touchpad (id: %llu) transport selected: frame (hostFeatures=0x%08x)",
@@ -108,15 +108,24 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
     else {
         m_ActiveTouchpadContacts.insert(event->fingerId, contact);
     }
-    if (hadMultipleContacts || m_ActiveTouchpadContacts.size() >= 2) {
+    const bool isMultiContactFrame = hadMultipleContacts || m_ActiveTouchpadContacts.size() >= 2;
+    if (isMultiContactFrame) {
         m_LastTouchpadScrollTimestamp = event->timestamp;
     }
     if (m_ActiveTouchpadContacts.isEmpty() && m_IgnoredTouchpadContacts.isEmpty()) {
         m_ActiveTouchpadId = 0;
     }
 
-    // SDL reports each contact separately, even when multiple contacts belong
-    // to the same touchpad frame. Queue a single event behind the current batch.
+    // A single-contact frame can be sent immediately for the lowest possible
+    // pointer latency. SDL reports contacts separately for multi-contact
+    // frames, so defer those until the current event batch has been collected.
+    if (!isMultiContactFrame) {
+        sendPendingTouchpadFrame();
+        return;
+    }
+
+    // Queue a single event behind the current batch to collect the remaining
+    // contacts that belong to this multi-contact frame.
     if (!m_TouchpadFlushEventQueued) {
         if (Session::queueTouchpadFrameFlush()) {
             m_TouchpadFlushEventQueued = true;
@@ -239,20 +248,11 @@ void SdlInputHandler::cancelNativeTouchpadContacts()
 {
     sendPendingTouchpadFrame();
 
-    NativeTouchpadContact contacts[MAX_TOUCHPAD_FRAME_CONTACTS];
-    int contactCount = 0;
-    for (auto it = m_ActiveTouchpadContacts.cbegin();
-         it != m_ActiveTouchpadContacts.cend(); ++it) {
-        NativeTouchpadContact contact = it.value();
-        contact.eventType = LI_TOUCH_EVENT_CANCEL;
-        contacts[contactCount++] = contact;
-        if (contactCount == MAX_TOUCHPAD_FRAME_CONTACTS) {
-            sendNativeTouchpadContacts(contacts, contactCount);
-            contactCount = 0;
-        }
-    }
-    if (contactCount > 0) {
-        sendNativeTouchpadContacts(contacts, contactCount);
+    if (!m_ActiveTouchpadContacts.isEmpty()) {
+        const NativeTouchpadContact cancelAll = {
+            LI_TOUCH_EVENT_CANCEL_ALL, 0, 0.0f, 0.0f, 0.0f,
+        };
+        sendNativeTouchpadContacts(&cancelAll, 1);
     }
 
     m_ActiveTouchpadContacts.clear();

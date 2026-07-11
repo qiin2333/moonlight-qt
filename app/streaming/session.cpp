@@ -883,11 +883,9 @@ bool Session::initialize(QQuickWindow* qtWindow)
 
     // SDL reads this hint when the video subsystem initializes. Configure it for
     // each session so preference changes take effect on the next stream without
-    // restarting Moonlight. When disabled, trackpads remain on the native pointer
-    // path, preserving system gestures and pointer acceleration.
+    // restarting Moonlight. This hint makes sens only on macOS currently.
     bool nativeTouchpadEnabled = m_Preferences->enableNativeTouchpad;
     SDL_SetHint(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, nativeTouchpadEnabled ? "1" : "0");
-    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, nativeTouchpadEnabled ? "0" : "1");
 
 #ifdef Q_OS_DARWIN
     if (qEnvironmentVariableIntValue("I_WANT_BUGGY_FULLSCREEN") == 0) {
