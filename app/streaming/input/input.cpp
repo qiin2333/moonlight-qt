@@ -5,6 +5,10 @@
 #include "path.h"
 #include "utils.h"
 
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+#include "wintouchpad.h"
+#endif
+
 #include <QtGlobal>
 #include <QDir>
 #include <QGuiApplication>
@@ -48,6 +52,13 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_PendingTouchpadContactCount(0),
       m_ActiveTouchpadId(0),
       m_LastTouchpadScrollTimestamp(0),
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+      m_ActiveWindowsTouchpadDevice(0),
+      m_LastWindowsTouchpadFrameTicks(0),
+      m_SuppressedWindowsTouchpadMouseButtons(0),
+      m_WindowsTouchpadButtonDown(false),
+      m_WindowsTouchpadButtonUsesMouseFallback(false),
+#endif
       m_LeftButtonReleaseTimer(0),
       m_RightButtonReleaseTimer(0),
       m_DragTimer(0),
@@ -224,6 +235,11 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
 
 SdlInputHandler::~SdlInputHandler()
 {
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    m_WindowsTouchpadInput.reset();
+#endif
+    cancelNativeTouchpadContacts();
+
     for (int i = 0; i < MAX_GAMEPADS; i++) {
         if (m_GamepadState[i].mouseEmulationTimer != 0) {
             Session::get()->notifyMouseEmulationMode(false);
@@ -274,6 +290,15 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    if (m_NativeTouchpadEnabled && !m_WindowsTouchpadInput) {
+        auto windowsTouchpadInput = std::make_unique<WindowsTouchpadInput>(this);
+        if (windowsTouchpadInput->initialize(window)) {
+            m_WindowsTouchpadInput = std::move(windowsTouchpadInput);
+        }
+    }
+#endif
 
 #ifdef Q_OS_WIN32
     SDL_SysWMinfo info;
@@ -512,8 +537,6 @@ void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
     else if (deviceType == SDL_TOUCH_DEVICE_INDIRECT_RELATIVE && m_NativeTouchpadEnabled) {
         // Relative indirect devices don't provide physical surface coordinates,
         // so they cannot be represented by the native touchpad protocol.
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-            "Native touchpad input is relative; using software pointer fallback");
         handleRelativeFingerEvent(event);
         return;
     }

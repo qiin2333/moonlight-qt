@@ -12,6 +12,12 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
         // Ignore synthetic mouse events
         return;
     }
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    else if (shouldSuppressWindowsTouchpadMouseButtonEvent(event)) {
+        // The click state is carried by the native touchpad frame.
+        return;
+    }
+#endif
     else if (!isCaptureActive()) {
         if (event->button == SDL_BUTTON_LEFT && event->state == SDL_RELEASED &&
                 isMouseInVideoRegion(event->x, event->y)) {
@@ -78,6 +84,13 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
         // Ignore synthetic mouse events
         return;
     }
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    else if (shouldSuppressWindowsTouchpadMouseEvent(event->which)) {
+        // The same Windows Precision Touchpad input is being sent through the
+        // native touchpad protocol. Drop the system-promoted pointer motion.
+        return;
+    }
+#endif
 
     // Batch all pending mouse motion events to save CPU time
     Sint32 x = event->x, y = event->y, xrel = event->xrel, yrel = event->yrel;
@@ -85,13 +98,19 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
     while (SDL_PeepEvents(&nextEvent, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0) {
         event = &nextEvent.motion;
 
-        // Ignore synthetic mouse events
-        if (event->which != SDL_TOUCH_MOUSEID) {
-            x = event->x;
-            y = event->y;
-            xrel += event->xrel;
-            yrel += event->yrel;
+        if (event->which == SDL_TOUCH_MOUSEID) {
+            continue;
         }
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+        if (shouldSuppressWindowsTouchpadMouseEvent(event->which)) {
+            continue;
+        }
+#endif
+
+        x = event->x;
+        y = event->y;
+        xrel += event->xrel;
+        yrel += event->yrel;
     }
 
     // We should not reference the original event anymore
@@ -178,6 +197,12 @@ void SdlInputHandler::handleMouseWheelEvent(SDL_MouseWheelEvent* event)
         m_LastTouchpadScrollTimestamp = event->timestamp;
         return;
     }
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    else if (shouldSuppressWindowsTouchpadMouseEvent(event->which)) {
+        // Native touchpad frames replace Windows' promoted scroll gestures.
+        return;
+    }
+#endif
 
     if (m_AbsoluteMouseMode) {
         int mouseX, mouseY;

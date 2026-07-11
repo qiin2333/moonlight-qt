@@ -170,6 +170,11 @@ win32 {
     CONFIG += ffmpeg libplacebo
 }
 win32:!winrt {
+    DEFINES += HAVE_WINDOWS_RAW_TOUCHPAD
+    LIBS += -lhid
+    SOURCES += streaming/input/wintouchpad.cpp
+    HEADERS += streaming/input/wintouchpad.h
+
     CONFIG += discord-rpc
 }
 macx {

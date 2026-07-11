@@ -3,6 +3,33 @@
 #include <Limelight.h>
 #include "streaming/session.h"
 
+void SdlInputHandler::selectNativeTouchpadTransport()
+{
+    if (m_NativeTouchpadTransport != NTT_UNKNOWN) {
+        return;
+    }
+
+    uint32_t hostFeatures = LiGetHostFeatureFlags();
+    if (hostFeatures & LI_FF_TOUCHPAD_FRAME_EVENTS) {
+        m_NativeTouchpadTransport = NTT_FRAME;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Native touchpad transport selected: frame (hostFeatures=0x%08x)",
+                    hostFeatures);
+    }
+    else if (hostFeatures & LI_FF_TOUCHPAD_EVENTS) {
+        m_NativeTouchpadTransport = NTT_INDIVIDUAL;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Native touchpad transport selected: individual (hostFeatures=0x%08x)",
+                    hostFeatures);
+    }
+    else {
+        m_NativeTouchpadTransport = NTT_SOFTWARE_POINTER;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Native touchpad transport selected: software-pointer (hostFeatures=0x%08x)",
+                    hostFeatures);
+    }
+}
+
 void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
 {
     if (!isCaptureActive()) {
@@ -10,31 +37,9 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
         return;
     }
 
-    if (m_NativeTouchpadTransport == NTT_UNKNOWN) {
-        uint32_t hostFeatures = LiGetHostFeatureFlags();
-        if (hostFeatures & (LI_FF_TOUCHPAD_FRAME_EVENTS | LI_FF_TOUCHPAD_EVENTS)) {
-            m_NativeTouchpadTransport = NTT_FRAME;
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Native touchpad (id: %llu) transport selected: frame (hostFeatures=0x%08x)",
-                        event->touchId, hostFeatures);
-        }
-        else if (hostFeatures & LI_FF_TOUCHPAD_EVENTS) {
-            m_NativeTouchpadTransport = NTT_INDIVIDUAL;
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Native touchpad (id: %llu) transport selected: individual (hostFeatures=0x%08x)",
-                        event->touchId, hostFeatures);
-        }
-        else {
-            m_NativeTouchpadTransport = NTT_SOFTWARE_POINTER;
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Native touchpad (id: %llu) transport selected: software-pointer (hostFeatures=0x%08x)",
-                        event->touchId, hostFeatures);
-        }
-    }
+    selectNativeTouchpadTransport();
 
     if (m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Native touchpad input is unavailable; using software pointer fallback");
         handleRelativeFingerEvent(event);
         return;
     }
@@ -139,8 +144,14 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
 }
 
 void SdlInputHandler::sendNativeTouchpadContacts(const NativeTouchpadContact* contacts,
-                                                  int contactCount)
+                                                 int contactCount,
+                                                 bool transitionToSoftwarePointer,
+                                                 uint8_t buttonState)
 {
+    if (contactCount <= 0) {
+        return;
+    }
+
     uint8_t eventTypes[MAX_TOUCHPAD_FRAME_CONTACTS];
     uint32_t pointerIds[MAX_TOUCHPAD_FRAME_CONTACTS];
     float x[MAX_TOUCHPAD_FRAME_CONTACTS];
@@ -158,7 +169,7 @@ void SdlInputHandler::sendNativeTouchpadContacts(const NativeTouchpadContact* co
     if (m_NativeTouchpadTransport == NTT_FRAME) {
         int rc = LiSendTouchpadFrameEvent(static_cast<uint8_t>(contactCount),
                                           eventTypes, pointerIds, x, y, pressure,
-                                          LI_ROT_UNKNOWN, 0, 0, 0);
+                                          LI_ROT_UNKNOWN, 0, 0, buttonState);
         if (rc == LI_ERR_UNSUPPORTED) {
             if (LiGetHostFeatureFlags() & LI_FF_TOUCHPAD_EVENTS) {
                 m_NativeTouchpadTransport = NTT_INDIVIDUAL;
@@ -169,7 +180,9 @@ void SdlInputHandler::sendNativeTouchpadContacts(const NativeTouchpadContact* co
                 m_NativeTouchpadTransport = NTT_SOFTWARE_POINTER;
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "Native touchpad transport downgraded: frame -> software-pointer");
-                transitionNativeTouchpadToSoftwarePointer();
+                if (transitionToSoftwarePointer) {
+                    transitionNativeTouchpadToSoftwarePointer();
+                }
                 return;
             }
         }
@@ -185,12 +198,14 @@ void SdlInputHandler::sendNativeTouchpadContacts(const NativeTouchpadContact* co
     if (m_NativeTouchpadTransport == NTT_INDIVIDUAL) {
         for (int i = 0; i < contactCount; i++) {
             int rc = LiSendTouchpadEvent(eventTypes[i], pointerIds[i], x[i], y[i], pressure[i],
-                                         0.0f, 0.0f, LI_ROT_UNKNOWN, 0, 0, 0);
+                                         0.0f, 0.0f, LI_ROT_UNKNOWN, 0, 0, buttonState);
             if (rc == LI_ERR_UNSUPPORTED) {
                 m_NativeTouchpadTransport = NTT_SOFTWARE_POINTER;
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "Native touchpad transport downgraded: individual -> software-pointer");
-                transitionNativeTouchpadToSoftwarePointer();
+                if (transitionToSoftwarePointer) {
+                    transitionNativeTouchpadToSoftwarePointer();
+                }
                 return;
             }
             else if (rc != 0) {
@@ -200,6 +215,246 @@ void SdlInputHandler::sendNativeTouchpadContacts(const NativeTouchpadContact* co
         }
     }
 }
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+void SdlInputHandler::handleWindowsTouchpadFrame(uint64_t deviceId,
+                                                 const uint32_t* pointerIds,
+                                                 const float* x, const float* y,
+                                                 const float* pressure,
+                                                 const uint8_t* touching,
+                                                 int contactCount,
+                                                 bool hasContactFrame,
+                                                 bool buttonDown)
+{
+    if (!isCaptureActive() || m_AbsoluteMouseMode) {
+        cancelWindowsTouchpadContacts();
+        return;
+    }
+
+    selectNativeTouchpadTransport();
+    if ((!m_ActiveWindowsTouchpadContacts.isEmpty() || m_WindowsTouchpadButtonDown ||
+         m_WindowsTouchpadButtonUsesMouseFallback) &&
+            m_ActiveWindowsTouchpadDevice != deviceId) {
+        cancelWindowsTouchpadContacts();
+    }
+
+    if (m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER) {
+        m_ActiveWindowsTouchpadContacts.clear();
+        m_LastWindowsTouchpadFrameTicks = 0;
+        if (m_WindowsTouchpadButtonUsesMouseFallback && !buttonDown) {
+            sendWindowsTouchpadMouseButton(false);
+            m_WindowsTouchpadButtonUsesMouseFallback = false;
+        }
+        m_ActiveWindowsTouchpadDevice = m_WindowsTouchpadButtonUsesMouseFallback ? deviceId : 0;
+        m_WindowsTouchpadButtonDown = m_WindowsTouchpadButtonUsesMouseFallback && buttonDown;
+        return;
+    }
+
+    m_ActiveWindowsTouchpadDevice = deviceId;
+    m_LastWindowsTouchpadFrameTicks = SDL_GetTicks();
+    if (m_LastWindowsTouchpadFrameTicks == 0) {
+        m_LastWindowsTouchpadFrameTicks = 1;
+    }
+
+    bool hasCurrentContact = false;
+    if (hasContactFrame) {
+        for (int i = 0; i < contactCount && i < MAX_TOUCHPAD_FRAME_CONTACTS; i++) {
+            if (touching[i]) {
+                hasCurrentContact = true;
+                break;
+            }
+        }
+    }
+
+    const bool buttonChanged = buttonDown != m_WindowsTouchpadButtonDown;
+    bool mouseFallbackTransition = false;
+    if (m_WindowsTouchpadButtonUsesMouseFallback && !buttonDown) {
+        sendWindowsTouchpadMouseButton(false);
+        m_WindowsTouchpadButtonUsesMouseFallback = false;
+        mouseFallbackTransition = true;
+    }
+    else if (!m_WindowsTouchpadButtonUsesMouseFallback && buttonDown &&
+             !(hasContactFrame ? hasCurrentContact :
+                                 !m_ActiveWindowsTouchpadContacts.isEmpty())) {
+        // Button 1 may be reported with no capacitive contact. Preserve those
+        // presses through the mouse protocol because Sunshine has no pointer
+        // slot to carry a native button state in that case.
+        sendWindowsTouchpadMouseButton(true);
+        m_WindowsTouchpadButtonUsesMouseFallback = true;
+        mouseFallbackTransition = true;
+    }
+
+    const uint8_t buttonState = buttonDown && !m_WindowsTouchpadButtonUsesMouseFallback ?
+            LI_TOUCHPAD_BUTTON_PRIMARY : 0;
+    if (!hasContactFrame) {
+        if (buttonChanged && !mouseFallbackTransition) {
+            NativeTouchpadContact changes[MAX_TOUCHPAD_FRAME_CONTACTS];
+            int changeCount = 0;
+            for (auto it = m_ActiveWindowsTouchpadContacts.cbegin();
+                 it != m_ActiveWindowsTouchpadContacts.cend(); ++it) {
+                NativeTouchpadContact contact = it.value();
+                contact.eventType = LI_TOUCH_EVENT_MOVE;
+                changes[changeCount++] = contact;
+            }
+            sendNativeTouchpadContacts(changes, changeCount, false, buttonState);
+        }
+        m_WindowsTouchpadButtonDown = buttonDown;
+        if (m_ActiveWindowsTouchpadContacts.isEmpty() && !buttonDown) {
+            m_ActiveWindowsTouchpadDevice = 0;
+        }
+        return;
+    }
+
+    QHash<uint32_t, NativeTouchpadContact> currentContacts;
+    NativeTouchpadContact currentChanges[MAX_TOUCHPAD_FRAME_CONTACTS];
+    int currentChangeCount = 0;
+    NativeTouchpadContact changes[MAX_TOUCHPAD_FRAME_CONTACTS];
+    int changeCount = 0;
+
+    auto flushChanges = [&]() {
+        if (changeCount > 0) {
+            sendNativeTouchpadContacts(changes, changeCount, false, buttonState);
+            changeCount = 0;
+        }
+    };
+
+    for (int i = 0; i < contactCount && i < MAX_TOUCHPAD_FRAME_CONTACTS; i++) {
+        if (!touching[i]) {
+            continue;
+        }
+
+        NativeTouchpadContact contact = {
+            static_cast<uint8_t>(m_ActiveWindowsTouchpadContacts.contains(pointerIds[i]) ?
+                                 LI_TOUCH_EVENT_MOVE : LI_TOUCH_EVENT_DOWN),
+            pointerIds[i],
+            SDL_clamp(x[i], 0.0f, 1.0f),
+            SDL_clamp(y[i], 0.0f, 1.0f),
+            SDL_clamp(pressure[i], 0.0f, 1.0f),
+        };
+        currentContacts.insert(contact.pointerId, contact);
+        currentChanges[currentChangeCount++] = contact;
+    }
+
+    // Release old pointer IDs before sending new Down events. This ensures the
+    // host has a free slot when a full five-contact frame replaces a contact.
+    for (auto it = m_ActiveWindowsTouchpadContacts.cbegin();
+         it != m_ActiveWindowsTouchpadContacts.cend(); ++it) {
+        if (currentContacts.contains(it.key())) {
+            continue;
+        }
+
+        NativeTouchpadContact contact = it.value();
+        contact.eventType = LI_TOUCH_EVENT_UP;
+        changes[changeCount++] = contact;
+        if (changeCount == MAX_TOUCHPAD_FRAME_CONTACTS) {
+            flushChanges();
+        }
+    }
+    flushChanges();
+
+    for (int i = 0; i < currentChangeCount; i++) {
+        changes[changeCount++] = currentChanges[i];
+        if (changeCount == MAX_TOUCHPAD_FRAME_CONTACTS) {
+            flushChanges();
+        }
+    }
+    flushChanges();
+
+    m_ActiveWindowsTouchpadContacts = currentContacts;
+    m_WindowsTouchpadButtonDown = buttonDown;
+    if (currentContacts.isEmpty() && !buttonDown) {
+        m_ActiveWindowsTouchpadDevice = 0;
+    }
+}
+
+void SdlInputHandler::cancelWindowsTouchpadContacts(uint64_t deviceId)
+{
+    if (deviceId != 0 && deviceId != m_ActiveWindowsTouchpadDevice) {
+        return;
+    }
+
+    NativeTouchpadContact contacts[MAX_TOUCHPAD_FRAME_CONTACTS];
+    int contactCount = 0;
+    for (auto it = m_ActiveWindowsTouchpadContacts.cbegin();
+         it != m_ActiveWindowsTouchpadContacts.cend(); ++it) {
+        NativeTouchpadContact contact = it.value();
+        contact.eventType = LI_TOUCH_EVENT_CANCEL;
+        contacts[contactCount++] = contact;
+    }
+    if (contactCount > 0) {
+        sendNativeTouchpadContacts(contacts, contactCount, false, 0);
+    }
+    if (m_WindowsTouchpadButtonUsesMouseFallback) {
+        sendWindowsTouchpadMouseButton(false);
+        m_WindowsTouchpadButtonUsesMouseFallback = false;
+    }
+
+    m_ActiveWindowsTouchpadContacts.clear();
+    m_ActiveWindowsTouchpadDevice = 0;
+    m_LastWindowsTouchpadFrameTicks = 0;
+    m_WindowsTouchpadButtonDown = false;
+}
+
+void SdlInputHandler::sendWindowsTouchpadMouseButton(bool down)
+{
+    const int button = m_SwapMouseButtons ? BUTTON_RIGHT : BUTTON_LEFT;
+    LiSendMouseButtonEvent(down ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, button);
+}
+
+bool SdlInputHandler::shouldSuppressWindowsTouchpadMouseEvent(Uint32 mouseId)
+{
+    if (m_LastWindowsTouchpadFrameTicks == 0 ||
+            m_NativeTouchpadTransport == NTT_UNKNOWN ||
+            m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER ||
+            m_AbsoluteMouseMode) {
+        return false;
+    }
+
+    constexpr Uint32 SDL3_GLOBAL_MOUSE_ID = 0;
+    if (mouseId != SDL3_GLOBAL_MOUSE_ID) {
+        return false;
+    }
+
+    const Uint32 frameAge = SDL_GetTicks() - m_LastWindowsTouchpadFrameTicks;
+
+    // Windows promotes touchpad gestures through SDL's global mouse device.
+    // Bound suppression to recent Raw Input so a missing final HID report
+    // cannot permanently disable legacy mouse input.
+    return frameAge <= TOUCHPAD_SCROLL_SUPPRESSION_TIMEOUT_MS;
+}
+
+bool SdlInputHandler::shouldSuppressWindowsTouchpadMouseButtonEvent(
+        const SDL_MouseButtonEvent* event)
+{
+    constexpr Uint32 SDL3_GLOBAL_MOUSE_ID = 0;
+    if (event->which != SDL3_GLOBAL_MOUSE_ID ||
+            event->button < SDL_BUTTON_LEFT || event->button > SDL_BUTTON_X2) {
+        return false;
+    }
+
+    const Uint32 buttonMask = SDL_BUTTON(event->button);
+    if (event->state == SDL_RELEASED) {
+        if (m_SuppressedWindowsTouchpadMouseButtons & buttonMask) {
+            m_SuppressedWindowsTouchpadMouseButtons &= ~buttonMask;
+            return true;
+        }
+        return false;
+    }
+
+    if (event->state == SDL_PRESSED) {
+        m_SuppressedWindowsTouchpadMouseButtons &= ~buttonMask;
+        if (isCaptureActive() &&
+                ((m_WindowsTouchpadButtonUsesMouseFallback &&
+                  event->button == SDL_BUTTON_LEFT) ||
+                 shouldSuppressWindowsTouchpadMouseEvent(event->which))) {
+            m_SuppressedWindowsTouchpadMouseButtons |= buttonMask;
+            return true;
+        }
+    }
+
+    return false;
+}
+#endif
 
 void SdlInputHandler::transitionNativeTouchpadToSoftwarePointer()
 {
@@ -258,4 +513,8 @@ void SdlInputHandler::cancelNativeTouchpadContacts()
     m_ActiveTouchpadContacts.clear();
     m_IgnoredTouchpadContacts.clear();
     m_ActiveTouchpadId = 0;
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    cancelWindowsTouchpadContacts();
+#endif
 }

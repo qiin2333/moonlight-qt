@@ -8,6 +8,12 @@
 #include <QHash>
 #include <QSet>
 
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+#include <memory>
+
+class WindowsTouchpadInput;
+#endif
+
 struct GamepadState {
     SDL_GameController* controller;
     SDL_JoystickID jsId;
@@ -216,6 +222,8 @@ private:
 
     void cancelNativeTouchpadContacts();
 
+    void selectNativeTouchpadTransport();
+
     void transitionNativeTouchpadToSoftwarePointer();
 
     struct NativeTouchpadContact {
@@ -226,7 +234,27 @@ private:
         float pressure;
     };
 
-    void sendNativeTouchpadContacts(const NativeTouchpadContact* contacts, int contactCount);
+    void sendNativeTouchpadContacts(const NativeTouchpadContact* contacts, int contactCount,
+                                    bool transitionToSoftwarePointer = true,
+                                    uint8_t buttonState = 0);
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    void handleWindowsTouchpadFrame(uint64_t deviceId,
+                                    const uint32_t* pointerIds,
+                                    const float* x, const float* y, const float* pressure,
+                                    const uint8_t* touching,
+                                    int contactCount, bool hasContactFrame,
+                                    bool buttonDown);
+
+    void cancelWindowsTouchpadContacts(uint64_t deviceId = 0);
+
+    void sendWindowsTouchpadMouseButton(bool down);
+
+    bool shouldSuppressWindowsTouchpadMouseEvent(Uint32 mouseId);
+    bool shouldSuppressWindowsTouchpadMouseButtonEvent(const SDL_MouseButtonEvent* event);
+
+    friend class WindowsTouchpadInput;
+#endif
 
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
@@ -302,6 +330,16 @@ private:
     QHash<SDL_FingerID, NativeTouchpadContact> m_ActiveTouchpadContacts;
     QSet<SDL_FingerID> m_IgnoredTouchpadContacts;
     Uint32 m_LastTouchpadScrollTimestamp;
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    QHash<uint32_t, NativeTouchpadContact> m_ActiveWindowsTouchpadContacts;
+    uint64_t m_ActiveWindowsTouchpadDevice;
+    Uint32 m_LastWindowsTouchpadFrameTicks;
+    Uint32 m_SuppressedWindowsTouchpadMouseButtons;
+    bool m_WindowsTouchpadButtonDown;
+    bool m_WindowsTouchpadButtonUsesMouseFallback;
+    std::unique_ptr<WindowsTouchpadInput> m_WindowsTouchpadInput;
+#endif
 
     SDL_TouchFingerEvent m_TouchDownEvent[MAX_FINGERS];
     SDL_TimerID m_LeftButtonReleaseTimer;
