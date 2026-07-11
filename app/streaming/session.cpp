@@ -38,6 +38,7 @@
 #define SDL_CODE_GAMECONTROLLER_SET_MOTION_EVENT_STATE 103
 #define SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED 104
 #define SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS 105
+#define SDL_CODE_FLUSH_TOUCHPAD_FRAME 106
 
 #include <openssl/rand.h>
 
@@ -396,6 +397,16 @@ void Session::clLogMessage(const char* format, ...)
                     format,
                     ap);
     va_end(ap);
+}
+
+bool Session::queueTouchpadFrameFlush()
+{
+    // Push an event onto the main loop so touchpad contacts already queued by
+    // SDL can be collected into a single frame before they are sent.
+    SDL_Event flushEvent = {};
+    flushEvent.type = SDL_USEREVENT;
+    flushEvent.user.code = SDL_CODE_FLUSH_TOUCHPAD_FRAME;
+    return SDL_PushEvent(&flushEvent) > 0;
 }
 
 void Session::clRumble(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor)
@@ -869,6 +880,14 @@ Session::~Session()
 bool Session::initialize(QQuickWindow* qtWindow)
 {
     m_QtWindow = qtWindow;
+
+    // SDL reads this hint when the video subsystem initializes. Configure it for
+    // each session so preference changes take effect on the next stream without
+    // restarting Moonlight. When disabled, trackpads remain on the native pointer
+    // path, preserving system gestures and pointer acceleration.
+    bool nativeTouchpadEnabled = m_Preferences->enableNativeTouchpad;
+    SDL_SetHint(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, nativeTouchpadEnabled ? "1" : "0");
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, nativeTouchpadEnabled ? "0" : "1");
 
 #ifdef Q_OS_DARWIN
     if (qEnvironmentVariableIntValue("I_WANT_BUGGY_FULLSCREEN") == 0) {
@@ -3627,6 +3646,9 @@ void Session::exec()
             case SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS:
                 m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.user.data1,
                                                     (DualSenseOutputReport *)event.user.data2);
+                break;
+            case SDL_CODE_FLUSH_TOUCHPAD_FRAME:
+                m_InputHandler->flushPendingTouchpadFrameEvent();
                 break;
             default:
                 SDL_assert(false);

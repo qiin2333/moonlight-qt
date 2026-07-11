@@ -164,6 +164,20 @@ void SdlInputHandler::handleMouseWheelEvent(SDL_MouseWheelEvent* event)
         // Ignore synthetic mouse events
         return;
     }
+    else if (m_NativeTouchpadEnabled &&
+             (m_NativeTouchpadTransport == NTT_FRAME ||
+              m_NativeTouchpadTransport == NTT_INDIVIDUAL) &&
+             (m_ActiveTouchpadContacts.size() >= 2 ||
+              (m_LastTouchpadScrollTimestamp != 0 &&
+               event->timestamp - m_LastTouchpadScrollTimestamp <=
+                   TOUCHPAD_SCROLL_SUPPRESSION_TIMEOUT_MS))) {
+        // SDL may still report a native two-finger trackpad gesture as a mouse
+        // wheel event even when the contacts are being sent via the native
+        // touchpad protocol. Keep extending a short suppression window for
+        // momentum events that arrive after the fingers have been released.
+        m_LastTouchpadScrollTimestamp = event->timestamp;
+        return;
+    }
 
     if (m_AbsoluteMouseMode) {
         int mouseX, mouseY;

@@ -5,6 +5,9 @@
 
 #include "SDL_compat.h"
 
+#include <QHash>
+#include <QSet>
+
 struct GamepadState {
     SDL_GameController* controller;
     SDL_JoystickID jsId;
@@ -74,6 +77,10 @@ struct DualSenseOutputReport{
 
 #define MAX_FINGERS 2
 
+#define MAX_TOUCHPAD_FRAME_CONTACTS 5
+
+#define TOUCHPAD_SCROLL_SUPPRESSION_TIMEOUT_MS 500
+
 #define GAMEPAD_HAPTIC_METHOD_NONE 0
 #define GAMEPAD_HAPTIC_METHOD_LEFTRIGHT 1
 #define GAMEPAD_HAPTIC_METHOD_SIMPLERUMBLE 2
@@ -129,6 +136,8 @@ public:
     void setAdaptiveTriggers(uint16_t controllerNumber, DualSenseOutputReport *report);
 
     void handleTouchFingerEvent(SDL_TouchFingerEvent* event);
+
+    void flushPendingTouchpadFrameEvent();
 
     int getAttachedGamepadMask();
 
@@ -201,6 +210,24 @@ private:
 
     void handleRelativeFingerEvent(SDL_TouchFingerEvent* event);
 
+    void handleNativeTouchpadEvent(SDL_TouchFingerEvent* event);
+
+    void sendPendingTouchpadFrame();
+
+    void cancelNativeTouchpadContacts();
+
+    void transitionNativeTouchpadToSoftwarePointer();
+
+    struct NativeTouchpadContact {
+        uint8_t eventType;
+        uint32_t pointerId;
+        float x;
+        float y;
+        float pressure;
+    };
+
+    void sendNativeTouchpadContacts(const NativeTouchpadContact* contacts, int contactCount);
+
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
 
@@ -256,6 +283,25 @@ private:
     bool m_AbsoluteMouseMode;
     bool m_AbsoluteTouchMode;
     bool m_DisabledTouchFeedback;
+
+    enum NativeTouchpadTransport {
+        NTT_UNKNOWN,
+        NTT_FRAME,
+        NTT_INDIVIDUAL,
+        NTT_SOFTWARE_POINTER,
+    };
+
+    bool m_NativeTouchpadEnabled;
+    bool m_TouchpadFlushEventQueued;
+    NativeTouchpadTransport m_NativeTouchpadTransport;
+    SDL_TouchID m_PendingTouchpadId;
+    Uint32 m_PendingTouchpadTimestamp;
+    int m_PendingTouchpadContactCount;
+    NativeTouchpadContact m_PendingTouchpadContacts[MAX_TOUCHPAD_FRAME_CONTACTS];
+    SDL_TouchID m_ActiveTouchpadId;
+    QHash<SDL_FingerID, NativeTouchpadContact> m_ActiveTouchpadContacts;
+    QSet<SDL_FingerID> m_IgnoredTouchpadContacts;
+    Uint32 m_LastTouchpadScrollTimestamp;
 
     SDL_TouchFingerEvent m_TouchDownEvent[MAX_FINGERS];
     SDL_TimerID m_LeftButtonReleaseTimer;
