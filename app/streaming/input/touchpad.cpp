@@ -54,11 +54,16 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
 
     if ((!m_ActiveTouchpadContacts.isEmpty() || !m_IgnoredTouchpadContacts.isEmpty()) &&
             event->touchId != m_ActiveTouchpadId) {
+        if (eventType != LI_TOUCH_EVENT_DOWN) {
+            // Ignore delayed events from a touch surface that no longer owns
+            // the native touchpad stream.
+            return;
+        }
+
         // The wire protocol has no device identifier. Finish contacts from the
-        // previous device before switching to another physical touchpad.
-        cancelNativeTouchpadContacts();
+        // previous device before switching to another touch surface.
+        cancelSdlTouchpadContacts();
     }
-    m_ActiveTouchpadId = event->touchId;
 
     if (m_IgnoredTouchpadContacts.contains(event->fingerId)) {
         if (eventType == LI_TOUCH_EVENT_UP || eventType == LI_TOUCH_EVENT_CANCEL) {
@@ -83,6 +88,17 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
     if (eventType != LI_TOUCH_EVENT_DOWN && !contactIsActive) {
         return;
     }
+
+    m_ActiveTouchpadId = event->touchId;
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    if (!m_ActiveWindowsTouchpadContacts.isEmpty() || m_WindowsTouchpadButtonDown ||
+            m_WindowsTouchpadButtonUsesMouseFallback) {
+        // The wire protocol has no input-source identifier. A valid SDL
+        // contact takes ownership from Windows Raw Input before it is sent.
+        cancelWindowsTouchpadContacts();
+    }
+#endif
 
     if (m_PendingTouchpadContactCount > 0 &&
             (event->touchId != m_PendingTouchpadId ||
@@ -232,10 +248,39 @@ void SdlInputHandler::handleWindowsTouchpadFrame(uint64_t deviceId,
     }
 
     selectNativeTouchpadTransport();
-    if ((!m_ActiveWindowsTouchpadContacts.isEmpty() || m_WindowsTouchpadButtonDown ||
-         m_WindowsTouchpadButtonUsesMouseFallback) &&
-            m_ActiveWindowsTouchpadDevice != deviceId) {
+
+    bool hasCurrentContact = false;
+    if (hasContactFrame) {
+        for (int i = 0; i < contactCount && i < MAX_TOUCHPAD_FRAME_CONTACTS; i++) {
+            if (touching[i]) {
+                hasCurrentContact = true;
+                break;
+            }
+        }
+    }
+
+    const bool hasWindowsState = !m_ActiveWindowsTouchpadContacts.isEmpty() ||
+            m_WindowsTouchpadButtonDown || m_WindowsTouchpadButtonUsesMouseFallback;
+    const bool currentDeviceOwnsWindowsState =
+            m_ActiveWindowsTouchpadDevice == deviceId && hasWindowsState;
+    const bool currentFrameIsActive = hasCurrentContact || buttonDown;
+
+    if (hasWindowsState && m_ActiveWindowsTouchpadDevice != deviceId) {
+        if (!currentFrameIsActive) {
+            // Ignore an empty or delayed release frame from another Raw Input
+            // device instead of allowing it to steal the active stream.
+            return;
+        }
         cancelWindowsTouchpadContacts();
+    }
+
+    const bool windowsSourceActive = currentFrameIsActive || currentDeviceOwnsWindowsState;
+    if (windowsSourceActive &&
+            (m_PendingTouchpadContactCount > 0 || !m_ActiveTouchpadContacts.isEmpty() ||
+             !m_IgnoredTouchpadContacts.isEmpty())) {
+        // Windows Raw Input is now active. Cancel SDL touch-surface contacts
+        // first because the native wire protocol cannot distinguish sources.
+        cancelSdlTouchpadContacts();
     }
 
     if (m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER) {
@@ -254,16 +299,6 @@ void SdlInputHandler::handleWindowsTouchpadFrame(uint64_t deviceId,
     m_LastWindowsTouchpadFrameTicks = SDL_GetTicks();
     if (m_LastWindowsTouchpadFrameTicks == 0) {
         m_LastWindowsTouchpadFrameTicks = 1;
-    }
-
-    bool hasCurrentContact = false;
-    if (hasContactFrame) {
-        for (int i = 0; i < contactCount && i < MAX_TOUCHPAD_FRAME_CONTACTS; i++) {
-            if (touching[i]) {
-                hasCurrentContact = true;
-                break;
-            }
-        }
     }
 
     const bool buttonChanged = buttonDown != m_WindowsTouchpadButtonDown;
@@ -499,7 +534,7 @@ void SdlInputHandler::flushPendingTouchpadFrameEvent()
     sendPendingTouchpadFrame();
 }
 
-void SdlInputHandler::cancelNativeTouchpadContacts()
+void SdlInputHandler::cancelSdlTouchpadContacts()
 {
     sendPendingTouchpadFrame();
 
@@ -513,6 +548,12 @@ void SdlInputHandler::cancelNativeTouchpadContacts()
     m_ActiveTouchpadContacts.clear();
     m_IgnoredTouchpadContacts.clear();
     m_ActiveTouchpadId = 0;
+}
+
+void SdlInputHandler::cancelNativeTouchpadContacts()
+{
+    cancelSdlTouchpadContacts();
+    cancelRelativeTouchpadState();
 
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
     cancelWindowsTouchpadContacts();

@@ -216,9 +216,13 @@ private:
 
     void handleRelativeFingerEvent(SDL_TouchFingerEvent* event);
 
+    void cancelRelativeTouchpadState();
+
     void handleNativeTouchpadEvent(SDL_TouchFingerEvent* event);
 
     void sendPendingTouchpadFrame();
+
+    void cancelSdlTouchpadContacts();
 
     void cancelNativeTouchpadContacts();
 

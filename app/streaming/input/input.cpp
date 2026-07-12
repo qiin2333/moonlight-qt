@@ -557,6 +557,13 @@ void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
     if (m_AbsoluteTouchMode) {
         handleAbsoluteFingerEvent(event);
     }
+    else if (m_NativeTouchpadEnabled) {
+        // A touchscreen in virtual trackpad mode provides the same normalized
+        // contact data as an indirect absolute touchpad. Reuse the native
+        // touchpad transport so the host can handle multi-touch gestures, with
+        // the existing software pointer path as the compatibility fallback.
+        handleNativeTouchpadEvent(event);
+    }
     else {
         handleRelativeFingerEvent(event);
     }
