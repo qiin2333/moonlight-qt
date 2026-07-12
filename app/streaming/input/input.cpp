@@ -58,6 +58,8 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_SuppressedWindowsTouchpadMouseButtons(0),
       m_WindowsTouchpadButtonDown(false),
       m_WindowsTouchpadButtonUsesMouseFallback(false),
+      m_WindowsTouchpadWidthMm(0),
+      m_WindowsTouchpadHeightMm(0),
 #endif
       m_LeftButtonReleaseTimer(0),
       m_RightButtonReleaseTimer(0),

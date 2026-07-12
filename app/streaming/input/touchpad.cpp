@@ -162,7 +162,9 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
 void SdlInputHandler::sendNativeTouchpadContacts(const NativeTouchpadContact* contacts,
                                                  int contactCount,
                                                  bool transitionToSoftwarePointer,
-                                                 uint8_t buttonState)
+                                                 uint8_t buttonState,
+                                                 uint16_t deviceWidthMm,
+                                                 uint16_t deviceHeightMm)
 {
     if (contactCount <= 0) {
         return;
@@ -185,7 +187,8 @@ void SdlInputHandler::sendNativeTouchpadContacts(const NativeTouchpadContact* co
     if (m_NativeTouchpadTransport == NTT_FRAME) {
         int rc = LiSendTouchpadFrameEvent(static_cast<uint8_t>(contactCount),
                                           eventTypes, pointerIds, x, y, pressure,
-                                          LI_ROT_UNKNOWN, 0, 0, buttonState);
+                                          LI_ROT_UNKNOWN, deviceWidthMm, deviceHeightMm,
+                                          buttonState);
         if (rc == LI_ERR_UNSUPPORTED) {
             if (LiGetHostFeatureFlags() & LI_FF_TOUCHPAD_EVENTS) {
                 m_NativeTouchpadTransport = NTT_INDIVIDUAL;
@@ -214,7 +217,8 @@ void SdlInputHandler::sendNativeTouchpadContacts(const NativeTouchpadContact* co
     if (m_NativeTouchpadTransport == NTT_INDIVIDUAL) {
         for (int i = 0; i < contactCount; i++) {
             int rc = LiSendTouchpadEvent(eventTypes[i], pointerIds[i], x[i], y[i], pressure[i],
-                                         0.0f, 0.0f, LI_ROT_UNKNOWN, 0, 0, buttonState);
+                                         0.0f, 0.0f, LI_ROT_UNKNOWN, deviceWidthMm,
+                                         deviceHeightMm, buttonState);
             if (rc == LI_ERR_UNSUPPORTED) {
                 m_NativeTouchpadTransport = NTT_SOFTWARE_POINTER;
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
@@ -240,7 +244,9 @@ void SdlInputHandler::handleWindowsTouchpadFrame(uint64_t deviceId,
                                                  const uint8_t* touching,
                                                  int contactCount,
                                                  bool hasContactFrame,
-                                                 bool buttonDown)
+                                                 bool buttonDown,
+                                                 uint16_t deviceWidthMm,
+                                                 uint16_t deviceHeightMm)
 {
     if (!isCaptureActive() || m_AbsoluteMouseMode) {
         cancelWindowsTouchpadContacts();
@@ -296,6 +302,8 @@ void SdlInputHandler::handleWindowsTouchpadFrame(uint64_t deviceId,
     }
 
     m_ActiveWindowsTouchpadDevice = deviceId;
+    m_WindowsTouchpadWidthMm = deviceWidthMm;
+    m_WindowsTouchpadHeightMm = deviceHeightMm;
     m_LastWindowsTouchpadFrameTicks = SDL_GetTicks();
     if (m_LastWindowsTouchpadFrameTicks == 0) {
         m_LastWindowsTouchpadFrameTicks = 1;
@@ -331,7 +339,9 @@ void SdlInputHandler::handleWindowsTouchpadFrame(uint64_t deviceId,
                 contact.eventType = LI_TOUCH_EVENT_MOVE;
                 changes[changeCount++] = contact;
             }
-            sendNativeTouchpadContacts(changes, changeCount, false, buttonState);
+            sendNativeTouchpadContacts(changes, changeCount, false, buttonState,
+                                       m_WindowsTouchpadWidthMm,
+                                       m_WindowsTouchpadHeightMm);
         }
         m_WindowsTouchpadButtonDown = buttonDown;
         if (m_ActiveWindowsTouchpadContacts.isEmpty() && !buttonDown) {
@@ -348,7 +358,9 @@ void SdlInputHandler::handleWindowsTouchpadFrame(uint64_t deviceId,
 
     auto flushChanges = [&]() {
         if (changeCount > 0) {
-            sendNativeTouchpadContacts(changes, changeCount, false, buttonState);
+            sendNativeTouchpadContacts(changes, changeCount, false, buttonState,
+                                       m_WindowsTouchpadWidthMm,
+                                       m_WindowsTouchpadHeightMm);
             changeCount = 0;
         }
     };
@@ -417,7 +429,9 @@ void SdlInputHandler::cancelWindowsTouchpadContacts(uint64_t deviceId)
         contacts[contactCount++] = contact;
     }
     if (contactCount > 0) {
-        sendNativeTouchpadContacts(contacts, contactCount, false, 0);
+        sendNativeTouchpadContacts(contacts, contactCount, false, 0,
+                                   m_WindowsTouchpadWidthMm,
+                                   m_WindowsTouchpadHeightMm);
     }
     if (m_WindowsTouchpadButtonUsesMouseFallback) {
         sendWindowsTouchpadMouseButton(false);
@@ -428,6 +442,8 @@ void SdlInputHandler::cancelWindowsTouchpadContacts(uint64_t deviceId)
     m_ActiveWindowsTouchpadDevice = 0;
     m_LastWindowsTouchpadFrameTicks = 0;
     m_WindowsTouchpadButtonDown = false;
+    m_WindowsTouchpadWidthMm = 0;
+    m_WindowsTouchpadHeightMm = 0;
 }
 
 void SdlInputHandler::sendWindowsTouchpadMouseButton(bool down)

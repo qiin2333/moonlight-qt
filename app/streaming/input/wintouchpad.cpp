@@ -10,6 +10,7 @@
 #include <SDL_system.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <iterator>
 #include <map>
@@ -98,6 +99,42 @@ static float normalizeAxis(ULONG value, LONG minimum, LONG maximum)
     return static_cast<float>(std::clamp(normalized, 0.0, 1.0));
 }
 
+static uint16_t physicalDimensionMm(const HIDP_VALUE_CAPS& cap)
+{
+    const int64_t physicalExtent = static_cast<int64_t>(cap.PhysicalMax) -
+            static_cast<int64_t>(cap.PhysicalMin);
+    if (physicalExtent <= 0) {
+        return 0;
+    }
+
+    // HID unit nibbles encode the unit system followed by exponents for
+    // length, mass, time, temperature, current, and luminous intensity.
+    // Touchpad X/Y axes are lengths, normally reported in centimetres (SI
+    // Linear) or inches (English Linear).
+    const ULONG units = cap.Units;
+    const ULONG unitSystem = units & 0xF;
+    const int lengthExponent = static_cast<int>((units >> 4) & 0xF);
+    if ((unitSystem != 1 && unitSystem != 3) || lengthExponent != 1 ||
+            (units & ~static_cast<ULONG>(0xFF)) != 0) {
+        return 0;
+    }
+
+    int unitExponent = static_cast<int>(cap.UnitsExp & 0xF);
+    if (unitExponent & 0x8) {
+        unitExponent -= 16;
+    }
+
+    const double millimetresPerUnit = unitSystem == 1 ? 10.0 : 25.4;
+    const double millimetres = static_cast<double>(physicalExtent) *
+            std::pow(10.0, unitExponent) * millimetresPerUnit;
+    if (!std::isfinite(millimetres) || millimetres <= 0.0) {
+        return 0;
+    }
+
+    return static_cast<uint16_t>(std::lround(
+            std::clamp(millimetres, 1.0, static_cast<double>(UINT16_MAX))));
+}
+
 }
 
 class WindowsTouchpadInput::Impl
@@ -116,6 +153,8 @@ public:
         uint32_t completedScanTime = 0;
         bool completedHasScanTime = false;
         bool buttonDown = false;
+        uint16_t widthMm = 0;
+        uint16_t heightMm = 0;
         std::map<uint32_t, RawContact> pendingContacts;
 
         PHIDP_PREPARSED_DATA preparsed() const
@@ -271,6 +310,19 @@ private:
             return nullptr;
         }
         state->valueCaps.resize(valueCapsLength);
+
+        for (const HIDP_VALUE_CAPS& cap : state->valueCaps) {
+            if (cap.UsagePage != HID_USAGE_PAGE_GENERIC || cap.LinkCollection == 0) {
+                continue;
+            }
+
+            if (state->widthMm == 0 && capContainsUsage(cap, HID_USAGE_GENERIC_X)) {
+                state->widthMm = physicalDimensionMm(cap);
+            }
+            if (state->heightMm == 0 && capContainsUsage(cap, HID_USAGE_GENERIC_Y)) {
+                state->heightMm = physicalDimensionMm(cap);
+            }
+        }
 
         return state;
     }
@@ -463,7 +515,7 @@ private:
             inputHandler->handleWindowsTouchpadFrame(
                     reinterpret_cast<uint64_t>(device.handle),
                     nullptr, nullptr, nullptr, nullptr, nullptr, 0,
-                    false, device.buttonDown);
+                    false, device.buttonDown, device.widthMm, device.heightMm);
         };
 
         if (!parsed.hasContactCount && !device.pendingFrame) {
@@ -554,7 +606,7 @@ private:
                     pointerIds.data(), x.data(), y.data(), pressure.data(),
                     touching.data(),
                     static_cast<int>(pointerIds.size()), true,
-                    device.buttonDown);
+                    device.buttonDown, device.widthMm, device.heightMm);
             device.completedHasScanTime = device.pendingHasScanTime;
             device.completedScanTime = device.pendingScanTime;
             device.pendingContacts.clear();

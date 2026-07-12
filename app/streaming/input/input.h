@@ -240,7 +240,9 @@ private:
 
     void sendNativeTouchpadContacts(const NativeTouchpadContact* contacts, int contactCount,
                                     bool transitionToSoftwarePointer = true,
-                                    uint8_t buttonState = 0);
+                                    uint8_t buttonState = 0,
+                                    uint16_t deviceWidthMm = 0,
+                                    uint16_t deviceHeightMm = 0);
 
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
     void handleWindowsTouchpadFrame(uint64_t deviceId,
@@ -248,7 +250,8 @@ private:
                                     const float* x, const float* y, const float* pressure,
                                     const uint8_t* touching,
                                     int contactCount, bool hasContactFrame,
-                                    bool buttonDown);
+                                    bool buttonDown, uint16_t deviceWidthMm,
+                                    uint16_t deviceHeightMm);
 
     void cancelWindowsTouchpadContacts(uint64_t deviceId = 0);
 
@@ -342,6 +345,8 @@ private:
     Uint32 m_SuppressedWindowsTouchpadMouseButtons;
     bool m_WindowsTouchpadButtonDown;
     bool m_WindowsTouchpadButtonUsesMouseFallback;
+    uint16_t m_WindowsTouchpadWidthMm;
+    uint16_t m_WindowsTouchpadHeightMm;
     std::unique_ptr<WindowsTouchpadInput> m_WindowsTouchpadInput;
 #endif
 
