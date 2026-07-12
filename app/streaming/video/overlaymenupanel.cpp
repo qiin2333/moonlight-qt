@@ -6,6 +6,7 @@
 #include <QPainterPath>
 #include <QCursor>
 #include <QFontDatabase>
+#include <QTimer>
 #include <memory>
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
@@ -995,8 +996,19 @@ bool OverlayMenuPanel::event(QEvent* ev)
 {
     if (ev->type() == QEvent::Leave) {
         if (m_Visible) {
-            // Grace period: ignore Leave within 300ms of showing
-            if (m_ShowTimer.elapsed() < 300) {
+            // During the grace period, defer the outside check instead of
+            // dropping the Leave event. Otherwise, leaving the panel quickly
+            // after it opens would keep it visible until the cursor entered
+            // and left the panel again.
+            constexpr qint64 LeaveGracePeriodMs = 300;
+            const qint64 elapsed = m_ShowTimer.elapsed();
+            if (elapsed < LeaveGracePeriodMs) {
+                QTimer::singleShot(static_cast<int>(LeaveGracePeriodMs - elapsed + 1),
+                                   this, [this]() {
+                    if (m_Visible && !geometry().contains(QCursor::pos())) {
+                        closeMenu();
+                    }
+                });
                 return true;
             }
             // Verify cursor is actually outside (cursor warp may lag)
