@@ -1005,7 +1005,9 @@ bool OverlayMenuPanel::event(QEvent* ev)
             if (elapsed < LeaveGracePeriodMs) {
                 QTimer::singleShot(static_cast<int>(LeaveGracePeriodMs - elapsed + 1),
                                    this, [this]() {
-                    if (m_Visible && !geometry().contains(QCursor::pos())) {
+                    if (m_Visible &&
+                            m_ShowTimer.elapsed() >= LeaveGracePeriodMs &&
+                            !geometry().contains(QCursor::pos())) {
                         closeMenu();
                     }
                 });
