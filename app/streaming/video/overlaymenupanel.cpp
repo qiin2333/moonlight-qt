@@ -107,6 +107,13 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
         forceRepaint();
     });
 
+    m_LeaveTimer.setSingleShot(true);
+    connect(&m_LeaveTimer, &QTimer::timeout, this, [this]() {
+        if (m_Visible && !geometry().contains(QCursor::pos())) {
+            closeMenu();
+        }
+    });
+
     buildMenuLevels();
 }
 
@@ -331,6 +338,7 @@ void OverlayMenuPanel::showAtCursor(int parentX, int parentY, int parentW, int p
 
 void OverlayMenuPanel::showInternal()
 {
+    m_LeaveTimer.stop();
     m_CurrentLevel = 0;
     m_HoveredIndex = -1;
     m_ContentOffset = 0;
@@ -447,6 +455,7 @@ void OverlayMenuPanel::navigateToLevel(int level)
 {
     if (level < 0 || level >= (int)m_MenuLevels.size()) return;
 
+    m_LeaveTimer.stop();
     bool goingForward = level > m_CurrentLevel;
     m_ContentSlideAnim->stop();
     m_ContentOffset = 0;
@@ -478,6 +487,7 @@ void OverlayMenuPanel::navigateToLevel(int level)
 
 void OverlayMenuPanel::closeMenu()
 {
+    m_LeaveTimer.stop();
     if (!m_Visible) return;
     if (m_Closing) return;  // already animating close
 
@@ -995,8 +1005,14 @@ bool OverlayMenuPanel::event(QEvent* ev)
 {
     if (ev->type() == QEvent::Leave) {
         if (m_Visible) {
-            // Grace period: ignore Leave within 300ms of showing
-            if (m_ShowTimer.elapsed() < 300) {
+            // During the grace period, defer the outside check instead of
+            // dropping the Leave event. Otherwise, leaving the panel quickly
+            // after it opens would keep it visible until the cursor entered
+            // and left the panel again.
+            constexpr qint64 LeaveGracePeriodMs = 300;
+            const qint64 elapsed = m_ShowTimer.elapsed();
+            if (elapsed < LeaveGracePeriodMs) {
+                m_LeaveTimer.start(static_cast<int>(LeaveGracePeriodMs - elapsed + 1));
                 return true;
             }
             // Verify cursor is actually outside (cursor warp may lag)

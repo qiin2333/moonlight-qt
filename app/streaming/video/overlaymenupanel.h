@@ -6,6 +6,7 @@
 #include <QFont>
 #include <QSurfaceFormat>
 #include <QElapsedTimer>
+#include <QTimer>
 #include <QPropertyAnimation>
 #include <QVariantAnimation>
 #include <functional>
@@ -179,6 +180,7 @@ private:
 
     // Anti-flicker: grace period after show
     QElapsedTimer m_ShowTimer;
+    QTimer m_LeaveTimer;
 
     // Animations
     QPropertyAnimation* m_OpacityAnim;
