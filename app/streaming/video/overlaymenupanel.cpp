@@ -6,7 +6,6 @@
 #include <QPainterPath>
 #include <QCursor>
 #include <QFontDatabase>
-#include <QTimer>
 #include <memory>
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
@@ -106,6 +105,13 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     connect(m_ContentSlideAnim, &QVariantAnimation::finished, this, [this]() {
         m_ContentOffset = 0;
         forceRepaint();
+    });
+
+    m_LeaveTimer.setSingleShot(true);
+    connect(&m_LeaveTimer, &QTimer::timeout, this, [this]() {
+        if (m_Visible && !geometry().contains(QCursor::pos())) {
+            closeMenu();
+        }
     });
 
     buildMenuLevels();
@@ -332,6 +338,7 @@ void OverlayMenuPanel::showAtCursor(int parentX, int parentY, int parentW, int p
 
 void OverlayMenuPanel::showInternal()
 {
+    m_LeaveTimer.stop();
     m_CurrentLevel = 0;
     m_HoveredIndex = -1;
     m_ContentOffset = 0;
@@ -448,6 +455,7 @@ void OverlayMenuPanel::navigateToLevel(int level)
 {
     if (level < 0 || level >= (int)m_MenuLevels.size()) return;
 
+    m_LeaveTimer.stop();
     bool goingForward = level > m_CurrentLevel;
     m_ContentSlideAnim->stop();
     m_ContentOffset = 0;
@@ -479,6 +487,7 @@ void OverlayMenuPanel::navigateToLevel(int level)
 
 void OverlayMenuPanel::closeMenu()
 {
+    m_LeaveTimer.stop();
     if (!m_Visible) return;
     if (m_Closing) return;  // already animating close
 
@@ -1003,14 +1012,7 @@ bool OverlayMenuPanel::event(QEvent* ev)
             constexpr qint64 LeaveGracePeriodMs = 300;
             const qint64 elapsed = m_ShowTimer.elapsed();
             if (elapsed < LeaveGracePeriodMs) {
-                QTimer::singleShot(static_cast<int>(LeaveGracePeriodMs - elapsed + 1),
-                                   this, [this]() {
-                    if (m_Visible &&
-                            m_ShowTimer.elapsed() >= LeaveGracePeriodMs &&
-                            !geometry().contains(QCursor::pos())) {
-                        closeMenu();
-                    }
-                });
+                m_LeaveTimer.start(static_cast<int>(LeaveGracePeriodMs - elapsed + 1));
                 return true;
             }
             // Verify cursor is actually outside (cursor warp may lag)
