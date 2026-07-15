@@ -345,17 +345,18 @@ void ClipboardSync::sendClipboardPng(const QByteArray& png,
             ? QByteArrayLiteral("unknown source")
             : sourceDescription.toUtf8();
 
-    if (png.size() > MAX_PAYLOAD) {
+    if (png.size() > MAX_BLOB_BYTES) {
+        ClipboardLog::info("ClipboardSync: PNG payload %lld B from %s exceeds %lld B blob cap, dropping",
+                    static_cast<long long>(png.size()),
+                    sourceUtf8.constData(),
+                    static_cast<long long>(MAX_BLOB_BYTES));
+        return;
+    }
+
+    if (shouldTransferOutOfBand(png.size())) {
         // Out-of-band path. Record the underlying PNG hash before
         // upload so the echo we'll see when the host loops the REF
         // back (and we fetch the same bytes) is suppressed.
-        if (png.size() > MAX_BLOB_BYTES) {
-            ClipboardLog::info("ClipboardSync: PNG payload %lld B from %s exceeds %lld B blob cap, dropping",
-                        static_cast<long long>(png.size()),
-                        sourceUtf8.constData(),
-                        static_cast<long long>(MAX_BLOB_BYTES));
-            return;
-        }
         uint64_t hash = hashBytes(png);
         if (seenRecently(hash)) {
             return;
@@ -658,7 +659,14 @@ void ClipboardSync::onLocalClipboardChanged()
     }
 
     QByteArray utf8 = text.toUtf8();
-    if (utf8.isEmpty() || utf8.size() > MAX_PAYLOAD) {
+    if (utf8.isEmpty()) {
+        return;
+    }
+
+    if (utf8.size() > MAX_BLOB_BYTES) {
+        ClipboardLog::info("ClipboardSync: text payload %lld B exceeds %lld B blob cap, dropping",
+                    static_cast<long long>(utf8.size()),
+                    static_cast<long long>(MAX_BLOB_BYTES));
         return;
     }
 
@@ -668,6 +676,16 @@ void ClipboardSync::onLocalClipboardChanged()
         return;
     }
     recordHash(hash);
+
+    if (shouldTransferOutOfBand(utf8.size())) {
+        ClipboardLog::debug("ClipboardSync: uploading outbound text blob (%lld bytes)",
+                     static_cast<long long>(utf8.size()));
+        // Sunshine's blob endpoint intentionally accepts only a bare
+        // RFC 6838 type/subtype without parameters. KIND_TEXT already
+        // defines the blob bytes as UTF-8.
+        uploadAndSendRef(utf8, QStringLiteral("text/plain"));
+        return;
+    }
 
     QByteArray frame;
     if (!encodeFrame(KIND_TEXT, utf8, frame)) {

@@ -77,6 +77,11 @@ public:
     // doesn't try to PNG-encode a 100 MB bitmap and stall the GUI thread.
     static constexpr qint64  MAX_IMAGE_PIXELS = 32LL * 1024 * 1024;
 
+    static constexpr bool shouldTransferOutOfBand(qint64 payloadBytes)
+    {
+        return payloadBytes >= INLINE_THRESHOLD;
+    }
+
     explicit ClipboardSync(const ClipboardSyncHostContext& hostContext = ClipboardSyncHostContext(),
                            QObject* parent = nullptr);
     ~ClipboardSync() override;
