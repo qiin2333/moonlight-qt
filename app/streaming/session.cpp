@@ -440,8 +440,12 @@ void Session::clConnectionStatusUpdate(int connectionStatus)
     }
 }
 
-void Session::clSetHdrMode(bool enabled)
+void Session::clSetHdrMode(bool enabled, void* hdrMetadata)
 {
+    // Renderers retrieve this same snapshot through LiGetHdrMetadata(). Keep
+    // accepting the callback argument so our listener ABI matches common-c.
+    Q_UNUSED(hdrMetadata);
+
     // If we're in the process of recreating our decoder when we get
     // this callback, we'll drop it. The main thread will make the
     // callback when it finishes creating the new decoder.
