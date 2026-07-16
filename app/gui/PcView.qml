@@ -599,10 +599,12 @@ CenteredGridView {
     Image {
         id: backgroundImage
         anchors.fill: parent
+        visible: StreamingPreferences.enableBackgroundImage
         source: ""
         fillMode: Image.PreserveAspectCrop
         z: -2
         property string currentImageUrl: ""
+        property bool usingFallbackImage: false
         
         Settings {
             id: settings
@@ -611,18 +613,45 @@ CenteredGridView {
         }
         
         onStatusChanged: {
+            if (!StreamingPreferences.enableBackgroundImage) {
+                loadingIndicator.visible = false
+                return
+            }
+
             if (status === Image.Loading) {
                 loadingIndicator.visible = true
             } else if (status === Image.Ready) {
                 loadingIndicator.visible = false
             } else if (status === Image.Error) {
                 loadingIndicator.visible = false
-                getBackgroundImage() // 如果缓存图加载失败，尝试加载新图片
+                if (!usingFallbackImage) {
+                    getBackgroundImage()
+                } else {
+                    console.error("Fallback background image failed to load")
+                }
             }
         }
 
+        function toFileUrl(path) {
+            return "file:///" + path.replace(/\\/g, "/").replace(/^\/+/, "")
+        }
+
+        function clearBackgroundImage() {
+            loadingIndicator.visible = false
+            source = ""
+            currentImageUrl = ""
+            pcGrid.currentBgUrl = ""
+            usingFallbackImage = false
+        }
+
         function getBackgroundImage() {
+            if (!StreamingPreferences.enableBackgroundImage) {
+                clearBackgroundImage()
+                return
+            }
+
             loadingIndicator.visible = true
+            usingFallbackImage = false
             
             var cachePath = imageUtils.fetchAndSaveRandomBackground("https://img-api.pipw.top/")
             loadingIndicator.visible = false
@@ -637,43 +666,68 @@ CenteredGridView {
         function handleImageResponse(cachePath) {
             settings.cachedImagePath = cachePath
             console.log("handleImageResponse: " + cachePath)
-            var fileUrl = "file:///" + cachePath.replace(/\\/g, "/").replace(/^\/+/, "")
+            var fileUrl = toFileUrl(cachePath)
             source = ""
             source = fileUrl
             currentImageUrl = fileUrl
             pcGrid.currentBgUrl = fileUrl
+            usingFallbackImage = false
             settings.lastRefreshTime = Date.now()
         }
 
         function handleImageError(status) {
             console.error("Background image load failed:", status)
-            if (!source.toString().startsWith("file://")) {
-                source = "qrc:/res/gura.jpg"
+            loadingIndicator.visible = false
+
+            if (!StreamingPreferences.enableBackgroundImage) {
+                clearBackgroundImage()
+                return
             }
+
+            usingFallbackImage = true
+            currentImageUrl = ""
+            pcGrid.currentBgUrl = ""
+            source = "qrc:/res/gura.png"
         }
         
-        Component.onCompleted: {
-            // 先检查缓存图是否存在
+        function loadBackgroundImage() {
+            if (!StreamingPreferences.enableBackgroundImage) {
+                clearBackgroundImage()
+                return
+            }
+
             if (settings.cachedImagePath && imageUtils.fileExists(settings.cachedImagePath)) {
                 try {
-                    var fileUrl = "file:///" + settings.cachedImagePath.replace(/\\/g, "/").replace(/^\/+/, "");
-                    source = fileUrl;
-                    console.log("loadBackgroundImageFromCache: " + fileUrl);
-                    currentImageUrl = fileUrl;
-                    pcGrid.currentBgUrl = fileUrl;  // 初始化时同步属性
-                    
-                    // 检查是否需要刷新（如果上次刷新时间超过1小时）
-                    var oneHour = 60 * 60 * 1000 * 24 * 7;
-                    if (Date.now() - settings.lastRefreshTime > oneHour) {
-                        loadNewImageTimer.start();
+                    var fileUrl = toFileUrl(settings.cachedImagePath)
+                    source = fileUrl
+                    console.log("loadBackgroundImageFromCache: " + fileUrl)
+                    currentImageUrl = fileUrl
+                    pcGrid.currentBgUrl = fileUrl
+                    usingFallbackImage = false
+
+                    var oneWeek = 60 * 60 * 1000 * 24 * 7
+                    if (Date.now() - settings.lastRefreshTime > oneWeek) {
+                        loadNewImageTimer.start()
                     }
                 } catch (e) {
-                    console.log("fail loadBackgroundImageFromCache: " + e);
-                    getBackgroundImage();
+                    console.log("fail loadBackgroundImageFromCache: " + e)
+                    getBackgroundImage()
                 }
             } else {
-                // 如果没有缓存，立即获取新图片
-                getBackgroundImage();
+                getBackgroundImage()
+            }
+        }
+
+        Component.onCompleted: loadBackgroundImage()
+
+        Connections {
+            target: StreamingPreferences
+            function onEnableBackgroundImageChanged() {
+                if (StreamingPreferences.enableBackgroundImage) {
+                    backgroundImage.loadBackgroundImage()
+                } else {
+                    backgroundImage.clearBackgroundImage()
+                }
             }
         }
         
@@ -682,13 +736,16 @@ CenteredGridView {
             interval: 1000 // 延迟1秒加载新图片
             repeat: false
             onTriggered: {
-                backgroundImage.getBackgroundImage();
+                if (StreamingPreferences.enableBackgroundImage) {
+                    backgroundImage.getBackgroundImage()
+                }
             }
         }
     }
 
     DropArea {
         anchors.fill: parent
+        enabled: StreamingPreferences.enableBackgroundImage
         onEntered: function(drag) {
             drag.accept(Qt.LinkAction)
             dragBorder.visible = true
@@ -708,7 +765,7 @@ CenteredGridView {
                     
                     // 更新背景图
                     backgroundImage.source = filePath;
-                    currentImageUrl = filePath;
+                    backgroundImage.currentImageUrl = filePath;
                     pcGrid.currentBgUrl = filePath;  // 拖放时同步属性
                 } else {
                     errorDialog.text = qsTr("不支持的图片格式")
@@ -743,12 +800,13 @@ CenteredGridView {
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.RightButton
+        enabled: StreamingPreferences.enableBackgroundImage
         propagateComposedEvents: true
         z: -1  // 确保这个MouseArea位于PC条目之下
         
         onClicked: function(mouse) {
             if (mouse.button === Qt.RightButton) {
-                if (backgroundImage.currentImageUrl) {
+                if (StreamingPreferences.enableBackgroundImage && backgroundImage.currentImageUrl) {
                     console.log("右键菜单被触发")
                     backgroundContextMenu.popup()
                 }
@@ -794,7 +852,9 @@ CenteredGridView {
         interval: 200  // 延迟200毫秒
         repeat: false
         onTriggered: {
-            backgroundImage.getBackgroundImage()
+            if (StreamingPreferences.enableBackgroundImage) {
+                backgroundImage.getBackgroundImage()
+            }
         }
     }
 
@@ -858,7 +918,7 @@ CenteredGridView {
     
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.6)
+        color: StreamingPreferences.enableBackgroundImage ? Qt.rgba(0, 0, 0, 0.6) : "#303030"
         z: -1
     }
 
