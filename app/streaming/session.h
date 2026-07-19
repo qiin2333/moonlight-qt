@@ -24,6 +24,10 @@ namespace FileMappingUx {
 struct ProbeState;
 struct MountState;
 }
+namespace FileMappingTransfer {
+struct State;
+}
+class FileTransferWindow;
 
 class SupportedVideoFormatList : public QList<int>
 {
@@ -291,7 +295,9 @@ private:
     void processFileMappingUxProbeResult();
     void startFileMappingMount();
     void processFileMappingMountResult();
+    void processFileMappingTransferEvents();
     void cleanupFileMappingMount();
+    void openFileTransferWindow();
     void startFileMappingSmokeProbe();
 
     static
@@ -358,6 +364,8 @@ private:
     bool m_FileMappingToastPending;
     std::shared_ptr<FileMappingUx::ProbeState> m_FileMappingProbeState;
     std::shared_ptr<FileMappingUx::MountState> m_FileMappingMountState;
+    std::shared_ptr<FileMappingTransfer::State> m_FileMappingTransferState;
+    FileTransferWindow* m_FileTransferWindow;
     QString m_FileMappingMountPath;
     QString m_FileMappingSessionId;
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）

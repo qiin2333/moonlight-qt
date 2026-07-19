@@ -67,7 +67,7 @@ win32 {
     }
 
     INCLUDEPATH += $$PWD/../libs/windows/include
-    LIBS += ws2_32.lib winmm.lib dxva2.lib ole32.lib gdi32.lib user32.lib d3d9.lib dwmapi.lib dbghelp.lib
+    LIBS += ws2_32.lib winmm.lib dxva2.lib ole32.lib shell32.lib gdi32.lib user32.lib d3d9.lib dwmapi.lib dbghelp.lib
 }
 macx:!disable-prebuilts {
     !exists($$PWD/../libs/mac) {
@@ -222,6 +222,8 @@ SOURCES += \
     streaming/filemappingclient.cpp \
     streaming/filemappingwebsocket.cpp \
     streaming/filemappingprotocoladapter.cpp \
+    streaming/filemappingtransfer.cpp \
+    streaming/filetransferwindow.cpp \
     streaming/filemappingux.cpp \
     streaming/clipboardhelperclient.cpp \
     streaming/clipboardipc.cpp \
@@ -273,6 +275,8 @@ HEADERS += \
     streaming/filemappingclient.h \
     streaming/filemappingwebsocket.h \
     streaming/filemappingprotocoladapter.h \
+    streaming/filemappingtransfer.h \
+    streaming/filetransferwindow.h \
     streaming/filemappingux.h \
     streaming/clipboardhelperclient.h \
     streaming/clipboardipc.h \

@@ -67,4 +67,12 @@ struct ReadResult {
     bool ok() const { return error.ok(); }
 };
 
+struct WriteResult {
+    Error error;
+    quint64 nextOffset = 0;
+    bool completed = false;
+
+    bool ok() const { return error.ok(); }
+};
+
 } // namespace FileMapping

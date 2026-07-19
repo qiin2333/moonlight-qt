@@ -319,6 +319,40 @@ FileMappingClient::RpcResult FileMappingClient::read(const QString& mappingId,
     }, timeoutMs);
 }
 
+FileMappingClient::RpcResult FileMappingClient::mkdir(const QString& mappingId,
+                                                      const QString& path,
+                                                      int timeoutMs)
+{
+    return sendRpc({
+        { QStringLiteral("type"), QStringLiteral("mkdir") },
+        { QStringLiteral("mapping"), mappingId },
+        { QStringLiteral("path"), path }
+    }, timeoutMs);
+}
+
+FileMappingClient::RpcResult FileMappingClient::write(const QString& mappingId,
+                                                      const QString& path,
+                                                      const QString& uploadId,
+                                                      quint64 offset,
+                                                      quint64 totalSize,
+                                                      const QByteArray& data,
+                                                      bool begin,
+                                                      bool complete,
+                                                      int timeoutMs)
+{
+    return sendRpc({
+        { QStringLiteral("type"), QStringLiteral("write") },
+        { QStringLiteral("mapping"), mappingId },
+        { QStringLiteral("path"), path },
+        { QStringLiteral("upload_id"), uploadId },
+        { QStringLiteral("offset"), static_cast<double>(offset) },
+        { QStringLiteral("total_size"), static_cast<double>(totalSize) },
+        { QStringLiteral("begin"), begin },
+        { QStringLiteral("complete"), complete },
+        { QStringLiteral("data"), QString::fromLatin1(data.toBase64()) }
+    }, timeoutMs);
+}
+
 FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappingId,
                                                             const QString& path,
                                                             quint64 offset,

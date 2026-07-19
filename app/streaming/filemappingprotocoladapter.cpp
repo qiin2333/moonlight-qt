@@ -23,6 +23,10 @@ FileMapping::Error mapRpcError(const QString& message)
             message.contains(QStringLiteral("mapping_not_found"), Qt::CaseInsensitive)) {
         return makeError(FileMapping::ErrorKind::NotFound, message);
     }
+    if (message.contains(QStringLiteral("read_only"), Qt::CaseInsensitive) ||
+            message.contains(QStringLiteral("does not allow uploads"), Qt::CaseInsensitive)) {
+        return makeError(FileMapping::ErrorKind::ReadOnly, message);
+    }
     if (message.contains(QStringLiteral("forbidden"), Qt::CaseInsensitive) ||
             message.contains(QStringLiteral("unauthorized"), Qt::CaseInsensitive)) {
         return makeError(FileMapping::ErrorKind::Unauthorized, message);
@@ -212,6 +216,44 @@ FileMapping::ReadResult FileMappingProtocolAdapter::read(const QString& mappingI
     }
 
     result.data = QByteArray::fromBase64(rpc.reply.value(QStringLiteral("data")).toString().toUtf8());
+    return result;
+}
+
+FileMapping::Error FileMappingProtocolAdapter::mkdir(const QString& mappingId,
+                                                     const QString& path,
+                                                     int timeoutMs)
+{
+    FileMappingClient::RpcResult rpc = client().mkdir(mappingId, path, timeoutMs);
+    return rpc.ok ? FileMapping::Error::none() : mapRpcError(rpc.error);
+}
+
+FileMapping::WriteResult FileMappingProtocolAdapter::write(const QString& mappingId,
+                                                           const QString& path,
+                                                           const QString& uploadId,
+                                                           quint64 offset,
+                                                           quint64 totalSize,
+                                                           const QByteArray& data,
+                                                           bool begin,
+                                                           bool complete,
+                                                           int timeoutMs)
+{
+    FileMapping::WriteResult result;
+    FileMappingClient::RpcResult rpc = client().write(mappingId,
+                                                      path,
+                                                      uploadId,
+                                                      offset,
+                                                      totalSize,
+                                                      data,
+                                                      begin,
+                                                      complete,
+                                                      timeoutMs);
+    if (!rpc.ok) {
+        result.error = mapRpcError(rpc.error);
+        return result;
+    }
+
+    result.nextOffset = static_cast<quint64>(rpc.reply.value(QStringLiteral("next_offset")).toDouble(offset));
+    result.completed = rpc.reply.value(QStringLiteral("completed")).toBool(false);
     return result;
 }
 

@@ -95,8 +95,13 @@ MountResult MacOSFinderMirrorProvider::mount(const MountRequest& request)
                   QStringLiteral("Moonlight Host Files\n\n"
                                  "Host: %1\n"
                                  "Session: %2\n\n"
-                                 "This folder is a read-only snapshot of folders shared by the host for the current streaming session.\n"
-                                 "To refresh it, choose Host Files in Moonlight again. Large files or very deep folders may be skipped.\n")
+                                 "Host share folders below are local snapshots. Copy files from them to receive files from the host.\n"
+                                 "To send files to a read/write Sunshine share, drop them into the matching folder under \"Send to Host\".\n"
+                                 "Successful uploads are moved into \"Sent to Host\". Existing host files are never overwritten.\n\n"
+                                 "下方主机共享目录是本地快照，可复制到本机其他位置完成接收。\n"
+                                 "要向主机发送文件，请将文件拖入“Send to Host”下对应的读写共享目录；成功后会移到“Sent to Host”。\n"
+                                 "为避免误操作，传输不会覆盖主机上的同名文件。\n\n"
+                                 "To refresh host snapshots, choose File Transfer in Moonlight again. Large or deep folders may be skipped.\n")
                           .arg(hostLabel.isEmpty() ? QStringLiteral("Unknown host") : hostLabel,
                                request.sessionId.isEmpty() ? QStringLiteral("current") : request.sessionId));
 

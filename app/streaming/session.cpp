@@ -1,7 +1,9 @@
 #include "session.h"
 #include "clipboardhelperclient.h"
 #include "filemappingclient.h"
+#include "filemappingtransfer.h"
 #include "filemappingux.h"
+#include "filetransferwindow.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
@@ -858,6 +860,8 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_FileMappingToastPending(false),
       m_FileMappingProbeState(nullptr),
       m_FileMappingMountState(nullptr),
+      m_FileMappingTransferState(nullptr),
+      m_FileTransferWindow(nullptr),
       m_FileMappingMountPath(),
       m_FileMappingSessionId(QUuid::createUuid().toString(QUuid::WithoutBraces)),
       m_MenuCloseTicks(0),
@@ -2015,6 +2019,9 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
         break;
 
     case OverlayMenuPanel::MenuAction::ShowHostFiles:
+        // The file manager is an interactive local window. Do not immediately
+        // recapture the mouse for the SDL stream when the overlay closes.
+        m_WasCapturedBeforeMenu = false;
         appendFileMappingDiagnostic(
                 QStringLiteral("overlay.click_host_files"),
                 QStringLiteral("state=%1 detail=%2 mount_path=%3")
@@ -2025,29 +2032,29 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
                 m_FileMappingSessionId);
         if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Checking ||
             m_FileMappingState == OverlayMenuPanel::FileMappingState::Unknown) {
-            showStreamingToast(tr("Checking host file sharing..."), 2000);
+            showStreamingToast(tr("Checking host file transfer..."), 2000);
         }
         else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Mounting) {
             showStreamingToast(tr("Preparing host files..."), 2000);
         }
         else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Open &&
-                 !m_FileMappingMountPath.isEmpty()) {
-            openFileMappingMountPath();
-            showStreamingToast(tr("Opening host files..."), 2000);
+                 m_FileTransferWindow != nullptr) {
+            m_FileTransferWindow->showAndActivate();
+            showStreamingToast(tr("Opening file transfer..."), 1500);
         }
         else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Available) {
-            startFileMappingMount();
+            openFileTransferWindow();
         }
         else if (m_FileMappingState == OverlayMenuPanel::FileMappingState::Error ||
                  m_FileMappingState == OverlayMenuPanel::FileMappingState::Unavailable) {
             showStreamingToast(m_FileMappingToast.isEmpty()
-                               ? tr("Host file sharing is not available. Retrying...")
+                               ? tr("Host file transfer is not available. Retrying...")
                                : m_FileMappingToast + tr(" Retrying..."),
                                4500);
             startFileMappingUxProbe();
         }
         else {
-            showStreamingToast(tr("Host file sharing is not available."), 3000);
+            showStreamingToast(tr("Host file transfer is not available."), 3000);
         }
         return;
 
@@ -2137,6 +2144,31 @@ void Session::showStreamingToast(const QString& message, int durationMs)
     SDL_GetWindowSize(m_Window, &ww, &wh);
     m_Toast->showToast(wx, wy, ww, wh, message, durationMs);
     QCoreApplication::processEvents();
+}
+
+void Session::openFileTransferWindow()
+{
+    if (m_FileTransferWindow != nullptr) {
+        m_FileTransferWindow->showAndActivate();
+        return;
+    }
+    if (m_Computer == nullptr) {
+        showStreamingToast(tr("Host file transfer is not available."), 3000);
+        return;
+    }
+
+    NvComputer computerSnapshot;
+    {
+        QReadLocker locker(&m_Computer->lock);
+        computerSnapshot = *m_Computer;
+    }
+
+    m_FileTransferWindow = new FileTransferWindow(std::move(computerSnapshot));
+    m_FileTransferWindow->showAndActivate();
+    m_FileMappingState = OverlayMenuPanel::FileMappingState::Open;
+    m_FileMappingDetail = tr("Open");
+    m_FileMappingToast = tr("File transfer is open.");
+    updateFileMappingMenuState();
 }
 
 void Session::updateFileMappingMenuState()
@@ -2370,14 +2402,14 @@ void Session::startFileMappingUxProbe()
 
     m_FileMappingState = OverlayMenuPanel::FileMappingState::Checking;
     m_FileMappingDetail = tr("Checking");
-    m_FileMappingToast = tr("Checking host file sharing...");
+    m_FileMappingToast = tr("Checking host file transfer...");
     m_FileMappingToastPending = false;
     updateFileMappingMenuState();
 
     if (m_Computer == nullptr) {
         m_FileMappingState = OverlayMenuPanel::FileMappingState::Unavailable;
         m_FileMappingDetail = tr("Unavailable");
-        m_FileMappingToast = tr("Host file sharing is not available.");
+        m_FileMappingToast = tr("Host file transfer is not available.");
         appendFileMappingDiagnostic(
                 QStringLiteral("ux_probe.no_computer"),
                 m_FileMappingToast,
@@ -2541,6 +2573,13 @@ void Session::processFileMappingMountResult()
         m_FileMappingDetail = detail.isEmpty() ? tr("Open") : detail;
         m_FileMappingToast = message.isEmpty() ? tr("Host files are ready.") : message;
         updateFileMappingMenuState();
+        if (m_Computer != nullptr) {
+            m_FileMappingTransferState = std::make_shared<FileMappingTransfer::State>();
+            FileMappingTransfer::start(*m_Computer,
+                                       m_FileMappingMountPath,
+                                       m_FileMappingTransferState,
+                                       10000);
+        }
         const bool opened = openFileMappingMountPath();
         showStreamingToast(opened
                            ? m_FileMappingToast
@@ -2557,6 +2596,31 @@ void Session::processFileMappingMountResult()
     }
 }
 
+void Session::processFileMappingTransferEvents()
+{
+    if (!m_FileMappingTransferState) {
+        return;
+    }
+
+    QStringList events;
+    {
+        QMutexLocker locker(&m_FileMappingTransferState->lock);
+        events.swap(m_FileMappingTransferState->events);
+    }
+    if (events.isEmpty()) {
+        return;
+    }
+
+    for (const QString& event : events) {
+        appendFileMappingDiagnostic(
+                QStringLiteral("transfer.event"),
+                event,
+                m_Computer ? m_Computer->uuid : QString(),
+                m_FileMappingSessionId);
+    }
+    showStreamingToast(events.constLast(), 4000);
+}
+
 void Session::cleanupFileMappingMount()
 {
     appendFileMappingDiagnostic(
@@ -2565,6 +2629,13 @@ void Session::cleanupFileMappingMount()
             m_Computer ? m_Computer->uuid : QString(),
             m_FileMappingSessionId);
     m_FileMappingMountState.reset();
+    if (m_FileTransferWindow != nullptr) {
+        m_FileTransferWindow->close();
+        delete m_FileTransferWindow;
+        m_FileTransferWindow = nullptr;
+    }
+    FileMappingTransfer::stopAndWait(m_FileMappingTransferState);
+    m_FileMappingTransferState.reset();
     const QString mountPath = m_FileMappingMountPath;
     m_FileMappingMountPath.clear();
     if (!mountPath.isEmpty()) {
@@ -3547,6 +3618,7 @@ void Session::exec()
         processSunshineAbrFeedback();
         processFileMappingUxProbeResult();
         processFileMappingMountResult();
+        processFileMappingTransferEvents();
         processClipboardHelperMessages();
 
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
@@ -3565,6 +3637,7 @@ void Session::exec()
             processClipboardHelperMessages();
             processFileMappingUxProbeResult();
             processFileMappingMountResult();
+            processFileMappingTransferEvents();
             processQtEventsDuringStream(true);
             processSunshineAbrFeedback();
             continue;
@@ -3586,6 +3659,7 @@ void Session::exec()
             processClipboardHelperMessages();
             processFileMappingUxProbeResult();
             processFileMappingMountResult();
+            processFileMappingTransferEvents();
             processQtEventsDuringStream();
             processSunshineAbrFeedback();
             continue;
@@ -4013,6 +4087,7 @@ void Session::exec()
         processClipboardHelperMessages();
         processFileMappingUxProbeResult();
         processFileMappingMountResult();
+        processFileMappingTransferEvents();
         processQtEventsDuringStream();
 
         // Deferred microphone toggle — runs outside processEvents() to avoid

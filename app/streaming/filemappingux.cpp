@@ -82,7 +82,7 @@ public:
         else {
             available = true;
             detail = QObject::tr("Ready");
-            message = QObject::tr("Host files are ready. Shared folders are read-only in this session.");
+            message = QObject::tr("Host drives are ready for file transfer.");
         }
 
         diagnosticsPath = FileMappingUx::appendDiagnostic(

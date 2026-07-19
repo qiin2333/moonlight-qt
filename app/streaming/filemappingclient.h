@@ -59,6 +59,18 @@ public:
                    quint64 offset = 0,
                    quint32 length = 64 * 1024,
                    int timeoutMs = 5000);
+    RpcResult mkdir(const QString& mappingId,
+                    const QString& path,
+                    int timeoutMs = 5000);
+    RpcResult write(const QString& mappingId,
+                    const QString& path,
+                    const QString& uploadId,
+                    quint64 offset,
+                    quint64 totalSize,
+                    const QByteArray& data,
+                    bool begin,
+                    bool complete,
+                    int timeoutMs = 10000);
     SmokeResult smokeRead(const QString& mappingId,
                           const QString& path,
                           quint64 offset = 0,
