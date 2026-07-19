@@ -2,22 +2,25 @@
 
 [中文](README.md)
 
-[![Build](https://img.shields.io/github/actions/workflow/status/qiin2333/moonlight-qt/build.yml?branch=master)](https://github.com/qiin2333/moonlight-qt/actions/workflows/build.yml?query=branch%3Amaster)
-[![Downloads](https://img.shields.io/github/downloads/qiin2333/moonlight-qt/total)](https://github.com/qiin2333/moonlight-qt/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/BuffPlum/moonlight-qt/build.yml?branch=master)](https://github.com/BuffPlum/moonlight-qt/actions/workflows/build.yml?query=branch%3Amaster)
+[![Downloads](https://img.shields.io/github/downloads/BuffPlum/moonlight-qt/total)](https://github.com/BuffPlum/moonlight-qt/releases)
 
-This is a downstream desktop client fork based on [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt), designed to work closely with [Foundation Sunshine](https://github.com/qiin2333/Sunshine).
+> [!WARNING]
+> **This is an unofficial version independently maintained by BuffPlum.** It is not supported by the Moonlight or Foundation Sunshine upstream projects. Full-disk file transfer lets a paired client access every drive readable by the Sunshine process. Use it only between personal devices on a trusted local network, and read the [security notice](SECURITY.md) before installing it.
+
+This is a downstream desktop client fork based on [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt), designed to work closely with [BuffPlum/foundation-sunshine](https://github.com/BuffPlum/foundation-sunshine).
 
 The fork remains compatible with upstream Moonlight and standard Sunshine hosts, while improving the Foundation Sunshine desktop experience with clearer capability negotiation, finer quality/performance controls, and more efficient in-stream actions.
 
 ## Downloads
 
-Download Windows, macOS, Linux AppImage, and Steam Link builds from this fork's [GitHub Releases](https://github.com/qiin2333/moonlight-qt/releases).
+Download builds from this fork's [GitHub Releases](https://github.com/BuffPlum/moonlight-qt/releases). Windows is the primary supported platform for the BuffPlum edition; the release workflow produces x64 and ARM64 portable packages plus a universal installer.
 
 For upstream Moonlight distribution channels, mobile clients, Flatpak, Snap, or distro packages, see the [Moonlight website](https://moonlight-stream.org) and the [upstream repository](https://github.com/moonlight-stream/moonlight-qt). Those builds may not include the Foundation Sunshine extensions maintained in this fork.
 
 ## Foundation Sunshine Integration
 
-Foundation Sunshine is the primary server counterpart for this client fork. The client probes host capabilities during connection setup; enhanced protocols are enabled only when the server advertises support, and standard Moonlight / Sunshine behavior is used otherwise.
+[BuffPlum/foundation-sunshine](https://github.com/BuffPlum/foundation-sunshine) is the primary server counterpart for this client fork. The client probes host capabilities during connection setup; enhanced protocols are enabled only when the server advertises support, and standard Moonlight / Sunshine behavior is used otherwise.
 
 You can use it like a regular Moonlight client, or pair it with a Foundation Sunshine host for richer clipboard, audio input, display control, bitrate control, and folder-mapping behavior. When an extension is unavailable, the client falls back to standard compatible behavior.
 
@@ -29,7 +32,7 @@ You can use it like a regular Moonlight client, or pair it with a Foundation Sun
 - **High-quality microphone forwarding**: uses the microphone extension in `moonlight-common-c` for continuous audio input and multichannel scenarios.
 - **Remote resolution decoupling**: stream resolution can be independent from the local display resolution, with custom remote resolution and frame-rate controls.
 - **AppView display control**: supports target display selection, virtual display groups, remote resolution, and remote frame-rate preferences so the client and Foundation Sunshine share the same display intent.
-- **Folder mapping / host file access**: exposes Foundation Sunshine folder-mapping features in the client, including in-stream access to shared host files and cross-platform mount support.
+- **Full-disk bidirectional file transfer**: browses all drives accessible to the paired host and client, transfers files or directories in either direction, and refuses to overwrite existing destinations by default.
 
 ### Quality And Performance
 
@@ -45,15 +48,17 @@ You can use it like a regular Moonlight client, or pair it with a Foundation Sun
 - **Floating menu quick controls** for fullscreen, performance stats, mouse mode, cursor visibility, microphone, host file access, and other common in-stream actions.
 - **Gamepad improvements** including configurable quit combos, instant gamepad/mouse switching, and context-aware settings visibility to reduce unrelated settings noise.
 - **Remote desktop mouse mode** alongside game-style pointer capture, covering games, desktop work, and quick maintenance sessions.
+- **Window-edge mouse release** that can be toggled from the in-stream menu when running in windowed mode.
 - **Automatic IME suppression while streaming** on Windows via Win32 IMM hooks to improve keyboard input stability.
 - **AppView presentation** for running state and display options, making it clearer where a session will launch.
 
 ### Automation And Releases
 
-- **Fork-specific update checks** using GitHub Releases from `qiin2333/moonlight-qt`.
+- **Fork-specific update checks** using GitHub Releases from `BuffPlum/moonlight-qt`.
 - **Git tag based versioning** through `scripts/derive-version.py`, keeping CI and local artifact names consistent.
 - **Automated translation build** via `.github/workflows/build-translate.yml` for `.ts` / `.qm` resources.
 - **CI build matrix** for Windows, macOS, Linux AppImage, and Steam Link artifacts.
+- **Independent Windows releases** that build an installer and portable packages for `vX.Y.Z-buffplum.N` versions.
 
 ## Compatibility
 
@@ -157,7 +162,9 @@ Original Steam Link hardware limits:
 
 ## Contributing
 
-This fork prioritizes Foundation Sunshine integration, desktop client experience, Chinese localization, and cross-platform build stability.
+This repository is the primary home of the BuffPlum edition. Fork-specific features are no longer proposed upstream; upstream repositories are used only as sources for compatible fixes and security updates. Report fork-specific problems in [BuffPlum/moonlight-qt Issues](https://github.com/BuffPlum/moonlight-qt/issues).
+
+Versions use `vX.Y.Z-buffplum.N`, for example `v6.2.92-buffplum.1`. See [.github/workflows/README.md](.github/workflows/README.md) for the release procedure.
 
 When opening an issue or pull request, please include:
 

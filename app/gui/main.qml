@@ -562,7 +562,8 @@ ApplicationWindow {
         standardButtons: Dialog.Ok | Dialog.Cancel
         text: qsTr("This version of Moonlight isn't optimized for your PC. Please download the '%1' version of Moonlight for the best streaming performance.").arg(SystemProperties.friendlyNativeArchName)
         onAccepted: {
-            Qt.openUrlExternally("https://github.com/moonlight-stream/moonlight-qt/releases");
+            // Keep architecture recommendations within the independently maintained fork.
+            Qt.openUrlExternally("https://github.com/BuffPlum/moonlight-qt/releases");
         }
     }
 

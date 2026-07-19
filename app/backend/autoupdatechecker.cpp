@@ -9,11 +9,12 @@
 #include <QJsonObject>
 #include <QNetworkRequest>
 #include <QNetworkReply>
+#include <QRegularExpression>
 #include <QSysInfo>
 #include <QTextStream>
 
-// GitHub repository for update checks
-#define GITHUB_OWNER "qiin2333"
+// BuffPlum releases are the update source for this independently maintained fork.
+#define GITHUB_OWNER "BuffPlum"
 #define GITHUB_REPO  "moonlight-qt"
 
 AutoUpdateChecker::AutoUpdateChecker(QObject *parent) :
@@ -94,13 +95,23 @@ void AutoUpdateChecker::parseStringToVersionQuad(const QString& string, QVector<
 {
     version.clear();
 
-    // Strip leading 'v' and ignore SemVer suffixes/build metadata:
-    //   v6.2.82                  -> 6.2.82
-    //   6.2.82+14.g13ca12da.dirty -> 6.2.82
-    //   v6.2.82-14-g13ca12da      -> 6.2.82
+    // Preserve the BuffPlum release revision as a fourth comparison component,
+    // while continuing to ignore ordinary SemVer suffixes and Git metadata.
+    //   v6.2.92-buffplum.3        -> 6.2.92.3
+    //   6.2.92+14.g13ca12da.dirty -> 6.2.92
+    //   v6.2.92-14-g13ca12da      -> 6.2.92
     QString versionStr = string.trimmed();
     if (versionStr.startsWith('v') || versionStr.startsWith('V')) {
         versionStr = versionStr.mid(1);
+    }
+
+    int forkRevision = -1;
+    const QRegularExpression forkRevisionPattern(
+            QStringLiteral("-buffplum\\.(\\d+)"),
+            QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpressionMatch forkMatch = forkRevisionPattern.match(versionStr);
+    if (forkMatch.hasMatch()) {
+        forkRevision = forkMatch.captured(1).toInt();
     }
 
     int suffixIndex = versionStr.indexOf('+');
@@ -120,6 +131,10 @@ void AutoUpdateChecker::parseStringToVersionQuad(const QString& string, QVector<
             break;
         }
         version.append(value);
+    }
+
+    if (forkRevision >= 0 && version.size() >= 3) {
+        version.append(forkRevision);
     }
 }
 

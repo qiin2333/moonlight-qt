@@ -2,22 +2,25 @@
 
 [English](README.en.md)
 
-[![Build](https://img.shields.io/github/actions/workflow/status/qiin2333/moonlight-qt/build.yml?branch=master)](https://github.com/qiin2333/moonlight-qt/actions/workflows/build.yml?query=branch%3Amaster)
-[![Downloads](https://img.shields.io/github/downloads/qiin2333/moonlight-qt/total)](https://github.com/qiin2333/moonlight-qt/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/BuffPlum/moonlight-qt/build.yml?branch=master)](https://github.com/BuffPlum/moonlight-qt/actions/workflows/build.yml?query=branch%3Amaster)
+[![Downloads](https://img.shields.io/github/downloads/BuffPlum/moonlight-qt/total)](https://github.com/BuffPlum/moonlight-qt/releases)
 
-这是基于 [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) 维护的下游客户端 fork，面向搭配 [Foundation Sunshine](https://github.com/qiin2333/Sunshine) 使用的桌面串流场景。
+> [!WARNING]
+> **这是 BuffPlum 独立维护的非官方版本。** 它不由 Moonlight 或 Foundation Sunshine 上游提供支持。全盘文件传输会让已配对客户端访问 Sunshine 进程能够读取的全部磁盘，仅建议在可信局域网和个人设备间使用。安装前请阅读 [安全说明](SECURITY.md)。
+
+这是基于 [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) 维护的下游客户端 fork，主要搭配 [BuffPlum/foundation-sunshine](https://github.com/BuffPlum/foundation-sunshine) 使用。
 
 本项目继续兼容上游 Moonlight / 标准 Sunshine，同时进一步完善 Foundation Sunshine 的客户端体验：能力协商更明确，画质与性能控制更细，串流中的常用操作效率更高。
 
 ## 下载
 
-推荐从本 fork 的 [GitHub Releases](https://github.com/qiin2333/moonlight-qt/releases) 下载 Windows、macOS、Linux AppImage 和 Steam Link 构建产物。
+推荐从本 fork 的 [GitHub Releases](https://github.com/BuffPlum/moonlight-qt/releases) 下载构建产物。Windows 是 BuffPlum 版本的主要支持平台，Release 工作流会生成 x64、ARM64 便携包和通用安装程序。
 
 如果你需要上游 Moonlight 的官方发行渠道、移动端客户端、Flatpak、Snap 或发行版软件源，请参考 [Moonlight 官方网站](https://moonlight-stream.org) 和 [上游仓库](https://github.com/moonlight-stream/moonlight-qt)。这些渠道不一定包含本 fork 与 Foundation Sunshine 配套的扩展能力。
 
 ## Foundation Sunshine 协同
 
-Foundation Sunshine 是本 fork 的主要服务端配套项目。客户端会在连接时探测服务端能力；当服务端支持对应扩展时启用增强协议，不支持时回退到标准 Moonlight / Sunshine 行为。
+[BuffPlum/foundation-sunshine](https://github.com/BuffPlum/foundation-sunshine) 是本 fork 的主要服务端配套项目。客户端会在连接时探测服务端能力；当服务端支持对应扩展时启用增强协议，不支持时回退到标准 Moonlight / Sunshine 行为。
 
 这意味着你可以把它当作普通 Moonlight 客户端使用，也可以在 Foundation Sunshine 主机上获得更完整的剪贴板、音频输入、显示控制、码率控制和文件夹映射体验。扩展能力不可用时，客户端会回退到标准兼容行为。
 
@@ -47,15 +50,17 @@ Foundation Sunshine 是本 fork 的主要服务端配套项目。客户端会在
 - **悬浮菜单快捷控制**：串流中可快速切换全屏、性能统计、鼠标模式、光标显示、麦克风、主机文件访问等常用动作。
 - **手柄体验增强**：可配置退出组合键，支持手柄鼠标即时切换，并在有手柄时展示相关选项，减少无关设置干扰。
 - **远程桌面鼠标模式**：保留游戏指针捕获和远程桌面直接鼠标控制两种模式，适合游戏、桌面办公和轻量维护场景。
+- **窗口边缘自动释放鼠标**：窗口模式下可在悬浮菜单中控制鼠标到达窗口边缘时是否自动移出串流窗口。
 - **串流时自动禁用 IME**：Windows 下基于 Win32 IMM hooks 降低输入法干扰，提升键盘输入稳定性。
 - **AppView 信息展示**：应用列表中展示运行状态和显示器选项，帮助用户更明确地选择要启动的位置。
 
 ### 自动化与发布
 
-- **本 fork 更新检查**：客户端更新检查指向 `qiin2333/moonlight-qt` 的 GitHub Releases。
+- **本 fork 更新检查**：客户端更新检查指向 `BuffPlum/moonlight-qt` 的 GitHub Releases。
 - **基于 Git tag 的版本号**：`scripts/derive-version.py` 支持 CI 与本地构建产物使用一致的版本命名。
 - **自动翻译构建**：`.github/workflows/build-translate.yml` 用于周期性更新 `.ts` / `.qm` 翻译资源。
 - **CI 构建矩阵**：Windows、macOS、Linux AppImage 和 Steam Link 均有独立工作流维护。
+- **独立 Windows Release**：发布 `vX.Y.Z-buffplum.N` 版本时自动生成 Windows 安装程序与便携包。
 
 ## 兼容性
 
@@ -159,7 +164,9 @@ Steam Link 原始硬件限制：
 
 ## 贡献
 
-这个 fork 的改动优先围绕 Foundation Sunshine 协同能力、桌面客户端体验、中文本地化和跨平台构建稳定性展开。
+这个仓库是 BuffPlum 版本的主要开发仓库，不再把 Fork 专属功能提交给上游。上游仅作为同步兼容性修复和安全更新的来源；Fork 专属问题请提交到 [BuffPlum/moonlight-qt Issues](https://github.com/BuffPlum/moonlight-qt/issues)。
+
+版本号使用 `vX.Y.Z-buffplum.N`，例如 `v6.2.92-buffplum.1`。发布流程见 [.github/workflows/README.md](.github/workflows/README.md)。
 
 提交 issue 或 PR 时，请尽量说明：
 

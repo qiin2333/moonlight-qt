@@ -22,6 +22,8 @@ from pathlib import Path
 
 SEMVER_RE = re.compile(
     r"^v?(?P<base>\d+\.\d+\.\d+)"
+    # BuffPlum tags use a SemVer prerelease label such as -buffplum.1.
+    r"(?:-(?P<prerelease>(?!(?:\d+-g))[0-9A-Za-z][0-9A-Za-z.-]*?))?"
     r"(?:-(?P<count>\d+)-g(?P<sha>[0-9a-fA-F]+))?"
     r"(?P<dirty>-dirty)?$"
 )
@@ -91,15 +93,19 @@ def derive(source_root: Path) -> dict[str, str]:
         match = SEMVER_RE.match(describe)
         if match:
             base = match.group("base")
+            prerelease = match.group("prerelease") or ""
             count = int(match.group("count") or 0)
             sha = match.group("sha") or commit
             dirty = bool(match.group("dirty"))
             major, minor, patch = split_numeric_base(base)
+            release_version = f"{base}-{prerelease}" if prerelease else base
+            fork_revision_match = re.fullmatch(r"buffplum\.(\d+)", prerelease)
+            fork_revision = int(fork_revision_match.group(1)) if fork_revision_match else 0
 
             if count == 0 and not dirty:
-                display = base
+                display = release_version
             else:
-                display = f"{base}+{count}.g{sha[:8]}"
+                display = f"{release_version}+{count}.g{sha[:8]}"
                 if dirty:
                     display += ".dirty"
 
@@ -107,7 +113,9 @@ def derive(source_root: Path) -> dict[str, str]:
                 "base": base,
                 "display": display,
                 "artifact": display.replace("+", "-"),
-                "numeric": f"{major}.{minor}.{patch}.{clamp_u16(count)}",
+                # Exact BuffPlum tags use their fork revision in the fourth
+                # numeric component; later commits use the Git distance.
+                "numeric": f"{major}.{minor}.{patch}.{clamp_u16(count or fork_revision)}",
                 "describe": describe,
                 "commit": commit,
             }

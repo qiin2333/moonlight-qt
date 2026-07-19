@@ -1,0 +1,137 @@
+name: BuffPlum Windows Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version used for a build-only run, for example v6.2.92-buffplum.1
+        required: true
+        default: v6.2.92-buffplum.1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: buffplum-windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Resolve BuffPlum version
+        shell: pwsh
+        run: |
+          # Release events use the published tag; manual runs only create Actions artifacts.
+          $tag = if ("${{ github.event_name }}" -eq "release") {
+            "${{ github.event.release.tag_name }}"
+          } else {
+            "${{ inputs.version }}"
+          }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+-buffplum\.\d+$') {
+            throw "Version must match vX.Y.Z-buffplum.N"
+          }
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+          "CI_VERSION=$($tag.Substring(1))" >> $env:GITHUB_ENV
+
+      - name: Download dependencies
+        shell: pwsh
+        run: ./setup-deps.ps1
+
+      - name: Install Qt x64
+        uses: jdpurcell/install-qt-action@v5
+        with:
+          arch: win64_msvc2022_64
+          dir: ${{ github.workspace }}\qt-x64
+          host: windows
+          target: desktop
+          version: '6.11.1'
+          modules: 'qtmultimedia qtimageformats'
+          use-naqt: true
+
+      - name: Install Qt ARM64
+        uses: jdpurcell/install-qt-action@v5
+        with:
+          arch: win64_msvc2022_arm64_cross_compiled
+          dir: ${{ github.workspace }}\qt-arm64
+          host: windows
+          target: desktop
+          version: '6.11.1'
+          modules: 'qtmultimedia qtimageformats'
+          use-naqt: true
+
+      - name: Build Windows x64
+        shell: cmd
+        env:
+          # Each Qt architecture has a fixed directory so the second install
+          # cannot overwrite the path used by the first build.
+          QT_PATH: ${{ github.workspace }}\qt-x64\Qt\6.11.1\msvc2022_64\bin
+        run: |
+          set "PATH=%QT_PATH%;%PATH%"
+          call scripts\build-arch.bat release x64
+          if errorlevel 1 exit /b %ERRORLEVEL%
+
+      - name: Build Windows ARM64
+        shell: cmd
+        env:
+          QT_PATH: ${{ github.workspace }}\qt-arm64\Qt\6.11.1\msvc2022_arm64\bin
+        run: |
+          rem The ARM64 Qt bin directory contains the host qmake wrapper used for cross-compilation.
+          set "PATH=%QT_PATH%;%PATH%"
+          call scripts\build-arch.bat release arm64
+          if errorlevel 1 exit /b %ERRORLEVEL%
+
+      - name: Generate portable packages and universal installer
+        shell: cmd
+        run: |
+          call scripts\generate-bundle.bat release
+          if errorlevel 1 exit /b %ERRORLEVEL%
+
+      - name: Generate SHA256 checksums
+        shell: pwsh
+        run: |
+          # Keep release verification independent of platform-specific signing.
+          $files = @(
+            Get-ChildItem build\installer-x64-release\MoonlightPortable-x64-*.zip
+            Get-ChildItem build\installer-arm64-release\MoonlightPortable-arm64-*.zip
+            Get-ChildItem build\installer-Release\MoonlightSetup-*.exe
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+            "$hash  $($file.Name)"
+          }
+          $lines | Set-Content -Encoding ascii SHA256SUMS.txt
+
+      - name: Upload Actions artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Moonlight-Windows-${{ env.CI_VERSION }}
+          path: |
+            build/installer-x64-release/MoonlightPortable-x64-*.zip
+            build/installer-arm64-release/MoonlightPortable-arm64-*.zip
+            build/installer-Release/MoonlightSetup-*.exe
+            SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Attach packages to the GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: |
+            build/installer-x64-release/MoonlightPortable-x64-*.zip
+            build/installer-arm64-release/MoonlightPortable-arm64-*.zip
+            build/installer-Release/MoonlightSetup-*.exe
+            SHA256SUMS.txt
+          fail_on_unmatched_files: true

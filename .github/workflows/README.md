@@ -9,7 +9,6 @@
 **触发条件：**
 - 推送到 `master` 或 `main` 分支
 - 创建 Pull Request
-- 发布 Release
 
 **支持平台：**
 - Windows (x64/ARM64) - 使用 Qt 6.8.0
@@ -51,8 +50,14 @@
 ### 自动构建
 每次推送代码或创建 PR 时，会自动触发构建。
 
-### 发布版本
-在 GitHub 上创建新的 Release 时，会自动构建并上传所有平台的构建产物。
+### BuffPlum Windows Release (`fork-release-windows.yml`)
+
+该工作流是 BuffPlum 独立版本的正式 Windows 发布入口：
+
+- 版本号必须使用 `vX.Y.Z-buffplum.N`，例如 `v6.2.92-buffplum.1`。
+- 先创建预发布 Release，工作流会自动生成 x64、ARM64 便携包、通用安装程序和 `SHA256SUMS.txt`。
+- 确认安装包上传成功后，再把预发布提升为正式 Release，避免自动更新客户端在构建完成前看到空版本。
+- `workflow_dispatch` 可用于只构建 Actions artifacts，不会自动创建 Release。
 
 ### 查看构建状态
 - 在仓库主页查看构建状态
@@ -86,10 +91,9 @@
 - **Linux**: 完整的开发环境，系统 Qt 5.15
 - **所有平台**: Git, 网络访问
 
-### 密钥配置
+### 权限配置
 
-需要在仓库设置中配置：
-- `GH_BOT_TOKEN`: GitHub 个人访问令牌（用于 Release 上传）
+发布工作流只使用 GitHub 自动提供的 `GITHUB_TOKEN`，不需要额外的个人访问令牌。工作流通过最小的 `contents: write` 权限把安装包上传到当前 Release。
 
 ## 自定义配置
 
@@ -118,4 +122,4 @@
 - 详细的错误日志
 - 优雅的失败处理
 
-这个工作流设计为开箱即用，无需额外配置即可在 GitHub Actions 中运行。 
+这个工作流设计为开箱即用，无需额外配置即可在 GitHub Actions 中运行。
