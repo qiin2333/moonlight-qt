@@ -74,21 +74,21 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
                            button);
 }
 
-void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
+bool SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
 {
     if (!isCaptureActive()) {
         // Not capturing
-        return;
+        return false;
     }
     else if (event->which == SDL_TOUCH_MOUSEID) {
         // Ignore synthetic mouse events
-        return;
+        return false;
     }
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
     else if (shouldSuppressWindowsTouchpadMouseEvent(event->which)) {
         // The same Windows Precision Touchpad input is being sent through the
         // native touchpad protocol. Drop the system-promoted pointer motion.
-        return;
+        return false;
     }
 #endif
 
@@ -169,8 +169,60 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
         m_MouseWasInVideoRegion = mouseInVideoRegion;
     }
     else {
+        WindowedMouseEdgeTracker::ReleaseDecision releaseDecision;
+        const Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
+        const bool isWindowed =
+                (windowFlags & SDL_WINDOW_FULLSCREEN) == 0;
+        const bool hasNativeRelativeCapture =
+                SDL_GetRelativeMouseMode() == SDL_TRUE;
+
+        if (m_AutoReleaseMouseOnWindowEdge &&
+            isWindowed &&
+            hasNativeRelativeCapture) {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            SDL_GetWindowSize(m_Window, &windowWidth, &windowHeight);
+
+            // Defer release while a button is held so drag operations can
+            // continue smoothly across the edge of the remote desktop.
+            const bool releaseAllowed =
+                    SDL_GetMouseState(nullptr, nullptr) == 0;
+            releaseDecision = m_WindowedMouseEdgeTracker.update(
+                    xrel,
+                    yrel,
+                    windowWidth,
+                    windowHeight,
+                    releaseAllowed);
+        }
+        else {
+            // Fullscreen and absolute/fallback mouse modes must retain their
+            // existing capture behavior and must not reuse stale coordinates
+            // if the stream later returns to windowed relative mode.
+            m_WindowedMouseEdgeTracker.deactivate();
+        }
+
+        // Forward the complete relative delta before releasing capture so the
+        // host does not lose the final movement that reached the edge.
         LiSendMouseMoveEvent(xrel, yrel);
+
+        if (releaseDecision.shouldRelease) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Automatically releasing mouse capture at window edge (%d, %d)",
+                        releaseDecision.x,
+                        releaseDecision.y);
+
+            // Disable relative mode before warping. SDL backends may ignore or
+            // misplace warps performed while relative capture is still active.
+            setCaptureActive(false);
+            SDL_WarpMouseInWindow(
+                    m_Window,
+                    releaseDecision.x,
+                    releaseDecision.y);
+            return true;
+        }
     }
+
+    return false;
 }
 
 void SdlInputHandler::handleMouseWheelEvent(SDL_MouseWheelEvent* event)

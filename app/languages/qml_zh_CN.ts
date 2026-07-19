@@ -253,6 +253,10 @@
         <translation>切换全屏</translation>
     </message>
     <message>
+        <source>Release Mouse at Window Edge</source>
+        <translation>窗口边缘自动释放</translation>
+    </message>
+    <message>
         <source>Microphone</source>
         <translation>麦克风</translation>
     </message>
@@ -609,6 +613,14 @@
 </context>
 <context>
     <name>Session</name>
+    <message>
+        <source>Window edge mouse release enabled.</source>
+        <translation>已开启窗口边缘自动释放鼠标。</translation>
+    </message>
+    <message>
+        <source>Window edge mouse release disabled.</source>
+        <translation>已关闭窗口边缘自动释放鼠标。</translation>
+    </message>
     <message>
         <location filename="../streaming/session.cpp" line="104"/>
         <source>No video received from host.</source>
@@ -1198,6 +1210,16 @@
         <location filename="../gui/SettingsView.qml" line="1321"/>
         <source>NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.</source>
         <translation>注意：由于 GeForce Experience 的 Bug，如果你的目标计算机有多个显示器，则此选项可能无法正常工作。</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1869"/>
+        <source>Release mouse when it reaches the edge of a window</source>
+        <translation>鼠标到达窗口边缘时自动释放</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1880"/>
+        <source>This lets the local cursor leave a windowed stream automatically while using game mouse mode. Click inside the stream to capture the mouse again. Fullscreen streams are unaffected.</source>
+        <translation>在游戏鼠标模式下，允许本机光标自动移出窗口化串流。单击串流窗口可重新捕获鼠标；全屏串流不受影响。</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="1507"/>

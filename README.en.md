@@ -45,6 +45,7 @@ You can use it like a regular Moonlight client, or pair it with a Foundation Sun
 - **Floating menu quick controls** for fullscreen, performance stats, mouse mode, cursor visibility, microphone, host file access, and other common in-stream actions.
 - **Gamepad improvements** including configurable quit combos, instant gamepad/mouse switching, and context-aware settings visibility to reduce unrelated settings noise.
 - **Remote desktop mouse mode** alongside game-style pointer capture, covering games, desktop work, and quick maintenance sessions.
+- **Automatic mouse release at window edges** can be toggled under Settings → Input Settings or from the in-stream overlay menu, allowing game mouse mode to leave a windowed stream without a shortcut while preserving existing fullscreen behavior.
 - **Automatic IME suppression while streaming** on Windows via Win32 IMM hooks to improve keyboard input stability.
 - **AppView presentation** for running state and display options, making it clearer where a session will launch.
 

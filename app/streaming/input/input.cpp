@@ -25,6 +25,10 @@
 SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight)
     : m_MultiController(prefs.multiController),
       m_GamepadMouse(prefs.gamepadMouse),
+      // Keep the preference on the input handler so the streaming hot path
+      // doesn't need to consult QSettings for each mouse event.
+      m_AutoReleaseMouseOnWindowEdge(
+              prefs.autoReleaseMouseOnWindowEdge),
       m_SwapMouseButtons(prefs.swapMouseButtons),
       m_SwapWinAltKeys(prefs.swapWinAltKeys),
       m_ReverseScrollDirection(prefs.reverseScrollDirection),
@@ -311,6 +315,20 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 #endif
 }
 
+void SdlInputHandler::setAutoReleaseMouseOnWindowEdge(bool enabled)
+{
+    if (m_AutoReleaseMouseOnWindowEdge == enabled) {
+        return;
+    }
+
+    m_AutoReleaseMouseOnWindowEdge = enabled;
+
+    // Discard the integrated relative position whenever the mode changes.
+    // Enabling will seed a fresh position on the next valid relative event,
+    // while disabling must not leave stale coordinates for a later re-enable.
+    m_WindowedMouseEdgeTracker.deactivate();
+}
+
 void SdlInputHandler::raiseAllKeys(bool clearKeys)
 {
     if (m_KeysDown.isEmpty()) {
@@ -472,11 +490,29 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
 void SdlInputHandler::setCaptureActive(bool active)
 {
     if (active) {
+        int mouseX = 0;
+        int mouseY = 0;
+        SDL_GetMouseState(&mouseX, &mouseY);
+
         // If we're in relative mode, try to activate SDL's relative mouse mode
         if (m_AbsoluteMouseMode || SDL_SetRelativeMouseMode(SDL_TRUE) < 0) {
             // Relative mouse mode didn't work or was disabled, so we'll just hide the cursor
             SDL_ShowCursor(m_MouseCursorCapturedVisibilityState);
             m_FakeMouseCaptureActive = true;
+            m_WindowedMouseEdgeTracker.deactivate();
+        }
+        else {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            SDL_GetWindowSize(m_Window, &windowWidth, &windowHeight);
+
+            // Seed the virtual cursor before SDL begins returning only relative
+            // motion, so the first movement cannot falsely trigger an edge.
+            m_WindowedMouseEdgeTracker.reset(
+                    mouseX,
+                    mouseY,
+                    windowWidth,
+                    windowHeight);
         }
 
         // Synchronize the client and host cursor when activating absolute capture
@@ -510,6 +546,9 @@ void SdlInputHandler::setCaptureActive(bool active)
         // example, when the user explicitly releases input). Ensure Sunshine
         // never retains contacts from the previous capture state.
         cancelNativeTouchpadContacts();
+
+        // A future recapture must start from the newly visible cursor position.
+        m_WindowedMouseEdgeTracker.deactivate();
 
         if (m_FakeMouseCaptureActive) {
             // Display the cursor again

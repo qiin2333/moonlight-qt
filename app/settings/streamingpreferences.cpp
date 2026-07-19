@@ -33,6 +33,8 @@
 #define SER_MDNS "mdns"
 #define SER_QUITAPPAFTER "quitAppAfter"
 #define SER_ABSMOUSEMODE "mouseacceleration"
+// Opt-in key for releasing relative mouse capture at window edges.
+#define SER_AUTORELEASEMOUSEONWINDOWEDGE "autoreleasemouseonwindowedge"
 #define SER_ABSTOUCHMODE "abstouchmode"
 #define SER_NATIVETOUCHPAD "nativeTouchpad"
 #define SER_STARTWINDOWED "startwindowed"
@@ -156,6 +158,10 @@ void StreamingPreferences::reload()
     enableMdns = settings.value(SER_MDNS, true).toBool();
     quitAppAfter = settings.value(SER_QUITAPPAFTER, false).toBool();
     absoluteMouseMode = settings.value(SER_ABSMOUSEMODE, false).toBool();
+    // Preserve Moonlight's historical capture behavior until users explicitly
+    // enable seamless edge release for windowed streams.
+    autoReleaseMouseOnWindowEdge =
+            settings.value(SER_AUTORELEASEMOUSEONWINDOWEDGE, false).toBool();
     showLocalCursor = settings.value(SER_SHOWLOCALCURSOR, false).toBool();
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
     enableNativeTouchpad = settings.value(SER_NATIVETOUCHPAD, true).toBool();
@@ -359,6 +365,16 @@ QString StreamingPreferences::getSuffixFromLanguage(StreamingPreferences::Langua
     }
 }
 
+void StreamingPreferences::setAutoReleaseMouseOnWindowEdge(bool enabled)
+{
+    if (autoReleaseMouseOnWindowEdge == enabled) {
+        return;
+    }
+
+    autoReleaseMouseOnWindowEdge = enabled;
+    emit autoReleaseMouseOnWindowEdgeChanged();
+}
+
 void StreamingPreferences::save()
 {
     QSettings settings;
@@ -377,6 +393,10 @@ void StreamingPreferences::save()
     settings.setValue(SER_MDNS, enableMdns);
     settings.setValue(SER_QUITAPPAFTER, quitAppAfter);
     settings.setValue(SER_ABSMOUSEMODE, absoluteMouseMode);
+    // Persist the edge-release preference independently of mouse mode so it is
+    // restored if the user switches back from remote desktop mouse mode.
+    settings.setValue(SER_AUTORELEASEMOUSEONWINDOWEDGE,
+                      autoReleaseMouseOnWindowEdge);
     settings.setValue(SER_SHOWLOCALCURSOR, showLocalCursor);
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
     settings.setValue(SER_NATIVETOUCHPAD, enableNativeTouchpad);

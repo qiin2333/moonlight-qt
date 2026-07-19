@@ -14,6 +14,7 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
       m_HoveredIndex(-1),
       m_Visible(false),
       m_HasGamepads(false),
+      m_AutoReleaseMouseOnWindowEdge(false),
       m_FileMappingState(FileMappingState::Unknown),
       m_FileMappingDetail(tr("Checking")),
       m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
@@ -160,6 +161,11 @@ void OverlayMenuPanel::buildMenuLevels()
                          m_FileMappingState == FileMappingState::Open, true});   // separator
     top.items.push_back({tr("Toggle Fullscreen"), QString(), MenuItemType::Action,
                          MenuAction::ToggleFullScreen, 0, true, false, false});
+    // Expose the persisted input preference in the in-stream menu so users can
+    // change capture behavior without ending or minimizing the current session.
+    top.items.push_back({tr("Release Mouse at Window Edge"), QString(), MenuItemType::Toggle,
+                         MenuAction::ToggleAutoReleaseMouseOnWindowEdge, 0, true,
+                         m_AutoReleaseMouseOnWindowEdge, false});
     top.items.push_back({tr("Microphone"),    QString(),  MenuItemType::Toggle,
                          MenuAction::ToggleMicrophone, 0, true, false, !m_HasGamepads}); // separator if no gamepad item follows
     // Only show Gamepad Mouse toggle when a gamepad is actually connected
@@ -235,6 +241,22 @@ void OverlayMenuPanel::updateGamepadMouseState(bool enabled)
     if (m_MenuLevels.empty()) return;
     for (auto& item : m_MenuLevels[0].items) {
         if (item.action == MenuAction::ToggleGamepadMouse) {
+            item.toggleState = enabled;
+            forceRepaint();
+            break;
+        }
+    }
+}
+
+void OverlayMenuPanel::updateAutoReleaseMouseOnWindowEdgeState(bool enabled)
+{
+    // Store the state even before the first menu build or after a conditional
+    // rebuild, ensuring the next top-level menu uses the current preference.
+    m_AutoReleaseMouseOnWindowEdge = enabled;
+    if (m_MenuLevels.empty()) return;
+
+    for (auto& item : m_MenuLevels[0].items) {
+        if (item.action == MenuAction::ToggleAutoReleaseMouseOnWindowEdge) {
             item.toggleState = enabled;
             forceRepaint();
             break;
@@ -643,6 +665,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE740); // FullScreen
         case MenuAction::ShowHostFiles:     return QChar(0xE8B7); // Folder
+        case MenuAction::ToggleAutoReleaseMouseOnWindowEdge: return QChar(0xE785); // Mouse back
         case MenuAction::ToggleMicrophone:  return QChar(0xE720); // Microphone
         case MenuAction::ToggleGamepadMouse:  return QChar(0xE7FC); // Gamepad
         case MenuAction::Quit:              return QChar(0xE711); // Close/X
@@ -665,6 +688,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE5D0); // fullscreen
         case MenuAction::ShowHostFiles:     return QChar(0xE2C7); // folder
+        case MenuAction::ToggleAutoReleaseMouseOnWindowEdge: return QChar(0xE5C4); // arrow_back
         case MenuAction::ToggleMicrophone:  return QChar(0xE029); // mic
         case MenuAction::ToggleGamepadMouse:  return QChar(0xE30F); // games (gamepad)
         case MenuAction::Quit:              return QChar(0xE5CD); // close

@@ -1858,6 +1858,28 @@ Flickable {
                                   qsTr("NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.")
                 }
 
+                // Relative mouse mode is required by most games, but normally
+                // traps the local cursor until the ungrab shortcut is pressed.
+                // This opt-in setting adds window-edge escape without changing
+                // the input protocol to absolute remote-desktop coordinates.
+                CheckBox {
+                    id: autoReleaseMouseOnWindowEdgeCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Release mouse when it reaches the edge of a window")
+                    font.pointSize: 12
+                    enabled: !absoluteMouseCheck.checked
+                    checked: StreamingPreferences.autoReleaseMouseOnWindowEdge
+                    onCheckedChanged: {
+                        StreamingPreferences.autoReleaseMouseOnWindowEdge = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("This lets the local cursor leave a windowed stream automatically while using game mouse mode. Click inside the stream to capture the mouse again. Fullscreen streams are unaffected.")
+                }
+
                 CheckBox {
                     id: showLocalCursorCheck
                     hoverEnabled: true

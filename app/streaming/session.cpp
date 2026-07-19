@@ -1887,6 +1887,8 @@ void Session::showQtOverlayMenu()
     m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
     m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
     m_MenuPanel->updateGamepadMouseState(m_InputHandler->isMouseEmulationActive());
+    m_MenuPanel->updateAutoReleaseMouseOnWindowEdgeState(
+            m_Preferences->autoReleaseMouseOnWindowEdge);
     updateFileMappingMenuState();
 
     // Show menu based on user preference
@@ -2050,6 +2052,31 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
             showStreamingToast(tr("Host file sharing is not available."), 3000);
         }
         return;
+
+    // --- Window-edge mouse release toggle ---
+    case OverlayMenuPanel::MenuAction::ToggleAutoReleaseMouseOnWindowEdge:
+    {
+        const bool enabled =
+                !m_Preferences->autoReleaseMouseOnWindowEdge;
+
+        // Keep the persistent preference, the live input handler, and the open
+        // menu synchronized so this takes effect without reconnecting.
+        m_Preferences->setAutoReleaseMouseOnWindowEdge(enabled);
+        m_Preferences->save();
+        if (m_InputHandler) {
+            m_InputHandler->setAutoReleaseMouseOnWindowEdge(enabled);
+        }
+        if (m_MenuPanel) {
+            m_MenuPanel->updateAutoReleaseMouseOnWindowEdgeState(enabled);
+        }
+
+        showStreamingToast(
+                enabled
+                        ? tr("Window edge mouse release enabled.")
+                        : tr("Window edge mouse release disabled."),
+                2500);
+        return;
+    }
 
     // --- Microphone toggle ---
     // Deferred: toggle mic outside processEvents() to avoid QAudioSource heap corruption
@@ -3904,6 +3931,18 @@ void Session::exec()
         }
         case SDL_MOUSEMOTION:
         {
+            // When Qt menu is visible, don't forward motion to input handler
+            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+                break;
+            }
+
+            // Give automatic edge release priority over the overlay's own edge
+            // trigger. Otherwise an edge-positioned menu could prevent the
+            // cursor from leaving that side of a windowed stream.
+            if (m_InputHandler->handleMouseMotionEvent(&event.motion)) {
+                break;
+            }
+
             // Qt overlay menu: edge detection with debounce (500ms cooldown after close)
             // Only trigger for edge-based positions (not disabled, at-cursor, or button)
             if (m_MenuPanel && !m_MenuPanel->isMenuVisible() &&
@@ -3927,12 +3966,6 @@ void Session::exec()
                 }
             }
 
-            // When Qt menu is visible, don't forward motion to input handler
-            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
-                break;
-            }
-
-            m_InputHandler->handleMouseMotionEvent(&event.motion);
             break;
         }
         case SDL_MOUSEWHEEL:

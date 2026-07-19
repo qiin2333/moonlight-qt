@@ -217,6 +217,7 @@ SOURCES += \
     streaming/input/keyboard.cpp \
     streaming/input/mouse.cpp \
     streaming/input/touchpad.cpp \
+    streaming/input/windowedmouseedgetracker.cpp \
     streaming/input/reltouch.cpp \
     streaming/session.cpp \
     streaming/filemappingclient.cpp \
@@ -269,6 +270,7 @@ HEADERS += \
     cli/startstream.h \
     settings/streamingpreferences.h \
     streaming/input/input.h \
+    streaming/input/windowedmouseedgetracker.h \
     streaming/session.h \
     streaming/filemappingclient.h \
     streaming/filemappingwebsocket.h \

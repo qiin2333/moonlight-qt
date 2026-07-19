@@ -19,7 +19,8 @@
  * D3D11/SDL/EGL video rendering pipeline.
  *
  * Menu structure:
- *   Level 0 (Top):      Quick Actions >, Bitrate >, Fullscreen, Microphone [toggle], Disconnect
+ *   Level 0 (Top):      Quick Actions >, Bitrate >, Fullscreen, mouse edge release [toggle],
+ *                       Microphone [toggle], Disconnect
  *   Level 1 (Actions):  Quit, Performance Stats, Mouse Mode, Cursor, Minimize, ...
  *   Level 2 (Bitrate):  1/2/5/10/20/30/50/100 Mbps
  *
@@ -42,6 +43,8 @@ public:
         PasteText,
         TogglePointerRegionLock,
         ShowHostFiles,
+        // Windowed relative-mouse capture behavior
+        ToggleAutoReleaseMouseOnWindowEdge,
         // Microphone
         ToggleMicrophone,
         // Gamepad mouse emulation
@@ -103,6 +106,8 @@ public:
     void updateMicrophoneState(bool enabled);
     void updateBitrateState(int bitrateKbps);
     void updateGamepadMouseState(bool enabled);
+    // Keeps the menu switch synchronized with the persisted input preference.
+    void updateAutoReleaseMouseOnWindowEdgeState(bool enabled);
     void updateFileMappingState(FileMappingState state, const QString& detail);
     void setHasGamepads(bool has) {
         if (m_HasGamepads != has) {
@@ -154,6 +159,8 @@ private:
     int  m_HoveredIndex;
     bool m_Visible;
     bool m_HasGamepads;
+    // Cached toggle state used when the top-level menu is rebuilt.
+    bool m_AutoReleaseMouseOnWindowEdge;
     FileMappingState m_FileMappingState;
     QString m_FileMappingDetail;
 

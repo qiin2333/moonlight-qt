@@ -2,6 +2,7 @@
 
 #include "settings/streamingpreferences.h"
 #include "backend/computermanager.h"
+#include "windowedmouseedgetracker.h"
 
 #include "SDL_compat.h"
 
@@ -107,7 +108,13 @@ public:
 
     void handleMouseButtonEvent(SDL_MouseButtonEvent* event);
 
-    void handleMouseMotionEvent(SDL_MouseMotionEvent* event);
+    /**
+     * Handles relative or absolute mouse motion.
+     *
+     * Returns true when window-edge handling released mouse capture, allowing
+     * the caller to suppress edge-triggered overlay actions for that event.
+     */
+    bool handleMouseMotionEvent(SDL_MouseMotionEvent* event);
 
     void handleMouseWheelEvent(SDL_MouseWheelEvent* event);
 
@@ -199,6 +206,14 @@ public:
     // Update the gamepad mouse setting at runtime
     void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
 
+    /**
+     * Applies the window-edge release preference to the active stream.
+     *
+     * This is called by the overlay menu so users do not need to reconnect
+     * after changing the setting.
+     */
+    void setAutoReleaseMouseOnWindowEdge(bool enabled);
+
 private:
 
     GamepadState*
@@ -281,6 +296,8 @@ private:
     SDL_Window* m_Window;
     bool m_MultiController;
     bool m_GamepadMouse;
+    // Enables seamless escape from a window while preserving game mouse mode.
+    bool m_AutoReleaseMouseOnWindowEdge;
     bool m_SwapMouseButtons;
     bool m_SwapWinAltKeys;
     bool m_ReverseScrollDirection;
@@ -302,6 +319,9 @@ private:
     QStringList m_IgnoreDeviceGuids;
     StreamingPreferences::CaptureSysKeysMode m_CaptureSystemKeysMode;
     int m_MouseCursorCapturedVisibilityState;
+    // Integrates relative deltas because SDL does not expose a stable absolute
+    // cursor position while relative mouse mode is active.
+    WindowedMouseEdgeTracker m_WindowedMouseEdgeTracker;
 
     struct {
         KeyCombo keyCombo;
