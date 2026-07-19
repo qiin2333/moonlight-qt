@@ -205,6 +205,9 @@ private:
 
     void notifyMouseEmulationMode(bool enabled);
 
+    static
+    bool queueTouchpadFrameFlush();
+
     void updateOptimalWindowDisplayMode();
 
     enum class DecoderAvailability {

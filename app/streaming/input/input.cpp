@@ -5,6 +5,10 @@
 #include "path.h"
 #include "utils.h"
 
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+#include "wintouchpad.h"
+#endif
+
 #include <QtGlobal>
 #include <QDir>
 #include <QGuiApplication>
@@ -40,6 +44,23 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_AbsoluteMouseMode(prefs.absoluteMouseMode),
       m_AbsoluteTouchMode(prefs.absoluteTouchMode),
       m_DisabledTouchFeedback(false),
+      m_NativeTouchpadEnabled(SDL_GetHintBoolean(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, SDL_FALSE) == SDL_TRUE),
+      m_TouchpadFlushEventQueued(false),
+      m_NativeTouchpadTransport(NTT_UNKNOWN),
+      m_PendingTouchpadId(0),
+      m_PendingTouchpadTimestamp(0),
+      m_PendingTouchpadContactCount(0),
+      m_ActiveTouchpadId(0),
+      m_LastTouchpadScrollTimestamp(0),
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+      m_ActiveWindowsTouchpadDevice(0),
+      m_LastWindowsTouchpadFrameTicks(0),
+      m_SuppressedWindowsTouchpadMouseButtons(0),
+      m_WindowsTouchpadButtonDown(false),
+      m_WindowsTouchpadButtonUsesMouseFallback(false),
+      m_WindowsTouchpadWidthMm(0),
+      m_WindowsTouchpadHeightMm(0),
+#endif
       m_LeftButtonReleaseTimer(0),
       m_RightButtonReleaseTimer(0),
       m_DragTimer(0),
@@ -216,6 +237,11 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
 
 SdlInputHandler::~SdlInputHandler()
 {
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    m_WindowsTouchpadInput.reset();
+#endif
+    cancelNativeTouchpadContacts();
+
     for (int i = 0; i < MAX_GAMEPADS; i++) {
         if (m_GamepadState[i].mouseEmulationTimer != 0) {
             Session::get()->notifyMouseEmulationMode(false);
@@ -266,6 +292,15 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    if (m_NativeTouchpadEnabled && !m_WindowsTouchpadInput) {
+        auto windowsTouchpadInput = std::make_unique<WindowsTouchpadInput>(this);
+        if (windowsTouchpadInput->initialize(window)) {
+            m_WindowsTouchpadInput = std::move(windowsTouchpadInput);
+        }
+    }
+#endif
 
 #ifdef Q_OS_WIN32
     SDL_SysWMinfo info;
@@ -346,6 +381,8 @@ void SdlInputHandler::notifyFocusLost()
                 (unsigned int)windowFlags,
                 (int)m_KeysDown.count(),
                 isCaptureActive() ? 1 : 0);
+
+    cancelNativeTouchpadContacts();
 
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.
@@ -469,6 +506,11 @@ void SdlInputHandler::setCaptureActive(bool active)
         }
     }
     else {
+        // A capture transition can happen without a window focus event (for
+        // example, when the user explicitly releases input). Ensure Sunshine
+        // never retains contacts from the previous capture state.
+        cancelNativeTouchpadContacts();
+
         if (m_FakeMouseCaptureActive) {
             // Display the cursor again
             SDL_ShowCursor(SDL_ENABLE);
@@ -489,9 +531,20 @@ void SdlInputHandler::setCaptureActive(bool active)
 void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
 {
 #if SDL_VERSION_ATLEAST(2, 0, 10)
-    if (SDL_GetTouchDeviceType(event->touchId) != SDL_TOUCH_DEVICE_DIRECT) {
-        // Ignore anything that isn't a touchscreen. We may get callbacks
-        // for trackpads, but we want to handle those in the mouse path.
+    SDL_TouchDeviceType deviceType = SDL_GetTouchDeviceType(event->touchId);
+    if (deviceType == SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE && m_NativeTouchpadEnabled) {
+        handleNativeTouchpadEvent(event);
+        return;
+    }
+    else if (deviceType == SDL_TOUCH_DEVICE_INDIRECT_RELATIVE && m_NativeTouchpadEnabled) {
+        // Relative indirect devices don't provide physical surface coordinates,
+        // so they cannot be represented by the native touchpad protocol.
+        handleRelativeFingerEvent(event);
+        return;
+    }
+    else if (deviceType != SDL_TOUCH_DEVICE_DIRECT) {
+        // With native touchpad input disabled, SDL leaves trackpads on the
+        // traditional mouse path. Ignore any other indirect touch callbacks.
         return;
     }
 #elif defined(Q_OS_DARWIN)
@@ -505,6 +558,13 @@ void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
 
     if (m_AbsoluteTouchMode) {
         handleAbsoluteFingerEvent(event);
+    }
+    else if (m_NativeTouchpadEnabled) {
+        // A touchscreen in virtual trackpad mode provides the same normalized
+        // contact data as an indirect absolute touchpad. Reuse the native
+        // touchpad transport so the host can handle multi-touch gestures, with
+        // the existing software pointer path as the compatibility fallback.
+        handleNativeTouchpadEvent(event);
     }
     else {
         handleRelativeFingerEvent(event);

@@ -44,6 +44,20 @@ Uint32 SdlInputHandler::dragTimerCallback(Uint32, void *param)
     return 0;
 }
 
+void SdlInputHandler::cancelRelativeTouchpadState()
+{
+    SDL_RemoveTimer(m_DragTimer);
+    m_DragTimer = 0;
+
+    if (m_DragButton != 0) {
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, m_DragButton);
+        m_DragButton = 0;
+    }
+
+    SDL_zero(m_TouchDownEvent);
+    m_NumFingersDown = 0;
+}
+
 void SdlInputHandler::handleRelativeFingerEvent(SDL_TouchFingerEvent* event)
 {
     int fingerIndex = -1;

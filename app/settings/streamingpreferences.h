@@ -153,6 +153,7 @@ public:
     Q_PROPERTY(bool absoluteMouseMode MEMBER absoluteMouseMode NOTIFY absoluteMouseModeChanged)
     Q_PROPERTY(bool showLocalCursor MEMBER showLocalCursor NOTIFY showLocalCursorChanged)
     Q_PROPERTY(bool absoluteTouchMode MEMBER absoluteTouchMode NOTIFY absoluteTouchModeChanged)
+    Q_PROPERTY(bool enableNativeTouchpad MEMBER enableNativeTouchpad NOTIFY enableNativeTouchpadChanged)
     Q_PROPERTY(bool framePacing MEMBER framePacing NOTIFY framePacingChanged)
     Q_PROPERTY(bool videoEnhancement MEMBER videoEnhancement NOTIFY videoEnhancementChanged)
     Q_PROPERTY(bool streamResolutionScale MEMBER streamResolutionScale NOTIFY streamResolutionScaleChanged)
@@ -212,6 +213,7 @@ public:
     bool absoluteMouseMode;
     bool showLocalCursor;
     bool absoluteTouchMode;
+    bool enableNativeTouchpad;
     bool framePacing;
     bool videoEnhancement;
     bool streamResolutionScale;
@@ -269,6 +271,7 @@ signals:
     void absoluteMouseModeChanged();
     void showLocalCursorChanged();
     void absoluteTouchModeChanged();
+    void enableNativeTouchpadChanged();
     void audioConfigChanged();
     void videoCodecConfigChanged();
     void enableHdrChanged();

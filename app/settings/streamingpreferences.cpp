@@ -34,6 +34,7 @@
 #define SER_QUITAPPAFTER "quitAppAfter"
 #define SER_ABSMOUSEMODE "mouseacceleration"
 #define SER_ABSTOUCHMODE "abstouchmode"
+#define SER_NATIVETOUCHPAD "nativeTouchpad"
 #define SER_STARTWINDOWED "startwindowed"
 #define SER_FRAMEPACING "framepacing"
 #define SER_VIDEOENHANCEMENT "videoenhancement"
@@ -157,6 +158,7 @@ void StreamingPreferences::reload()
     absoluteMouseMode = settings.value(SER_ABSMOUSEMODE, false).toBool();
     showLocalCursor = settings.value(SER_SHOWLOCALCURSOR, false).toBool();
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
+    enableNativeTouchpad = settings.value(SER_NATIVETOUCHPAD, true).toBool();
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     videoEnhancement = settings.value(SER_VIDEOENHANCEMENT, false).toBool();
     enableMicrophone = settings.value(SER_MICROPHONE, false).toBool();
@@ -377,6 +379,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_ABSMOUSEMODE, absoluteMouseMode);
     settings.setValue(SER_SHOWLOCALCURSOR, showLocalCursor);
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
+    settings.setValue(SER_NATIVETOUCHPAD, enableNativeTouchpad);
     settings.setValue(SER_FRAMEPACING, framePacing);
     settings.setValue(SER_VIDEOENHANCEMENT, videoEnhancement);
     settings.setValue(SER_STREAMRESOLUTIONSCALE, streamResolutionScale);

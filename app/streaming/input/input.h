@@ -5,6 +5,15 @@
 
 #include "SDL_compat.h"
 
+#include <QHash>
+#include <QSet>
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+#include <memory>
+
+class WindowsTouchpadInput;
+#endif
+
 struct GamepadState {
     SDL_GameController* controller;
     SDL_JoystickID jsId;
@@ -74,6 +83,10 @@ struct DualSenseOutputReport{
 
 #define MAX_FINGERS 2
 
+#define MAX_TOUCHPAD_FRAME_CONTACTS 5
+
+#define TOUCHPAD_SCROLL_SUPPRESSION_TIMEOUT_MS 500
+
 #define GAMEPAD_HAPTIC_METHOD_NONE 0
 #define GAMEPAD_HAPTIC_METHOD_LEFTRIGHT 1
 #define GAMEPAD_HAPTIC_METHOD_SIMPLERUMBLE 2
@@ -129,6 +142,8 @@ public:
     void setAdaptiveTriggers(uint16_t controllerNumber, DualSenseOutputReport *report);
 
     void handleTouchFingerEvent(SDL_TouchFingerEvent* event);
+
+    void flushPendingTouchpadFrameEvent();
 
     int getAttachedGamepadMask();
 
@@ -201,6 +216,53 @@ private:
 
     void handleRelativeFingerEvent(SDL_TouchFingerEvent* event);
 
+    void cancelRelativeTouchpadState();
+
+    void handleNativeTouchpadEvent(SDL_TouchFingerEvent* event);
+
+    void sendPendingTouchpadFrame();
+
+    void cancelSdlTouchpadContacts();
+
+    void cancelNativeTouchpadContacts();
+
+    void selectNativeTouchpadTransport();
+
+    void transitionNativeTouchpadToSoftwarePointer();
+
+    struct NativeTouchpadContact {
+        uint8_t eventType;
+        uint32_t pointerId;
+        float x;
+        float y;
+        float pressure;
+    };
+
+    void sendNativeTouchpadContacts(const NativeTouchpadContact* contacts, int contactCount,
+                                    bool transitionToSoftwarePointer = true,
+                                    uint8_t buttonState = 0,
+                                    uint16_t deviceWidthMm = 0,
+                                    uint16_t deviceHeightMm = 0);
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    void handleWindowsTouchpadFrame(uint64_t deviceId,
+                                    const uint32_t* pointerIds,
+                                    const float* x, const float* y, const float* pressure,
+                                    const uint8_t* touching,
+                                    int contactCount, bool hasContactFrame,
+                                    bool buttonDown, uint16_t deviceWidthMm,
+                                    uint16_t deviceHeightMm);
+
+    void cancelWindowsTouchpadContacts(uint64_t deviceId = 0);
+
+    void sendWindowsTouchpadMouseButton(bool down);
+
+    bool shouldSuppressWindowsTouchpadMouseEvent(Uint32 mouseId);
+    bool shouldSuppressWindowsTouchpadMouseButtonEvent(const SDL_MouseButtonEvent* event);
+
+    friend class WindowsTouchpadInput;
+#endif
+
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
 
@@ -256,6 +318,37 @@ private:
     bool m_AbsoluteMouseMode;
     bool m_AbsoluteTouchMode;
     bool m_DisabledTouchFeedback;
+
+    enum NativeTouchpadTransport {
+        NTT_UNKNOWN,
+        NTT_FRAME,
+        NTT_INDIVIDUAL,
+        NTT_SOFTWARE_POINTER,
+    };
+
+    bool m_NativeTouchpadEnabled;
+    bool m_TouchpadFlushEventQueued;
+    NativeTouchpadTransport m_NativeTouchpadTransport;
+    SDL_TouchID m_PendingTouchpadId;
+    Uint32 m_PendingTouchpadTimestamp;
+    int m_PendingTouchpadContactCount;
+    NativeTouchpadContact m_PendingTouchpadContacts[MAX_TOUCHPAD_FRAME_CONTACTS];
+    SDL_TouchID m_ActiveTouchpadId;
+    QHash<SDL_FingerID, NativeTouchpadContact> m_ActiveTouchpadContacts;
+    QSet<SDL_FingerID> m_IgnoredTouchpadContacts;
+    Uint32 m_LastTouchpadScrollTimestamp;
+
+#ifdef HAVE_WINDOWS_RAW_TOUCHPAD
+    QHash<uint32_t, NativeTouchpadContact> m_ActiveWindowsTouchpadContacts;
+    uint64_t m_ActiveWindowsTouchpadDevice;
+    Uint32 m_LastWindowsTouchpadFrameTicks;
+    Uint32 m_SuppressedWindowsTouchpadMouseButtons;
+    bool m_WindowsTouchpadButtonDown;
+    bool m_WindowsTouchpadButtonUsesMouseFallback;
+    uint16_t m_WindowsTouchpadWidthMm;
+    uint16_t m_WindowsTouchpadHeightMm;
+    std::unique_ptr<WindowsTouchpadInput> m_WindowsTouchpadInput;
+#endif
 
     SDL_TouchFingerEvent m_TouchDownEvent[MAX_FINGERS];
     SDL_TimerID m_LeftButtonReleaseTimer;

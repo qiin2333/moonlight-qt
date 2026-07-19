@@ -1969,6 +1969,23 @@ Flickable {
                 }
 
                 CheckBox {
+                    id: nativeTouchpadCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Use precision touchpad input when available")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.enableNativeTouchpad
+                    onCheckedChanged: {
+                        StreamingPreferences.enableNativeTouchpad = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Sends native multi-touch trackpad contacts to compatible Sunshine hosts. Unsupported devices and hosts fall back to pointer input. Changes apply to the next stream.")
+                }
+
+                CheckBox {
                     id: swapMouseButtonsCheck
                     hoverEnabled: true
                     width: parent.width

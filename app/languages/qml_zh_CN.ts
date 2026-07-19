@@ -1295,6 +1295,16 @@
         <translation>选中时，触摸屏就像一个触控板。取消选中时，触摸屏将直接控制鼠标指针。</translation>
     </message>
     <message>
+        <location filename="../gui/SettingsView.qml" line="1975"/>
+        <source>Use precision touchpad input when available</source>
+        <translation>可用时使用精确式触控板输入</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1985"/>
+        <source>Sends native multi-touch trackpad contacts to compatible Sunshine hosts. Unsupported devices and hosts fall back to pointer input. Changes apply to the next stream.</source>
+        <translation>向兼容的 Sunshine 主机发送原生多点触控板接触信息。不支持的设备和主机将回退到指针输入。更改将在下次串流时生效。</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="1420"/>
         <source>Swap left and right mouse buttons</source>
         <translation>交换鼠标左键和右键</translation>
