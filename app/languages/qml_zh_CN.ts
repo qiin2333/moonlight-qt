@@ -570,6 +570,92 @@
         <source>Computer %1 has not been paired. Please open Moonlight to pair before retrieving games list.</source>
         <translation>电脑 %1 未配对，请在请求游戏列表前使用 Moonlight 配对。</translation>
     </message>
+    <message>
+        <source>Could not open %1 for upload.</source>
+        <translation>无法打开 %1 进行上传。</translation>
+    </message>
+    <message>
+        <source>File transfer stopped.</source>
+        <translation>文件传输已停止。</translation>
+    </message>
+    <message>
+        <source>%1 changed during upload; it will be retried after it is stable.</source>
+        <translation>%1 在上传过程中发生变化；稳定后将重试。</translation>
+    </message>
+    <message>
+        <source>Could not read %1 during upload.</source>
+        <translation>上传过程中无法读取 %1。</translation>
+    </message>
+    <message>
+        <source>%1 changed or became unavailable during upload.</source>
+        <translation>%1 在上传过程中发生变化或变得不可用。</translation>
+    </message>
+    <message>
+        <source>Host acknowledged an unexpected upload offset.</source>
+        <translation>远程主机确认了意外的上传偏移量。</translation>
+    </message>
+    <message>
+        <source>Moonlight file transfer
+
+Folders for writable host shares will appear here.
+Drop files into a share folder. Moonlight uploads them automatically and moves successful files to &quot;Sent to Host&quot;.
+
+Existing host files are never overwritten. Rename the local file if the host already has the same name.
+</source>
+        <translation>Moonlight 文件传输
+
+设置为“读写”的主机共享文件夹会显示在这里。
+将文件拖入共享文件夹后，Moonlight 会自动上传，并在成功后将文件移到“Sent to Host”。
+
+绝不会覆盖主机上的现有文件。如果主机上已有同名文件，请重命名本地文件。
+</translation>
+    </message>
+    <message>
+        <source>File transfer is waiting for the host: %1</source>
+        <translation>文件传输正在等待远程主机：%1</translation>
+    </message>
+    <message>
+        <source>File transfer could not connect: %1</source>
+        <translation>文件传输无法连接：%1</translation>
+    </message>
+    <message>
+        <source>Host folders are read-only. Enable Read &amp; Write on a Sunshine share to send files.</source>
+        <translation>主机文件夹为只读。请在 Sunshine 共享中启用“读写”后再发送文件。</translation>
+    </message>
+    <message>
+        <source>File transfer is ready. Drop files into &quot;Send to Host&quot;.</source>
+        <translation>文件传输已就绪。请将文件拖入“Send to Host”。</translation>
+    </message>
+    <message>
+        <source>File transfer paused; it will retry %1.</source>
+        <translation>文件传输已暂停；将在 %1 重试。</translation>
+    </message>
+    <message>
+        <source>Moonlight could not send this file.
+
+%1
+
+Fix the problem, then modify or rename the file to retry.
+</source>
+        <translation>Moonlight 无法发送此文件。
+
+%1
+
+解决问题后，修改文件或重命名以重试。
+</translation>
+    </message>
+    <message>
+        <source>Could not send %1: %2</source>
+        <translation>无法发送 %1：%2</translation>
+    </message>
+    <message>
+        <source>%1 reached the host, but Moonlight could not move the local copy to &quot;Sent to Host&quot;.</source>
+        <translation>%1 已到达主机，但 Moonlight 无法将本地副本移到“Sent to Host”。</translation>
+    </message>
+    <message>
+        <source>Sent %1 to %2.</source>
+        <translation>已将 %1 发送到 %2。</translation>
+    </message>
 </context>
 <context>
     <name>QPlatformTheme</name>
@@ -1710,6 +1796,272 @@
         <location filename="../backend/portableupdateinstaller.cpp" line="368"/>
         <source>Installing update and restarting Moonlight...</source>
         <translation>正在安装更新并重启 Moonlight...</translation>
+    </message>
+</context>
+<context>
+    <name>FileTransferWorker</name>
+    <message>
+        <source>Host file transfer is not ready yet. Keep the streaming session connected and try again.</source>
+        <translation>远程主机的文件传输尚未就绪，请保持串流连接后重试。</translation>
+    </message>
+    <message>
+        <source>Could not open the local file: %1</source>
+        <translation>无法打开本地文件：%1</translation>
+    </message>
+    <message>
+        <source>The transfer was cancelled.</source>
+        <translation>传输已取消。</translation>
+    </message>
+    <message>
+        <source>Could not read the local file: %1</source>
+        <translation>读取本地文件失败：%1</translation>
+    </message>
+    <message>
+        <source>Uploading %1</source>
+        <translation>正在上传 %1</translation>
+    </message>
+    <message>
+        <source>Symbolic links are not supported: %1</source>
+        <translation>不支持传输符号链接：%1</translation>
+    </message>
+    <message>
+        <source>Unsupported local item: %1</source>
+        <translation>不支持的本地项目：%1</translation>
+    </message>
+    <message>
+        <source>The selected local file or folder no longer exists.</source>
+        <translation>所选本地文件或文件夹已经不存在。</translation>
+    </message>
+    <message>
+        <source>&quot;%1&quot; already exists on the host. Existing files will not be overwritten.</source>
+        <translation>远程主机中已存在“%1”，不会覆盖已有文件。</translation>
+    </message>
+    <message>
+        <source>Uploaded &quot;%1&quot; to the host.</source>
+        <translation>已将“%1”上传到远程主机。</translation>
+    </message>
+    <message>
+        <source>The remote file is no longer available: %1</source>
+        <translation>远程文件已经不可用：%1</translation>
+    </message>
+    <message>
+        <source>Could not create a temporary download file in %1.</source>
+        <translation>无法在 %1 中创建下载临时文件。</translation>
+    </message>
+    <message>
+        <source>The host returned incomplete file data.</source>
+        <translation>远程主机返回了不完整的文件数据。</translation>
+    </message>
+    <message>
+        <source>Could not write the local file: %1</source>
+        <translation>写入本地文件失败：%1</translation>
+    </message>
+    <message>
+        <source>Downloading %1</source>
+        <translation>正在下载 %1</translation>
+    </message>
+    <message>
+        <source>&quot;%1&quot; already exists on this computer. Existing files will not be overwritten.</source>
+        <translation>本机已存在“%1”，不会覆盖已有文件。</translation>
+    </message>
+    <message>
+        <source>Could not save the downloaded file: %1 (%2)</source>
+        <translation>无法保存下载文件：%1（%2）</translation>
+    </message>
+    <message>
+        <source>Could not create the local folder: %1</source>
+        <translation>无法创建本地文件夹：%1</translation>
+    </message>
+    <message>
+        <source>Downloaded &quot;%1&quot; to this computer.</source>
+        <translation>已将“%1”下载到本机。</translation>
+    </message>
+</context>
+<context>
+    <name>FileTransferWindow</name>
+    <message>
+        <source>The host closed the file transfer connection.</source>
+        <translation>远程主机关闭了文件传输连接。</translation>
+    </message>
+    <message>
+        <source>Unknown file transfer error.</source>
+        <translation>未知的文件传输错误。</translation>
+    </message>
+    <message>
+        <source>The host file transfer service is unavailable.</source>
+        <translation>远程主机的文件传输服务不可用。</translation>
+    </message>
+    <message>
+        <source>The host denied file transfer authorization.</source>
+        <translation>远程主机拒绝了文件传输授权。</translation>
+    </message>
+    <message>
+        <source>The connection to the host timed out.</source>
+        <translation>连接远程主机超时。</translation>
+    </message>
+    <message>
+        <source>The file transfer network connection failed.</source>
+        <translation>文件传输网络连接异常。</translation>
+    </message>
+    <message>
+        <source>The remote file or folder was not found.</source>
+        <translation>找不到远程文件或文件夹。</translation>
+    </message>
+    <message>
+        <source>The remote drive is read-only and cannot accept uploads.</source>
+        <translation>远程磁盘为只读，无法上传。</translation>
+    </message>
+    <message>
+        <source>The transfer was cancelled.</source>
+        <translation>传输已取消。</translation>
+    </message>
+    <message>
+        <source>The host does not support this file operation.</source>
+        <translation>远程主机不支持此文件操作。</translation>
+    </message>
+    <message>
+        <source>An internal file transfer error occurred.</source>
+        <translation>文件传输发生内部错误。</translation>
+    </message>
+    <message>
+        <source>File transfer failed: %1</source>
+        <translation>文件传输失败：%1</translation>
+    </message>
+    <message>
+        <source>Moonlight File Transfer</source>
+        <translation>Moonlight 文件传输</translation>
+    </message>
+    <message>
+        <source>Connecting to host drives...</source>
+        <translation>正在连接远程主机磁盘…</translation>
+    </message>
+    <message>
+        <source>The local folder is unavailable: %1</source>
+        <translation>本地文件夹不可用：%1</translation>
+    </message>
+    <message>
+        <source>Reconnecting to host drives...</source>
+        <translation>正在重新连接远程主机磁盘…</translation>
+    </message>
+    <message>
+        <source>Loading remote folder...</source>
+        <translation>正在读取远程文件夹…</translation>
+    </message>
+    <message>
+        <source>Select a local file or folder first.</source>
+        <translation>请先选择本机文件或文件夹。</translation>
+    </message>
+    <message>
+        <source>Open a remote drive and enter the destination folder first.</source>
+        <translation>请先打开远程磁盘并进入目标文件夹。</translation>
+    </message>
+    <message>
+        <source>This remote drive is read-only.</source>
+        <translation>这个远程磁盘是只读的。</translation>
+    </message>
+    <message>
+        <source>Open a local drive and select a file or folder. Entire drives cannot be transferred.</source>
+        <translation>请打开本机磁盘后选择文件或文件夹，不能传输整个磁盘。</translation>
+    </message>
+    <message>
+        <source>Preparing to upload: %1</source>
+        <translation>正在准备上传：%1</translation>
+    </message>
+    <message>
+        <source>Select a remote file or folder first.</source>
+        <translation>请先选择远程文件或文件夹。</translation>
+    </message>
+    <message>
+        <source>Open a local drive and enter the destination folder first.</source>
+        <translation>请先打开本机磁盘并进入目标文件夹。</translation>
+    </message>
+    <message>
+        <source>Open a remote drive and select a file or folder. Entire drives cannot be transferred.</source>
+        <translation>请打开远程磁盘后选择文件或文件夹，不能传输整个磁盘。</translation>
+    </message>
+    <message>
+        <source>Preparing to download: %1</source>
+        <translation>正在准备下载：%1</translation>
+    </message>
+    <message>
+        <source>Release to upload to %1</source>
+        <translation>松开鼠标，上传到 %1</translation>
+    </message>
+    <message>
+        <source>Drop onto a remote folder on the right.</source>
+        <translation>请拖到右侧远程文件夹。</translation>
+    </message>
+    <message>
+        <source>Release to download to %1</source>
+        <translation>松开鼠标，下载到 %1</translation>
+    </message>
+    <message>
+        <source>Drop onto a local folder on the left.</source>
+        <translation>请拖到左侧本机文件夹。</translation>
+    </message>
+    <message>
+        <source>Upload cancelled: drop onto a writable remote folder on the right.</source>
+        <translation>上传已取消：请拖到右侧可写的远程文件夹。</translation>
+    </message>
+    <message>
+        <source>Download cancelled: drop onto a local folder on the left.</source>
+        <translation>下载已取消：请拖到左侧本机文件夹。</translation>
+    </message>
+    <message>
+        <source>Could not connect to the host drives: %1</source>
+        <translation>无法连接远程主机磁盘：%1</translation>
+    </message>
+    <message>
+        <source>The host has no accessible drives.</source>
+        <translation>远程主机没有可访问的磁盘。</translation>
+    </message>
+    <message>
+        <source>Connected. Click a button or drag files to the other pane to transfer.</source>
+        <translation>连接成功，可点击按钮或把文件拖到另一侧进行传输。</translation>
+    </message>
+    <message>
+        <source>Could not open the remote folder: %1</source>
+        <translation>无法打开远程文件夹：%1</translation>
+    </message>
+    <message>
+        <source>Remote folder loaded.</source>
+        <translation>远程文件夹已加载。</translation>
+    </message>
+    <message>
+        <source>This computer</source>
+        <translation>本机</translation>
+    </message>
+    <message>
+        <source>Host computer</source>
+        <translation>远程主机</translation>
+    </message>
+    <message>
+        <source>Drives</source>
+        <translation>磁盘</translation>
+    </message>
+    <message>
+        <source>↑ Up</source>
+        <translation>↑ 上一级</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>名称</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>大小</translation>
+    </message>
+    <message>
+        <source>Upload →</source>
+        <translation>上传 →</translation>
+    </message>
+    <message>
+        <source>← Download</source>
+        <translation>← 下载</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>刷新</translation>
     </message>
 </context>
 </TS>

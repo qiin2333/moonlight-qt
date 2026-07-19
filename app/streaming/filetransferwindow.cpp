@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
@@ -197,37 +198,64 @@ QString displaySize(quint64 bytes)
 QString errorMessage(const FileMapping::Error& error)
 {
     if (error.message.contains(QStringLiteral("closed"), Qt::CaseInsensitive)) {
-        return QStringLiteral("远程主机关闭了文件传输连接");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The host closed the file transfer connection.");
     }
 
     switch (error.kind) {
     case FileMapping::ErrorKind::None:
         return error.message.isEmpty()
-                ? QStringLiteral("未知的文件传输错误")
+                ? QCoreApplication::translate(
+                          "FileTransferWindow",
+                          "Unknown file transfer error.")
                 : error.message;
     case FileMapping::ErrorKind::Unavailable:
-        return QStringLiteral("远程主机的文件传输服务不可用");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The host file transfer service is unavailable.");
     case FileMapping::ErrorKind::Unauthorized:
-        return QStringLiteral("远程主机拒绝了文件传输授权");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The host denied file transfer authorization.");
     case FileMapping::ErrorKind::Timeout:
-        return QStringLiteral("连接远程主机超时");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The connection to the host timed out.");
     case FileMapping::ErrorKind::Network:
-        return QStringLiteral("文件传输网络连接异常");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The file transfer network connection failed.");
     case FileMapping::ErrorKind::NotFound:
-        return QStringLiteral("找不到远程文件或文件夹");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The remote file or folder was not found.");
     case FileMapping::ErrorKind::ReadOnly:
-        return QStringLiteral("远程磁盘为只读，无法上传");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The remote drive is read-only and cannot accept uploads.");
     case FileMapping::ErrorKind::Cancelled:
-        return QStringLiteral("传输已取消");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The transfer was cancelled.");
     case FileMapping::ErrorKind::Unsupported:
-        return QStringLiteral("远程主机不支持此文件操作");
+        return QCoreApplication::translate(
+                "FileTransferWindow",
+                "The host does not support this file operation.");
     case FileMapping::ErrorKind::Internal:
         return error.message.isEmpty()
-                ? QStringLiteral("文件传输发生内部错误")
-                : QStringLiteral("文件传输失败：%1").arg(error.message);
+                ? QCoreApplication::translate(
+                          "FileTransferWindow",
+                          "An internal file transfer error occurred.")
+                : QCoreApplication::translate(
+                          "FileTransferWindow",
+                          "File transfer failed: %1")
+                          .arg(error.message);
     }
 
-    return QStringLiteral("未知的文件传输错误");
+    return QCoreApplication::translate(
+            "FileTransferWindow",
+            "Unknown file transfer error.");
 }
 
 bool connectionError(const FileMapping::Error& error)
@@ -265,7 +293,7 @@ bool FileTransferWorker::ensureConnected(QString& error)
         return false;
     }
     if (!capability.enabled || !capability.listening || capability.sessionToken.isEmpty()) {
-        error = QStringLiteral("远程主机的文件传输尚未就绪，请保持串流连接后重试");
+        error = tr("Host file transfer is not ready yet. Keep the streaming session connected and try again.");
         return false;
     }
 
@@ -335,7 +363,7 @@ bool FileTransferWorker::uploadFile(const QString& localPath,
 {
     QFile file(localPath);
     if (!file.open(QIODevice::ReadOnly)) {
-        error = QStringLiteral("无法打开本地文件：%1").arg(localPath);
+        error = tr("Could not open the local file: %1").arg(localPath);
         return false;
     }
 
@@ -346,13 +374,13 @@ bool FileTransferWorker::uploadFile(const QString& localPath,
 
     do {
         if (m_Cancelled.load()) {
-            error = QStringLiteral("传输已取消");
+            error = tr("The transfer was cancelled.");
             return false;
         }
 
         const QByteArray chunk = file.read(kTransferChunkBytes);
         if (chunk.isNull()) {
-            error = QStringLiteral("读取本地文件失败：%1").arg(localPath);
+            error = tr("Could not read the local file: %1").arg(localPath);
             return false;
         }
         const bool complete = offset + static_cast<quint64>(chunk.size()) >= total;
@@ -376,7 +404,7 @@ bool FileTransferWorker::uploadFile(const QString& localPath,
         offset += static_cast<quint64>(chunk.size());
         first = false;
         emit transferProgress(
-                QStringLiteral("正在上传 %1").arg(QFileInfo(localPath).fileName()),
+                tr("Uploading %1").arg(QFileInfo(localPath).fileName()),
                 offset,
                 total);
     } while (first || offset < total);
@@ -390,20 +418,20 @@ bool FileTransferWorker::uploadItem(const QString& localPath,
                                     QString& error)
 {
     if (m_Cancelled.load()) {
-        error = QStringLiteral("传输已取消");
+        error = tr("The transfer was cancelled.");
         return false;
     }
 
     const QFileInfo info(localPath);
     if (info.isSymLink()) {
-        error = QStringLiteral("不支持传输符号链接：%1").arg(localPath);
+        error = tr("Symbolic links are not supported: %1").arg(localPath);
         return false;
     }
     if (info.isFile()) {
         return uploadFile(localPath, mappingId, remotePath, error);
     }
     if (!info.isDir()) {
-        error = QStringLiteral("不支持的本地项目：%1").arg(localPath);
+        error = tr("Unsupported local item: %1").arg(localPath);
         return false;
     }
 
@@ -443,7 +471,9 @@ void FileTransferWorker::upload(const QString& localPath,
     m_Cancelled.store(false);
     const QFileInfo source(localPath);
     if (!source.exists()) {
-        emit transferFinished(false, QStringLiteral("所选本地文件或文件夹已经不存在"));
+        emit transferFinished(
+                false,
+                tr("The selected local file or folder no longer exists."));
         return;
     }
 
@@ -471,7 +501,7 @@ void FileTransferWorker::upload(const QString& localPath,
     if (destinationExists) {
         emit transferFinished(
                 false,
-                QStringLiteral("远程主机中已存在“%1”，不会覆盖已有文件")
+                tr("\"%1\" already exists on the host. Existing files will not be overwritten.")
                         .arg(source.fileName()));
         return;
     }
@@ -479,7 +509,7 @@ void FileTransferWorker::upload(const QString& localPath,
     if (uploadItem(localPath, mappingId, remotePath, error)) {
         emit transferFinished(
                 true,
-                QStringLiteral("已将“%1”上传到远程主机").arg(source.fileName()));
+                tr("Uploaded \"%1\" to the host.").arg(source.fileName()));
     }
     else {
         emit transferFinished(false, error);
@@ -500,7 +530,7 @@ bool FileTransferWorker::downloadFile(const QString& mappingId,
         return false;
     }
     if (!stat.stat.exists || stat.stat.directory) {
-        error = QStringLiteral("远程文件已经不可用：%1").arg(remotePath);
+        error = tr("The remote file is no longer available: %1").arg(remotePath);
         return false;
     }
 
@@ -509,7 +539,7 @@ bool FileTransferWorker::downloadFile(const QString& mappingId,
     QTemporaryFile temporary(QDir(targetInfo.absolutePath())
                                     .filePath(QStringLiteral(".moonlight-download-XXXXXX.part")));
     if (!temporary.open()) {
-        error = QStringLiteral("无法在 %1 中创建下载临时文件")
+        error = tr("Could not create a temporary download file in %1.")
                         .arg(targetInfo.absolutePath());
         return false;
     }
@@ -518,7 +548,7 @@ bool FileTransferWorker::downloadFile(const QString& mappingId,
     const quint64 total = stat.stat.size;
     while (offset < total) {
         if (m_Cancelled.load()) {
-            error = QStringLiteral("传输已取消");
+            error = tr("The transfer was cancelled.");
             return false;
         }
 
@@ -537,16 +567,16 @@ bool FileTransferWorker::downloadFile(const QString& mappingId,
             return false;
         }
         if (result.data.isEmpty()) {
-            error = QStringLiteral("远程主机返回了不完整的文件数据");
+            error = tr("The host returned incomplete file data.");
             return false;
         }
         if (temporary.write(result.data) != result.data.size()) {
-            error = QStringLiteral("写入本地文件失败：%1").arg(localPath);
+            error = tr("Could not write the local file: %1").arg(localPath);
             return false;
         }
         offset += static_cast<quint64>(result.data.size());
         emit transferProgress(
-                QStringLiteral("正在下载 %1").arg(QFileInfo(remotePath).fileName()),
+                tr("Downloading %1").arg(QFileInfo(remotePath).fileName()),
                 offset,
                 total);
     }
@@ -554,7 +584,7 @@ bool FileTransferWorker::downloadFile(const QString& mappingId,
     temporary.flush();
     temporary.close();
     if (QFileInfo::exists(localPath)) {
-        error = QStringLiteral("本机已存在“%1”，不会覆盖已有文件")
+        error = tr("\"%1\" already exists on this computer. Existing files will not be overwritten.")
                         .arg(targetInfo.fileName());
         return false;
     }
@@ -565,7 +595,7 @@ bool FileTransferWorker::downloadFile(const QString& mappingId,
     // completed download, including paths containing Chinese characters.
     if (!temporary.rename(localPath)) {
         const QString renameError = temporary.errorString();
-        error = QStringLiteral("无法保存下载文件：%1（%2）")
+        error = tr("Could not save the downloaded file: %1 (%2)")
                         .arg(localPath, renameError);
         return false;
     }
@@ -582,7 +612,7 @@ bool FileTransferWorker::downloadItem(const QString& mappingId,
                                       QString& error)
 {
     if (m_Cancelled.load()) {
-        error = QStringLiteral("传输已取消");
+        error = tr("The transfer was cancelled.");
         return false;
     }
     if (!directory) {
@@ -590,7 +620,7 @@ bool FileTransferWorker::downloadItem(const QString& mappingId,
     }
 
     if (!QDir().mkdir(localPath)) {
-        error = QStringLiteral("无法创建本地文件夹：%1").arg(localPath);
+        error = tr("Could not create the local folder: %1").arg(localPath);
         return false;
     }
 
@@ -631,14 +661,15 @@ void FileTransferWorker::download(const QString& mappingId,
     if (QFileInfo::exists(localPath)) {
         emit transferFinished(
                 false,
-                QStringLiteral("本机已存在“%1”，不会覆盖已有文件").arg(name));
+                tr("\"%1\" already exists on this computer. Existing files will not be overwritten.")
+                        .arg(name));
         return;
     }
 
     if (downloadItem(mappingId, remotePath, directory, localPath, error)) {
         emit transferFinished(
                 true,
-                QStringLiteral("已将“%1”下载到本机").arg(name));
+                tr("Downloaded \"%1\" to this computer.").arg(name));
     }
     else {
         if (directory) {
@@ -650,7 +681,7 @@ void FileTransferWorker::download(const QString& mappingId,
 
 FileTransferWindow::FileTransferWindow(NvComputer computer)
 {
-    setTitle(QStringLiteral("Moonlight 文件传输"));
+    setTitle(tr("Moonlight File Transfer"));
     setFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
              Qt::WindowStaysOnTopHint |
              Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
@@ -663,7 +694,7 @@ FileTransferWindow::FileTransferWindow(NvComputer computer)
     }
 
     loadLocalRoot();
-    setStatus(QStringLiteral("正在连接远程主机磁盘…"));
+    setStatus(tr("Connecting to host drives..."));
 
     m_Worker = new FileTransferWorker(std::move(computer));
     m_Worker->moveToThread(&m_WorkerThread);
@@ -807,7 +838,7 @@ void FileTransferWindow::browseLocal(const QString& path)
 {
     QDir directory(path);
     if (!directory.exists()) {
-        setStatus(QStringLiteral("本地文件夹不可用：%1").arg(path), true);
+        setStatus(tr("The local folder is unavailable: %1").arg(path), true);
         return;
     }
 
@@ -849,7 +880,7 @@ void FileTransferWindow::refreshRemote()
     if (m_RemoteMappingId.isEmpty()) {
         if (m_RemoteRoots.isEmpty()) {
             m_Busy = true;
-            setStatus(QStringLiteral("正在重新连接远程主机磁盘…"));
+            setStatus(tr("Reconnecting to host drives..."));
             emit initializeWorker();
             return;
         }
@@ -861,7 +892,7 @@ void FileTransferWindow::refreshRemote()
     }
 
     m_Busy = true;
-    setStatus(QStringLiteral("正在读取远程文件夹…"));
+    setStatus(tr("Loading remote folder..."));
     emit requestRemoteList(m_RemoteMappingId, m_RemotePath);
 }
 
@@ -933,28 +964,30 @@ void FileTransferWindow::beginUpload()
         return;
     }
     if (m_LocalSelection < 0 || m_LocalSelection >= m_LocalEntries.size()) {
-        setStatus(QStringLiteral("请先选择本机文件或文件夹"), true);
+        setStatus(tr("Select a local file or folder first."), true);
         return;
     }
     if (m_RemoteMappingId.isEmpty()) {
-        setStatus(QStringLiteral("请先打开远程磁盘并进入目标文件夹"), true);
+        setStatus(tr("Open a remote drive and enter the destination folder first."), true);
         return;
     }
     if (!m_RemoteWritable) {
-        setStatus(QStringLiteral("这个远程磁盘是只读的"), true);
+        setStatus(tr("This remote drive is read-only."), true);
         return;
     }
 
     const Entry entry = m_LocalEntries.at(m_LocalSelection);
     if (entry.drive) {
-        setStatus(QStringLiteral("请打开本机磁盘后选择文件或文件夹，不能传输整个磁盘"), true);
+        setStatus(
+                tr("Open a local drive and select a file or folder. Entire drives cannot be transferred."),
+                true);
         return;
     }
 
     m_Busy = true;
     m_ProgressVisible = true;
     m_ProgressPercent = 0;
-    setStatus(QStringLiteral("正在准备上传：%1").arg(entry.name));
+    setStatus(tr("Preparing to upload: %1").arg(entry.name));
     emit requestUpload(entry.path, m_RemoteMappingId, m_RemotePath);
 }
 
@@ -964,24 +997,26 @@ void FileTransferWindow::beginDownload()
         return;
     }
     if (m_RemoteSelection < 0 || m_RemoteSelection >= m_RemoteEntries.size()) {
-        setStatus(QStringLiteral("请先选择远程文件或文件夹"), true);
+        setStatus(tr("Select a remote file or folder first."), true);
         return;
     }
     if (m_LocalPath.isEmpty()) {
-        setStatus(QStringLiteral("请先打开本机磁盘并进入目标文件夹"), true);
+        setStatus(tr("Open a local drive and enter the destination folder first."), true);
         return;
     }
 
     const Entry entry = m_RemoteEntries.at(m_RemoteSelection);
     if (entry.drive) {
-        setStatus(QStringLiteral("请打开远程磁盘后选择文件或文件夹，不能传输整个磁盘"), true);
+        setStatus(
+                tr("Open a remote drive and select a file or folder. Entire drives cannot be transferred."),
+                true);
         return;
     }
 
     m_Busy = true;
     m_ProgressVisible = true;
     m_ProgressPercent = 0;
-    setStatus(QStringLiteral("正在准备下载：%1").arg(entry.name));
+    setStatus(tr("Preparing to download: %1").arg(entry.name));
     emit requestDownload(m_RemoteMappingId, entry.path, entry.directory, m_LocalPath);
 }
 
@@ -1068,16 +1103,16 @@ void FileTransferWindow::updateDrag(const QPoint& point)
         m_DragTargetValid = resolveRemoteDropTarget(
                 point, mappingId, remoteDirectory, displayPath);
         m_DragHint = m_DragTargetValid
-                ? QStringLiteral("松开鼠标，上传到 %1").arg(displayPath)
-                : QStringLiteral("请拖到右侧远程文件夹");
+                ? tr("Release to upload to %1").arg(displayPath)
+                : tr("Drop onto a remote folder on the right.");
     }
     else {
         QString localDirectory;
         m_DragTargetValid = resolveLocalDropTarget(point, localDirectory);
         m_DragHint = m_DragTargetValid
-                ? QStringLiteral("松开鼠标，下载到 %1")
+                ? tr("Release to download to %1")
                           .arg(QDir::toNativeSeparators(localDirectory))
-                : QStringLiteral("请拖到左侧本机文件夹");
+                : tr("Drop onto a local folder on the left.");
     }
 
     setCursor(m_DragTargetValid
@@ -1102,13 +1137,15 @@ void FileTransferWindow::finishDrag(const QPoint& point)
         QString displayPath;
         if (!resolveRemoteDropTarget(
                 point, mappingId, remoteDirectory, displayPath)) {
-            setStatus(QStringLiteral("上传已取消：请拖到右侧可写的远程文件夹"), true);
+            setStatus(
+                    tr("Upload cancelled: drop onto a writable remote folder on the right."),
+                    true);
             return;
         }
         m_Busy = true;
         m_ProgressVisible = true;
         m_ProgressPercent = 0;
-        setStatus(QStringLiteral("正在准备上传：%1").arg(source.name));
+        setStatus(tr("Preparing to upload: %1").arg(source.name));
         emit requestUpload(source.path, mappingId, remoteDirectory);
         return;
     }
@@ -1119,13 +1156,15 @@ void FileTransferWindow::finishDrag(const QPoint& point)
     const Entry source = m_RemoteEntries.at(m_DragSourceIndex);
     QString localDirectory;
     if (!resolveLocalDropTarget(point, localDirectory)) {
-        setStatus(QStringLiteral("下载已取消：请拖到左侧本机文件夹"), true);
+        setStatus(
+                tr("Download cancelled: drop onto a local folder on the left."),
+                true);
         return;
     }
     m_Busy = true;
     m_ProgressVisible = true;
     m_ProgressPercent = 0;
-    setStatus(QStringLiteral("正在准备下载：%1").arg(source.name));
+    setStatus(tr("Preparing to download: %1").arg(source.name));
     emit requestDownload(
             m_RemoteMappingId,
             source.path,
@@ -1164,7 +1203,7 @@ void FileTransferWindow::onRemoteReady(const QVariantList& mappings, const QStri
     m_Busy = false;
     m_RemoteRoots.clear();
     if (!error.isEmpty()) {
-        setStatus(QStringLiteral("无法连接远程主机磁盘：%1").arg(error), true);
+        setStatus(tr("Could not connect to the host drives: %1").arg(error), true);
         return;
     }
 
@@ -1189,8 +1228,8 @@ void FileTransferWindow::onRemoteReady(const QVariantList& mappings, const QStri
     m_RemoteSelection = -1;
     m_RemoteScroll = 0;
     setStatus(m_RemoteRoots.isEmpty()
-              ? QStringLiteral("远程主机没有可访问的磁盘")
-              : QStringLiteral("连接成功，可点击按钮或把文件拖到另一侧进行传输"),
+              ? tr("The host has no accessible drives.")
+              : tr("Connected. Click a button or drag files to the other pane to transfer."),
               m_RemoteRoots.isEmpty());
 }
 
@@ -1205,7 +1244,7 @@ void FileTransferWindow::onRemoteListed(const QString& mappingId,
 
     m_Busy = false;
     if (!error.isEmpty()) {
-        setStatus(QStringLiteral("无法打开远程文件夹：%1").arg(error), true);
+        setStatus(tr("Could not open the remote folder: %1").arg(error), true);
         return;
     }
 
@@ -1226,7 +1265,7 @@ void FileTransferWindow::onRemoteListed(const QString& mappingId,
     m_RemoteEntries = std::move(converted);
     m_RemoteSelection = -1;
     m_RemoteScroll = 0;
-    setStatus(QStringLiteral("远程文件夹已加载"));
+    setStatus(tr("Remote folder loaded."));
 }
 
 void FileTransferWindow::onTransferProgress(const QString& message, quint64 completed, quint64 total)
@@ -1314,9 +1353,7 @@ bool FileTransferWindow::event(QEvent* event)
                 m_Busy = true;
                 m_ProgressVisible = true;
                 m_ProgressPercent = 0;
-                setStatus(
-                        QStringLiteral("正在准备上传：%1")
-                                .arg(source.fileName()));
+                setStatus(tr("Preparing to upload: %1").arg(source.fileName()));
                 emit requestUpload(
                         source.absoluteFilePath(),
                         mappingId,
@@ -1354,10 +1391,10 @@ void FileTransferWindow::paintEvent(QPaintEvent*)
     painter.setFont(heading);
     painter.drawText(QRect(localPaneRect().x(), 4, localPaneRect().width(), 34),
                      Qt::AlignLeft | Qt::AlignVCenter,
-                     QStringLiteral("本机"));
+                     tr("This computer"));
     painter.drawText(QRect(remotePaneRect().x(), 4, remotePaneRect().width(), 34),
                      Qt::AlignLeft | Qt::AlignVCenter,
-                     QStringLiteral("远程主机"));
+                     tr("Host computer"));
 
     auto drawPath = [&](const QRect& rect, const QString& path, bool canGoUp) {
         painter.setBrush(panel);
@@ -1369,7 +1406,7 @@ void FileTransferWindow::paintEvent(QPaintEvent*)
         normal.setPointSize(10);
         painter.setFont(normal);
         const QString shown = path.isEmpty()
-                ? QStringLiteral("磁盘")
+                ? tr("Drives")
                 : QDir::toNativeSeparators(path);
         painter.drawText(rect.adjusted(12, 0, -82, 0),
                          Qt::AlignLeft | Qt::AlignVCenter,
@@ -1378,7 +1415,7 @@ void FileTransferWindow::paintEvent(QPaintEvent*)
         painter.setPen(canGoUp ? accent : muted);
         painter.drawText(QRect(rect.right() - 76, rect.y(), 72, rect.height()),
                          Qt::AlignCenter,
-                         QStringLiteral("↑ 上一级"));
+                         tr("↑ Up"));
     };
     drawPath(localPathRect(), m_LocalPath, !m_LocalPath.isEmpty());
     const QString remoteDisplay = m_RemoteMappingId.isEmpty()
@@ -1415,12 +1452,12 @@ void FileTransferWindow::paintEvent(QPaintEvent*)
         painter.drawText(
                 columnHeader.adjusted(42, 0, -90, 0),
                 Qt::AlignLeft | Qt::AlignVCenter,
-                QStringLiteral("名称"));
+                tr("Name"));
         painter.drawText(
                 columnHeader.adjusted(
                         columnHeader.width() - 84, 0, -12, 0),
                 Qt::AlignRight | Qt::AlignVCenter,
-                QStringLiteral("大小"));
+                tr("Size"));
 
         const QVector<Entry>& entries = local ? m_LocalEntries : m_RemoteEntries;
         const int selection = local ? m_LocalSelection : m_RemoteSelection;
@@ -1481,9 +1518,9 @@ void FileTransferWindow::paintEvent(QPaintEvent*)
         painter.setFont(button);
         painter.drawText(rect, Qt::AlignCenter, label);
     };
-    drawButton(uploadButtonRect(), QStringLiteral("上传 →"), !m_Busy);
-    drawButton(downloadButtonRect(), QStringLiteral("← 下载"), !m_Busy);
-    drawButton(refreshButtonRect(), QStringLiteral("刷新"), !m_Busy);
+    drawButton(uploadButtonRect(), tr("Upload →"), !m_Busy);
+    drawButton(downloadButtonRect(), tr("← Download"), !m_Busy);
+    drawButton(refreshButtonRect(), tr("Refresh"), !m_Busy);
 
     const QRect statusRect(0, height() - kStatusHeight, width(), kStatusHeight);
     painter.fillRect(statusRect, QColor(13, 16, 20));

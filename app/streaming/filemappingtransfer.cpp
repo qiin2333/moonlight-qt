@@ -226,13 +226,12 @@ public:
         QDir().mkpath(outbox);
         QDir().mkpath(sentRoot(m_MirrorRoot));
         writeTextFile(QDir(outbox).filePath(QStringLiteral("README.txt")),
-                      QStringLiteral(
-                              "Moonlight file transfer / Moonlight 文件传输\n\n"
+                      QObject::tr(
+                              "Moonlight file transfer\n\n"
                               "Folders for writable host shares will appear here.\n"
                               "Drop files into a share folder. Moonlight uploads them automatically and moves successful files to \"Sent to Host\".\n"
-                              "主机上设置为“读写”的共享会显示在这里。把文件拖进对应目录即可自动上传；成功后文件会移到“Sent to Host”。\n\n"
-                              "Existing host files are never overwritten. Rename the local file if the host already has the same name.\n"
-                              "不会覆盖主机上的同名文件；如遇重名，请重命名本地文件后重试。\n"));
+                              "\n"
+                              "Existing host files are never overwritten. Rename the local file if the host already has the same name.\n"));
         {
             QMutexLocker locker(&m_State->lock);
             m_State->outboxPath = outbox;
