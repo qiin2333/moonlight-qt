@@ -14,7 +14,7 @@
 **支持平台：**
 - Windows (x64/ARM64) - 使用 Qt 6.11.1
 - macOS - 使用 Qt 6.11.1
-- Linux (x86_64) - 固定使用 Qt 6.8.3
+- Linux (x86_64) - 使用 Qt 6.11.1
 - SteamLink - 交叉编译
 
 **构建产物：**
@@ -73,7 +73,7 @@
 
 3. **Qt 版本问题**：
    - Windows/macOS 使用 Qt 6.x
-   - Linux 固定使用 Qt 6.8.3
+   - Linux 使用 CI 安装的 Qt 6.x
 
 4. **依赖库构建失败**：
    - 检查网络连接（需要下载源码）
@@ -83,7 +83,7 @@
 
 - **Windows**: Visual Studio 2022, Qt 6.11.1
 - **macOS**: Xcode, Qt 6.11.1, Node.js
-- **Linux**: 完整的开发环境，Qt 6.8.3
+- **Linux**: 完整的开发环境，Qt 6.11.1
 - **所有平台**: Git, 网络访问
 
 ### 密钥配置
