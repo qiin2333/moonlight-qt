@@ -1501,6 +1501,7 @@ Flickable {
                                         handleStyle: minimumStyle
                                         scaleItem: hdrBrightnessScale
                                         brightnessValue: hdrBrightnessCard.previewMin
+                                        maximumValue: Math.min(10, hdrBrightnessCard.previewAverage)
                                         decimalPlaces: 6
                                         valueLabel: qsTr("Minimum brightness")
                                         unitLabel: qsTr("nits")
@@ -1520,6 +1521,8 @@ Flickable {
                                         handleStyle: averageStyle
                                         scaleItem: hdrBrightnessScale
                                         brightnessValue: hdrBrightnessCard.previewAverage
+                                        minimumValue: Math.max(1, hdrBrightnessCard.previewMin)
+                                        maximumValue: hdrBrightnessCard.previewMax
                                         valueLabel: qsTr("Full-frame brightness")
                                         unitLabel: qsTr("nits")
                                         restingZ: 4
@@ -1538,6 +1541,7 @@ Flickable {
                                         handleStyle: peakStyle
                                         scaleItem: hdrBrightnessScale
                                         brightnessValue: hdrBrightnessCard.previewMax
+                                        minimumValue: Math.max(1, hdrBrightnessCard.previewAverage)
                                         valueLabel: qsTr("Peak brightness")
                                         unitLabel: qsTr("nits")
                                         restingZ: 5

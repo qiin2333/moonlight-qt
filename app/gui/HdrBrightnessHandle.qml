@@ -11,6 +11,9 @@ Item {
     property Item scaleItem
     property int handleStyle: minimumStyle
     property real brightnessValue: 0
+    readonly property real value: brightnessValue
+    property real minimumValue: 0
+    property real maximumValue: 10000
     property int decimalPlaces: 3
     property string valueLabel
     property string unitLabel
