@@ -377,7 +377,7 @@ void SdlInputHandler::resetMacTouchpadState()
         sendMacTouchpadButtonState(false);
     }
 
-    m_MacTouchpadSuppressedMouseButtons = 0;
+    // Preserve suppressed buttons until SDL delivers their matching releases.
     m_MacTouchpadPendingTapButtons = 0;
     m_MacTouchpadLastTapTimestamp = 0;
     m_MacTouchpadGestureStartTimestamp = 0;
