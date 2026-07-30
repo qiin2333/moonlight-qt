@@ -369,6 +369,7 @@ private:
     class ClipboardHelperClient* m_ClipboardHelper; // Bidirectional clipboard sync helper process; nullptr when stream not active
     std::mutex m_CursorUpdateMutex;
     std::shared_ptr<RemoteCursorUpdate> m_PendingCursorUpdate;
+    bool m_CursorUpdateEventQueued = false;
 
     static CONNECTION_LISTENER_CALLBACKS k_ConnCallbacks;
     static Session* s_ActiveSession;

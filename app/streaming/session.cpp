@@ -503,9 +503,18 @@ void Session::clCursorUpdate(const LI_CURSOR_UPDATE* update)
             static_cast<int>(update->pixelDataLength));
     }
 
+    bool queueCursorEvent = false;
     {
         std::lock_guard<std::mutex> lock(session->m_CursorUpdateMutex);
         session->m_PendingCursorUpdate = pending;
+        if (!session->m_CursorUpdateEventQueued) {
+            session->m_CursorUpdateEventQueued = true;
+            queueCursorEvent = true;
+        }
+    }
+
+    if (!queueCursorEvent) {
+        return;
     }
 
     SDL_Event cursorEvent = {};
@@ -513,9 +522,9 @@ void Session::clCursorUpdate(const LI_CURSOR_UPDATE* update)
     cursorEvent.user.code = SDL_CODE_CURSOR_UPDATE;
     if (SDL_PushEvent(&cursorEvent) <= 0) {
         std::lock_guard<std::mutex> lock(session->m_CursorUpdateMutex);
-        if (session->m_PendingCursorUpdate == pending) {
-            session->m_PendingCursorUpdate.reset();
-        }
+        // Keep the latest mailbox value. A subsequent callback will enqueue
+        // another wakeup after observing the cleared flag.
+        session->m_CursorUpdateEventQueued = false;
     }
 }
 
@@ -3203,7 +3212,8 @@ bool Session::startConnectionAsync()
     if (m_InputHandler != nullptr) {
         const int cursorResult =
             LiSetCursorMode(m_InputHandler->getLocalCursorMode());
-        if (cursorResult != 0 && cursorResult != -2) {
+        if (cursorResult != LI_CURSOR_MODE_OK &&
+            cursorResult != LI_CURSOR_MODE_ERR_UNSUPPORTED) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Failed to set initial local cursor mode: %d",
                         cursorResult);
@@ -3745,6 +3755,7 @@ void Session::exec()
                 {
                     std::lock_guard<std::mutex> lock(m_CursorUpdateMutex);
                     cursorUpdate.swap(m_PendingCursorUpdate);
+                    m_CursorUpdateEventQueued = false;
                 }
                 if (cursorUpdate != nullptr && m_InputHandler != nullptr) {
                     m_InputHandler->updateRemoteCursor(*cursorUpdate);

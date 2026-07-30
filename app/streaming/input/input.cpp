@@ -368,7 +368,9 @@ void SdlInputHandler::synchronizeLocalCursorMode()
                                LI_CURSOR_MODE_LOCAL : LI_CURSOR_MODE_VIDEO;
     m_LocalCursorMode.store(cursorMode, std::memory_order_relaxed);
     const int result = LiSetCursorMode(cursorMode);
-    if (result != 0 && result != -2 && result != -3) {
+    if (result != LI_CURSOR_MODE_OK &&
+        result != LI_CURSOR_MODE_ERR_UNSUPPORTED &&
+        result != LI_CURSOR_MODE_ERR_NOT_CONNECTED) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Failed to synchronize local cursor mode: %d",
                     result);
@@ -398,35 +400,35 @@ void SdlInputHandler::updateRemoteCursor(const RemoteCursorUpdate& update)
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Ignoring invalid remote cursor shape %u",
                         update.shapeId);
-            return;
         }
-
-        SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(
-            const_cast<char*>(update.bgra.constData()),
-            update.width,
-            update.height,
-            32,
-            update.width * 4,
-            SDL_PIXELFORMAT_BGRA32);
-        if (surface == nullptr) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Failed to create remote cursor surface: %s",
-                        SDL_GetError());
-            return;
+        else {
+            SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(
+                const_cast<char*>(update.bgra.constData()),
+                update.width,
+                update.height,
+                32,
+                update.width * 4,
+                SDL_PIXELFORMAT_BGRA32);
+            if (surface == nullptr) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "Failed to create remote cursor surface: %s",
+                            SDL_GetError());
+            }
+            else {
+                SDL_Cursor* cursor =
+                    SDL_CreateColorCursor(surface, update.hotspotX, update.hotspotY);
+                SDL_FreeSurface(surface);
+                if (cursor == nullptr) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                                "Failed to create remote cursor: %s",
+                                SDL_GetError());
+                }
+                else {
+                    resetRemoteCursor();
+                    m_RemoteCursor = cursor;
+                }
+            }
         }
-
-        SDL_Cursor* cursor =
-            SDL_CreateColorCursor(surface, update.hotspotX, update.hotspotY);
-        SDL_FreeSurface(surface);
-        if (cursor == nullptr) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Failed to create remote cursor: %s",
-                        SDL_GetError());
-            return;
-        }
-
-        resetRemoteCursor();
-        m_RemoteCursor = cursor;
     }
 
     if (getLocalCursorMode() == LI_CURSOR_MODE_LOCAL && isCaptureActive()) {
