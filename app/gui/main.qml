@@ -10,6 +10,8 @@ import StreamingPreferences 1.0
 import SystemProperties 1.0
 import SdlGamepadKeyNavigation 1.0
 
+import "theme"
+
 ApplicationWindow {
     property bool pollingActive: false
 
@@ -21,6 +23,12 @@ ApplicationWindow {
     id: window
     width: 1280
     height: 640
+
+    // FluentWinUI3's ApplicationWindow is just "color: palette.window", and on macOS
+    // that palette follows the system appearance regardless of the color scheme we
+    // ask for. Pin it so pages we haven't given a background of their own (the
+    // connection spinner, the quit page) are never white-on-white.
+    color: Theme.ink
 
     // This function runs prior to creation of the initial StackView item
     function doEarlyInit() {
@@ -102,10 +110,66 @@ ApplicationWindow {
         }
     }
 
+    // 全局壁纸。PcView 负责抓取、缓存和刷新，抓到之后写回这里，
+    // 这样连接进度页、退出页、设置页共用同一张背景，而不是各自一片纯色。
+    property string backgroundImageUrl: ""
+
+    // PcView / AppView / SettingsView 各自已经按自己的配方铺了一层壁纸（半透明 + 压暗），
+    // 它们背后再垫一张全尺寸原图的话两层会错位叠在一起。所以这层只服务于自己不画背景的页面
+    // ——连接进度页、退出页。
+    readonly property bool showGlobalBackground:
+        !(stackView.currentItem && stackView.currentItem.usesOwnBackground === true)
+
+    Image {
+        anchors.fill: parent
+        source: window.backgroundImageUrl
+        visible: source != "" && window.showGlobalBackground
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        cache: true
+        z: -3
+    }
+
+    // 压暗壁纸，保证上层的文字和加载动画有足够对比度。用 ink 而不是纯黑，
+    // 和各页自己那层遮罩同一个底色，切页时不会有色温跳变。
+    Rectangle {
+        anchors.fill: parent
+        color: Qt.rgba(Theme.ink.r, Theme.ink.g, Theme.ink.b, 0.72)
+        visible: window.showGlobalBackground
+        z: -2
+    }
+
     StackView {
         id: stackView
         anchors.fill: parent
         focus: true
+
+        // 切页动效：neo-brutalism 要更短更机械，所以不缩放（缩放读起来是「软」的），
+        // 改成 12px 横向位移 + 淡入，150ms OutQuad。
+        pushEnter: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durNormal; easing.type: Theme.easing }
+                NumberAnimation { property: "x"; from: 12; to: 0; duration: Theme.durNormal; easing.type: Theme.easing }
+            }
+        }
+        pushExit: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durFast; easing.type: Easing.InQuad }
+                NumberAnimation { property: "x"; from: 0; to: -12; duration: Theme.durFast; easing.type: Easing.InQuad }
+            }
+        }
+        popEnter: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durNormal; easing.type: Theme.easing }
+                NumberAnimation { property: "x"; from: -12; to: 0; duration: Theme.durNormal; easing.type: Theme.easing }
+            }
+        }
+        popExit: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durFast; easing.type: Easing.InQuad }
+                NumberAnimation { property: "x"; from: 0; to: 12; duration: Theme.durFast; easing.type: Easing.InQuad }
+            }
+        }
 
         // This configures the maximum width of the singleton attached QML ToolTip. If left unconstrained,
         // it will never insert a line break and just extend on forever.
@@ -241,39 +305,48 @@ ApplicationWindow {
     // 添加工具栏作为浮动元素
     ToolBar {
         id: toolBar
-        height: 60
+
+        // 各个 segue 页面用 shown 而不是直接写 visible：直接 visible=false 的话
+        // 工具栏会「啪」地消失，而 visible 变假之后就不再渲染，opacity 动画也没机会跑。
+        property bool shown: true
+        opacity: shown ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 220; easing.type: Easing.InOutQuad }
+        }
+
+        height: 56
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.topMargin: 5
         z: 1
-        
-        background: Rectangle {
-            color: "transparent"
-        }
 
-        Label {
-            id: titleLabel
-            visible: toolBar.width > 700
-            anchors.fill: parent
-            text: stackView.currentItem ? stackView.currentItem.objectName : ""
-            font.pointSize: 20
-            elide: Label.ElideRight
-            horizontalAlignment: Qt.AlignHCenter
-            verticalAlignment: Qt.AlignVCenter
+        // 以前这是一条「浮」在壁纸上的透明工具栏（topMargin: 5 + transparent 背景）。
+        // 新风格里它是一条真正的 bar：贴住窗口顶边、底部一条 1px 分隔线，页面内容从
+        // 线下面开始。底色留一半透明度让壁纸透上来 —— 全不透明的话这条 bar 会像一块
+        // 贴在窗口上的黑板，和下面的壁纸完全割裂。不加模糊（这套风格里没有毛玻璃）。
+        background: Rectangle {
+            color: Qt.rgba(Theme.ink.r, Theme.ink.g, Theme.ink.b, 0.55)
+
+            Rectangle {
+                anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                height: 1
+                color: Theme.line
+            }
         }
 
         RowLayout {
-            spacing: 10
-            anchors.leftMargin: 10
-            anchors.rightMargin: 10
+            spacing: Theme.spaceSm
+            anchors.leftMargin: Theme.spaceLg
+            anchors.rightMargin: Theme.spaceLg
             anchors.fill: parent
 
             NavigableToolButton {
                 // Only make the button visible if the user has navigated somewhere.
                 visible: stackView.depth > 1
 
-                iconSource: "qrc:/res/arrow_left.svg"
+                iconSource: "qrc:/res/fluent/tb-back.svg"
 
                 onClicked: goBack()
 
@@ -282,29 +355,59 @@ ApplicationWindow {
                 }
             }
 
-            // This label will appear when the window gets too small and
-            // we need to ensure the toolbar controls don't collide
-            Label {
-                id: titleRowLabel
-                font.pointSize: titleLabel.font.pointSize
-                elide: Label.ElideRight
-                horizontalAlignment: Qt.AlignHCenter
-                verticalAlignment: Qt.AlignVCenter
-                Layout.fillWidth: true
-
-                // We need this label to always be visible so it can occupy
-                // the remaining space in the RowLayout. To "hide" it, we
-                // just set the text to empty string.
-                text: !titleLabel.visible ? stackView.currentItem.objectName : ""
+            // 字标 + 页名面包屑，左对齐。窄窗口下字标先让位，页名一直留着。
+            Text {
+                id: wordmark
+                visible: toolBar.width > 700
+                text: "MOONLIGHT"
+                color: Theme.text
+                font.family: Theme.fontSans
+                font.pointSize: Theme.fontCardTitle
+                font.weight: Font.ExtraBold
+                font.letterSpacing: Theme.tracking(Theme.fontCardTitle, 0.1)
+                verticalAlignment: Text.AlignVCenter
+                Layout.fillHeight: true
             }
 
-            Label {
+            Text {
+                visible: wordmark.visible
+                text: "/"
+                color: Theme.textFaint
+                font.family: Theme.fontMono
+                font.pointSize: Theme.fontCardTitle
+                verticalAlignment: Text.AlignVCenter
+                Layout.fillHeight: true
+                Layout.leftMargin: Theme.spaceXs
+                Layout.rightMargin: Theme.spaceXs
+            }
+
+            // 这一条必须始终存在：RowLayout 靠它 fillWidth 把右边那排按钮推到边上。
+            Text {
+                id: titleRowLabel
+                text: stackView.currentItem ? stackView.currentItem.objectName : ""
+                color: Theme.accent
+                font.family: Theme.fontSans
+                font.pointSize: Theme.fontRowTitle
+                font.weight: Font.Bold
+                font.capitalization: Font.AllUppercase
+                font.letterSpacing: Theme.tracking(Theme.fontRowTitle, 0.14)
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+                Layout.fillHeight: true
+                Layout.fillWidth: true
+            }
+
+            Text {
                 id: versionLabel
                 visible: stackView.currentItem instanceof SettingsView
                 text: qsTr("Version %1").arg(SystemProperties.versionString)
-                font.pointSize: 12
+                color: Theme.textDim
+                font.family: Theme.fontMono
+                font.pointSize: Theme.fontCaption
                 horizontalAlignment: Qt.AlignRight
-                verticalAlignment: Qt.AlignVCenter
+                verticalAlignment: Text.AlignVCenter
+                Layout.fillHeight: true
+                Layout.rightMargin: Theme.spaceSm
             }
 
             NavigableToolButton {
@@ -331,7 +434,7 @@ ApplicationWindow {
                 id: addPcButton
                 visible: stackView.currentItem instanceof PcView
 
-                iconSource:  "qrc:/res/ic_add_to_queue_white_48px.svg"
+                iconSource:  "qrc:/res/fluent/tb-add-pc.svg"
 
                 ToolTip.delay: 1000
                 ToolTip.timeout: 3000
@@ -358,7 +461,7 @@ ApplicationWindow {
 
                 id: updateButton
 
-                iconSource: "qrc:/res/update.svg"
+                iconSource: "qrc:/res/fluent/tb-update.svg"
 
                 ToolTip.delay: 1000
                 ToolTip.timeout: 3000
@@ -419,7 +522,7 @@ ApplicationWindow {
                 id: helpButton
                 visible: SystemProperties.hasBrowser
 
-                iconSource: "qrc:/res/question_mark.svg"
+                iconSource: "qrc:/res/fluent/tb-help.svg"
 
                 ToolTip.delay: 1000
                 ToolTip.timeout: 3000
@@ -449,7 +552,7 @@ ApplicationWindow {
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Gamepad Mapper")
 
-                iconSource: "qrc:/res/ic_videogame_asset_white_48px.svg"
+                iconSource: "qrc:/res/fluent/tb-gamepad.svg"
 
                 onClicked: navigateTo("qrc:/gui/GamepadMapper.qml", GamepadMapper)
 
@@ -463,7 +566,7 @@ ApplicationWindow {
                 visible: stackView.currentItem instanceof AppView &&
                          stackView.currentItem.hasMultipleAddresses
 
-                iconSource: "qrc:/res/ic_network_white_48px.svg"
+                iconSource: "qrc:/res/fluent/tb-network.svg"
 
                 ToolTip.delay: 1000
                 ToolTip.timeout: 3000
@@ -485,7 +588,7 @@ ApplicationWindow {
                 id: displaySettingsButton
                 visible: stackView.currentItem instanceof AppView
 
-                iconSource: "qrc:/res/desktop_windows-48px.svg"
+                iconSource: "qrc:/res/fluent/tb-display.svg"
 
                 ToolTip.delay: 1000
                 ToolTip.timeout: 3000
@@ -506,7 +609,7 @@ ApplicationWindow {
             NavigableToolButton {
                 id: settingsButton
 
-                iconSource:  "qrc:/res/settings.svg"
+                iconSource:  "qrc:/res/fluent/tb-settings.svg"
 
                 onClicked: navigateTo("qrc:/gui/SettingsView.qml", SettingsView)
 
@@ -629,14 +732,22 @@ ApplicationWindow {
         }
 
         ColumnLayout {
-            Label {
+            spacing: Theme.spaceSm
+
+            Text {
                 text: addPcDialog.label
-                font.bold: true
+                color: Theme.text
+                font.family: Theme.fontSans
+                font.pointSize: Theme.fontRowTitle
+                font.weight: Font.DemiBold
+                Layout.fillWidth: true
             }
 
-            TextField {
+            HardTextField {
                 id: editText
+                placeholderText: "192.168.1.100"
                 Layout.fillWidth: true
+                Layout.minimumWidth: 260
                 focus: true
 
                 Keys.onReturnPressed: {

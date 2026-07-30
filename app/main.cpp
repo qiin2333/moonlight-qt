@@ -1045,7 +1045,63 @@ int main(int argc, char *argv[])
     // Create the identity manager on the main thread
     IdentityManager::get();
 
-    // We require the Material theme
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    // Qt 6.8+ ships the FluentWinUI3 style, which is what our settings UI is designed
+    // around. It picks light/dark from the application color scheme (there is no env
+    // var equivalent to the Material ones), and our icons are styled for a dark theme,
+    // so we force dark here rather than following the system.
+    QQuickStyle::setStyle("FluentWinUI3");
+    QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
+
+    // Unlike the Material style, FluentWinUI3 takes all of its colors from the
+    // application palette: ApplicationWindow is literally "color: palette.window",
+    // and the checked color of check boxes, switches, sliders and progress bars
+    // comes from palette.accent. setColorScheme() above only swaps the style's own
+    // assets; on macOS the palette still follows the system appearance, so under a
+    // light system theme every page we haven't restyled ourselves (the connection
+    // spinner, the legacy settings groups) renders as white-on-white.
+    //
+    // Force a dark palette built from the alkaidlab.com design variables so the
+    // whole app is consistent regardless of the system appearance.
+    {
+        const QColor background(0x0F, 0x17, 0x2A);  // --background-darker
+        const QColor surface(0x1E, 0x29, 0x3B);     // --background-dark
+        const QColor border(0x33, 0x41, 0x55);      // --border-dark
+        const QColor text(0xF1, 0xF5, 0xF9);
+        const QColor textMuted(0x94, 0xA3, 0xB8);   // --text-muted
+        const QColor accent(0x39, 0xC5, 0xBB);      // --primary-color
+
+        QPalette palette;
+        palette.setColor(QPalette::Window, background);
+        palette.setColor(QPalette::WindowText, text);
+        palette.setColor(QPalette::Base, surface);
+        palette.setColor(QPalette::AlternateBase, border);
+        palette.setColor(QPalette::Text, text);
+        palette.setColor(QPalette::Button, surface);
+        palette.setColor(QPalette::ButtonText, text);
+        palette.setColor(QPalette::BrightText, text);
+        palette.setColor(QPalette::ToolTipBase, surface);
+        palette.setColor(QPalette::ToolTipText, text);
+        palette.setColor(QPalette::PlaceholderText, textMuted);
+        palette.setColor(QPalette::Mid, border);
+        palette.setColor(QPalette::Dark, background);
+        palette.setColor(QPalette::Light, border);
+        palette.setColor(QPalette::Midlight, border);
+        palette.setColor(QPalette::Shadow, background);
+        palette.setColor(QPalette::Accent, accent);
+        palette.setColor(QPalette::Highlight, accent);
+        palette.setColor(QPalette::HighlightedText, background);
+        palette.setColor(QPalette::Link, accent);
+        palette.setColor(QPalette::LinkVisited, accent);
+
+        palette.setColor(QPalette::Disabled, QPalette::WindowText, textMuted);
+        palette.setColor(QPalette::Disabled, QPalette::Text, textMuted);
+        palette.setColor(QPalette::Disabled, QPalette::ButtonText, textMuted);
+
+        QGuiApplication::setPalette(palette);
+    }
+#else
+    // Fall back to the Material theme on older Qt builds
     QQuickStyle::setStyle("Material");
 
     // Our icons are styled for a dark theme, so we do not allow the user to override this
@@ -1063,6 +1119,54 @@ int main(int argc, char *argv[])
         // (which is all the time). The new color looks washed out, so manually specify the
         // old primary color unless the user overrides it themselves.
         qputenv("QT_QUICK_CONTROLS_MATERIAL_PRIMARY", "#3F51B5");
+    }
+#endif
+
+    // 界面字体：Manrope（正文/标题）+ DM Mono（数字、状态徽标、宽字距微标签），
+    // 这是 neo-brutalism 视觉的一半，见 app/res/fonts/README.md。
+    //
+    // 必须放在上面那整段样式/palette 块之后：Windows 分支在更前面已经调过一次
+    // app.setFont()，谁最后调谁生效，顺序反了这里就白设了。
+    {
+        static const char* const kBundledFonts[] = {
+            ":/res/fonts/Manrope-Regular.ttf",
+            ":/res/fonts/Manrope-SemiBold.ttf",
+            ":/res/fonts/Manrope-ExtraBold.ttf",
+            ":/res/fonts/DMMono-Regular.ttf",
+        };
+
+        bool haveManrope = false;
+        for (const char* path : kBundledFonts) {
+            if (QFontDatabase::addApplicationFont(QLatin1String(path)) < 0) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to load bundled font: %s", path);
+            }
+            else {
+                haveManrope = true;
+            }
+        }
+
+        if (haveManrope) {
+            // Manrope 和 DM Mono 都没有中文字形，中文交给系统字体回退。
+            // Qt 会跳过列表里不存在的 family，所以这里可以无条件把候选都列上。
+            QStringList families;
+            families << QStringLiteral("Manrope");
+#ifdef Q_OS_DARWIN
+            families << QStringLiteral("PingFang SC");
+#elif defined(Q_OS_WIN32)
+            families << QStringLiteral("Microsoft YaHei UI") << QStringLiteral("Microsoft YaHei");
+#else
+            families << QStringLiteral("Noto Sans CJK SC") << QStringLiteral("Source Han Sans SC");
+#endif
+            // 最后兜住原本的系统默认字体，别把上面平台分支设好的字号/字形提示丢了
+            QFont uiFont = app.font();
+            families << uiFont.family();
+            uiFont.setFamilies(families);
+            uiFont.setStyleHint(QFont::SansSerif);
+            app.setFont(uiFont);
+
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "UI font families: %s",
+                        qPrintable(families.join(QLatin1String(", "))));
+        }
     }
 
     QQmlApplicationEngine engine;

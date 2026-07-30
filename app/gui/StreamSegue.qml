@@ -6,9 +6,18 @@ import SdlGamepadKeyNavigation 1.0
 import Session 1.0
 import SystemProperties 1.0
 
+import "theme"
+
 Item {
     property Session session
     property string appName
+
+    // 正在启动的这个游戏的封面。加载页用它做背景，而不是首页的主机壁纸——
+    // 你正要进的是这个游戏，画面就该先切过去。取不到时退回主机壁纸。
+    property string boxArtUrl: ""
+
+    // 自带背景，main.qml 的全局壁纸层不用再垫一层
+    readonly property bool usesOwnBackground: true
     property string stageText : isResume ? qsTr("Resuming %1...").arg(appName) :
                                            qsTr("Starting %1...").arg(appName)
     property bool isResume : false
@@ -30,7 +39,7 @@ Item {
         }
     }
 
-    function connectionStarted()
+    function hideForStreaming()
     {
         // Hide the UI contents so the user doesn't
         // see them briefly when we pop off the StackView
@@ -40,6 +49,14 @@ Item {
 
         // Hide the window now that streaming has begun
         window.visible = false
+    }
+
+    function connectionStarted()
+    {
+        // 淡出到黑，再把窗口藏掉。SDL 的串流窗口紧接着接管画面，
+        // 这样从加载页到游戏画面之间不会突然闪一下。
+        exitFallbackTimer.start()
+        exitAnimation.start()
     }
 
     function displayLaunchError(text)
@@ -102,7 +119,7 @@ Item {
 
     StackView.onDeactivating: {
         // Show the toolbar again when popped off the stack
-        toolBar.visible = true
+        toolBar.shown = true
 
         // Re-enable GUI gamepad usage now
         SdlGamepadKeyNavigation.enable()
@@ -110,7 +127,7 @@ Item {
 
     StackView.onActivated: {
         // Hide the toolbar before we start loading
-        toolBar.visible = false
+        toolBar.shown = false
 
         // Hook up our signals
         session.stageStarting.connect(stageStarting)
@@ -125,9 +142,134 @@ Item {
         // since it may currently be using the SDL video subsystem
         SystemProperties.waitForAsyncLoad()
 
+        enterAnimation.start()
+        backgroundZoomAnimation.start()
+
         // Kick off the stream
         spinnerTimer.start()
         streamLoader.active = true
+    }
+
+    // 上一页（游戏列表）的背景先留在最底层。封面在它上面淡入，
+    // 这样从列表切到加载页不是整张图硬换，而是接着上一张继续。
+    Image {
+        id: previousBackground
+
+        anchors.fill: parent
+        source: window.backgroundImageUrl
+        visible: source != ""
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        cache: true
+        opacity: 0.3
+        z: -3
+    }
+
+    Image {
+        id: segueBackground
+
+        anchors.fill: parent
+        source: boxArtUrl !== "" ? boxArtUrl
+                                 : (window.backgroundImageUrl !== "" ? window.backgroundImageUrl
+                                                                     : "qrc:/res/gura.png")
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        cache: true
+        z: -2
+
+        // 声明式地跟着加载状态淡入。不要用 onStatusChanged 触发动画：
+        // 封面通常已经在缓存里，status 在处理器挂上之前就已经是 Ready，
+        // 那样动画永远不会触发，背景会一直停在全透明。
+        opacity: status === Image.Ready ? 1 : 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 700; easing.type: Easing.OutCubic }
+        }
+
+        // 缓慢推近，让等待的这几秒不是一张死图
+        transform: Scale {
+            id: backgroundZoom
+            origin.x: segueBackground.width / 2
+            origin.y: segueBackground.height / 2
+        }
+    }
+
+    ParallelAnimation {
+        id: backgroundZoomAnimation
+        NumberAnimation {
+            target: backgroundZoom; property: "xScale"
+            from: 1.0; to: 1.08; duration: 14000; easing.type: Easing.InOutSine
+        }
+        NumberAnimation {
+            target: backgroundZoom; property: "yScale"
+            from: 1.0; to: 1.08; duration: 14000; easing.type: Easing.InOutSine
+        }
+    }
+
+    // 压暗，保证进度条和文字在任何封面上都读得清
+    Rectangle {
+        anchors.fill: parent
+        color: Qt.rgba(Theme.ink.r, Theme.ink.g, Theme.ink.b, 0.72)
+        z: -1
+    }
+
+    // 进入串流时盖上来的幕，替代原来「一帧之内直接隐藏窗口」的硬切。
+    // 用 ink 而不是纯黑：和窗口底色一致，SDL 接管的那一帧不会有色阶跳变。
+    Rectangle {
+        id: exitVeil
+        anchors.fill: parent
+        color: Theme.ink
+        opacity: 0
+        visible: opacity > 0
+        z: 10
+    }
+
+    ParallelAnimation {
+        id: enterAnimation
+        NumberAnimation {
+            target: contentRoot; property: "opacity"
+            from: 0; to: 1; duration: 420; easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            target: contentShift; property: "y"
+            from: 14; to: 0; duration: 480; easing.type: Easing.OutCubic
+        }
+    }
+
+    // 进入串流：内容淡出、背景轻微推近、黑幕盖上来，三件事一起做，
+    // 读起来像是「被带进游戏」而不是窗口突然不见了。
+    ParallelAnimation {
+        id: exitAnimation
+
+        NumberAnimation {
+            target: contentRoot; property: "opacity"
+            to: 0; duration: 260; easing.type: Easing.InCubic
+        }
+        NumberAnimation {
+            target: backgroundZoom; property: "xScale"
+            to: 1.14; duration: 340; easing.type: Easing.InOutQuad
+        }
+        NumberAnimation {
+            target: backgroundZoom; property: "yScale"
+            to: 1.14; duration: 340; easing.type: Easing.InOutQuad
+        }
+        SequentialAnimation {
+            NumberAnimation {
+                target: exitVeil; property: "opacity"
+                to: 1; duration: 340; easing.type: Easing.InOutQuad
+            }
+            ScriptAction {
+                script: hideForStreaming()
+            }
+        }
+    }
+
+    // 万一淡出动画没跑完（动画被禁用、时序异常），也必须把窗口藏掉，
+    // 否则 Qt 窗口会压在串流画面上。
+    Timer {
+        id: exitFallbackTimer
+        interval: 800
+        onTriggered: hideForStreaming()
     }
 
     Timer {
@@ -208,35 +350,63 @@ Item {
         sourceComponent: Item {}
     }
 
-    Row {
-        anchors.centerIn: parent
-        spacing: 5
+    Item {
+        id: contentRoot
 
-        BusyIndicator {
-            id: stageSpinner
-            running: visible
-            visible: false
+        anchors.fill: parent
+        opacity: 0
+
+        // 淡入的同时轻微上浮
+        transform: Translate {
+            id: contentShift
+            y: 14
         }
 
-        Label {
-            id: stageLabel
-            height: stageSpinner.height
-            text: stageText
-            font.pointSize: 20
+        // 阶段文字 + 斜条纹读条。转圈的 BusyIndicator 换成 HardProgress。
+        // stageSpinner 这个 id 和 visible 语义保持不变，spinnerTimer 和
+        // hideForStreaming() 还在用。
+        Column {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - Theme.spaceXl * 2, 620)
+            spacing: Theme.spaceLg
+
+            Text {
+                id: stageLabel
+
+                width: parent.width
+                text: stageText
+                color: Theme.text
+                font.family: Theme.fontSans
+                font.pointSize: 24
+                font.weight: Font.ExtraBold
+                font.letterSpacing: Theme.trackingTight(24)
+                // 左对齐。居中大字是那种「优雅」排版的做法，这套风格里所有东西都
+                // 咬着一条左基线走（工具栏字标、卡片标题、设置行），读条上的阶段文字
+                // 也一样 —— 而且它会随阶段变长变短，居中的话每换一句都在左右横跳。
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.Wrap
+            }
+
+            HardProgress {
+                id: stageSpinner
+
+                width: parent.width
+                visible: false
+            }
+        }
+
+        Text {
+            id: hintText
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 50
+            anchors.horizontalCenter: parent.horizontalCenter
+            color: Theme.textDim
+            font.family: Theme.fontMono
+            font.pointSize: Theme.fontBody
+            horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
 
             wrapMode: Text.Wrap
         }
-    }
-
-    Label {
-        id: hintText
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 50
-        anchors.horizontalCenter: parent.horizontalCenter
-        font.pointSize: 18
-        verticalAlignment: Text.AlignVCenter
-
-        wrapMode: Text.Wrap
     }
 }
