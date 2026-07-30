@@ -252,6 +252,8 @@ private:
 
     int getCapturedCursorVisibilityState() const;
 
+    void applyCapturedCursorState();
+
     void resetRemoteCursor();
 
     struct NativeTouchpadContact {

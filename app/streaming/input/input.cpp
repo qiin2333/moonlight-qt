@@ -348,6 +348,15 @@ int SdlInputHandler::getCapturedCursorVisibilityState() const
     return SDL_ENABLE;
 }
 
+void SdlInputHandler::applyCapturedCursorState()
+{
+    if (getLocalCursorMode() == LI_CURSOR_MODE_LOCAL &&
+        m_RemoteCursor != nullptr) {
+        SDL_SetCursor(m_RemoteCursor);
+    }
+    SDL_ShowCursor(getCapturedCursorVisibilityState());
+}
+
 void SdlInputHandler::resetRemoteCursor()
 {
     if (m_RemoteCursor == nullptr) {
@@ -431,11 +440,8 @@ void SdlInputHandler::updateRemoteCursor(const RemoteCursorUpdate& update)
         }
     }
 
-    if (getLocalCursorMode() == LI_CURSOR_MODE_LOCAL && isCaptureActive()) {
-        if (m_RemoteCursor != nullptr) {
-            SDL_SetCursor(m_RemoteCursor);
-        }
-        SDL_ShowCursor(getCapturedCursorVisibilityState());
+    if (isCaptureActive()) {
+        applyCapturedCursorState();
     }
 }
 
@@ -602,16 +608,12 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
 void SdlInputHandler::setCaptureActive(bool active)
 {
     if (active) {
-        if (getLocalCursorMode() == LI_CURSOR_MODE_LOCAL &&
-            m_RemoteCursor != nullptr) {
-            SDL_SetCursor(m_RemoteCursor);
-        }
-
         // If we're in relative mode, try to activate SDL's relative mouse mode
         if (m_AbsoluteMouseMode || SDL_SetRelativeMouseMode(SDL_TRUE) < 0) {
-            // Relative mouse mode didn't work or was disabled, so we'll just hide the cursor
-            SDL_ShowCursor(getCapturedCursorVisibilityState());
             m_FakeMouseCaptureActive = true;
+            // Relative mouse mode didn't work or was disabled, so apply the
+            // cursor shape and visibility directly.
+            applyCapturedCursorState();
         }
 
         // Synchronize the client and host cursor when activating absolute capture

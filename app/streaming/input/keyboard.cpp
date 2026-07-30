@@ -81,7 +81,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
             // 切换本地鼠标光标可见性状态
             m_MouseCursorCapturedVisibilityState = !m_MouseCursorCapturedVisibilityState;
             synchronizeLocalCursorMode();
-            SDL_ShowCursor(getCapturedCursorVisibilityState());
+            applyCapturedCursorState();
         }
         else {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
