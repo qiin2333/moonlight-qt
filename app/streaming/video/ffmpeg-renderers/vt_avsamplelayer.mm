@@ -10,6 +10,7 @@
 #include <streaming/session.h>
 
 #include <mach/mach_time.h>
+#include <cmath>
 #import <Cocoa/Cocoa.h>
 #import <VideoToolbox/VideoToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -473,7 +474,14 @@ public:
         [CATransaction setDisableActions:YES];
 
         if (image != nullptr) {
-            CGFloat scale = m_StreamView.window.screen.backingScaleFactor;
+            // NSWindow.backingScaleFactor stays valid even when the window is
+            // not currently on a screen, unlike NSWindow.screen which can be nil
+            // while moving between displays or entering full-screen. Getting this
+            // wrong stretches the overlay and makes it look blurry.
+            CGFloat scale = m_StreamView.window.backingScaleFactor;
+            if (scale <= 0) {
+                scale = [NSScreen mainScreen].backingScaleFactor;
+            }
             if (scale <= 0) {
                 scale = 1;
             }
@@ -499,6 +507,13 @@ public:
                 position = CGPointMake(0, 0);
                 break;
             }
+
+            // Snap the origin to the pixel grid. Centering an overlay with an odd
+            // pixel width lands it on a half pixel, which resamples the bitmap font
+            // and makes the text look smeared. The overlay text changes size as it
+            // updates, so without this the overlay alternates between crisp and blurry.
+            position.x = std::round(position.x * scale) / scale;
+            position.y = std::round(position.y * scale) / scale;
 
             m_OverlayLayers[type].bounds = CGRectMake(0, 0, size.width, size.height);
             m_OverlayLayers[type].position = position;
