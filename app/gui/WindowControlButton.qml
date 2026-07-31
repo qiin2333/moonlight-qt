@@ -13,6 +13,7 @@ AbstractButton {
     width: 44
     height: 40
     focusPolicy: Qt.NoFocus
+    hoverEnabled: true
 
     Accessible.name: accessibleName
     Accessible.role: Accessible.Button
