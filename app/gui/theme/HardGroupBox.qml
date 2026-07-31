@@ -36,6 +36,7 @@ GroupBox {
     }
 
     background: Panel {
+        fill: Theme.surfaceLayer
         y: control.topPadding - control.bottomPadding
         width: control.width
         height: control.height - control.topPadding + control.bottomPadding

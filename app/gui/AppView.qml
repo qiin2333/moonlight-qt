@@ -95,7 +95,7 @@ CenteredGridView {
         padding: Theme.spaceXl
 
         background: Panel {
-            accentBarColor: Theme.accent
+            fill: Theme.surfaceLayer
             accentBarWidth: Theme.accentBar
         }
 
@@ -847,7 +847,7 @@ CenteredGridView {
         padding: Theme.spaceXl
 
         background: Panel {
-            accentBarColor: Theme.accent
+            fill: Theme.surfaceLayer
             accentBarWidth: Theme.accentBar
         }
 

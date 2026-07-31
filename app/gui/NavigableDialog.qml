@@ -18,6 +18,7 @@ Dialog {
     rightPadding: Theme.spaceXl
 
     background: Panel {
+        fill: Theme.surfaceLayer
         accentBarColor: Theme.accent
         accentBarWidth: Theme.accentBar
     }

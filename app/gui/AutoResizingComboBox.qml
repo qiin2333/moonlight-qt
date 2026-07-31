@@ -207,7 +207,7 @@ ComboBox {
 
         // 面板自带硬投影，右下会溢出一点，这是刻意的：投影必须落在页面上才成立
         background: Panel {
-            fill: Theme.surface
+            fill: Theme.surfaceLayer
             borderColor: Theme.accent
         }
 

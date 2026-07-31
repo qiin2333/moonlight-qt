@@ -38,6 +38,7 @@ Item {
     implicitHeight: layout.implicitHeight + Theme.spaceLg * 2 + Theme.shadowOffset
 
     Panel {
+        fill: Theme.surfaceLayer
         anchors {
             fill: parent
             // 右下让出投影的位置，不然会溢出滚动区

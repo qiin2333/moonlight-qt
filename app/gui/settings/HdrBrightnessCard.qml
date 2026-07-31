@@ -24,7 +24,7 @@ Item {
             rightMargin: Theme.shadowOffset
             bottomMargin: Theme.shadowOffset
         }
-        fill: Theme.surface2
+        fill: Theme.surface2Layer
         borderColor: hdrBrightnessCard.manualValuesValid ? Theme.line : Theme.danger
         accentBarColor: hdrBrightnessCard.manualValuesValid ? Theme.accentDim : Theme.danger
         accentBarWidth: Theme.accentBar

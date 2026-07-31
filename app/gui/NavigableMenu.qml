@@ -14,7 +14,7 @@ Menu {
     // 再加粗条会和菜单项的 hover 抢注意力。
     background: Panel {
         implicitWidth: 200
-        fill: Theme.surface
+        fill: Theme.surfaceLayer
     }
 
     onOpened: {
