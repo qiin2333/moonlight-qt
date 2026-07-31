@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QEventLoop>
 #include <QFileInfo>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -171,7 +172,17 @@ QString PortableUpdateInstaller::getUpdateArchiveName() const
 QString PortableUpdateInstaller::getUpdateStorageProbePath() const
 {
 #if defined(Q_OS_DARWIN)
-    // 工作目录放缓存里，不往 /Applications 里塞临时文件
+    // 工作目录放在已安装 bundle 的旁边，不放缓存目录。
+    //
+    // 缓存目录通常和 /Applications 不在同一个卷上，那样两次 mv（备份、换新）都会退化
+    // 成 200MB 级的递归复制：慢，而且中途被打断会在目标位置留下半个 bundle。放在同一个
+    // 卷上，两次 mv 都是原子 rename。父目录的可写性 ensureWritableInstallDir() 已经
+    // 确认过，磁盘空间检查也就自然落在真正要写入的那个卷上。
+    QString bundlePath = getInstalledBundlePath();
+    if (!bundlePath.isEmpty()) {
+        return QFileInfo(bundlePath).absolutePath();
+    }
+
     return QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
 #else
     return Path::getPortableRootDir();
@@ -237,8 +248,15 @@ bool PortableUpdateInstaller::ensureWritableInstallDir(QString& errorMessage) co
 
 QString PortableUpdateInstaller::createPortableUpdateWorkspace() const
 {
+#if defined(Q_OS_DARWIN)
+    // 工作目录就在 /Applications 边上，加个点前缀别让它出现在访达里
+    static const QLatin1String kWorkspacePrefix(".MoonlightUpdate-");
+#else
+    static const QLatin1String kWorkspacePrefix("MoonlightPortableUpdate-");
+#endif
+
     QString workspace = QDir(getUpdateStorageProbePath()).filePath(
-                QString("MoonlightPortableUpdate-%1-%2")
+                kWorkspacePrefix + QString("%1-%2")
                 .arg(QCoreApplication::applicationPid())
                 .arg(QDateTime::currentMSecsSinceEpoch()));
 
@@ -328,11 +346,31 @@ bool PortableUpdateInstaller::runTool(const QString& program,
         return false;
     }
 
-    if (!process.waitForFinished(timeoutMs)) {
-        qWarning() << program << "timed out";
-        process.kill();
-        process.waitForFinished(5000);
-        return false;
+    // 用局部事件循环等，而不是 waitForFinished()。hdiutil / ditto 正常也要跑几秒，
+    // 卡住的话就是分钟级 —— waitForFinished() 会把主线程连界面一起冻住，连那句
+    // 「正在校验更新…」都不会重绘。ExcludeUserInputEvents 保证重绘照做，但这期间
+    // 用户点不动东西，不会在半路触发别的操作。
+    if (process.state() != QProcess::NotRunning) {
+        QEventLoop loop;
+        QTimer timeoutTimer;
+        bool timedOut = false;
+
+        QObject::connect(&process, &QProcess::finished, &loop, &QEventLoop::quit);
+        QObject::connect(&timeoutTimer, &QTimer::timeout, &loop, [&loop, &timedOut]() {
+            timedOut = true;
+            loop.quit();
+        });
+
+        timeoutTimer.setSingleShot(true);
+        timeoutTimer.start(timeoutMs);
+        loop.exec(QEventLoop::ExcludeUserInputEvents);
+
+        if (timedOut) {
+            qWarning() << program << "timed out";
+            process.kill();
+            process.waitForFinished(5000);
+            return false;
+        }
     }
 
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {

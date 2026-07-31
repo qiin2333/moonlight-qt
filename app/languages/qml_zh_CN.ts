@@ -1826,118 +1826,118 @@
 <context>
     <name>PortableUpdateInstaller</name>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="58"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="59"/>
         <source>The update URL is invalid.</source>
         <translation>更新链接无效。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="47"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="48"/>
         <source>In-app update is not supported for this installation.</source>
         <translation>这种安装方式不支持应用内更新。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="52"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="53"/>
         <source>An update is already in progress.</source>
         <translation>已经有一个更新在进行中。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="63"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="64"/>
         <source>The update package was not found for this release.</source>
         <translation>这个版本里没有找到对应的更新包。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="75"/>
-        <location filename="../backend/portableupdateinstaller.cpp" line="357"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="76"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="395"/>
         <source>Unable to create a temporary folder for the update.</source>
         <translation>无法为更新创建临时目录。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="93"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="94"/>
         <source>Unable to create the update package on disk.</source>
         <translation>无法在磁盘上创建更新包。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="120"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="121"/>
         <source>Downloading update...</source>
         <translation>正在下载更新…</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="213"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="224"/>
         <source>In-app update requires running Moonlight from an app bundle.</source>
         <translation>应用内更新要求从 .app 里运行 Moonlight。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="225"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="236"/>
         <source>Moonlight is installed in a folder you can&apos;t write to. Move it to your Applications folder, or download and install the update manually.</source>
         <translation>Moonlight 所在的文件夹没有写入权限。请把它移动到「应用程序」文件夹，或者手动下载安装更新。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="290"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="308"/>
         <source>Unable to determine free disk space for the update.</source>
         <translation>无法确定更新所需的磁盘剩余空间。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="295"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="313"/>
         <source>Not enough free disk space for the update. Need about %1 MB free.</source>
         <translation>磁盘剩余空间不足，更新大约需要 %1 MB。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="369"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="407"/>
         <source>Unable to open the downloaded disk image.</source>
         <translation>无法打开下载的磁盘映像。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="378"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="416"/>
         <source>The downloaded disk image does not contain Moonlight.</source>
         <translation>下载的磁盘映像里没有 Moonlight。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="383"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="421"/>
         <source>Unable to extract the update.</source>
         <translation>无法解出更新内容。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="488"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="526"/>
         <source>Downloading update... %1%</source>
         <translation>正在下载更新… %1%</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="492"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="530"/>
         <source>Downloading update... %1 MB</source>
         <translation>正在下载更新… %1 MB</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="524"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="562"/>
         <source>Verifying update...</source>
         <translation>正在校验更新…</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="538"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="576"/>
         <source>Unable to prepare the update installer.</source>
         <translation>无法准备更新安装程序。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="574"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="612"/>
         <source>Unable to launch the updater.</source>
         <translation>无法启动更新程序。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="204"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="215"/>
         <source>The current Moonlight folder is not writable. Move the portable build to a writable location, run Moonlight with sufficient permissions, or download and install the update manually.</source>
         <translation>当前 Moonlight 所在文件夹不可写。请把便携版移动到可写位置、以足够的权限运行 Moonlight，或者手动下载安装更新。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="479"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="517"/>
         <source>Failed while writing the update package to disk.</source>
         <translation>将更新包写入磁盘时失败。</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="504"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="542"/>
         <source>Failed to download the update: %1</source>
         <translation>下载更新失败：%1</translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="578"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="616"/>
         <source>Installing update and restarting Moonlight...</source>
         <translation>正在安装更新并重启 Moonlight...</translation>
     </message>
@@ -2587,17 +2587,13 @@
         <translation>Moonlight 可用更新：版本 %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="788"/>
-        <source>Preparing portable update...</source>
-        <translation>正在准备便携版更新...</translation>
-    </message>
-    <message>
         <location filename="../gui/main.qml" line="633"/>
         <source>Help</source>
         <translation>帮助</translation>
     </message>
     <message>
         <location filename="../gui/main.qml" line="579"/>
+        <location filename="../gui/main.qml" line="788"/>
         <source>Preparing update...</source>
         <translation>正在准备更新…</translation>
     </message>

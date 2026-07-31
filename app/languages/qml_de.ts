@@ -1826,118 +1826,118 @@
 <context>
     <name>PortableUpdateInstaller</name>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="58"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="59"/>
         <source>The update URL is invalid.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="47"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="48"/>
         <source>In-app update is not supported for this installation.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="52"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="53"/>
         <source>An update is already in progress.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="63"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="64"/>
         <source>The update package was not found for this release.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="75"/>
-        <location filename="../backend/portableupdateinstaller.cpp" line="357"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="76"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="395"/>
         <source>Unable to create a temporary folder for the update.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="93"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="94"/>
         <source>Unable to create the update package on disk.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="120"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="121"/>
         <source>Downloading update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="213"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="224"/>
         <source>In-app update requires running Moonlight from an app bundle.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="225"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="236"/>
         <source>Moonlight is installed in a folder you can&apos;t write to. Move it to your Applications folder, or download and install the update manually.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="290"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="308"/>
         <source>Unable to determine free disk space for the update.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="295"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="313"/>
         <source>Not enough free disk space for the update. Need about %1 MB free.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="369"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="407"/>
         <source>Unable to open the downloaded disk image.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="378"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="416"/>
         <source>The downloaded disk image does not contain Moonlight.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="383"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="421"/>
         <source>Unable to extract the update.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="488"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="526"/>
         <source>Downloading update... %1%</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="492"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="530"/>
         <source>Downloading update... %1 MB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="524"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="562"/>
         <source>Verifying update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="538"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="576"/>
         <source>Unable to prepare the update installer.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="574"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="612"/>
         <source>Unable to launch the updater.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="204"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="215"/>
         <source>The current Moonlight folder is not writable. Move the portable build to a writable location, run Moonlight with sufficient permissions, or download and install the update manually.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="479"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="517"/>
         <source>Failed while writing the update package to disk.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="504"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="542"/>
         <source>Failed to download the update: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="578"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="616"/>
         <source>Installing update and restarting Moonlight...</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2612,17 +2612,13 @@
         <translation>Hilfe</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="788"/>
-        <source>Preparing portable update...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../gui/main.qml" line="677"/>
         <source>Connection IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../gui/main.qml" line="579"/>
+        <location filename="../gui/main.qml" line="788"/>
         <source>Preparing update...</source>
         <translation type="unfinished"></translation>
     </message>

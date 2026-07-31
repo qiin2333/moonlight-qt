@@ -785,7 +785,7 @@ ApplicationWindow {
         standardButtons: Dialog.NoButton
         closePolicy: Popup.CloseOnEscape
         showSpinner: true
-        text: qsTr("Preparing portable update...")
+        text: qsTr("Preparing update...")
     }
 
     ErrorMessageDialog {

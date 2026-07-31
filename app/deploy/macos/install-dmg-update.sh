@@ -68,9 +68,18 @@ fi
 if ! mv "$STAGED_APP" "$INSTALLED_APP" 2>/dev/null; then
     log_failure "Unable to move the new app into place: $INSTALLED_APP"
 
+    # 跨卷时 mv 是复制 + 删除，失败可能已经在目标位置留下半个 bundle。不先清掉的话，
+    # 下面这次 mv 会把备份塞进那个半成品里变成 Moonlight.app/Moonlight.app ——
+    # 看着像回滚成功了，其实装的东西彻底坏掉。
+    rm -rf "$INSTALLED_APP"
+
     BACKUP_APP="$BACKUP_DIR/$(basename "$INSTALLED_APP")"
-    if [ -d "$BACKUP_APP" ]; then
-        mv "$BACKUP_APP" "$INSTALLED_APP" 2>/dev/null && open -a "$INSTALLED_APP" 2>/dev/null
+    if [ -d "$BACKUP_APP" ] && mv "$BACKUP_APP" "$INSTALLED_APP" 2>/dev/null; then
+        open -a "$INSTALLED_APP" 2>/dev/null
+    else
+        # 回滚也失败了：此时备份是唯一一份完整的安装，绝对不能跟着工作目录一起删。
+        log_failure "Rollback failed. The previous version is still in $BACKUP_DIR — move it back manually."
+        exit 1
     fi
 
     cleanup
