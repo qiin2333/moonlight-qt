@@ -13,8 +13,8 @@ QtObject {
     readonly property color ink: "#0F1115"       // --cend-ink，最底层
     readonly property color surface: "#171A20"   // --cend-surface，卡片/面板
     readonly property color surface2: "#1F232B"  // --cend-surface-2，hover / 输入框
-    readonly property color surfaceLayer: "#EB171A20"  // 菜单/卡片层，约 92% 不透明
-    readonly property color surface2Layer: "#EB1F232B" // 抬高一层的半透明表面
+    readonly property color surfaceLayer: "#E0171A20"  // 菜单/卡片层，约 88% 不透明
+    readonly property color surface2Layer: "#E01F232B" // 抬高一层的半透明表面
     readonly property color line: "#2B3038"      // --cend-border，1px 描边
     readonly property color lineStrong: "#3C434E" // 控件轮廓，比描边亮一档
 
