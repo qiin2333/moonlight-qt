@@ -1,5 +1,5 @@
 import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick.Controls
 import "."
 
 // 方角硬投影按钮。只覆盖 background（FluentWinUI3 的圆角是从它自己的

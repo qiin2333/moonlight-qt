@@ -1,8 +1,8 @@
 import QtQuick
-import QtQuick.Controls 2.2
+import QtQuick.Controls
 import QtQuick.Layouts 1.3
 import QtQuick.Window 2.2
-import QtQuick.Controls.Material 2.2
+import QtQuick.Controls.Material as MaterialStyle
 
 import ComputerManager 1.0
 import AutoUpdateChecker 1.0
@@ -31,7 +31,19 @@ ApplicationWindow {
     // 全屏按钮、Cmd+Tab、调度中心、无障碍都由系统管，我们只是不画它的底。
     // 真正的 frameless（自绘窗口按钮、方角窗口）是另一件事，要补 resize、阴影、
     // 双击最大化和一堆平台差异，这里刻意没走那条路。
-    flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
+    flags: Qt.Window
+           | Qt.ExpandedClientAreaHint
+           | Qt.NoTitleBarBackgroundHint
+           // Windows otherwise keeps drawing the native window icon and title
+           // over our own wordmark. Keep the native caption buttons, resizing,
+           // shadow, and taskbar integration, but opt out of the default title
+           // and system-menu decorations.
+           | (Qt.platform.os === "windows"
+              ? Qt.CustomizeWindowHint
+                | Qt.WindowMinimizeButtonHint
+                | Qt.WindowMaximizeButtonHint
+                | Qt.WindowCloseButtonHint
+              : 0)
 
     // 加了上面那两个 flag 之后窗口的可绘制区域顶到了最上沿，但 ApplicationWindow 仍然
     // 把 contentItem 往下缩了一个安全区（实测 macOS 上 contentItem.y = 32，正好是系统
@@ -53,7 +65,7 @@ ApplicationWindow {
         // in order to improve contrast between GFE's placeholder box art
         // and the background of the app grid.
         if (SystemProperties.usesMaterial3Theme) {
-            Material.background = "#303030"
+            MaterialStyle.Material.background = "#303030"
         }
 
         SdlGamepadKeyNavigation.enable()

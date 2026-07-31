@@ -1160,7 +1160,13 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_DARWIN
             families << QStringLiteral("PingFang SC");
 #elif defined(Q_OS_WIN32)
-            families << QStringLiteral("Microsoft YaHei UI") << QStringLiteral("Microsoft YaHei");
+            const QStringList preferredHanFamilies = {
+                QStringLiteral("Noto Sans SC"),
+                QStringLiteral("DengXian"),
+                QStringLiteral("Microsoft YaHei UI"),
+                QStringLiteral("Microsoft YaHei"),
+            };
+            families << preferredHanFamilies;
 #else
             families << QStringLiteral("Noto Sans CJK SC") << QStringLiteral("Source Han Sans SC");
 #endif
@@ -1170,6 +1176,24 @@ int main(int argc, char *argv[])
             uiFont.setFamilies(families);
             uiFont.setStyleHint(QFont::SansSerif);
             app.setFont(uiFont);
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0) && defined(Q_OS_WIN32)
+            // QML controls frequently select Manrope or DM Mono directly.
+            // That replaces the default font's family list, so Windows may
+            // choose SimSun for missing Han glyphs. Pin the application-wide
+            // Han fallback to modern sans-serif fonts instead.
+            QStringList hanFallbackFamilies;
+            const QStringList installedFamilies = QFontDatabase::families();
+            for (const QString &family : preferredHanFamilies) {
+                if (installedFamilies.contains(family)) {
+                    hanFallbackFamilies << family;
+                }
+            }
+            if (!hanFallbackFamilies.isEmpty()) {
+                QFontDatabase::setApplicationFallbackFontFamilies(QChar::Script_Han,
+                                                                  hanFallbackFamilies);
+            }
+#endif
 
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "UI font families: %s",
                         qPrintable(families.join(QLatin1String(", "))));

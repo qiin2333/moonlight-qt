@@ -1,5 +1,5 @@
 import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick.Controls
 import "."
 
 // 方角滑条：4px 方槽 + 竖直方块把手，把手带一小截硬投影。

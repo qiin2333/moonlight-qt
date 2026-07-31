@@ -1,5 +1,5 @@
 import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick.Controls
 import "."
 
 // 方角开关：方轨 + 方滑块，滑块位移不带回弹。

@@ -1,6 +1,6 @@
 import QtQuick 2.9
 // Overlay（下拉面板算可用高度时要用）需要 QtQuick.Controls 2.3 以上
-import QtQuick.Controls 2.15
+import QtQuick.Controls
 import QtQuick.Window 2.2
 
 import SdlGamepadKeyNavigation 1.0

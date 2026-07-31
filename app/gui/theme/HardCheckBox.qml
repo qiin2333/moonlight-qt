@@ -1,5 +1,5 @@
 import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick.Controls
 import "."
 
 // 方角勾选框。只覆盖 indicator，文字排布/换行继续走基类，

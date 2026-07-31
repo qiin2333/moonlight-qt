@@ -1,5 +1,5 @@
 import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick.Controls
 import "."
 
 // 方角分组框：标题在面板上方（宽字距大写强调色），下面是 surface 面板
