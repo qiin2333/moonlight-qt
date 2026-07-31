@@ -7,11 +7,17 @@ Switch {
     id: control
 
     font.family: Theme.fontSans
+    implicitWidth: 44
+    implicitHeight: 22
+    padding: 0
+    spacing: 0
 
     indicator: Rectangle {
+        id: track
         implicitWidth: 44
         implicitHeight: 22
-        x: control.text ? control.leftPadding : control.width - width - control.rightPadding
+        x: control.text ? control.leftPadding
+                        : control.leftPadding + (control.availableWidth - width) / 2
         y: control.topPadding + (control.availableHeight - height) / 2
 
         radius: 0
@@ -27,16 +33,63 @@ Switch {
         }
 
         Rectangle {
+            id: handle
             y: 3
-            x: control.checked ? parent.width - width - 3 : 3
+            x: 3 + (pointerArea.dragging ? pointerArea.dragPosition
+                                         : control.visualPosition) * (parent.width - width - 6)
             width: 16
             height: parent.height - 6
             radius: 0
             color: control.checked ? Theme.ink : Theme.textDim
 
             Behavior on x {
+                enabled: !pointerArea.pressed && !control.down
                 NumberAnimation { duration: Theme.durFast; easing.type: Theme.easing }
             }
+        }
+
+        // Own the pointer gesture on the painted track. This avoids the
+        // FluentWinUI3 Switch regression where a stationary release is ignored,
+        // while retaining both tap-to-toggle and drag-to-select behavior.
+        MouseArea {
+            id: pointerArea
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.PointingHandCursor
+
+            property real pressStartX: 0
+            property real dragPosition: control.visualPosition
+            property bool dragging: false
+
+            onPressed: function(mouse) {
+                pressStartX = mouse.x
+                dragPosition = control.visualPosition
+                dragging = false
+                control.forceActiveFocus(Qt.MouseFocusReason)
+            }
+            onPositionChanged: function(mouse) {
+                if (!pressed) {
+                    return
+                }
+                if (Math.abs(mouse.x - pressStartX) >= 4) {
+                    dragging = true
+                }
+                if (dragging) {
+                    dragPosition = Math.max(0, Math.min(1, mouse.x / width))
+                }
+            }
+            onReleased: function(mouse) {
+                if (dragging) {
+                    var targetChecked = dragPosition >= 0.5
+                    if (targetChecked !== control.checked) {
+                        control.toggle()
+                    }
+                } else {
+                    control.toggle()
+                }
+                dragging = false
+            }
+            onCanceled: dragging = false
         }
     }
 }

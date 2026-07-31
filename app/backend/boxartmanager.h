@@ -34,7 +34,10 @@ private slots:
 
 private:
     QUrl
-    loadBoxArtFromNetwork(NvComputer* computer, int appId);
+    loadBoxArtFromNetwork(NvComputer* computer, const NvApp& app);
+
+    static bool
+    isPlaceholderBoxArt(const QSize& size);
 
     QString
     getFilePathForBoxArt(NvComputer* computer, int appId);

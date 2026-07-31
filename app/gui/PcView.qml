@@ -667,15 +667,7 @@ CenteredGridView {
 
         function getBackgroundImage() {
             loadingIndicator.visible = true
-
-            var cachePath = imageUtils.fetchAndSaveRandomBackground("https://img-api.pipw.top/")
-            loadingIndicator.visible = false
-
-            if (cachePath) {
-                handleImageResponse(cachePath)
-            } else {
-                handleImageError("fetchAndSaveRandomBackground returned empty")
-            }
+            imageUtils.fetchAndSaveRandomBackground("https://img-api.pipw.top/")
         }
 
         function handleImageResponse(cachePath) {
@@ -924,6 +916,14 @@ CenteredGridView {
 
     ImageUtils {
         id: imageUtils
+        onBackgroundReady: function(filePath) {
+            loadingIndicator.visible = false
+            backgroundImage.handleImageResponse(filePath)
+        }
+        onBackgroundError: function(errorMessage) {
+            loadingIndicator.visible = false
+            backgroundImage.handleImageError(errorMessage)
+        }
         onSaveCompleted: function(success, message) {
             if (success) {
                 saveNotification.text = qsTr("Image saved to: %1").arg(message)

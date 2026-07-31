@@ -36,6 +36,13 @@ BoxArtManager::getFilePathForBoxArt(NvComputer* computer, int appId)
     return dir.filePath(QString::number(appId) + ".png");
 }
 
+bool BoxArtManager::isPlaceholderBoxArt(const QSize& size)
+{
+    return size == QSize(130, 180) ||
+           size == QSize(628, 888) ||
+           size == QSize(200, 266);
+}
+
 class NetworkBoxArtLoadTask : public QObject, public QRunnable
 {
     Q_OBJECT
@@ -56,10 +63,10 @@ signals:
 private:
     void run()
     {
-        QUrl image = m_Bam->loadBoxArtFromNetwork(m_Computer, m_App.id);
+        QUrl image = m_Bam->loadBoxArtFromNetwork(m_Computer, m_App);
         if (image.isEmpty()) {
             // Give it another shot if it fails once
-            image = m_Bam->loadBoxArtFromNetwork(m_Computer, m_App.id);
+            image = m_Bam->loadBoxArtFromNetwork(m_Computer, m_App);
         }
         emit boxArtFetchCompleted(m_Computer, m_App, image);
     }
@@ -74,6 +81,10 @@ QUrl BoxArtManager::loadBoxArt(NvComputer* computer, NvApp& app)
     // Try to open the cached file if it exists and contains data
     QFile cacheFile(getFilePathForBoxArt(computer, app.id));
     if (cacheFile.exists() && cacheFile.size() > 0) {
+        QImageReader reader(cacheFile.fileName());
+        if (!app.isAppCollectorGame && isPlaceholderBoxArt(reader.size())) {
+            return QUrl("qrc:/res/no_app_image.png");
+        }
         return QUrl::fromLocalFile(cacheFile.fileName());
     }
 
@@ -104,19 +115,22 @@ void BoxArtManager::handleBoxArtLoadComplete(NvComputer* computer, NvApp app, QU
     }
 }
 
-QUrl BoxArtManager::loadBoxArtFromNetwork(NvComputer* computer, int appId)
+QUrl BoxArtManager::loadBoxArtFromNetwork(NvComputer* computer, const NvApp& app)
 {
     NvHTTP http(computer);
 
-    QString cachePath = getFilePathForBoxArt(computer, appId);
+    QString cachePath = getFilePathForBoxArt(computer, app.id);
     QImage image;
     try {
-        image = http.getBoxArt(appId);
+        image = http.getBoxArt(app.id);
     } catch (...) {}
 
     // Cache the box art on disk if it loaded
     if (!image.isNull()) {
         if (image.save(cachePath)) {
+            if (!app.isAppCollectorGame && isPlaceholderBoxArt(image.size())) {
+                return QUrl("qrc:/res/no_app_image.png");
+            }
             return QUrl::fromLocalFile(cachePath);
         }
         else {
