@@ -47,16 +47,15 @@ Item {
         stageLabel.visible = false
         hintText.visible = false
 
-        // 窗口本身不在这里藏。Session::exec() 会等这条动画跑完再创建串流窗口，
-        // 并在串流窗口进入全屏之后才隐藏窗口 —— 提前藏的话，macOS 切进新 Space 的
-        // 整个动画期间旧 Space 露出来的是桌面，而不是这层已经全黑的幕。
+        // 窗口本身不在这里藏，由 Session::exec() 在串流窗口进入全屏之后隐藏。
+        // 提前藏的话，macOS 切进新 Space 的整个动画期间旧 Space 露出来的是桌面，
+        // 而不是这层已经全黑的幕。
     }
 
     function connectionStarted()
     {
-        // 淡出到黑，再把窗口藏掉。SDL 的串流窗口紧接着接管画面，
-        // 这样从加载页到游戏画面之间不会突然闪一下。
-        exitFallbackTimer.start()
+        // 淡出到全黑。Session::exec() 会等这条动画跑完再创建串流窗口，
+        // 所以交接是在一块纯黑上完成的，中间不会闪。
         exitAnimation.start()
     }
 
@@ -267,14 +266,6 @@ Item {
         }
     }
 
-    // 万一淡出动画没跑完（动画被禁用、时序异常），也必须把窗口藏掉，
-    // 否则 Qt 窗口会压在串流画面上。
-    Timer {
-        id: exitFallbackTimer
-        interval: 800
-        onTriggered: hideForStreaming()
-    }
-
     Timer {
         id: spinnerTimer
 
@@ -366,8 +357,8 @@ Item {
         }
 
         // 阶段文字 + 斜条纹读条。转圈的 BusyIndicator 换成 HardProgress。
-        // stageSpinner 这个 id 和 visible 语义保持不变，spinnerTimer 和
-        // hideForStreaming() 还在用。
+        // stageSpinner 这个 id 和 visible 语义保持不变：spinnerTimer 和
+        // hideForStreaming() 都在用。
         Column {
             anchors.centerIn: parent
             width: Math.min(parent.width - Theme.spaceXl * 2, 620)

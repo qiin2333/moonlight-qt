@@ -92,6 +92,9 @@ static QString getStartupApplicationDir(const char* argv0)
 #include "imageutils.h"
 #include "streaming/macpermissions.h"
 
+#ifdef Q_OS_WIN32
+// 只有 Windows 分支的 app.setFont() 会用到它。不加这层 #ifdef 的话，其他平台每次
+// 构建都会报一条 -Wunused-function。
 static bool shouldUseChineseWindowsUiFont(StreamingPreferences::Language language)
 {
     switch (language) {
@@ -104,6 +107,7 @@ static bool shouldUseChineseWindowsUiFont(StreamingPreferences::Language languag
         return false;
     }
 }
+#endif
 
 #if defined(Q_OS_WIN32)
 #define IS_UNSPECIFIED_HANDLE(x) ((x) == INVALID_HANDLE_VALUE || (x) == NULL)
