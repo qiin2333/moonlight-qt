@@ -1,4 +1,4 @@
-import QtQuick 2.9
+import QtQuick
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
 import QtQuick.Window 2.2
@@ -23,6 +23,15 @@ ApplicationWindow {
     id: window
     width: 1280
     height: 640
+
+    // 去掉系统标题栏的外壳：内容顶到窗口最上沿、系统不再画标题栏底色，于是下面
+    // 那条 56px 的工具栏本身就成了标题栏，整个窗口从上到下都是我们自己的配色。
+    //
+    // 仍然是一个正常的原生窗口：关闭/最小化/最大化按钮、resize 边缘、窗口阴影、
+    // 全屏按钮、Cmd+Tab、调度中心、无障碍都由系统管，我们只是不画它的底。
+    // 真正的 frameless（自绘窗口按钮、方角窗口）是另一件事，要补 resize、阴影、
+    // 双击最大化和一堆平台差异，这里刻意没走那条路。
+    flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
 
     // FluentWinUI3's ApplicationWindow is just "color: palette.window", and on macOS
     // that palette follows the system appearance regardless of the color scheme we
@@ -322,6 +331,20 @@ ApplicationWindow {
         anchors.right: parent.right
         z: 1
 
+        // 给系统窗口按钮让位。Qt 的 SafeArea 只报了标题栏那条带子的高度
+        // （实测 macOS 上 top=32、left=0），没有给出按钮的水平占位，只能自己留：
+        // macOS 的红绿灯在左上，三颗到 x≈70 结束；Windows 的最小化/最大化/关闭
+        // 由 DWM 画在右上，一组约 138pt。
+        //
+        // 全屏时不留：macOS 全屏会把红绿灯藏起来（要鼠标移到顶边才浮出来），
+        // 这时候还留着那 76pt 就是一段莫名其妙的空档 —— 界面全屏是个偏好项，
+        // 真有人这么用。
+        readonly property bool windowChromeVisible: window.visibility !== Window.FullScreen
+        readonly property int windowButtonInsetLeft:
+            (SystemProperties.isDarwin && windowChromeVisible) ? 76 : 0
+        readonly property int windowButtonInsetRight:
+            (Qt.platform.os === "windows" && windowChromeVisible) ? 138 : 0
+
         // 以前这是一条「浮」在壁纸上的透明工具栏（topMargin: 5 + transparent 背景）。
         // 新风格里它是一条真正的 bar：贴住窗口顶边、底部一条 1px 分隔线，页面内容从
         // 线下面开始。底色留一半透明度让壁纸透上来 —— 全不透明的话这条 bar 会像一块
@@ -336,10 +359,30 @@ ApplicationWindow {
             }
         }
 
+        // 空白处拖动整个窗口，双击最大化/还原 —— 标题栏的这两个行为原本由系统提供，
+        // 现在标题栏是我们自己的了，得自己接上。
+        //
+        // 声明在 RowLayout 之前：同层同 z 时后声明的画在上面也先拿到事件，所以按钮
+        // 和字标照常响应，只有真正空着的地方才落到这里。
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+
+            onPressed: window.startSystemMove()
+            onDoubleClicked: {
+                if (window.visibility === Window.Maximized) {
+                    window.showNormal()
+                }
+                else {
+                    window.showMaximized()
+                }
+            }
+        }
+
         RowLayout {
             spacing: Theme.spaceSm
-            anchors.leftMargin: Theme.spaceLg
-            anchors.rightMargin: Theme.spaceLg
+            anchors.leftMargin: Theme.spaceLg + toolBar.windowButtonInsetLeft
+            anchors.rightMargin: Theme.spaceLg + toolBar.windowButtonInsetRight
             anchors.fill: parent
 
             NavigableToolButton {
