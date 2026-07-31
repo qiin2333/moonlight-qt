@@ -882,7 +882,7 @@ Column {
                          qsTr("This feature effectively upscales, reduces compression artifacts and enhances the clarity of streamed content.") + "\n" +
                          qsTr("Note:") + "\n" +
                          qsTr("If available, ensure that appropriate settings (i.e. RTX Video enhancement) are enabled in your GPU driver configuration.") + "\n" +
-                         qsTr("HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.") + "\n" +
+                         qsTr("HDR rendering has diverse issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.") + "\n" +
                          qsTr("Be advised that using this feature on laptops running on battery power may lead to significant battery drain.")
 
             HardSwitch {
@@ -985,8 +985,8 @@ Column {
                     validator: IntValidator{bottom:256; top:8192}
                     width: 96
                     visible: remoteResolutionSwitch.checked
-                    text: StreamingPreferences.remoteResolutionWidth > 0 ? StreamingPreferences.remoteResolutionWidth.toString() : "800"
-                    onTextChanged: {
+                    text: StreamingPreferences.remoteResolutionWidth > 0 ? StreamingPreferences.remoteResolutionWidth.toString() : ""
+                    onEditingFinished: {
                         var value = parseInt(text);
                         if (!isNaN(value)) {
                             StreamingPreferences.remoteResolutionWidth = value;
@@ -1010,8 +1010,8 @@ Column {
                     validator: IntValidator{bottom:256; top:8192}
                     width: 96
                     visible: remoteResolutionSwitch.checked
-                    text: StreamingPreferences.remoteResolutionHeight > 0 ? StreamingPreferences.remoteResolutionHeight.toString() : "600"
-                    onTextChanged: {
+                    text: StreamingPreferences.remoteResolutionHeight > 0 ? StreamingPreferences.remoteResolutionHeight.toString() : ""
+                    onEditingFinished: {
                         var value = parseInt(text);
                         if (!isNaN(value)) {
                             StreamingPreferences.remoteResolutionHeight = value;
@@ -1042,10 +1042,11 @@ Column {
                     maximumLength: 3
                     inputMethodHints: Qt.ImhDigitsOnly
                     validator: IntValidator{bottom:1; top:512}
+                    placeholderText: "60"
                     width: 80
                     visible: remoteFpsSwitch.checked
-                    text: StreamingPreferences.remoteFpsRate > 0 ? StreamingPreferences.remoteFpsRate.toString() : "60"
-                    onTextChanged: {
+                    text: StreamingPreferences.remoteFpsRate > 0 ? StreamingPreferences.remoteFpsRate.toString() : ""
+                    onEditingFinished: {
                         var value = parseInt(text);
                         if (!isNaN(value)) {
                             StreamingPreferences.remoteFpsRate = value;

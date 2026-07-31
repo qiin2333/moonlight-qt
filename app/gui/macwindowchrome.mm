@@ -1,6 +1,7 @@
 #include "macwindowchrome.h"
 
 #import <AppKit/AppKit.h>
+#import <objc/runtime.h>
 
 namespace
 {
@@ -8,7 +9,17 @@ namespace
 // 红绿灯距窗口左边的留白。main.qml 里工具栏的 windowButtonInsetLeft 是按
 // 「这个值 + 整组 60pt 宽 + 一格间距」算出来的，两边要一起改。
 const CGFloat kButtonLeftMargin = 20;
+const void* kTitleBarObserverTokensKey = &kTitleBarObserverTokensKey;
 
+void removeTitleBarObservers(NSWindow* window)
+{
+    NSArray* observerTokens = objc_getAssociatedObject(window, kTitleBarObserverTokensKey);
+    NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+    for (id token in observerTokens) {
+        [center removeObserver:token];
+    }
+    objc_setAssociatedObject(window, kTitleBarObserverTokensKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
 
 // 把系统标题栏那条带子拉高到 barHeight，并让红绿灯在新高度里垂直居中。
 //
@@ -85,7 +96,7 @@ void MacWindowChrome::useTallTitleBar(QWindow* window, int barHeight)
         return;
     }
 
-    // 需要已经有 NSWindow 才能动它的视图层级。窗口还没创建出来时先等一轮事件循环。
+    // Create the native window before accessing its AppKit view hierarchy.
     window->create();
 
     NSView* view = reinterpret_cast<NSView*>(window->winId());
@@ -96,9 +107,14 @@ void MacWindowChrome::useTallTitleBar(QWindow* window, int barHeight)
 
     applyTallTitleBar(nsWindow, barHeight);
 
-    // AppKit 会在窗口尺寸变化、进出全屏之后把带子的布局改回默认高度，所以这几个
-    // 时机都要重新应用一遍。用 block 版观察者，生命周期跟着 NSWindow 走。
+    // AppKit resets the title-bar layout after resizing and full-screen
+    // transitions, so reapply it at each of these points. Notification-center
+    // block observers must be removed explicitly; keep their tokens associated
+    // with this window and tear them down when it closes.
     NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+    removeTitleBarObservers(nsWindow);
+
+    NSMutableArray* observerTokens = [NSMutableArray array];
     NSArray<NSNotificationName>* names = @[
         NSWindowDidResizeNotification,
         NSWindowDidEndLiveResizeNotification,
@@ -108,11 +124,24 @@ void MacWindowChrome::useTallTitleBar(QWindow* window, int barHeight)
     ];
 
     for (NSNotificationName name in names) {
-        [center addObserverForName:name
-                           object:nsWindow
-                            queue:nil
-                       usingBlock:^(NSNotification* note) {
+        id token = [center addObserverForName:name
+                                      object:nsWindow
+                                       queue:nil
+                                  usingBlock:^(NSNotification* note) {
             applyTallTitleBar(static_cast<NSWindow*>(note.object), barHeight);
         }];
+        [observerTokens addObject:token];
     }
+
+    id closeToken = [center addObserverForName:NSWindowWillCloseNotification
+                                        object:nsWindow
+                                         queue:nil
+                                    usingBlock:^(NSNotification* note) {
+        removeTitleBarObservers(static_cast<NSWindow*>(note.object));
+    }];
+    [observerTokens addObject:closeToken];
+    objc_setAssociatedObject(nsWindow,
+                             kTitleBarObserverTokensKey,
+                             observerTokens,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }

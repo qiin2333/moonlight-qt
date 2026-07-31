@@ -459,8 +459,12 @@
     </message>
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="885"/>
+        <source>HDR rendering has diverse issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
+        <translation>HDR 渲染在不同 GPU 上存在多种问题。我们正在努力解决，但目前建议使用非 HDR 模式。</translation>
+    </message>
+    <message>
         <source>HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
-        <translation>HDR渲染在不同的GPU上存在不同的问题，建议不配合HDR使用</translation>
+        <translation type="vanished">HDR渲染在不同的GPU上存在不同的问题，建议不配合HDR使用</translation>
     </message>
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="886"/>
@@ -513,7 +517,7 @@
         <translation>远程帧率</translation>
     </message>
     <message>
-        <location filename="../gui/settings/BasicSettingsPage.qml" line="1058"/>
+        <location filename="../gui/settings/BasicSettingsPage.qml" line="1059"/>
         <source>FPS</source>
         <translation>帧</translation>
     </message>
@@ -957,9 +961,13 @@
         <translation>当你用 Alt+Tab 键离开流式传输或者点击其他窗口时，Moonlight 将静音。</translation>
     </message>
     <message>
-        <location filename="../gui/settings/LegacySettingsPage.qml" line="138"/>
         <source>Enable microphone streaming(test)</source>
-        <translation>启用麦克风流式传输（测试）</translation>
+        <translation type="vanished">启用麦克风流式传输（测试）</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="138"/>
+        <source>Enable microphone streaming (test)</source>
+        <translation>启用麦克风串流（测试）</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="153"/>
@@ -1392,7 +1400,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="1221"/>
         <source>Good for streaming desktop and text-heavy games, but not recommended for fast-paced games.</source>
-        <translation>适合串流桌游和文字类游戏，但不推荐用于快节奏游戏。</translation>
+        <translation>适合串流桌面和文字较多的游戏，但不推荐用于快节奏游戏。</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="1223"/>
@@ -1929,7 +1937,7 @@
         <location filename="../cli/quitstream.cpp" line="88"/>
         <location filename="../cli/startstream.cpp" line="89"/>
         <source>Computer %1 has not been paired. Please open Moonlight to pair before streaming.</source>
-        <translation>计算机 %1 尚未配对。</translation>
+        <translation>计算机 %1 尚未配对。请先打开 Moonlight 完成配对，再开始串流。</translation>
     </message>
     <message>
         <location filename="../cli/quitstream.cpp" line="102"/>
@@ -2111,27 +2119,27 @@
 <context>
     <name>QPlatformTheme</name>
     <message>
-        <location filename="../main.cpp" line="919"/>
+        <location filename="../main.cpp" line="922"/>
         <source>&amp;Yes</source>
         <translation>是(&amp;Y)</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="920"/>
+        <location filename="../main.cpp" line="923"/>
         <source>&amp;No</source>
         <translation>否(&amp;N)</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="921"/>
+        <location filename="../main.cpp" line="924"/>
         <source>OK</source>
         <translation>确定</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="922"/>
+        <location filename="../main.cpp" line="925"/>
         <source>Help</source>
         <translation>帮助</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="923"/>
+        <location filename="../main.cpp" line="926"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
@@ -2503,27 +2511,27 @@
         <translation>检查防火墙和端口转发规则: %1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="82"/>
+        <location filename="../gui/StreamSegue.qml" line="83"/>
         <source>This PC&apos;s Internet connection is blocking Moonlight. Streaming over the Internet may not work while connected to this network.</source>
         <translation>此计算机的互联网连接被阻塞。当连接到此网络时，互联网上的流式传输可能无法工作。</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="318"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Tip:</source>
         <translation>提示:</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="318"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Press %1 to disconnect your session</source>
         <translation>按 %1 来断开会话</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="319"/>
+        <location filename="../gui/StreamSegue.qml" line="320"/>
         <source>Start+Select+L1+R1</source>
         <translation>Start+Select+L1+R1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="319"/>
+        <location filename="../gui/StreamSegue.qml" line="320"/>
         <source>Ctrl+Alt+Shift+Q</source>
         <translation>Ctrl+Alt+Shift+Q</translation>
     </message>
@@ -2531,113 +2539,114 @@
 <context>
     <name>main</name>
     <message>
-        <location filename="../gui/main.qml" line="632"/>
+        <location filename="../gui/main.qml" line="736"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="403"/>
+        <location filename="../gui/main.qml" line="507"/>
         <source>Version %1</source>
         <translation>版本 %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="426"/>
+        <location filename="../gui/main.qml" line="530"/>
         <source>Join our QQ group</source>
         <translation>来裙里丸</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="445"/>
+        <location filename="../gui/main.qml" line="549"/>
         <source>Add PC manually</source>
         <translation>手动添加计算机</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="490"/>
+        <location filename="../gui/main.qml" line="594"/>
         <source>Update available for Moonlight: Version %1</source>
         <translation>Moonlight 可用更新：版本 %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="479"/>
-        <location filename="../gui/main.qml" line="650"/>
+        <location filename="../gui/main.qml" line="583"/>
+        <location filename="../gui/main.qml" line="754"/>
         <source>Preparing portable update...</source>
         <translation>正在准备便携版更新...</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="533"/>
+        <location filename="../gui/main.qml" line="637"/>
         <source>Help</source>
         <translation>帮助</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="556"/>
+        <location filename="../gui/main.qml" line="660"/>
         <source>Gamepad Mapper</source>
         <translation>手柄按键映射</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="577"/>
+        <location filename="../gui/main.qml" line="681"/>
         <source>Connection IP</source>
         <translation>连接 IP</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="599"/>
+        <location filename="../gui/main.qml" line="703"/>
         <source>Display Settings</source>
         <translation>显示设置</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="639"/>
+        <location filename="../gui/main.qml" line="743"/>
         <source>No functioning hardware accelerated video decoder was detected by Moonlight. Your streaming performance may be severely degraded in this configuration.</source>
         <translation>Moonlight 未检测到有效的硬件加速视频解码器。在此配置中，你的流性能可能会严重下降。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="641"/>
+        <location filename="../gui/main.qml" line="745"/>
         <source>Click the Help button for more information on solving this problem.</source>
         <translation>单击帮助按钮以获取有关解决此问题的更多信息。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="660"/>
+        <location filename="../gui/main.qml" line="764"/>
         <source>Hardware acceleration doesn&apos;t work on XWayland. Continuing on XWayland may result in poor streaming performance. Try running with QT_QPA_PLATFORM=wayland or switch to X11.</source>
-        <translation>硬件加速在 XWayland 上不起作用。在 XWayland 上继续操作可能会导致流式传输性能下降。</translation>
+        <translation>硬件加速在 XWayland 上不起作用。在 XWayland 上继续运行可能导致串流性能不佳。请尝试使用 QT_QPA_PLATFORM=wayland 运行，或切换到 X11。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="662"/>
+        <location filename="../gui/main.qml" line="766"/>
         <source>Click the Help button for more information.</source>
         <translation>单击帮助按钮以获取更多信息。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="669"/>
+        <location filename="../gui/main.qml" line="773"/>
         <source>This version of Moonlight isn&apos;t optimized for your PC. Please download the &apos;%1&apos; version of Moonlight for the best streaming performance.</source>
         <translation>此版本的 Moonlight 尚未针对你的计算机优化。请下载“%1”版本的 Moonlight，以获得最佳的流式传输性能。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="678"/>
+        <location filename="../gui/main.qml" line="782"/>
         <source>Moonlight detected gamepads without a mapping:</source>
         <translation>Moonlight 检测到没有映射的手柄:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="680"/>
+        <location filename="../gui/main.qml" line="784"/>
         <source>Click the Help button for information on how to map your gamepads.</source>
         <translation>单击帮助按钮以获取有关如何映射手柄的信息。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="688"/>
+        <location filename="../gui/main.qml" line="792"/>
         <source>Are you sure you want to quit?</source>
         <translation>确定要退出吗？</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="718"/>
+        <location filename="../gui/main.qml" line="822"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>输入你主机的 IP 地址：</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="789"/>
+        <location filename="../gui/main.qml" line="893"/>
         <source>No host PC of your own?</source>
         <translation>还没有自己的主机？</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="797"/>
+        <location filename="../gui/main.qml" line="902"/>
         <source>Procriva Cloud rents out cloud hosts that are ready to stream.</source>
+        <extracomment>Procriva Cloud is a product name and must not be translated.</extracomment>
         <translation>基地云提供开箱即用的云主机，租一台就能直接串流。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="805"/>
+        <location filename="../gui/main.qml" line="910"/>
         <source>Learn more</source>
         <translation>了解一下</translation>
     </message>

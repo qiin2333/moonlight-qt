@@ -459,7 +459,7 @@
     </message>
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="885"/>
-        <source>HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
+        <source>HDR rendering has diverse issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -513,7 +513,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/BasicSettingsPage.qml" line="1058"/>
+        <location filename="../gui/settings/BasicSettingsPage.qml" line="1059"/>
         <source>FPS</source>
         <translation type="unfinished"></translation>
     </message>
@@ -958,7 +958,7 @@
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="138"/>
-        <source>Enable microphone streaming(test)</source>
+        <source>Enable microphone streaming (test)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2111,27 +2111,27 @@
 <context>
     <name>QPlatformTheme</name>
     <message>
-        <location filename="../main.cpp" line="919"/>
+        <location filename="../main.cpp" line="922"/>
         <source>&amp;Yes</source>
         <translation>はい(&amp;Y)</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="920"/>
+        <location filename="../main.cpp" line="923"/>
         <source>&amp;No</source>
         <translation>いいえ(&amp;N)</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="921"/>
+        <location filename="../main.cpp" line="924"/>
         <source>OK</source>
         <translation>OK</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="922"/>
+        <location filename="../main.cpp" line="925"/>
         <source>Help</source>
         <translation>ヘルプ</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="923"/>
+        <location filename="../main.cpp" line="926"/>
         <source>Cancel</source>
         <translation>キャンセル</translation>
     </message>
@@ -2174,7 +2174,7 @@
     <message>
         <location filename="../streaming/session.cpp" line="375"/>
         <source>The host PC reported a fatal video encoding error.</source>
-        <translation>ホーストのPCが再起不能なビデオエンコードエラーを起こしました。</translation>
+        <translation>ホストPCが致命的なビデオエンコードエラーを報告しました。</translation>
     </message>
     <message>
         <location filename="../streaming/session.cpp" line="376"/>
@@ -2311,7 +2311,7 @@
     <message>
         <location filename="../streaming/session.cpp" line="1498"/>
         <source>This PC&apos;s GPU doesn&apos;t support YUV 4:4:4 decoding for selected video codec.</source>
-        <translation>このPCのGPUは選択されたビデオコーデックでのYUV 4:4:4ストリーミングをサポートしていません。</translation>
+        <translation>このPCのGPUは選択されたビデオコーデックでのYUV 4:4:4デコードをサポートしていません。</translation>
     </message>
     <message>
         <location filename="../streaming/session.cpp" line="1507"/>
@@ -2503,27 +2503,27 @@
         <translation>ファイアウォールと次のポートのポートフォワーディングルールを確認してください: %1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="82"/>
+        <location filename="../gui/StreamSegue.qml" line="83"/>
         <source>This PC&apos;s Internet connection is blocking Moonlight. Streaming over the Internet may not work while connected to this network.</source>
         <translation>このPCのインターネット接続がMoonlightをブロックしています。このネットワークに接続している間はインターネットでのストリーミングができない場合があります。</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="318"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Tip:</source>
         <translation>ヒント:</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="318"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Press %1 to disconnect your session</source>
         <translation>%1を押してセッションを切断します</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="319"/>
+        <location filename="../gui/StreamSegue.qml" line="320"/>
         <source>Start+Select+L1+R1</source>
         <translation>Start+Select+L1+R1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="319"/>
+        <location filename="../gui/StreamSegue.qml" line="320"/>
         <source>Ctrl+Alt+Shift+Q</source>
         <translation>Ctrl+Alt+Shift+Q</translation>
     </message>
@@ -2531,113 +2531,114 @@
 <context>
     <name>main</name>
     <message>
-        <location filename="../gui/main.qml" line="632"/>
+        <location filename="../gui/main.qml" line="736"/>
         <source>Settings</source>
         <translation>設定</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="403"/>
+        <location filename="../gui/main.qml" line="507"/>
         <source>Version %1</source>
         <translation>バージョン %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="426"/>
+        <location filename="../gui/main.qml" line="530"/>
         <source>Join our QQ group</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="445"/>
+        <location filename="../gui/main.qml" line="549"/>
         <source>Add PC manually</source>
         <translation>手動でPCを追加</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="490"/>
+        <location filename="../gui/main.qml" line="594"/>
         <source>Update available for Moonlight: Version %1</source>
         <translation>Moonlightで利用可能なアップデート: バージョン %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="556"/>
+        <location filename="../gui/main.qml" line="660"/>
         <source>Gamepad Mapper</source>
         <translation>ゲームパッドマッパー</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="660"/>
+        <location filename="../gui/main.qml" line="764"/>
         <source>Hardware acceleration doesn&apos;t work on XWayland. Continuing on XWayland may result in poor streaming performance. Try running with QT_QPA_PLATFORM=wayland or switch to X11.</source>
         <translation>XWaylandではハードウェアアクセラレーションが動作しません。XWaylandで続行すると、ストリーミングのパフォーマンスが低下する可能性があります。QT_QPA_PLATFORM=waylandで実行するか、X11に切り替えてみてください。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="669"/>
+        <location filename="../gui/main.qml" line="773"/>
         <source>This version of Moonlight isn&apos;t optimized for your PC. Please download the &apos;%1&apos; version of Moonlight for the best streaming performance.</source>
         <translation>このバージョンのMoonlightは、お使いのPCに最適化されていません。最高のストリーミングパフォーマンスを実現するには、Moonlightの&apos;%1&apos;バージョンをダウンロードしてください。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="678"/>
+        <location filename="../gui/main.qml" line="782"/>
         <source>Moonlight detected gamepads without a mapping:</source>
         <translation>Moonlightはマッピングのないゲームパッドを検出しました:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="533"/>
+        <location filename="../gui/main.qml" line="637"/>
         <source>Help</source>
         <translation>ヘルプ</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="479"/>
-        <location filename="../gui/main.qml" line="650"/>
+        <location filename="../gui/main.qml" line="583"/>
+        <location filename="../gui/main.qml" line="754"/>
         <source>Preparing portable update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="577"/>
+        <location filename="../gui/main.qml" line="681"/>
         <source>Connection IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="599"/>
+        <location filename="../gui/main.qml" line="703"/>
         <source>Display Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="639"/>
+        <location filename="../gui/main.qml" line="743"/>
         <source>No functioning hardware accelerated video decoder was detected by Moonlight. Your streaming performance may be severely degraded in this configuration.</source>
         <translation>Moonlightはハードウェアアクセラレーションされたビデオデコーダーを検出できませんでした。この構成ではストリーミングのパフォーマンスが著しく低下する可能性があります。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="641"/>
+        <location filename="../gui/main.qml" line="745"/>
         <source>Click the Help button for more information on solving this problem.</source>
         <translation>この問題を解決するための詳細情報については、ヘルプボタンをクリックしてください。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="662"/>
+        <location filename="../gui/main.qml" line="766"/>
         <source>Click the Help button for more information.</source>
         <translation>詳細については、ヘルプボタンをクリックしてください。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="680"/>
+        <location filename="../gui/main.qml" line="784"/>
         <source>Click the Help button for information on how to map your gamepads.</source>
         <translation>ゲームパッドをマップする方法については、ヘルプボタンをクリックしてください。</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="688"/>
+        <location filename="../gui/main.qml" line="792"/>
         <source>Are you sure you want to quit?</source>
         <translation>本当に終了しますか？</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="718"/>
+        <location filename="../gui/main.qml" line="822"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>ホストPCのIPアドレスを入力してください:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="789"/>
+        <location filename="../gui/main.qml" line="893"/>
         <source>No host PC of your own?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="797"/>
+        <location filename="../gui/main.qml" line="902"/>
         <source>Procriva Cloud rents out cloud hosts that are ready to stream.</source>
+        <extracomment>Procriva Cloud is a product name and must not be translated.</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="805"/>
+        <location filename="../gui/main.qml" line="910"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
     </message>

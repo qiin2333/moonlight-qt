@@ -1147,7 +1147,7 @@ int main(int argc, char *argv[])
             if (QFontDatabase::addApplicationFont(QLatin1String(path)) < 0) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to load bundled font: %s", path);
             }
-            else {
+            else if (QLatin1String(path).startsWith(QLatin1String(":/res/fonts/Manrope-"))) {
                 haveManrope = true;
             }
         }

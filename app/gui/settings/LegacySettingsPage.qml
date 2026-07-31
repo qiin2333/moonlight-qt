@@ -135,7 +135,7 @@ Column {
                 HardCheckBox {
                     id: enableMicCheck
                     width: parent.width
-                    text: qsTr("Enable microphone streaming(test)")
+                    text: qsTr("Enable microphone streaming (test)")
                     font.pointSize: 12
                     checked: StreamingPreferences.enableMicrophone
                     onCheckedChanged: {

@@ -459,7 +459,7 @@
     </message>
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="885"/>
-        <source>HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
+        <source>HDR rendering has diverse issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -513,7 +513,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/BasicSettingsPage.qml" line="1058"/>
+        <location filename="../gui/settings/BasicSettingsPage.qml" line="1059"/>
         <source>FPS</source>
         <translation type="unfinished"></translation>
     </message>
@@ -958,7 +958,7 @@
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="138"/>
-        <source>Enable microphone streaming(test)</source>
+        <source>Enable microphone streaming (test)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2111,27 +2111,27 @@
 <context>
     <name>QPlatformTheme</name>
     <message>
-        <location filename="../main.cpp" line="919"/>
+        <location filename="../main.cpp" line="922"/>
         <source>&amp;Yes</source>
         <translation>&amp;ஆம்</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="920"/>
+        <location filename="../main.cpp" line="923"/>
         <source>&amp;No</source>
         <translation>&amp;இல்லை</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="921"/>
+        <location filename="../main.cpp" line="924"/>
         <source>OK</source>
         <translation>சரி</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="922"/>
+        <location filename="../main.cpp" line="925"/>
         <source>Help</source>
         <translation>உதவி</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="923"/>
+        <location filename="../main.cpp" line="926"/>
         <source>Cancel</source>
         <translation>ரத்துசெய்</translation>
     </message>
@@ -2503,27 +2503,27 @@
         <translation>துறைமுகம் (கள்) க்கான உங்கள் ஃபயர்வால் மற்றும் துறைமுகம் பகிர்தல் விதிகளை சரிபார்க்கவும்: %1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="82"/>
+        <location filename="../gui/StreamSegue.qml" line="83"/>
         <source>This PC&apos;s Internet connection is blocking Moonlight. Streaming over the Internet may not work while connected to this network.</source>
         <translation>இந்த கணினியின் இணைய இணைப்பு நிலவொளியைத் தடுக்கிறது. இந்த பிணையத்துடன் இணைக்கப்படும்போது இணையத்தில் ச்ட்ரீமிங் வேலை செய்யாது.</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="318"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Tip:</source>
         <translation>உதவிக்குறிப்பு:</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="318"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Press %1 to disconnect your session</source>
         <translation>உங்கள் அமர்வை துண்டிக்க %1 ஐ அழுத்தவும்</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="319"/>
+        <location filename="../gui/StreamSegue.qml" line="320"/>
         <source>Start+Select+L1+R1</source>
         <translation>தொடக்க+தேர்ந்தெடுக்கவும்+L1+R1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="319"/>
+        <location filename="../gui/StreamSegue.qml" line="320"/>
         <source>Ctrl+Alt+Shift+Q</source>
         <translation>Ctrl+alt+shift+q</translation>
     </message>
@@ -2531,113 +2531,114 @@
 <context>
     <name>main</name>
     <message>
-        <location filename="../gui/main.qml" line="632"/>
+        <location filename="../gui/main.qml" line="736"/>
         <source>Settings</source>
         <translation>அமைப்புகள்</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="403"/>
+        <location filename="../gui/main.qml" line="507"/>
         <source>Version %1</source>
         <translation>பதிப்பு %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="426"/>
+        <location filename="../gui/main.qml" line="530"/>
         <source>Join our QQ group</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="445"/>
+        <location filename="../gui/main.qml" line="549"/>
         <source>Add PC manually</source>
         <translation>பிசி கைமுறையாக சேர்க்கவும்</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="490"/>
+        <location filename="../gui/main.qml" line="594"/>
         <source>Update available for Moonlight: Version %1</source>
         <translation>நிலவொளிக்கு புதுப்பிப்பு கிடைக்கிறது: பதிப்பு %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="556"/>
+        <location filename="../gui/main.qml" line="660"/>
         <source>Gamepad Mapper</source>
         <translation>கேம்பேட் மேப்பர்</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="660"/>
+        <location filename="../gui/main.qml" line="764"/>
         <source>Hardware acceleration doesn&apos;t work on XWayland. Continuing on XWayland may result in poor streaming performance. Try running with QT_QPA_PLATFORM=wayland or switch to X11.</source>
         <translation>வன்பொருள் முடுக்கம் XWayland இல் வேலை செய்யாது. XWayland இல் தொடர்வது மோசமான ச்ட்ரீமிங் செயல்திறனை ஏற்படுத்தக்கூடும். Qt_qpa_platform = wayland உடன் இயங்க முயற்சிக்கவும் அல்லது x11 க்கு மாறவும்.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="669"/>
+        <location filename="../gui/main.qml" line="773"/>
         <source>This version of Moonlight isn&apos;t optimized for your PC. Please download the &apos;%1&apos; version of Moonlight for the best streaming performance.</source>
         <translation>மூன்லைட்டின் இந்த பதிப்பு உங்கள் கணினிக்கு உகந்ததாக இல்லை. சிறந்த ச்ட்ரீமிங் செயல்திறனுக்காக மூன்லைட்டின் &apos;%1&apos; பதிப்பைப் பதிவிறக்கவும்.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="678"/>
+        <location filename="../gui/main.qml" line="782"/>
         <source>Moonlight detected gamepads without a mapping:</source>
         <translation>மேப்பிங் இல்லாமல் மூன்லைட் கேம்பேடுகளைக் கண்டறிந்தது:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="533"/>
+        <location filename="../gui/main.qml" line="637"/>
         <source>Help</source>
         <translation>உதவி</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="479"/>
-        <location filename="../gui/main.qml" line="650"/>
+        <location filename="../gui/main.qml" line="583"/>
+        <location filename="../gui/main.qml" line="754"/>
         <source>Preparing portable update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="577"/>
+        <location filename="../gui/main.qml" line="681"/>
         <source>Connection IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="599"/>
+        <location filename="../gui/main.qml" line="703"/>
         <source>Display Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="639"/>
+        <location filename="../gui/main.qml" line="743"/>
         <source>No functioning hardware accelerated video decoder was detected by Moonlight. Your streaming performance may be severely degraded in this configuration.</source>
         <translation>செயல்படும் வன்பொருள் முடுக்கப்பட்ட வீடியோ டிகோடர் மூன்லைட் மூலம் கண்டறியப்படவில்லை. இந்த உள்ளமைவில் உங்கள் ச்ட்ரீமிங் செயல்திறன் கடுமையாக சிதைக்கப்படலாம்.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="641"/>
+        <location filename="../gui/main.qml" line="745"/>
         <source>Click the Help button for more information on solving this problem.</source>
         <translation>இந்த சிக்கலைத் தீர்ப்பது குறித்த கூடுதல் தகவலுக்கு உதவி பொத்தானைக் சொடுக்கு செய்க.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="662"/>
+        <location filename="../gui/main.qml" line="766"/>
         <source>Click the Help button for more information.</source>
         <translation>மேலும் தகவலுக்கு உதவி பொத்தானைக் சொடுக்கு செய்க.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="680"/>
+        <location filename="../gui/main.qml" line="784"/>
         <source>Click the Help button for information on how to map your gamepads.</source>
         <translation>உங்கள் கேம்பேட்களை எவ்வாறு வரைபடமாக்குவது என்பது குறித்த தகவலுக்கு உதவி பொத்தானைக் சொடுக்கு செய்க.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="688"/>
+        <location filename="../gui/main.qml" line="792"/>
         <source>Are you sure you want to quit?</source>
         <translation>நீங்கள் நிச்சயமாக வெளியேற விரும்புகிறீர்களா?</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="718"/>
+        <location filename="../gui/main.qml" line="822"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>உங்கள் புரவலன் கணினியின் ஐபி முகவரியை உள்ளிடவும்:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="789"/>
+        <location filename="../gui/main.qml" line="893"/>
         <source>No host PC of your own?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="797"/>
+        <location filename="../gui/main.qml" line="902"/>
         <source>Procriva Cloud rents out cloud hosts that are ready to stream.</source>
+        <extracomment>Procriva Cloud is a product name and must not be translated.</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="805"/>
+        <location filename="../gui/main.qml" line="910"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
     </message>

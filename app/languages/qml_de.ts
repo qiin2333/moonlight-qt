@@ -459,7 +459,7 @@
     </message>
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="885"/>
-        <source>HDR rendering has divers issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
+        <source>HDR rendering has diverse issues depending on the GPU used, we are working on it but we advise to currently use Non-HDR.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -513,7 +513,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/BasicSettingsPage.qml" line="1058"/>
+        <location filename="../gui/settings/BasicSettingsPage.qml" line="1059"/>
         <source>FPS</source>
         <translation type="unfinished"></translation>
     </message>
@@ -958,7 +958,7 @@
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="138"/>
-        <source>Enable microphone streaming(test)</source>
+        <source>Enable microphone streaming (test)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2111,27 +2111,27 @@
 <context>
     <name>QPlatformTheme</name>
     <message>
-        <location filename="../main.cpp" line="919"/>
+        <location filename="../main.cpp" line="922"/>
         <source>&amp;Yes</source>
         <translation>&amp;Ja</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="920"/>
+        <location filename="../main.cpp" line="923"/>
         <source>&amp;No</source>
         <translation>&amp;Nein</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="921"/>
+        <location filename="../main.cpp" line="924"/>
         <source>OK</source>
         <translation>OK</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="922"/>
+        <location filename="../main.cpp" line="925"/>
         <source>Help</source>
         <translation>Hilfe</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="923"/>
+        <location filename="../main.cpp" line="926"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
@@ -2503,27 +2503,27 @@
         <translation>Prüfen Sie Ihre Firewall- und Portweiterleitungsregeln für (die) Port(s): %1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="82"/>
+        <location filename="../gui/StreamSegue.qml" line="83"/>
         <source>This PC&apos;s Internet connection is blocking Moonlight. Streaming over the Internet may not work while connected to this network.</source>
         <translation>Die Internetverbindung blockiert Moonlight. Streamen übers Internet könnte in diesem Netzwerk nicht funktionieren.</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="318"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Tip:</source>
         <translation>Tipp:</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="318"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Press %1 to disconnect your session</source>
         <translation>Drücken Sie %1 um die Session zu trennen</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="319"/>
+        <location filename="../gui/StreamSegue.qml" line="320"/>
         <source>Start+Select+L1+R1</source>
         <translation>Start+Select+L1+R1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="319"/>
+        <location filename="../gui/StreamSegue.qml" line="320"/>
         <source>Ctrl+Alt+Shift+Q</source>
         <translation>Strg+Alt+Shift+Q</translation>
     </message>
@@ -2531,113 +2531,114 @@
 <context>
     <name>main</name>
     <message>
-        <location filename="../gui/main.qml" line="632"/>
+        <location filename="../gui/main.qml" line="736"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="403"/>
+        <location filename="../gui/main.qml" line="507"/>
         <source>Version %1</source>
         <translation>Version %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="426"/>
+        <location filename="../gui/main.qml" line="530"/>
         <source>Join our QQ group</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="445"/>
+        <location filename="../gui/main.qml" line="549"/>
         <source>Add PC manually</source>
         <translation>PC manuell hinzufügen</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="490"/>
+        <location filename="../gui/main.qml" line="594"/>
         <source>Update available for Moonlight: Version %1</source>
         <translation>Eine neue Version ist verfügbar: Version %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="556"/>
+        <location filename="../gui/main.qml" line="660"/>
         <source>Gamepad Mapper</source>
         <translation>Controller-Tastenbelegung</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="660"/>
+        <location filename="../gui/main.qml" line="764"/>
         <source>Hardware acceleration doesn&apos;t work on XWayland. Continuing on XWayland may result in poor streaming performance. Try running with QT_QPA_PLATFORM=wayland or switch to X11.</source>
         <translation>Die Hardwarebeschleunigung funktioniert nicht auf XWayland. Das Weitermachen mit XWayland kann zu schlechter Streaming-Leistung führen. Versuchen Sie es mit QT_QPA_PLATFORM=wayland oder wechseln Sie zu X11.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="669"/>
+        <location filename="../gui/main.qml" line="773"/>
         <source>This version of Moonlight isn&apos;t optimized for your PC. Please download the &apos;%1&apos; version of Moonlight for the best streaming performance.</source>
         <translation>Diese Version von Moonlight ist nicht für IhrenPC optimiert. Bitte laden Sie die Version &apos;%1&apos; von Moonlight herunter, um die beste Streaming-Performance zu erhalten.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="678"/>
+        <location filename="../gui/main.qml" line="782"/>
         <source>Moonlight detected gamepads without a mapping:</source>
         <translation>Moonlight hat Controller ohne Tastenbelegung erkannt:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="533"/>
+        <location filename="../gui/main.qml" line="637"/>
         <source>Help</source>
         <translation>Hilfe</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="479"/>
-        <location filename="../gui/main.qml" line="650"/>
+        <location filename="../gui/main.qml" line="583"/>
+        <location filename="../gui/main.qml" line="754"/>
         <source>Preparing portable update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="577"/>
+        <location filename="../gui/main.qml" line="681"/>
         <source>Connection IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="599"/>
+        <location filename="../gui/main.qml" line="703"/>
         <source>Display Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="639"/>
+        <location filename="../gui/main.qml" line="743"/>
         <source>No functioning hardware accelerated video decoder was detected by Moonlight. Your streaming performance may be severely degraded in this configuration.</source>
         <translation>Moonlight hat keinen funktionierenden hardwarebeschleunigten Videodecoder erkannt. Ihre Streaming-Leistung kann in dieser Konfiguration stark beeinträchtigt sein.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="641"/>
+        <location filename="../gui/main.qml" line="745"/>
         <source>Click the Help button for more information on solving this problem.</source>
         <translation>Klicken Sie auf Hilfe, um weitere Informationen zur Lösung dieses Problems zu erhalten.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="662"/>
+        <location filename="../gui/main.qml" line="766"/>
         <source>Click the Help button for more information.</source>
         <translation>Klicken Sie auf Hilfe für mehr Informationen.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="680"/>
+        <location filename="../gui/main.qml" line="784"/>
         <source>Click the Help button for information on how to map your gamepads.</source>
         <translation>Klicken Sie auf Hilfe, um zu erfahren, wie Sie Ihre Controller-Tastenbelegung ändern.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="688"/>
+        <location filename="../gui/main.qml" line="792"/>
         <source>Are you sure you want to quit?</source>
         <translation>Sind Sie sicher, dass Sie aufhören wollen?</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="718"/>
+        <location filename="../gui/main.qml" line="822"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>Geben Sie die IP-Adresse Ihres Host-PCs ein:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="789"/>
+        <location filename="../gui/main.qml" line="893"/>
         <source>No host PC of your own?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="797"/>
+        <location filename="../gui/main.qml" line="902"/>
         <source>Procriva Cloud rents out cloud hosts that are ready to stream.</source>
+        <extracomment>Procriva Cloud is a product name and must not be translated.</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="805"/>
+        <location filename="../gui/main.qml" line="910"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
     </message>

@@ -56,6 +56,7 @@ Item {
     {
         // 淡出到全黑。Session::exec() 会等这条动画跑完再创建串流窗口，
         // 所以交接是在一块纯黑上完成的，中间不会闪。
+        backgroundZoomAnimation.stop()
         exitAnimation.start()
     }
 

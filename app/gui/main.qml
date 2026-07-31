@@ -411,7 +411,25 @@ ApplicationWindow {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
 
-            onPressed: window.startSystemMove()
+            property point pressPosition
+            property bool systemMoveStarted: false
+
+            onPressed: function(mouse) {
+                pressPosition = Qt.point(mouse.x, mouse.y)
+                systemMoveStarted = false
+            }
+            onPositionChanged: function(mouse) {
+                if (!pressed || systemMoveStarted) {
+                    return
+                }
+
+                var deltaX = Math.abs(mouse.x - pressPosition.x)
+                var deltaY = Math.abs(mouse.y - pressPosition.y)
+                if (Math.max(deltaX, deltaY) >= Qt.styleHints.startDragDistance) {
+                    systemMoveStarted = true
+                    window.startSystemMove()
+                }
+            }
             onDoubleClicked: {
                 if (window.visibility === Window.Maximized) {
                     window.showNormal()
@@ -880,6 +898,7 @@ ApplicationWindow {
 
                     Text {
                         width: parent.width
+                        //: Procriva Cloud is a product name and must not be translated.
                         text: qsTr("Procriva Cloud rents out cloud hosts that are ready to stream.")
                         color: Theme.text
                         font.family: Theme.fontSans
