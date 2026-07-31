@@ -17,7 +17,10 @@ SettingsRow {
     HardSwitch {
         id: control
         hoverEnabled: true
-        onCheckedChanged: toggleRow.toggled(checked)
+        // 只在用户操作时上报。checked 是别名，从偏好设置恢复初值也会改动它，
+        // 用 onCheckedChanged 的话初始化阶段就会触发一次写回 —— 正是上面注释里
+        // 说要避免的那件事。Switch 自带的 toggled() 只由用户交互触发。
+        onToggled: toggleRow.toggled(checked)
 
         ToolTip {
             id: tip

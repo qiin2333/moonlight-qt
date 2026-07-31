@@ -246,6 +246,7 @@
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="130"/>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="139"/>
+        <location filename="../gui/settings/BasicSettingsPage.qml" line="268"/>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="539"/>
         <source>Custom</source>
         <translation>Personnalisé</translation>
@@ -520,17 +521,17 @@
 <context>
     <name>CliPair</name>
     <message>
-        <location filename="../gui/CliPair.qml" line="8"/>
+        <location filename="../gui/CliPair.qml" line="10"/>
         <source>Establishing connection to PC...</source>
         <translation>Connexion au PC...</translation>
     </message>
     <message>
-        <location filename="../gui/CliPair.qml" line="12"/>
+        <location filename="../gui/CliPair.qml" line="14"/>
         <source>Pairing... Please enter &apos;%1&apos; on %2.</source>
         <translation>Appareillage... Veuillez entrer &apos;%1&apos; sur %2.</translation>
     </message>
     <message>
-        <location filename="../gui/CliPair.qml" line="81"/>
+        <location filename="../gui/CliPair.qml" line="91"/>
         <source>Pairing completed successfully</source>
         <translation>Appairage terminé avec succès</translation>
     </message>
@@ -538,12 +539,12 @@
 <context>
     <name>CliQuitStreamSegue</name>
     <message>
-        <location filename="../gui/CliQuitStreamSegue.qml" line="9"/>
+        <location filename="../gui/CliQuitStreamSegue.qml" line="11"/>
         <source>Establishing connection to PC...</source>
         <translation>Connexion au PC...</translation>
     </message>
     <message>
-        <location filename="../gui/CliQuitStreamSegue.qml" line="13"/>
+        <location filename="../gui/CliQuitStreamSegue.qml" line="15"/>
         <source>Quitting app...</source>
         <translation>Fermeture de l&apos;application...</translation>
     </message>
@@ -551,17 +552,17 @@
 <context>
     <name>CliStartStreamSegue</name>
     <message>
-        <location filename="../gui/CliStartStreamSegue.qml" line="8"/>
+        <location filename="../gui/CliStartStreamSegue.qml" line="10"/>
         <source>Establishing connection to PC...</source>
         <translation>Connexion au PC...</translation>
     </message>
     <message>
-        <location filename="../gui/CliStartStreamSegue.qml" line="12"/>
+        <location filename="../gui/CliStartStreamSegue.qml" line="14"/>
         <source>Loading app list...</source>
         <translation>Chargement de la liste des applications...</translation>
     </message>
     <message>
-        <location filename="../gui/CliStartStreamSegue.qml" line="78"/>
+        <location filename="../gui/CliStartStreamSegue.qml" line="88"/>
         <source>Are you sure you want to quit %1? Any unsaved progress will be lost.</source>
         <translation>Êtes-vous sûr de vouloir arrêter %1&#x202f;? Tout progrès non enregistré sera perdu.</translation>
     </message>
@@ -2530,7 +2531,7 @@
 <context>
     <name>main</name>
     <message>
-        <location filename="../gui/main.qml" line="629"/>
+        <location filename="../gui/main.qml" line="632"/>
         <source>Settings</source>
         <translation>Paramètres</translation>
     </message>
@@ -2540,88 +2541,88 @@
         <translation>Version %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="442"/>
+        <location filename="../gui/main.qml" line="426"/>
+        <source>Join our QQ group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="445"/>
         <source>Add PC manually</source>
         <translation>Ajouter un PC manuellement</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="476"/>
-        <location filename="../gui/main.qml" line="647"/>
+        <location filename="../gui/main.qml" line="479"/>
+        <location filename="../gui/main.qml" line="650"/>
         <source>Preparing portable update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="487"/>
+        <location filename="../gui/main.qml" line="490"/>
         <source>Update available for Moonlight: Version %1</source>
         <translation>Mise à jour disponible pour Moonlight : Version %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="553"/>
+        <location filename="../gui/main.qml" line="556"/>
         <source>Gamepad Mapper</source>
         <translation>Mappeur de manette</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="574"/>
+        <location filename="../gui/main.qml" line="577"/>
         <source>Connection IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="596"/>
+        <location filename="../gui/main.qml" line="599"/>
         <source>Display Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="657"/>
+        <location filename="../gui/main.qml" line="660"/>
         <source>Hardware acceleration doesn&apos;t work on XWayland. Continuing on XWayland may result in poor streaming performance. Try running with QT_QPA_PLATFORM=wayland or switch to X11.</source>
         <translation>L&apos;accélération matérielle ne fonctionne pas sur XWayland. Continuer sur XWayland peut entraîner de mauvaises performances de streaming. Essayez de lancer Moonlight avec QT_QPA_PLATFORM=wayland ou passez à X11.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="666"/>
+        <location filename="../gui/main.qml" line="669"/>
         <source>This version of Moonlight isn&apos;t optimized for your PC. Please download the &apos;%1&apos; version of Moonlight for the best streaming performance.</source>
         <translation>Cette version de Moonlight n&apos;est pas optimisée pour votre PC. Téléchargez la version « %1 » pour de meilleures performances.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="675"/>
+        <location filename="../gui/main.qml" line="678"/>
         <source>Moonlight detected gamepads without a mapping:</source>
         <translation>Moonlight a détecté des manettes sans mapping&#x202f;:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="530"/>
+        <location filename="../gui/main.qml" line="533"/>
         <source>Help</source>
         <translation>Aide</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="423"/>
-        <source>来裙里丸</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../gui/main.qml" line="636"/>
+        <location filename="../gui/main.qml" line="639"/>
         <source>No functioning hardware accelerated video decoder was detected by Moonlight. Your streaming performance may be severely degraded in this configuration.</source>
         <translation>Aucun décodeur vidéo matériel n&apos;a été détecté par Moonlight. Les performances de streaming risquent d&apos;être sévèrement dégradées dans cette configuration.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="638"/>
+        <location filename="../gui/main.qml" line="641"/>
         <source>Click the Help button for more information on solving this problem.</source>
         <translation>Cliquez sur le bouton Aide pour obtenir plus d&apos;informations sur la résolution de ce problème.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="659"/>
+        <location filename="../gui/main.qml" line="662"/>
         <source>Click the Help button for more information.</source>
         <translation>Cliquez sur le bouton Aide pour plus d&apos;informations.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="715"/>
+        <location filename="../gui/main.qml" line="718"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>Saisissez l&apos;adresse IP de votre PC hôte :</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="677"/>
+        <location filename="../gui/main.qml" line="680"/>
         <source>Click the Help button for information on how to map your gamepads.</source>
         <translation>Cliquez sur le bouton Aide pour obtenir des informations sur le mappage des manettes.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="685"/>
+        <location filename="../gui/main.qml" line="688"/>
         <source>Are you sure you want to quit?</source>
         <translation>Êtes-vous sûr de vouloir quitter&#x202f;?</translation>
     </message>

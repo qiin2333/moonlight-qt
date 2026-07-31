@@ -265,7 +265,7 @@ Column {
                                 if (resolutionListModel.get(i).is_custom) {
                                     resolutionListModel.setProperty(i, "video_width", width)
                                     resolutionListModel.setProperty(i, "video_height", height)
-                                    resolutionListModel.setProperty(i, "text", "Custom ("+width+"x"+height+")")
+                                    resolutionListModel.setProperty(i, "text", qsTr("Custom")+" ("+width+"x"+height+")")
 
                                     // Now update the bitrate using the custom resolution
                                     resolutionComboBox.currentIndex = i

@@ -44,8 +44,17 @@ Item {
         SdlGamepadKeyNavigation.setUiNavMode(true)
 
         // Highlight the first item if a gamepad is connected
+        //
+        // category 会跨次进入保留下来，所以不能无条件去点基本设置页的第一个控件：
+        // 当前分类不是 basic 时那个控件是不可见的，forceActiveFocus() 静默失效，
+        // 手柄用户就一个可用焦点都没有（firstControl 万一是 undefined 还会抛）。
         if (SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
-            basicPage.firstControl.forceActiveFocus(Qt.TabFocus)
+            if (settingsPage.category === "basic" && basicPage.firstControl) {
+                basicPage.firstControl.forceActiveFocus(Qt.TabFocus)
+            }
+            else {
+                rail.forceActiveFocus(Qt.TabFocus)
+            }
         }
     }
 

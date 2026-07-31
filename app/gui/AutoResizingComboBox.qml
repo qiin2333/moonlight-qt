@@ -56,12 +56,26 @@ ComboBox {
     // so we can adjust the combo box width here too
     onActivated: recalculateWidth()
 
-    Keys.onLeftPressed: {
-        decrementCurrentIndex()
+    // 左右键在列表内部换选项，到首尾就把事件放开，交给上层做焦点移动。
+    // QML 的按键处理器默认 accepted = true，而 decrementCurrentIndex() 在第一项上
+    // 是空操作 —— 事件被吃掉又什么都没发生，手柄/键盘用户到了首尾就再也用左右键
+    // 离不开这个下拉了。
+    Keys.onLeftPressed: function(event) {
+        if (currentIndex > 0) {
+            decrementCurrentIndex()
+        }
+        else {
+            event.accepted = false
+        }
     }
 
-    Keys.onRightPressed: {
-        incrementCurrentIndex()
+    Keys.onRightPressed: function(event) {
+        if (currentIndex < count - 1) {
+            incrementCurrentIndex()
+        }
+        else {
+            event.accepted = false
+        }
     }
 
     // 方角化。FluentWinUI3 的圆角来自它自己 __config 里的背景，只能整块替掉。

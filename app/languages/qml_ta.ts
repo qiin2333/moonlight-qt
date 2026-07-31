@@ -246,6 +246,7 @@
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="130"/>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="139"/>
+        <location filename="../gui/settings/BasicSettingsPage.qml" line="268"/>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="539"/>
         <source>Custom</source>
         <translation>தனிப்பயன்</translation>
@@ -520,17 +521,17 @@
 <context>
     <name>CliPair</name>
     <message>
-        <location filename="../gui/CliPair.qml" line="8"/>
+        <location filename="../gui/CliPair.qml" line="10"/>
         <source>Establishing connection to PC...</source>
         <translation>கணினியுடன் இணைப்பை நிறுவுதல் ...</translation>
     </message>
     <message>
-        <location filename="../gui/CliPair.qml" line="12"/>
+        <location filename="../gui/CliPair.qml" line="14"/>
         <source>Pairing... Please enter &apos;%1&apos; on %2.</source>
         <translation>இணைத்தல் ... தயவுசெய்து %2 இல் &apos; %1&apos; ஐ உள்ளிடவும்.</translation>
     </message>
     <message>
-        <location filename="../gui/CliPair.qml" line="81"/>
+        <location filename="../gui/CliPair.qml" line="91"/>
         <source>Pairing completed successfully</source>
         <translation>இணைத்தல் வெற்றிகரமாக முடிந்தது</translation>
     </message>
@@ -538,12 +539,12 @@
 <context>
     <name>CliQuitStreamSegue</name>
     <message>
-        <location filename="../gui/CliQuitStreamSegue.qml" line="9"/>
+        <location filename="../gui/CliQuitStreamSegue.qml" line="11"/>
         <source>Establishing connection to PC...</source>
         <translation>கணினியுடன் இணைப்பை நிறுவுதல் ...</translation>
     </message>
     <message>
-        <location filename="../gui/CliQuitStreamSegue.qml" line="13"/>
+        <location filename="../gui/CliQuitStreamSegue.qml" line="15"/>
         <source>Quitting app...</source>
         <translation>பயன்பாட்டை விட்டு வெளியேறுதல் ...</translation>
     </message>
@@ -551,17 +552,17 @@
 <context>
     <name>CliStartStreamSegue</name>
     <message>
-        <location filename="../gui/CliStartStreamSegue.qml" line="8"/>
+        <location filename="../gui/CliStartStreamSegue.qml" line="10"/>
         <source>Establishing connection to PC...</source>
         <translation>கணினியுடன் இணைப்பை நிறுவுதல் ...</translation>
     </message>
     <message>
-        <location filename="../gui/CliStartStreamSegue.qml" line="12"/>
+        <location filename="../gui/CliStartStreamSegue.qml" line="14"/>
         <source>Loading app list...</source>
         <translation>பயன்பாட்டு பட்டியலை ஏற்றுகிறது ...</translation>
     </message>
     <message>
-        <location filename="../gui/CliStartStreamSegue.qml" line="78"/>
+        <location filename="../gui/CliStartStreamSegue.qml" line="88"/>
         <source>Are you sure you want to quit %1? Any unsaved progress will be lost.</source>
         <translation>%1 ஐ விட்டு வெளியேற விரும்புகிறீர்களா? சேமிக்கப்படாத எந்த முன்னேற்றமும் இழக்கப்படும்.</translation>
     </message>
@@ -2530,7 +2531,7 @@
 <context>
     <name>main</name>
     <message>
-        <location filename="../gui/main.qml" line="629"/>
+        <location filename="../gui/main.qml" line="632"/>
         <source>Settings</source>
         <translation>அமைப்புகள்</translation>
     </message>
@@ -2540,88 +2541,88 @@
         <translation>பதிப்பு %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="442"/>
+        <location filename="../gui/main.qml" line="426"/>
+        <source>Join our QQ group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="445"/>
         <source>Add PC manually</source>
         <translation>பிசி கைமுறையாக சேர்க்கவும்</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="487"/>
+        <location filename="../gui/main.qml" line="490"/>
         <source>Update available for Moonlight: Version %1</source>
         <translation>நிலவொளிக்கு புதுப்பிப்பு கிடைக்கிறது: பதிப்பு %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="553"/>
+        <location filename="../gui/main.qml" line="556"/>
         <source>Gamepad Mapper</source>
         <translation>கேம்பேட் மேப்பர்</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="657"/>
+        <location filename="../gui/main.qml" line="660"/>
         <source>Hardware acceleration doesn&apos;t work on XWayland. Continuing on XWayland may result in poor streaming performance. Try running with QT_QPA_PLATFORM=wayland or switch to X11.</source>
         <translation>வன்பொருள் முடுக்கம் XWayland இல் வேலை செய்யாது. XWayland இல் தொடர்வது மோசமான ச்ட்ரீமிங் செயல்திறனை ஏற்படுத்தக்கூடும். Qt_qpa_platform = wayland உடன் இயங்க முயற்சிக்கவும் அல்லது x11 க்கு மாறவும்.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="666"/>
+        <location filename="../gui/main.qml" line="669"/>
         <source>This version of Moonlight isn&apos;t optimized for your PC. Please download the &apos;%1&apos; version of Moonlight for the best streaming performance.</source>
         <translation>மூன்லைட்டின் இந்த பதிப்பு உங்கள் கணினிக்கு உகந்ததாக இல்லை. சிறந்த ச்ட்ரீமிங் செயல்திறனுக்காக மூன்லைட்டின் &apos;%1&apos; பதிப்பைப் பதிவிறக்கவும்.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="675"/>
+        <location filename="../gui/main.qml" line="678"/>
         <source>Moonlight detected gamepads without a mapping:</source>
         <translation>மேப்பிங் இல்லாமல் மூன்லைட் கேம்பேடுகளைக் கண்டறிந்தது:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="530"/>
+        <location filename="../gui/main.qml" line="533"/>
         <source>Help</source>
         <translation>உதவி</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="423"/>
-        <source>来裙里丸</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../gui/main.qml" line="476"/>
-        <location filename="../gui/main.qml" line="647"/>
+        <location filename="../gui/main.qml" line="479"/>
+        <location filename="../gui/main.qml" line="650"/>
         <source>Preparing portable update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="574"/>
+        <location filename="../gui/main.qml" line="577"/>
         <source>Connection IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="596"/>
+        <location filename="../gui/main.qml" line="599"/>
         <source>Display Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="636"/>
+        <location filename="../gui/main.qml" line="639"/>
         <source>No functioning hardware accelerated video decoder was detected by Moonlight. Your streaming performance may be severely degraded in this configuration.</source>
         <translation>செயல்படும் வன்பொருள் முடுக்கப்பட்ட வீடியோ டிகோடர் மூன்லைட் மூலம் கண்டறியப்படவில்லை. இந்த உள்ளமைவில் உங்கள் ச்ட்ரீமிங் செயல்திறன் கடுமையாக சிதைக்கப்படலாம்.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="638"/>
+        <location filename="../gui/main.qml" line="641"/>
         <source>Click the Help button for more information on solving this problem.</source>
         <translation>இந்த சிக்கலைத் தீர்ப்பது குறித்த கூடுதல் தகவலுக்கு உதவி பொத்தானைக் சொடுக்கு செய்க.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="659"/>
+        <location filename="../gui/main.qml" line="662"/>
         <source>Click the Help button for more information.</source>
         <translation>மேலும் தகவலுக்கு உதவி பொத்தானைக் சொடுக்கு செய்க.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="677"/>
+        <location filename="../gui/main.qml" line="680"/>
         <source>Click the Help button for information on how to map your gamepads.</source>
         <translation>உங்கள் கேம்பேட்களை எவ்வாறு வரைபடமாக்குவது என்பது குறித்த தகவலுக்கு உதவி பொத்தானைக் சொடுக்கு செய்க.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="685"/>
+        <location filename="../gui/main.qml" line="688"/>
         <source>Are you sure you want to quit?</source>
         <translation>நீங்கள் நிச்சயமாக வெளியேற விரும்புகிறீர்களா?</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="715"/>
+        <location filename="../gui/main.qml" line="718"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>உங்கள் புரவலன் கணினியின் ஐபி முகவரியை உள்ளிடவும்:</translation>
     </message>
