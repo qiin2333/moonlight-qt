@@ -33,6 +33,14 @@ ApplicationWindow {
     // 双击最大化和一堆平台差异，这里刻意没走那条路。
     flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
 
+    // 加了上面那两个 flag 之后窗口的可绘制区域顶到了最上沿，但 ApplicationWindow 仍然
+    // 把 contentItem 往下缩了一个安全区（实测 macOS 上 contentItem.y = 32，正好是系统
+    // 标题栏那条带子的高度）。结果是工具栏其实从 32pt 才开始，上面留着一条空带。
+    //
+    // 我们要的是「工具栏本身就是标题栏」，所以把顶层的几层都往上顶回去，一切仍然从
+    // 窗口真正的顶边开始量。全屏时 contentItem.y 会变回 0，这个绑定跟着走。
+    readonly property real chromeInset: contentItem.y
+
     // FluentWinUI3's ApplicationWindow is just "color: palette.window", and on macOS
     // that palette follows the system appearance regardless of the color scheme we
     // ask for. Pin it so pages we haven't given a background of their own (the
@@ -131,6 +139,7 @@ ApplicationWindow {
 
     Image {
         anchors.fill: parent
+        anchors.topMargin: -window.chromeInset
         source: window.backgroundImageUrl
         visible: source != "" && window.showGlobalBackground
         fillMode: Image.PreserveAspectCrop
@@ -143,6 +152,7 @@ ApplicationWindow {
     // 和各页自己那层遮罩同一个底色，切页时不会有色温跳变。
     Rectangle {
         anchors.fill: parent
+        anchors.topMargin: -window.chromeInset
         color: Qt.rgba(Theme.ink.r, Theme.ink.g, Theme.ink.b, 0.72)
         visible: window.showGlobalBackground
         z: -2
@@ -151,6 +161,8 @@ ApplicationWindow {
     StackView {
         id: stackView
         anchors.fill: parent
+        // 各页自己按 72 让出工具栏的高度，那个 72 是从窗口顶边算的
+        anchors.topMargin: -window.chromeInset
         focus: true
 
         // 切页动效：neo-brutalism 要更短更机械，所以不缩放（缩放读起来是「软」的），
@@ -327,9 +339,20 @@ ApplicationWindow {
 
         height: 56
         anchors.top: parent.top
+        anchors.topMargin: -window.chromeInset
         anchors.left: parent.left
         anchors.right: parent.right
         z: 1
+
+        // Qt 6.9 起 Control 会把安全区当成 padding 自动加上去（实测这里 topPadding
+        // 被设成了 32），于是这条 bar 里能用的高度只剩 24，字标和按钮被挤到下半部分，
+        // 和红绿灯对不齐。这层 padding 的用意是「别把内容放到刘海/标题栏底下」，而我们
+        // 恰恰是故意把工具栏当标题栏用的 —— 红绿灯的位置由下面 windowButtonInsetLeft
+        // 自己让，所以这里四边都归零。
+        topPadding: 0
+        bottomPadding: 0
+        leftPadding: 0
+        rightPadding: 0
 
         // 给系统窗口按钮让位。Qt 的 SafeArea 只报了标题栏那条带子的高度
         // （实测 macOS 上 top=32、left=0），没有给出按钮的水平占位，只能自己留：
@@ -359,11 +382,14 @@ ApplicationWindow {
             }
         }
 
-        // 空白处拖动整个窗口，双击最大化/还原 —— 标题栏的这两个行为原本由系统提供，
-        // 现在标题栏是我们自己的了，得自己接上。
+        // 空白处拖动整个窗口，双击最大化/还原。
         //
-        // 声明在 RowLayout 之前：同层同 z 时后声明的画在上面也先拿到事件，所以按钮
-        // 和字标照常响应，只有真正空着的地方才落到这里。
+        // macOS 上走不到这里：那边把系统标题栏那条带子拉高到了整条 bar
+        // （macwindowchrome.mm），拖动和双击缩放由 AppKit 自己接管，这个 MouseArea
+        // 拿不到 bar 区域的事件。这一份是给 Windows / Linux 用的。
+        //
+        // 声明在 RowLayout 之前：同层同 z 时后声明的先拿到事件，所以按钮和字标照常
+        // 响应，只有真正空着的地方才落到这里。
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton

@@ -91,6 +91,9 @@ static QString getStartupApplicationDir(const char* argv0)
 #include "gui/sdlgamepadkeynavigation.h"
 #include "imageutils.h"
 #include "streaming/macpermissions.h"
+#ifdef Q_OS_DARWIN
+#include "gui/macwindowchrome.h"
+#endif
 
 #ifdef Q_OS_WIN32
 // 只有 Windows 分支的 app.setFont() 会用到它。不加这层 #ifdef 的话，其他平台每次
@@ -1230,6 +1233,18 @@ int main(int argc, char *argv[])
         engine.load(QUrl(QStringLiteral("qrc:/gui/main.qml")));
         if (engine.rootObjects().isEmpty())
             return -1;
+
+#ifdef Q_OS_DARWIN
+        // 主界面去掉了系统标题栏的底色，那条 56px 的工具栏就是标题栏。但系统的标题栏
+        // 带子仍然只有 28~32pt 高：红绿灯挤在最上面一小条里，而 AppKit 也只在那条带子
+        // 里提供窗口拖动和双击缩放，工具栏下半部分是拖不动的。把带子拉高到 56，
+        // 红绿灯落到 bar 的中线上，拖动区也就覆盖了整条 bar。
+        //
+        // 56 要和 main.qml 里 toolBar 的 height 保持一致。
+        if (auto* rootWindow = qobject_cast<QWindow*>(engine.rootObjects().first())) {
+            MacWindowChrome::useTallTitleBar(rootWindow, 56);
+        }
+#endif
     }
 
     int err = app.exec();
