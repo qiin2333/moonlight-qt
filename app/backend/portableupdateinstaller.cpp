@@ -2,6 +2,7 @@
 #include "path.h"
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -10,6 +11,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QTemporaryFile>
 #include <QStandardPaths>
 #include <QStorageInfo>
@@ -42,7 +44,7 @@ bool PortableUpdateInstaller::supportsInAppUpdate() const
 #endif
 }
 
-void PortableUpdateInstaller::installUpdate(const QString& url)
+void PortableUpdateInstaller::installUpdate(const QString& url, const QString& expectedDigest)
 {
     if (!supportsInAppUpdate()) {
         emit onPortableUpdateFailed(tr("In-app update is not supported for this installation."));
@@ -65,6 +67,24 @@ void PortableUpdateInstaller::installUpdate(const QString& url)
         return;
     }
 
+    QString normalizedDigest = expectedDigest.trimmed();
+    if (normalizedDigest.startsWith(QStringLiteral("sha256:"), Qt::CaseInsensitive)) {
+        normalizedDigest.remove(0, 7);
+    }
+
+    static const QRegularExpression sha256Pattern(QStringLiteral("^[0-9a-fA-F]{64}$"));
+#if defined(Q_OS_DARWIN)
+    if (!sha256Pattern.match(normalizedDigest).hasMatch()) {
+        emit onPortableUpdateFailed(tr("The update package has no valid integrity information. Please install the update manually."));
+        return;
+    }
+#else
+    if (!normalizedDigest.isEmpty() && !sha256Pattern.match(normalizedDigest).hasMatch()) {
+        emit onPortableUpdateFailed(tr("The update package has invalid integrity information."));
+        return;
+    }
+#endif
+
     QString errorMessage;
     if (!ensureWritableInstallDir(errorMessage)) {
         emit onPortableUpdateFailed(errorMessage);
@@ -80,6 +100,7 @@ void PortableUpdateInstaller::installUpdate(const QString& url)
     resetPortableUpdateState(true);
     m_PortableUpdateWorkspace = workspace;
     m_PortableUpdateError.clear();
+    m_ExpectedSha256 = normalizedDigest.toLatin1().toLower();
     m_MetadataChecked = false;
 
     if (m_UpdateNam == nullptr) {
@@ -212,7 +233,7 @@ bool PortableUpdateInstaller::ensureWritableInstallDir(QString& errorMessage) co
     probeFile.setAutoRemove(true);
 
     if (!probeFile.open()) {
-        errorMessage = tr("The current Moonlight folder is not writable. Move the portable build to a writable location, run Moonlight with sufficient permissions, or download and install the update manually.");
+        errorMessage = tr("The current Moonlight folder is not writable. Move Moonlight to a writable location, run it with sufficient permissions, or download and install the update manually.");
         return false;
     }
 
@@ -329,6 +350,37 @@ qint64 PortableUpdateInstaller::estimateRequiredWorkspaceBytes(qint64 archiveByt
     // 下载下来的包和解出来的一份要同时存在（Windows 是 zip + 解压目录，
     // macOS 是 dmg + ditto 出来的 bundle），另外给替换过程留一份余量。
     return archiveBytes * 3 + kSafetyMarginBytes;
+}
+
+bool PortableUpdateInstaller::verifyUpdateArchive(const QString& archivePath,
+                                                   QString& errorMessage) const
+{
+    if (m_ExpectedSha256.isEmpty()) {
+        return true;
+    }
+
+    QFile archive(archivePath);
+    if (!archive.open(QIODevice::ReadOnly)) {
+        errorMessage = tr("Unable to verify the downloaded update package.");
+        return false;
+    }
+
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    while (!archive.atEnd()) {
+        QByteArray chunk = archive.read(1024 * 1024);
+        if (chunk.isEmpty() && archive.error() != QFile::NoError) {
+            errorMessage = tr("Unable to verify the downloaded update package.");
+            return false;
+        }
+        hash.addData(chunk);
+    }
+
+    if (hash.result().toHex() != m_ExpectedSha256) {
+        errorMessage = tr("The downloaded update package failed its integrity check.");
+        return false;
+    }
+
+    return true;
 }
 
 bool PortableUpdateInstaller::runTool(const QString& program,
@@ -476,6 +528,7 @@ void PortableUpdateInstaller::resetPortableUpdateState(bool removeWorkspace)
 
     if (removeWorkspace) {
         m_PortableUpdateWorkspace.clear();
+        m_ExpectedSha256.clear();
     }
 
     m_MetadataChecked = false;
@@ -557,10 +610,16 @@ void PortableUpdateInstaller::handlePortableUpdateDownloadFinished()
 
     QString archivePath = QDir(m_PortableUpdateWorkspace).filePath(getUpdateArchiveName());
 
+    emit onPortableUpdateStatusChanged(tr("Verifying update..."));
+    QString verificationError;
+    if (!verifyUpdateArchive(archivePath, verificationError)) {
+        resetPortableUpdateState(true);
+        emit onPortableUpdateFailed(verificationError);
+        return;
+    }
+
 #if defined(Q_OS_DARWIN)
     // 先把 DMG 里的 bundle 挂载、拷出来、清掉隔离属性，失败还来得及弹对话框
-    emit onPortableUpdateStatusChanged(tr("Verifying update..."));
-
     QString stagedBundle;
     QString stageError;
     if (!stageMacUpdateBundle(archivePath, stagedBundle, stageError)) {

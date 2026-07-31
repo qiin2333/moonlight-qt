@@ -18,7 +18,7 @@ public:
     explicit PortableUpdateInstaller(QObject *parent = nullptr);
 
     bool supportsInAppUpdate() const;
-    void installUpdate(const QString& url);
+    void installUpdate(const QString& url, const QString& expectedDigest = QString());
 
 signals:
     void onPortableUpdateStatusChanged(QString message);
@@ -49,6 +49,7 @@ private:
                               QString& errorMessage);
     bool runTool(const QString& program, const QStringList& arguments, int timeoutMs) const;
     bool ensureSufficientDiskSpace(qint64 requiredBytes, QString& errorMessage) const;
+    bool verifyUpdateArchive(const QString& archivePath, QString& errorMessage) const;
     qint64 estimateRequiredWorkspaceBytes(qint64 archiveBytes) const;
     void resetPortableUpdateState(bool removeWorkspace);
 
@@ -57,5 +58,6 @@ private:
     QFile* m_UpdateFile;
     QString m_PortableUpdateWorkspace;
     QString m_PortableUpdateError;
+    QByteArray m_ExpectedSha256;
     bool m_MetadataChecked;
 };

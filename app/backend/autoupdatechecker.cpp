@@ -51,7 +51,8 @@ bool AutoUpdateChecker::supportsInAppUpdate() const
 
 void AutoUpdateChecker::installUpdate(QString url)
 {
-    m_PortableUpdateInstaller->installUpdate(url);
+    const QString expectedDigest = url == m_UpdateDownloadUrl ? m_UpdateAssetDigest : QString();
+    m_PortableUpdateInstaller->installUpdate(url, expectedDigest);
 }
 
 void AutoUpdateChecker::start()
@@ -274,6 +275,7 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
 
             // Try to find a platform-specific download URL from assets
             QString downloadUrl;
+            QString assetDigest;
             QString expectedPrefix = getExpectedAssetPrefix();
             QString expectedSuffix = getExpectedAssetSuffix();
 
@@ -289,6 +291,7 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
 
                         if (prefixMatches && suffixMatches) {
                             downloadUrl = assetObj["browser_download_url"].toString();
+                            assetDigest = assetObj["digest"].toString();
                             qDebug() << "Found matching asset:" << assetName;
                             break;
                         }
@@ -300,6 +303,9 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
             if (downloadUrl.isEmpty()) {
                 downloadUrl = releaseObj["html_url"].toString();
             }
+
+            m_UpdateDownloadUrl = downloadUrl;
+            m_UpdateAssetDigest = assetDigest;
 
             emit onUpdateAvailable(tagName, downloadUrl);
         }

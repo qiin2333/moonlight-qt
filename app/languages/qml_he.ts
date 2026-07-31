@@ -1826,118 +1826,139 @@
 <context>
     <name>PortableUpdateInstaller</name>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="59"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="61"/>
         <source>The update URL is invalid.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="48"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="50"/>
         <source>In-app update is not supported for this installation.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="53"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="55"/>
         <source>An update is already in progress.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="64"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="66"/>
         <source>The update package was not found for this release.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="76"/>
-        <location filename="../backend/portableupdateinstaller.cpp" line="395"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="78"/>
+        <source>The update package has no valid integrity information. Please install the update manually.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="83"/>
+        <source>The update package has invalid integrity information.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="96"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="447"/>
         <source>Unable to create a temporary folder for the update.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="94"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="115"/>
         <source>Unable to create the update package on disk.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="121"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="142"/>
         <source>Downloading update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="224"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="236"/>
+        <source>The current Moonlight folder is not writable. Move Moonlight to a writable location, run it with sufficient permissions, or download and install the update manually.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="245"/>
         <source>In-app update requires running Moonlight from an app bundle.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="236"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="257"/>
         <source>Moonlight is installed in a folder you can&apos;t write to. Move it to your Applications folder, or download and install the update manually.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="308"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="329"/>
         <source>Unable to determine free disk space for the update.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="313"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="334"/>
         <source>Not enough free disk space for the update. Need about %1 MB free.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="407"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="364"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="372"/>
+        <source>Unable to verify the downloaded update package.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="379"/>
+        <source>The downloaded update package failed its integrity check.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../backend/portableupdateinstaller.cpp" line="459"/>
         <source>Unable to open the downloaded disk image.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="416"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="468"/>
         <source>The downloaded disk image does not contain Moonlight.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="421"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="473"/>
         <source>Unable to extract the update.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="526"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="579"/>
         <source>Downloading update... %1%</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="530"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="583"/>
         <source>Downloading update... %1 MB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="562"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="613"/>
         <source>Verifying update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="576"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="635"/>
         <source>Unable to prepare the update installer.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="612"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="671"/>
         <source>Unable to launch the updater.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="215"/>
-        <source>The current Moonlight folder is not writable. Move the portable build to a writable location, run Moonlight with sufficient permissions, or download and install the update manually.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="517"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="570"/>
         <source>Failed while writing the update package to disk.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="542"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="595"/>
         <source>Failed to download the update: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../backend/portableupdateinstaller.cpp" line="616"/>
+        <location filename="../backend/portableupdateinstaller.cpp" line="675"/>
         <source>Installing update and restarting Moonlight...</source>
         <translation type="unfinished"></translation>
     </message>
