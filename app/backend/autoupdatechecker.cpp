@@ -321,7 +321,15 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
                             break;
                         }
 
-                        if (fallbackUrl.isEmpty()) {
+                        // 后备只认「没带架构后缀」的旧命名。带了别的架构后缀的资产
+                        // 绝对不能当后备 —— 只发了 arm64 包的 release 会把 arm64 的
+                        // DMG 喂给 Intel 客户端。这种情况下宁可让 downloadUrl 留空，
+                        // 退回打开 release 页面让用户自己看。
+                        bool isOtherArchAsset =
+                                assetName.endsWith(QStringLiteral("-arm64.dmg"), Qt::CaseInsensitive) ||
+                                assetName.endsWith(QStringLiteral("-x86_64.dmg"), Qt::CaseInsensitive);
+
+                        if (fallbackUrl.isEmpty() && !isOtherArchAsset) {
                             fallbackUrl = assetObj["browser_download_url"].toString();
                             fallbackName = assetName;
                         }
