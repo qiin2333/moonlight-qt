@@ -12,6 +12,9 @@
 #include <QtGlobal>
 #include <QDir>
 #include <QGuiApplication>
+#ifdef Q_OS_MACOS
+#include <QImage>
+#endif
 
 // Include SDL_syswm.h after Qt headers to avoid X11 macro conflicts on Linux
 #include <SDL_syswm.h>
@@ -411,12 +414,56 @@ void SdlInputHandler::updateRemoteCursor(const RemoteCursorUpdate& update)
                         update.shapeId);
         }
         else {
+            int cursorWidth = update.width;
+            int cursorHeight = update.height;
+            int hotspotX = update.hotspotX;
+            int hotspotY = update.hotspotY;
+            int cursorPitch = update.width * 4;
+            const char* cursorPixels = update.bgra.constData();
+
+#ifdef Q_OS_MACOS
+            QImage scaledCursor;
+            int windowWidth = 0;
+            int windowHeight = 0;
+            int pixelWidth = 0;
+            int pixelHeight = 0;
+            if (m_Window != nullptr) {
+                SDL_GetWindowSize(m_Window, &windowWidth, &windowHeight);
+                SDL_GetWindowSizeInPixels(m_Window, &pixelWidth, &pixelHeight);
+            }
+            if (windowWidth > 0 && windowHeight > 0 &&
+                pixelWidth >= windowWidth && pixelHeight >= windowHeight) {
+                const qreal scaleX = static_cast<qreal>(pixelWidth) / windowWidth;
+                const qreal scaleY = static_cast<qreal>(pixelHeight) / windowHeight;
+                cursorWidth = qMax(1, qRound(update.width / scaleX));
+                cursorHeight = qMax(1, qRound(update.height / scaleY));
+                hotspotX = qBound(0, qRound(update.hotspotX / scaleX), cursorWidth - 1);
+                hotspotY = qBound(0, qRound(update.hotspotY / scaleY), cursorHeight - 1);
+
+                if (cursorWidth != update.width || cursorHeight != update.height) {
+                    const QImage source(
+                        reinterpret_cast<const uchar*>(update.bgra.constData()),
+                        update.width,
+                        update.height,
+                        update.width * 4,
+                        QImage::Format_ARGB32);
+                    scaledCursor = source.scaled(
+                        cursorWidth,
+                        cursorHeight,
+                        Qt::IgnoreAspectRatio,
+                        Qt::SmoothTransformation);
+                    cursorPixels = reinterpret_cast<const char*>(scaledCursor.constBits());
+                    cursorPitch = scaledCursor.bytesPerLine();
+                }
+            }
+#endif
+
             SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(
-                const_cast<char*>(update.bgra.constData()),
-                update.width,
-                update.height,
+                const_cast<char*>(cursorPixels),
+                cursorWidth,
+                cursorHeight,
                 32,
-                update.width * 4,
+                cursorPitch,
                 SDL_PIXELFORMAT_BGRA32);
             if (surface == nullptr) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
@@ -425,7 +472,7 @@ void SdlInputHandler::updateRemoteCursor(const RemoteCursorUpdate& update)
             }
             else {
                 SDL_Cursor* cursor =
-                    SDL_CreateColorCursor(surface, update.hotspotX, update.hotspotY);
+                    SDL_CreateColorCursor(surface, hotspotX, hotspotY);
                 SDL_FreeSurface(surface);
                 if (cursor == nullptr) {
                     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
