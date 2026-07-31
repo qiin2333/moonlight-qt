@@ -27,22 +27,17 @@ ApplicationWindow {
     // 去掉系统标题栏的外壳：内容顶到窗口最上沿、系统不再画标题栏底色，于是下面
     // 那条 56px 的工具栏本身就成了标题栏，整个窗口从上到下都是我们自己的配色。
     //
-    // 仍然是一个正常的原生窗口：关闭/最小化/最大化按钮、resize 边缘、窗口阴影、
-    // 全屏按钮、Cmd+Tab、调度中心、无障碍都由系统管，我们只是不画它的底。
-    // 真正的 frameless（自绘窗口按钮、方角窗口）是另一件事，要补 resize、阴影、
-    // 双击最大化和一堆平台差异，这里刻意没走那条路。
+    // 仍然是一个正常的原生窗口，resize 边缘、窗口阴影和任务栏集成都由系统管理。
+    // Windows 只关闭原生 caption buttons，改由工具栏右侧的自绘按钮提供窗口操作；
+    // 没有使用 FramelessWindowHint，因此不会丢掉系统边框行为。
     flags: Qt.Window
            | Qt.ExpandedClientAreaHint
            | Qt.NoTitleBarBackgroundHint
            // Windows otherwise keeps drawing the native window icon and title
-           // over our own wordmark. Keep the native caption buttons, resizing,
-           // shadow, and taskbar integration, but opt out of the default title
-           // and system-menu decorations.
+           // over our own wordmark. CustomizeWindowHint removes those default
+           // decorations; the three caption buttons are drawn below in QML.
            | (Qt.platform.os === "windows"
               ? Qt.CustomizeWindowHint
-                | Qt.WindowMinimizeButtonHint
-                | Qt.WindowMaximizeButtonHint
-                | Qt.WindowCloseButtonHint
               : 0)
 
     // 加了上面那两个 flag 之后窗口的可绘制区域顶到了最上沿，但 ApplicationWindow 仍然
@@ -373,17 +368,18 @@ ApplicationWindow {
         // 这里再留一格间距 —— 20 + 60 + 20 = 100，减掉 RowLayout 自带的 spaceLg(16)
         // 就是 84。改动那边的 kButtonLeftMargin 时这个数要跟着改。
         //
-        // Windows：最小化/最大化/关闭由 DWM 画在右上，Win11 是三个 46px 的格子，
-        // 一组 138。这条没法在这台机器上核，按 DWM 的标准尺寸给。
+        // Windows：右边是三颗 44px 的自绘窗口按钮。
         //
         // 全屏时两边都不留：macOS 全屏会把红绿灯藏起来（要鼠标移到顶边才浮出来），
         // 这时候还留着那段让位就是一段莫名其妙的空档 —— 界面全屏是个偏好项，
         // 真有人这么用。
         readonly property bool windowChromeVisible: window.visibility !== Window.FullScreen
+        readonly property int customWindowControlsWidth: 132
         readonly property int windowButtonInsetLeft:
             (SystemProperties.isDarwin && windowChromeVisible) ? 84 : 0
         readonly property int windowButtonInsetRight:
-            (Qt.platform.os === "windows" && windowChromeVisible) ? 138 : 0
+            (Qt.platform.os === "windows" && windowChromeVisible)
+                ? customWindowControlsWidth : 0
 
         // 以前这是一条「浮」在壁纸上的透明工具栏（topMargin: 5 + transparent 背景）。
         // 新风格里它是一条真正的 bar：贴住窗口顶边、底部一条 1px 分隔线，页面内容从
@@ -734,6 +730,44 @@ ApplicationWindow {
                 ToolTip.timeout: 3000
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Settings") + (settingsShortcut.nativeText ? (" ("+settingsShortcut.nativeText+")") : "")
+            }
+        }
+
+        Row {
+            id: windowControls
+            visible: Qt.platform.os === "windows" && toolBar.windowChromeVisible
+            anchors.top: parent.top
+            anchors.right: parent.right
+            height: 40
+            z: 2
+
+            WindowControlButton {
+                controlType: "minimize"
+                accessibleName: qsTr("Minimize")
+                highlightColor: Theme.acid
+                onClicked: window.showMinimized()
+            }
+
+            WindowControlButton {
+                controlType: window.visibility === Window.Maximized ? "restore" : "maximize"
+                accessibleName: window.visibility === Window.Maximized
+                                ? qsTr("Restore") : qsTr("Maximize")
+                highlightColor: Theme.accent
+                onClicked: {
+                    if (window.visibility === Window.Maximized) {
+                        window.showNormal()
+                    }
+                    else {
+                        window.showMaximized()
+                    }
+                }
+            }
+
+            WindowControlButton {
+                controlType: "close"
+                accessibleName: qsTr("Close")
+                highlightColor: Theme.danger
+                onClicked: window.close()
             }
         }
     }

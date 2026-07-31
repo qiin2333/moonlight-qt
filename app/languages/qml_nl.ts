@@ -2531,114 +2531,134 @@
 <context>
     <name>main</name>
     <message>
-        <location filename="../gui/main.qml" line="736"/>
+        <location filename="../gui/main.qml" line="732"/>
         <source>Settings</source>
         <translation>Instellingen</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="507"/>
+        <location filename="../gui/main.qml" line="503"/>
         <source>Version %1</source>
         <translation>Versie %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="530"/>
+        <location filename="../gui/main.qml" line="526"/>
         <source>Join our QQ group</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="549"/>
+        <location filename="../gui/main.qml" line="545"/>
         <source>Add PC manually</source>
         <translation>PC handmatig toe­voegen</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="594"/>
+        <location filename="../gui/main.qml" line="590"/>
         <source>Update available for Moonlight: Version %1</source>
         <translation>Update beschikbaar voor Moonlight: Versie %1</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="660"/>
+        <location filename="../gui/main.qml" line="656"/>
         <source>Gamepad Mapper</source>
         <translation>Gamepad-mapper</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="764"/>
+        <location filename="../gui/main.qml" line="798"/>
         <source>Hardware acceleration doesn&apos;t work on XWayland. Continuing on XWayland may result in poor streaming performance. Try running with QT_QPA_PLATFORM=wayland or switch to X11.</source>
         <translation>Hardware acceleration werkt niet met XWayland. Doorgaan met XWayland kan slechte streaming prestaties veroorzaken. Probeer te spelen met QT_QPA_PLATFORM=wayland of verander naar X11.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="773"/>
+        <location filename="../gui/main.qml" line="807"/>
         <source>This version of Moonlight isn&apos;t optimized for your PC. Please download the &apos;%1&apos; version of Moonlight for the best streaming performance.</source>
         <translation>Deze versie van Moonlight is niet geoptimaliseerd voor uw PC. Download de &apos;%1&apos;-versie van Moonlight voor de beste streamingprestaties.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="782"/>
+        <location filename="../gui/main.qml" line="816"/>
         <source>Moonlight detected gamepads without a mapping:</source>
         <translation>Moonlight heeft gamepads gedetecteerd zonder mapping:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="637"/>
+        <location filename="../gui/main.qml" line="633"/>
         <source>Help</source>
         <translation>Hulp</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="583"/>
-        <location filename="../gui/main.qml" line="754"/>
+        <location filename="../gui/main.qml" line="579"/>
+        <location filename="../gui/main.qml" line="788"/>
         <source>Preparing portable update...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="681"/>
+        <location filename="../gui/main.qml" line="677"/>
         <source>Connection IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="703"/>
+        <location filename="../gui/main.qml" line="699"/>
         <source>Display Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="743"/>
+        <location filename="../gui/main.qml" line="746"/>
+        <source>Minimize</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="754"/>
+        <source>Restore</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="754"/>
+        <source>Maximize</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="768"/>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="777"/>
         <source>No functioning hardware accelerated video decoder was detected by Moonlight. Your streaming performance may be severely degraded in this configuration.</source>
         <translation>Geen werkende hardware versnelde videodecoder gevonden door Moonlight. De streamingkwaliteit kan ernstig beïnvloed worden met deze configuratie.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="745"/>
+        <location filename="../gui/main.qml" line="779"/>
         <source>Click the Help button for more information on solving this problem.</source>
         <translation>Klik op de hulp-knop voor meer informatie over het oplossen van dit probleem.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="766"/>
+        <location filename="../gui/main.qml" line="800"/>
         <source>Click the Help button for more information.</source>
         <translation>Klik op de hulp-knop voor meer informatie.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="784"/>
+        <location filename="../gui/main.qml" line="818"/>
         <source>Click the Help button for information on how to map your gamepads.</source>
         <translation>Klik op de Hulp-knop voor meer informatie over het toewijzen van uw gamepads.</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="792"/>
+        <location filename="../gui/main.qml" line="826"/>
         <source>Are you sure you want to quit?</source>
         <translation>Weet u zeker dat u wilt stoppen?</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="822"/>
+        <location filename="../gui/main.qml" line="856"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>Voer het IP-adres van uw host-PC in:</translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="893"/>
+        <location filename="../gui/main.qml" line="927"/>
         <source>No host PC of your own?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="902"/>
+        <location filename="../gui/main.qml" line="936"/>
         <source>Procriva Cloud rents out cloud hosts that are ready to stream.</source>
         <extracomment>Procriva Cloud is a product name and must not be translated.</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/main.qml" line="910"/>
+        <location filename="../gui/main.qml" line="944"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
     </message>
