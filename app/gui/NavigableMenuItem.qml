@@ -21,6 +21,7 @@ MenuItem {
     enabled: visible
     height: visible ? implicitHeight : 0
     focusPolicy: visible ? Qt.TabFocus : Qt.NoFocus
+    hoverEnabled: true
 
     readonly property bool active: hovered || visualFocus
 
