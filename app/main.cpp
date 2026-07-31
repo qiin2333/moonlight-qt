@@ -1161,10 +1161,10 @@ int main(int argc, char *argv[])
             families << QStringLiteral("PingFang SC");
 #elif defined(Q_OS_WIN32)
             const QStringList preferredHanFamilies = {
-                QStringLiteral("Noto Sans SC"),
-                QStringLiteral("DengXian"),
                 QStringLiteral("Microsoft YaHei UI"),
                 QStringLiteral("Microsoft YaHei"),
+                QStringLiteral("Noto Sans SC"),
+                QStringLiteral("DengXian"),
             };
             families << preferredHanFamilies;
 #else

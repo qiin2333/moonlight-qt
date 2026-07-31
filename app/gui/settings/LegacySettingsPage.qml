@@ -29,8 +29,8 @@ Column {
                                                    StreamingPreferences.language === StreamingPreferences.LANG_ZH_TW ||
                                                    (StreamingPreferences.language === StreamingPreferences.LANG_AUTO &&
                                                     Qt.locale().name.indexOf("zh") === 0)
-    property font defaultTitleFont: Qt.font({ bold: true, pointSize: 13 })
-    property font cuteChineseTitleFont: Qt.font({ family: "YouYuan", bold: true, pointSize: 13 })
+    property font defaultTitleFont: Qt.font({ weight: Font.Normal, pointSize: 13 })
+    property font cuteChineseTitleFont: Qt.font({ family: "YouYuan", weight: Font.Normal, pointSize: 13 })
     property font groupBoxTitleFont: useCuteChineseTitleFont ? cuteChineseTitleFont : defaultTitleFont
 
     width: parent ? parent.width : 0
