@@ -148,7 +148,7 @@
     <message>
         <location filename="../gui/AppView.qml" line="781"/>
         <source>Launch this app immediately when the host is selected, bypassing the app selection grid.</source>
-        <translation>选择目标计算机后立即启动此应用程序，绕过应用程序选择网格。</translation>
+        <translation>选择主机后立即启动此应用程序，绕过应用程序选择网格。</translation>
     </message>
     <message>
         <location filename="../gui/AppView.qml" line="789"/>
@@ -158,7 +158,7 @@
     <message>
         <location filename="../gui/AppView.qml" line="793"/>
         <source>Hide this game from the app grid. To access hidden games, right-click on the host and choose %1.</source>
-        <translation>从应用程序网格中隐藏此游戏。要访问隐藏的游戏，请右键单击目标计算机并选择 %1。</translation>
+        <translation>从应用程序网格中隐藏此游戏。要访问隐藏的游戏，请右键单击主机并选择 %1。</translation>
     </message>
     <message>
         <location filename="../gui/AppView.qml" line="793"/>
@@ -274,12 +274,12 @@
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="283"/>
         <source>Custom resolutions are not officially supported by GeForce Experience, so it will not set your host display resolution. You will need to set it manually while in game.</source>
-        <translation>自定义分辨率不受 GeForce Experience 的正式支持，因此不会设置目标计算机的分辨率。你需要在游戏中手动设置。</translation>
+        <translation>自定义分辨率不受 GeForce Experience 的正式支持，因此不会设置主机的分辨率。你需要在游戏中手动设置。</translation>
     </message>
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="284"/>
         <source>Resolutions that are not supported by your client or host PC may cause streaming errors.</source>
-        <translation>使用当前计算机或目标计算机不支持的分辨率可能会导致流式传输错误。</translation>
+        <translation>使用当前计算机或主机不支持的分辨率可能会导致流式传输错误。</translation>
     </message>
     <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="290"/>
@@ -523,7 +523,7 @@
     <message>
         <location filename="../gui/CliPair.qml" line="10"/>
         <source>Establishing connection to PC...</source>
-        <translation>正在建立与目标计算机的连接...</translation>
+        <translation>正在建立与主机的连接...</translation>
     </message>
     <message>
         <location filename="../gui/CliPair.qml" line="14"/>
@@ -541,7 +541,7 @@
     <message>
         <location filename="../gui/CliQuitStreamSegue.qml" line="11"/>
         <source>Establishing connection to PC...</source>
-        <translation>正在建立与目标计算机的连接...</translation>
+        <translation>正在建立与主机的连接...</translation>
     </message>
     <message>
         <location filename="../gui/CliQuitStreamSegue.qml" line="15"/>
@@ -554,7 +554,7 @@
     <message>
         <location filename="../gui/CliStartStreamSegue.qml" line="10"/>
         <source>Establishing connection to PC...</source>
-        <translation>正在建立与目标计算机的连接...</translation>
+        <translation>正在建立与主机的连接...</translation>
     </message>
     <message>
         <location filename="../gui/CliStartStreamSegue.qml" line="14"/>
@@ -939,7 +939,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="106"/>
         <source>Mute host PC speakers while streaming</source>
-        <translation>流式传输启动时将目标计算机的扬声器静音</translation>
+        <translation>流式传输启动时将主机的扬声器静音</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="116"/>
@@ -1035,7 +1035,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="290"/>
         <source>Quit app on host PC after ending stream</source>
-        <translation>流式传输结束后退出目标计算机上的应用程序</translation>
+        <translation>流式传输结束后退出主机上的应用程序</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="300"/>
@@ -1165,7 +1165,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="698"/>
         <source>NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.</source>
-        <translation>注意：由于 GeForce Experience 的 Bug，如果你的目标计算机有多个显示器，则此选项可能无法正常工作。</translation>
+        <translation>注意：由于 GeForce Experience 的 Bug，如果你的主机有多个显示器，则此选项可能无法正常工作。</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="705"/>
@@ -1265,7 +1265,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="908"/>
         <source>Forces a single gamepad to always stay connected to the host, even if no gamepads are actually connected to this PC.</source>
-        <translation>强制单个手柄始终与目标计算机保持连接，即使没有任何手柄实际连接到此计算机。</translation>
+        <translation>强制单个手柄始终与主机保持连接，即使没有任何手柄实际连接到此计算机。</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="909"/>
@@ -1573,7 +1573,7 @@
     <message>
         <location filename="../gui/PcView.qml" line="80"/>
         <source>Unable to connect to the specified PC.</source>
-        <translation>无法连接到目标计算机。</translation>
+        <translation>无法连接到主机。</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="83"/>
@@ -1628,7 +1628,7 @@
     <message>
         <location filename="../gui/PcView.qml" line="336"/>
         <source>Wake PC</source>
-        <translation>唤醒目标计算机</translation>
+        <translation>唤醒主机</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="341"/>
@@ -1693,7 +1693,7 @@
     <message>
         <location filename="../gui/PcView.qml" line="485"/>
         <source>If you are trying to stream over the Internet, install the Moonlight Internet Hosting Tool on your gaming PC and run the included Internet Streaming Tester to check your gaming PC&apos;s Internet connection.</source>
-        <translation>如果你想通过互联网进行流式传输，请在你的目标计算机上安装 Moonlight Internet Hosting 工具，并运行包含的互联网流式传输测试程序来检查你目标计算机的互联网连接。</translation>
+        <translation>如果你想通过互联网进行流式传输，请在你的主机上安装 Moonlight Internet Hosting 工具，并运行包含的互联网流式传输测试程序来检查你主机的互联网连接。</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="489"/>
@@ -1820,7 +1820,7 @@
     <message>
         <location filename="../backend/computermanager.cpp" line="680"/>
         <source>The running game wasn&apos;t started by this PC. You must quit the game on the host PC manually or use the device that originally started the game.</source>
-        <translation>正在运行的游戏不是由这台计算机启动的。你必须在目标计算机上手动退出游戏或使用最初启动游戏的设备。</translation>
+        <translation>正在运行的游戏不是由这台计算机启动的。你必须在主机上手动退出游戏或使用最初启动游戏的设备。</translation>
     </message>
 </context>
 <context>
@@ -2149,7 +2149,7 @@
     <message>
         <location filename="../streaming/session.cpp" line="355"/>
         <source>No video received from host.</source>
-        <translation>没有从目标计算机接收到视频画面。</translation>
+        <translation>没有从主机接收到视频画面。</translation>
     </message>
     <message>
         <location filename="../streaming/session.cpp" line="356"/>
@@ -2164,12 +2164,12 @@
     <message>
         <location filename="../streaming/session.cpp" line="368"/>
         <source>Something went wrong on your host PC when starting the stream.</source>
-        <translation>目标计算机启动流式传输时出现问题。</translation>
+        <translation>主机启动流式传输时出现问题。</translation>
     </message>
     <message>
         <location filename="../streaming/session.cpp" line="369"/>
         <source>Make sure you don&apos;t have any DRM-protected content open on your host PC. You can also try restarting your host PC.</source>
-        <translation>确保目标计算机上没有打开任何受 DRM 保护的内容。你也可以尝试重新启动目标计算机。</translation>
+        <translation>确保主机上没有打开任何受 DRM 保护的内容。你也可以尝试重新启动主机。</translation>
     </message>
     <message>
         <location filename="../streaming/session.cpp" line="374"/>
@@ -2336,7 +2336,7 @@
     <message>
         <location filename="../streaming/session.cpp" line="1550"/>
         <source>Your host PC&apos;s GPU doesn&apos;t support streaming video resolutions over 4K.</source>
-        <translation>目标计算机的显卡不支持 4K 以上的流式传输视频分辨率。</translation>
+        <translation>主机的显卡不支持 4K 以上的流式传输视频分辨率。</translation>
     </message>
     <message>
         <location filename="../streaming/session.cpp" line="1568"/>

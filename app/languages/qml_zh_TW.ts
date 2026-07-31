@@ -523,7 +523,7 @@
     <message>
         <location filename="../gui/CliPair.qml" line="10"/>
         <source>Establishing connection to PC...</source>
-        <translation>正在與目標電腦建立連線…</translation>
+        <translation>正在與主機建立連線…</translation>
     </message>
     <message>
         <location filename="../gui/CliPair.qml" line="14"/>
@@ -541,7 +541,7 @@
     <message>
         <location filename="../gui/CliQuitStreamSegue.qml" line="11"/>
         <source>Establishing connection to PC...</source>
-        <translation>正在與目標電腦建立連線…</translation>
+        <translation>正在與主機建立連線…</translation>
     </message>
     <message>
         <location filename="../gui/CliQuitStreamSegue.qml" line="15"/>
@@ -554,7 +554,7 @@
     <message>
         <location filename="../gui/CliStartStreamSegue.qml" line="10"/>
         <source>Establishing connection to PC...</source>
-        <translation>正在與目標電腦建立連線…</translation>
+        <translation>正在與主機建立連線…</translation>
     </message>
     <message>
         <location filename="../gui/CliStartStreamSegue.qml" line="14"/>
