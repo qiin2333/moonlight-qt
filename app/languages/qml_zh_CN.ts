@@ -2111,27 +2111,27 @@
 <context>
     <name>QPlatformTheme</name>
     <message>
-        <location filename="../main.cpp" line="915"/>
+        <location filename="../main.cpp" line="919"/>
         <source>&amp;Yes</source>
         <translation>是(&amp;Y)</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="916"/>
+        <location filename="../main.cpp" line="920"/>
         <source>&amp;No</source>
         <translation>否(&amp;N)</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="917"/>
+        <location filename="../main.cpp" line="921"/>
         <source>OK</source>
         <translation>确定</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="918"/>
+        <location filename="../main.cpp" line="922"/>
         <source>Help</source>
         <translation>帮助</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="919"/>
+        <location filename="../main.cpp" line="923"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
@@ -2147,291 +2147,291 @@
 <context>
     <name>Session</name>
     <message>
-        <location filename="../streaming/session.cpp" line="355"/>
+        <location filename="../streaming/session.cpp" line="356"/>
         <source>No video received from host.</source>
         <translation>没有从主机接收到视频画面。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="356"/>
+        <location filename="../streaming/session.cpp" line="357"/>
         <source>Check your firewall and port forwarding rules for port(s): %1</source>
         <translation>检查防火墙和端口转发规则: %1</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="362"/>
+        <location filename="../streaming/session.cpp" line="363"/>
         <source>Your network connection isn&apos;t performing well. Reduce your video bitrate setting or try a faster connection.</source>
         <translation>网络连接性能不佳。请降低视频比特率或尝试更快的网络连接。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="368"/>
+        <location filename="../streaming/session.cpp" line="369"/>
         <source>Something went wrong on your host PC when starting the stream.</source>
         <translation>主机启动流式传输时出现问题。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="369"/>
+        <location filename="../streaming/session.cpp" line="370"/>
         <source>Make sure you don&apos;t have any DRM-protected content open on your host PC. You can also try restarting your host PC.</source>
         <translation>确保主机上没有打开任何受 DRM 保护的内容。你也可以尝试重新启动主机。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="374"/>
+        <location filename="../streaming/session.cpp" line="375"/>
         <source>The host PC reported a fatal video encoding error.</source>
         <translation>主机 PC 报告了致命的视频编码错误。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="375"/>
+        <location filename="../streaming/session.cpp" line="376"/>
         <source>Try disabling HDR mode, changing the streaming resolution, or changing your host PC&apos;s display resolution.</source>
         <translation>尝试禁用 HDR 模式、更改流分辨率或更改主机 PC 的显示分辨率。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="383"/>
+        <location filename="../streaming/session.cpp" line="384"/>
         <source>Connection terminated</source>
         <translation>会话已终止</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="384"/>
+        <location filename="../streaming/session.cpp" line="385"/>
         <source>Error code: %1</source>
         <translation>错误代码: %1</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1303"/>
+        <location filename="../streaming/session.cpp" line="1304"/>
         <source>The version of GeForce Experience on %1 is not supported by this build of Moonlight. You must update Moonlight to stream from %1.</source>
         <translation>在 %1 安装的 GeForce Experience 版本不受当前版本的 Moonlight 支持。你必须升级 Moonlight 才能从 %1 串流。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1308"/>
+        <location filename="../streaming/session.cpp" line="1309"/>
         <source>Your selection to enable remote desktop mouse mode may cause problems in games.</source>
         <translation>启用远程桌面鼠标模式可能会导致游戏出现问题。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1312"/>
+        <location filename="../streaming/session.cpp" line="1313"/>
         <source>Your settings selection to force software decoding may cause poor streaming performance.</source>
         <translation>你选择的用于强制软件解码的设置可能会导致流式传输性能不佳。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1348"/>
+        <location filename="../streaming/session.cpp" line="1349"/>
         <source>Your host PC doesn&apos;t support encoding HEVC.</source>
         <translation>你的 PC 主机不支持使用HEVC编码。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1366"/>
+        <location filename="../streaming/session.cpp" line="1367"/>
         <source>Using software decoding due to your selection to force HEVC without GPU support. This may cause poor streaming performance.</source>
         <translation>根据你的选择使用软件解码，以在没有显卡支持的情况下强制 HEVC。这可能会导致流式传输性能不佳。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1318"/>
+        <location filename="../streaming/session.cpp" line="1319"/>
         <source>Your host software or GPU doesn&apos;t support encoding AV1.</source>
         <translation>你的主机软件或显卡不支持进行 AV1 编码。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1336"/>
+        <location filename="../streaming/session.cpp" line="1337"/>
         <source>Using software decoding due to your selection to force AV1 without GPU support. This may cause poor streaming performance.</source>
         <translation>由于你选择在没有显卡支持的情况下强制使用 AV1，因此目前使用软件解码。这可能会导致视频流解码处理性能不佳。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1413"/>
+        <location filename="../streaming/session.cpp" line="1414"/>
         <source>Your host PC doesn&apos;t support HDR streaming.</source>
         <translation>你的 PC 主机不支持 HDR 串流。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1405"/>
+        <location filename="../streaming/session.cpp" line="1406"/>
         <source>HDR is not supported using the H.264 codec.</source>
         <translation>使用 H.264 编解码器的情况下不支持 HDR。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1428"/>
+        <location filename="../streaming/session.cpp" line="1429"/>
         <source>This PC&apos;s GPU doesn&apos;t support AV1 Main10 decoding for HDR streaming.</source>
         <translation>这台电脑的显卡不支持包含 HDR 的 AV1 Main10 解码。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1409"/>
+        <location filename="../streaming/session.cpp" line="1410"/>
         <source>This PC&apos;s GPU doesn&apos;t support 10-bit HEVC or AV1 decoding for HDR streaming.</source>
         <translation>这台电脑的显卡不支持包含 HDR 的 HEVC 或 AV1 Main10 解码。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1461"/>
+        <location filename="../streaming/session.cpp" line="1462"/>
         <source>Your host PC and client PC don&apos;t support the same HDR video codecs.</source>
         <translation>主机电脑和客户端电脑不支持相同的 HDR 视频编解码器。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1554"/>
+        <location filename="../streaming/session.cpp" line="1555"/>
         <source>Video resolutions over 4K are not supported by the H.264 codec.</source>
         <translation>H.264 编解码器不支持超过 4K 的视频分辨率。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="3090"/>
+        <location filename="../streaming/session.cpp" line="3091"/>
         <source>Host returned error: %1</source>
         <translation>主机返回错误：%1</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1385"/>
+        <location filename="../streaming/session.cpp" line="1386"/>
         <source>Using software decoding due to your selection to force H.264 without GPU support. This may cause poor streaming performance.</source>
         <translation>使用软件解码，因为你选择强制使用没有 GPU 支持的 H.264。这可能会导致较差的流性能。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="873"/>
-        <location filename="../streaming/session.cpp" line="2389"/>
+        <location filename="../streaming/session.cpp" line="874"/>
+        <location filename="../streaming/session.cpp" line="2390"/>
         <source>Checking</source>
         <translation>检查中</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1395"/>
+        <location filename="../streaming/session.cpp" line="1396"/>
         <source>Your host PC and client PC don&apos;t support the same video codecs. This may cause poor streaming performance.</source>
         <translation>你的主机和客户端 PC 不支持相同的视频编解码器。这可能会导致较差的流性能。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1398"/>
+        <location filename="../streaming/session.cpp" line="1399"/>
         <source>Your client GPU doesn&apos;t support H.264 decoding. This may cause poor streaming performance.</source>
         <translation>你的客户端 GPU 不支持 H.264 解码。这可能会导致较差的流性能。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1434"/>
-        <location filename="../streaming/session.cpp" line="1452"/>
+        <location filename="../streaming/session.cpp" line="1435"/>
+        <location filename="../streaming/session.cpp" line="1453"/>
         <source>Using software decoding due to your selection to force HDR without GPU support. This may cause poor streaming performance.</source>
         <translation>由于您选择强制使用未经 GPU 支持的 HDR，因此将采用软件解码。这可能会导致串流性能不佳。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1446"/>
+        <location filename="../streaming/session.cpp" line="1447"/>
         <source>This PC&apos;s GPU doesn&apos;t support HEVC Main10 decoding for HDR streaming.</source>
         <translation>此计算机的显卡不支持 HEVC Main10 解码 HDR 流。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1468"/>
+        <location filename="../streaming/session.cpp" line="1469"/>
         <source>Your host PC doesn&apos;t support YUV 4:4:4 streaming.</source>
         <translation>您的主机 PC 不支持 YUV 4:4:4 串流。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1476"/>
+        <location filename="../streaming/session.cpp" line="1477"/>
         <source>Your host PC doesn&apos;t support YUV 4:4:4 streaming for selected video codec.</source>
         <translation>您的主机 PC 不支持所选视频编解码器的 YUV 4:4:4 串流。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1491"/>
+        <location filename="../streaming/session.cpp" line="1492"/>
         <source>Using software decoding due to your selection to force YUV 4:4:4 without GPU support. This may cause poor streaming performance.</source>
         <translation>由于您选择强制使用未经 GPU 支持的 YUV 4:4:4，因此将采用软件解码。这可能会导致串流性能不佳。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1497"/>
+        <location filename="../streaming/session.cpp" line="1498"/>
         <source>This PC&apos;s GPU doesn&apos;t support YUV 4:4:4 decoding for selected video codec.</source>
         <translation>这台 PC 的 GPU 不支持所选视频编解码器的 YUV 4:4:4 解码。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1506"/>
+        <location filename="../streaming/session.cpp" line="1507"/>
         <source>GeForce Experience 3.0 or higher is required for 4K streaming.</source>
         <translation>4K 流式传输需要 GeForce Experience 3.0 或更高版本。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1521"/>
+        <location filename="../streaming/session.cpp" line="1522"/>
         <source>Your selected surround sound setting is not supported by the current audio device.</source>
         <translation>当前音频设备不支持你选择的环绕声设置。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1527"/>
+        <location filename="../streaming/session.cpp" line="1528"/>
         <source>Failed to open audio device. Audio will be unavailable during this session.</source>
         <translation>无法打开音频设备。音频在此会话期间将不可用。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1532"/>
+        <location filename="../streaming/session.cpp" line="1533"/>
         <source>An attached gamepad has no mapping and won&apos;t be usable. Visit the Moonlight help to resolve this.</source>
         <translation>附加的手柄没有映射，因此无法使用。请访问 Moonlight 帮助解决此问题。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1550"/>
+        <location filename="../streaming/session.cpp" line="1551"/>
         <source>Your host PC&apos;s GPU doesn&apos;t support streaming video resolutions over 4K.</source>
         <translation>主机的显卡不支持 4K 以上的流式传输视频分辨率。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1568"/>
+        <location filename="../streaming/session.cpp" line="1569"/>
         <source>Your selection to force hardware decoding cannot be satisfied due to missing hardware decoding support on this PC&apos;s GPU.</source>
         <translation>由于此计算机的显卡上缺少硬件解码支持，无法满足强制硬件解码的选择。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="1571"/>
+        <location filename="../streaming/session.cpp" line="1572"/>
         <source>Your codec selection and force hardware decoding setting are not compatible. This PC&apos;s GPU lacks support for decoding your chosen codec.</source>
         <translation>你选择的编解码器和强制硬件解码设置不兼容。此计算机的显卡不支持解码你选择的编解码器。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2045"/>
-        <location filename="../streaming/session.cpp" line="2390"/>
+        <location filename="../streaming/session.cpp" line="2046"/>
+        <location filename="../streaming/session.cpp" line="2391"/>
         <source>Checking host file sharing...</source>
         <translation>正在检查主机文件共享…</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2048"/>
-        <location filename="../streaming/session.cpp" line="2476"/>
-        <location filename="../streaming/session.cpp" line="2488"/>
+        <location filename="../streaming/session.cpp" line="2049"/>
+        <location filename="../streaming/session.cpp" line="2477"/>
+        <location filename="../streaming/session.cpp" line="2489"/>
         <source>Preparing host files...</source>
         <translation>正在准备主机文件…</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2053"/>
-        <location filename="../streaming/session.cpp" line="2482"/>
+        <location filename="../streaming/session.cpp" line="2054"/>
+        <location filename="../streaming/session.cpp" line="2483"/>
         <source>Opening host files...</source>
         <translation>正在打开主机文件…</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2061"/>
+        <location filename="../streaming/session.cpp" line="2062"/>
         <source>Host file sharing is not available. Retrying...</source>
         <translation>主机文件共享不可用，正在重试…</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2062"/>
+        <location filename="../streaming/session.cpp" line="2063"/>
         <source> Retrying...</source>
         <translation> 正在重试…</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2067"/>
-        <location filename="../streaming/session.cpp" line="2397"/>
-        <location filename="../streaming/session.cpp" line="2496"/>
+        <location filename="../streaming/session.cpp" line="2068"/>
+        <location filename="../streaming/session.cpp" line="2398"/>
+        <location filename="../streaming/session.cpp" line="2497"/>
         <source>Host file sharing is not available.</source>
         <translation>主机文件共享不可用。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2396"/>
-        <location filename="../streaming/session.cpp" line="2495"/>
+        <location filename="../streaming/session.cpp" line="2397"/>
+        <location filename="../streaming/session.cpp" line="2496"/>
         <source>Unavailable</source>
         <translation>不可用</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2487"/>
+        <location filename="../streaming/session.cpp" line="2488"/>
         <source>Preparing</source>
         <translation>准备中</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2558"/>
+        <location filename="../streaming/session.cpp" line="2559"/>
         <source>Open</source>
         <translation>打开</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2559"/>
+        <location filename="../streaming/session.cpp" line="2560"/>
         <source>Host files are ready.</source>
         <translation>主机文件已就绪。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2564"/>
+        <location filename="../streaming/session.cpp" line="2565"/>
         <source>Host files are ready, but the folder did not open. Check %1.</source>
         <translation>主机文件已就绪，但文件夹没有打开。请检查 %1。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2570"/>
+        <location filename="../streaming/session.cpp" line="2571"/>
         <source>Error</source>
         <translation>错误</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2571"/>
+        <location filename="../streaming/session.cpp" line="2572"/>
         <source>Host files could not be opened.</source>
         <translation>无法打开主机文件。</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2782"/>
+        <location filename="../streaming/session.cpp" line="2783"/>
         <source>Connection interrupted. Reconnecting... (%1s)</source>
         <translation>连接中断，正在重连…（%1 秒）</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="2865"/>
+        <location filename="../streaming/session.cpp" line="2866"/>
         <source>Reconnected</source>
         <translation>已重连</translation>
     </message>
     <message>
-        <location filename="../streaming/session.cpp" line="3890"/>
+        <location filename="../streaming/session.cpp" line="3989"/>
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>无法初始化视频解码器。请检查你的流式传输设置，然后重试。</translation>
     </message>
@@ -2508,22 +2508,22 @@
         <translation>此计算机的互联网连接被阻塞。当连接到此网络时，互联网上的流式传输可能无法工作。</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="310"/>
+        <location filename="../gui/StreamSegue.qml" line="318"/>
         <source>Tip:</source>
         <translation>提示:</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="310"/>
+        <location filename="../gui/StreamSegue.qml" line="318"/>
         <source>Press %1 to disconnect your session</source>
         <translation>按 %1 来断开会话</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="311"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Start+Select+L1+R1</source>
         <translation>Start+Select+L1+R1</translation>
     </message>
     <message>
-        <location filename="../gui/StreamSegue.qml" line="311"/>
+        <location filename="../gui/StreamSegue.qml" line="319"/>
         <source>Ctrl+Alt+Shift+Q</source>
         <translation>Ctrl+Alt+Shift+Q</translation>
     </message>
@@ -2625,6 +2625,21 @@
         <location filename="../gui/main.qml" line="718"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>输入你主机的 IP 地址：</translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="789"/>
+        <source>No host PC of your own?</source>
+        <translation>还没有自己的主机？</translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="797"/>
+        <source>Procriva Cloud rents out cloud hosts that are ready to stream.</source>
+        <translation>基地云提供开箱即用的云主机，租一台就能直接串流。</translation>
+    </message>
+    <message>
+        <location filename="../gui/main.qml" line="805"/>
+        <source>Learn more</source>
+        <translation>了解一下</translation>
     </message>
 </context>
 </TS>

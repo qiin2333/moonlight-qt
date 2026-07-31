@@ -761,6 +761,55 @@ ApplicationWindow {
                     addPcDialog.accept()
                 }
             }
+
+            // 云主机推广。放在这里是因为「我没有可以串流的主机」正好是打开这个框的
+            // 人最可能卡住的地方 —— 手动填 IP 填不出一台主机来。
+            //
+            // 没有浏览器可用时整块隐藏（和 QQ 按钮同一个判断），否则按钮点了没反应。
+            Item {
+                Layout.fillWidth: true
+                Layout.topMargin: Theme.spaceSm
+                implicitHeight: promoColumn.implicitHeight
+                visible: SystemProperties.hasBrowser
+
+                Column {
+                    id: promoColumn
+
+                    anchors { left: parent.left; right: parent.right }
+                    spacing: Theme.spaceSm
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Theme.line
+                    }
+
+                    MicroLabel {
+                        width: parent.width
+                        text: qsTr("No host PC of your own?")
+                        // 这句比一般微标签长，允许折行（MicroLabel 默认单行省略）
+                        elide: Text.ElideNone
+                        wrapMode: Text.Wrap
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: qsTr("Procriva Cloud rents out cloud hosts that are ready to stream.")
+                        color: Theme.text
+                        font.family: Theme.fontSans
+                        font.pointSize: Theme.fontBody
+                        wrapMode: Text.Wrap
+                    }
+
+                    HardButton {
+                        text: qsTr("Learn more")
+                        // 焦点默认停在输入框上，别让这颗按钮抢走
+                        focusPolicy: Qt.TabFocus
+
+                        onClicked: Qt.openUrlExternally("https://client.cloud.procriva.com/")
+                    }
+                }
+            }
         }
     }
 }
