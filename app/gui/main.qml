@@ -364,8 +364,8 @@ ApplicationWindow {
         // Windows：最小化/最大化/关闭由 DWM 画在右上，Win11 是三个 46px 的格子，
         // 一组 138。这条没法在这台机器上核，按 DWM 的标准尺寸给。
         //
-        // 全屏时不留：macOS 全屏会把红绿灯藏起来（要鼠标移到顶边才浮出来），
-        // 这时候还留着那 76pt 就是一段莫名其妙的空档 —— 界面全屏是个偏好项，
+        // 全屏时两边都不留：macOS 全屏会把红绿灯藏起来（要鼠标移到顶边才浮出来），
+        // 这时候还留着那段让位就是一段莫名其妙的空档 —— 界面全屏是个偏好项，
         // 真有人这么用。
         readonly property bool windowChromeVisible: window.visibility !== Window.FullScreen
         readonly property int windowButtonInsetLeft:
