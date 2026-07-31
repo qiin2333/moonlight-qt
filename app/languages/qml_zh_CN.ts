@@ -964,7 +964,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="153"/>
         <source>Host Settings</source>
-        <translation>目标计算机设置</translation>
+        <translation>主机设置</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="164"/>
@@ -2471,7 +2471,7 @@
     <message>
         <location filename="../gui/SettingsView.qml" line="34"/>
         <source>Host Settings</source>
-        <translation>目标计算机设置</translation>
+        <translation>主机设置</translation>
     </message>
     <message>
         <location filename="../gui/SettingsView.qml" line="38"/>
