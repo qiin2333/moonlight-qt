@@ -5,6 +5,11 @@
 namespace
 {
 
+// 红绿灯距窗口左边的留白。main.qml 里工具栏的 windowButtonInsetLeft 是按
+// 「这个值 + 整组 60pt 宽 + 一格间距」算出来的，两边要一起改。
+const CGFloat kButtonLeftMargin = 20;
+
+
 // 把系统标题栏那条带子拉高到 barHeight，并让红绿灯在新高度里垂直居中。
 //
 // 这里动的是 standardWindowButton 的 superview 链：
@@ -51,13 +56,22 @@ void applyTallTitleBar(NSWindow* window, CGFloat barHeight)
     titleBarFrame.size.height = barHeight;
     titleBarView.frame = titleBarFrame;
 
-    // 三颗按钮在带子里垂直居中。NSView 默认不翻转，y 从下往上算。
+    // 三颗按钮垂直居中，并整组右移到 kButtonLeftMargin。
+    //
+    // 系统默认把第一颗放在 x=9（实测三颗分别在 9 / 32 / 55，各 14×14，整组占 9..69）。
+    // 那是给 28pt 高的窄标题栏配的边距，放到我们这条 56pt 的 bar 里显得贴边，
+    // 所以整组往右挪，左右各留出一样的余量。
+    //
+    // NSView 默认不翻转，y 从下往上算。
+    CGFloat shiftX = kButtonLeftMargin - buttons[0].frame.origin.x;
+
     for (NSButton* button : buttons) {
         if (button == nil) {
             continue;
         }
 
         NSRect buttonFrame = button.frame;
+        buttonFrame.origin.x += shiftX;
         buttonFrame.origin.y = (barHeight - buttonFrame.size.height) / 2.0;
         button.frame = buttonFrame;
     }

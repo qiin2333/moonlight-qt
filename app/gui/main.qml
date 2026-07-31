@@ -355,16 +355,21 @@ ApplicationWindow {
         rightPadding: 0
 
         // 给系统窗口按钮让位。Qt 的 SafeArea 只报了标题栏那条带子的高度
-        // （实测 macOS 上 top=32、left=0），没有给出按钮的水平占位，只能自己留：
-        // macOS 的红绿灯在左上，三颗到 x≈70 结束；Windows 的最小化/最大化/关闭
-        // 由 DWM 画在右上，一组约 138pt。
+        // （实测 macOS 上 top=32、left=0），没有给出按钮的水平占位，只能自己留。
+        //
+        // macOS：红绿灯被 macwindowchrome.mm 挪到了 x=20 起（整组 60pt 宽，到 80 结束），
+        // 这里再留一格间距 —— 20 + 60 + 20 = 100，减掉 RowLayout 自带的 spaceLg(16)
+        // 就是 84。改动那边的 kButtonLeftMargin 时这个数要跟着改。
+        //
+        // Windows：最小化/最大化/关闭由 DWM 画在右上，Win11 是三个 46px 的格子，
+        // 一组 138。这条没法在这台机器上核，按 DWM 的标准尺寸给。
         //
         // 全屏时不留：macOS 全屏会把红绿灯藏起来（要鼠标移到顶边才浮出来），
         // 这时候还留着那 76pt 就是一段莫名其妙的空档 —— 界面全屏是个偏好项，
         // 真有人这么用。
         readonly property bool windowChromeVisible: window.visibility !== Window.FullScreen
         readonly property int windowButtonInsetLeft:
-            (SystemProperties.isDarwin && windowChromeVisible) ? 76 : 0
+            (SystemProperties.isDarwin && windowChromeVisible) ? 84 : 0
         readonly property int windowButtonInsetRight:
             (Qt.platform.os === "windows" && windowChromeVisible) ? 138 : 0
 
