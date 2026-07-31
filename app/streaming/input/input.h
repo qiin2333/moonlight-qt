@@ -184,6 +184,9 @@ public:
 
     void updateRemoteCursor(const RemoteCursorUpdate& update);
 
+    // 显示器变化后按新的 backing 比例重建远端光标（只有 macOS 需要）
+    void refreshRemoteCursorScale();
+
     void synchronizeLocalCursorMode();
 
     int getLocalCursorMode() const;
@@ -220,6 +223,8 @@ public:
     void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
 
 private:
+    qreal getRemoteCursorScale() const;
+
 
     GamepadState*
     findStateForGamepad(SDL_JoystickID id);
@@ -332,6 +337,10 @@ private:
     std::atomic<int> m_LocalCursorMode;
     bool m_RemoteCursorVisible;
     SDL_Cursor* m_RemoteCursor;
+    // 最后一份成功建出光标的形状，以及当时用的 backing 比例
+    RemoteCursorUpdate m_LastCursorShape;
+    bool m_HasLastCursorShape;
+    qreal m_RemoteCursorScale;
 
     struct {
         KeyCombo keyCombo;

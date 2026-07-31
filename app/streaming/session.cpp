@@ -3796,6 +3796,11 @@ void Session::exec()
             case SDL_WINDOWEVENT_MOVED:
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 syncQtOverlayWindowsWithSdlWindowState();
+                // 远端光标的尺寸是按窗口的 backing 比例算的（见 getRemoteCursorScale()），
+                // 换屏、改分辨率、改缩放都会让它失效。挂在这一组事件上而不是只挂
+                // DISPLAY_CHANGED：同一块屏上改系统缩放只会发 SIZE_CHANGED。
+                // 比例没变时这个调用会直接返回，挂宽一点不亏。
+                m_InputHandler->refreshRemoteCursorScale();
                 break;
             }
 
