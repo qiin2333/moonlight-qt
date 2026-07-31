@@ -165,13 +165,22 @@ Item {
         z: -3
     }
 
+    // 封面加载失败过一次就别再试了，直接退回主机壁纸。
+    // 只看 boxArtUrl 是不是空串不够：地址在但图取不下来（换过封面、缓存失效、
+    // 主机没这张图）时 status 会停在 Error，而 opacity 绑的是 status === Ready，
+    // 结果整层永远是全透明的，加载页只剩一块压暗的底。
+    property bool boxArtFailed: false
+
+    onBoxArtUrlChanged: boxArtFailed = false
+
     Image {
         id: segueBackground
 
         anchors.fill: parent
-        source: boxArtUrl !== "" ? boxArtUrl
-                                 : (window.backgroundImageUrl !== "" ? window.backgroundImageUrl
-                                                                     : "qrc:/res/gura.png")
+        source: (boxArtUrl !== "" && !boxArtFailed)
+                    ? boxArtUrl
+                    : (window.backgroundImageUrl !== "" ? window.backgroundImageUrl
+                                                        : "qrc:/res/gura.png")
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
@@ -181,6 +190,11 @@ Item {
         // 封面通常已经在缓存里，status 在处理器挂上之前就已经是 Ready，
         // 那样动画永远不会触发，背景会一直停在全透明。
         opacity: status === Image.Ready ? 1 : 0
+
+        // 失败要靠事件记下来。同样因为缓存的关系，也可能在处理器挂上之前
+        // 就已经是 Error 了，所以创建时再补查一次。
+        onStatusChanged: if (status === Image.Error) boxArtFailed = true
+        Component.onCompleted: if (status === Image.Error) boxArtFailed = true
 
         Behavior on opacity {
             NumberAnimation { duration: 700; easing.type: Easing.OutCubic }
