@@ -92,9 +92,18 @@ void ImageUtils::startBackgroundRequest()
     request.setRawHeader("Referer", m_backgroundApiUrl.toEncoded());
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     request.setTransferTimeout(15000);
+#endif
 
     QNetworkReply *reply = m_backgroundNetworkManager.get(request);
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+    QTimer::singleShot(15000, reply, [reply]() {
+        if (reply->isRunning()) {
+            reply->abort();
+        }
+    });
+#endif
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() != QNetworkReply::NoError) {
             const QString errorMessage = reply->errorString();
