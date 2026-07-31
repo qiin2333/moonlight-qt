@@ -47,8 +47,9 @@ Item {
         stageLabel.visible = false
         hintText.visible = false
 
-        // Hide the window now that streaming has begun
-        window.visible = false
+        // 窗口本身不在这里藏。Session::exec() 会等这条动画跑完再创建串流窗口，
+        // 并在串流窗口进入全屏之后才隐藏窗口 —— 提前藏的话，macOS 切进新 Space 的
+        // 整个动画期间旧 Space 露出来的是桌面，而不是这层已经全黑的幕。
     }
 
     function connectionStarted()
@@ -214,11 +215,13 @@ Item {
     }
 
     // 进入串流时盖上来的幕，替代原来「一帧之内直接隐藏窗口」的硬切。
-    // 用 ink 而不是纯黑：和窗口底色一致，SDL 接管的那一帧不会有色阶跳变。
+    //
+    // 这一层刻意用纯黑而不是 Theme.ink：接手它的是 SDL 串流窗口，而 SDL 窗口在拿到
+    // 第一帧之前就是纯黑的（实测 macOS 上是 0,0,0）。两边同色，交接那一刻才没有色阶跳变。
     Rectangle {
         id: exitVeil
         anchors.fill: parent
-        color: Theme.ink
+        color: "black"
         opacity: 0
         visible: opacity > 0
         z: 10
