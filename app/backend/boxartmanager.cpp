@@ -149,10 +149,12 @@ QUrl BoxArtManager::loadBoxArtFromNetwork(NvComputer* computer, const NvApp& app
     // Cache the box art on disk if it loaded
     if (!image.isNull()) {
         if (image.save(cachePath)) {
-            const bool isPlaceholder = !app.isAppCollectorGame &&
-                    isPlaceholderBoxArt(image.size());
+            // Cache only the image property. App classification is applied by
+            // the caller so a later classification change cannot poison this
+            // path's cached result.
+            const bool isPlaceholder = isPlaceholderBoxArt(image.size());
             rememberPlaceholderBoxArt(cachePath, isPlaceholder);
-            if (isPlaceholder) {
+            if (!app.isAppCollectorGame && isPlaceholder) {
                 return QUrl("qrc:/res/no_app_image.png");
             }
             return QUrl::fromLocalFile(cachePath);
