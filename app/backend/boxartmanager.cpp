@@ -3,6 +3,7 @@
 
 #include <QImageReader>
 #include <QImageWriter>
+#include <QMutexLocker>
 
 BoxArtManager::BoxArtManager(QObject *parent) :
     QObject(parent),
@@ -43,6 +44,27 @@ bool BoxArtManager::isPlaceholderBoxArt(const QSize& size)
            size == QSize(200, 266);
 }
 
+bool BoxArtManager::isCachedPlaceholderBoxArt(const QString& cachePath)
+{
+    {
+        QMutexLocker locker(&m_PlaceholderCacheMutex);
+        const auto cached = m_PlaceholderCache.constFind(cachePath);
+        if (cached != m_PlaceholderCache.constEnd()) {
+            return cached.value();
+        }
+    }
+
+    const bool isPlaceholder = isPlaceholderBoxArt(QImageReader(cachePath).size());
+    rememberPlaceholderBoxArt(cachePath, isPlaceholder);
+    return isPlaceholder;
+}
+
+void BoxArtManager::rememberPlaceholderBoxArt(const QString& cachePath, bool isPlaceholder)
+{
+    QMutexLocker locker(&m_PlaceholderCacheMutex);
+    m_PlaceholderCache.insert(cachePath, isPlaceholder);
+}
+
 class NetworkBoxArtLoadTask : public QObject, public QRunnable
 {
     Q_OBJECT
@@ -81,8 +103,7 @@ QUrl BoxArtManager::loadBoxArt(NvComputer* computer, NvApp& app)
     // Try to open the cached file if it exists and contains data
     QFile cacheFile(getFilePathForBoxArt(computer, app.id));
     if (cacheFile.exists() && cacheFile.size() > 0) {
-        QImageReader reader(cacheFile.fileName());
-        if (!app.isAppCollectorGame && isPlaceholderBoxArt(reader.size())) {
+        if (!app.isAppCollectorGame && isCachedPlaceholderBoxArt(cacheFile.fileName())) {
             return QUrl("qrc:/res/no_app_image.png");
         }
         return QUrl::fromLocalFile(cacheFile.fileName());
@@ -128,7 +149,10 @@ QUrl BoxArtManager::loadBoxArtFromNetwork(NvComputer* computer, const NvApp& app
     // Cache the box art on disk if it loaded
     if (!image.isNull()) {
         if (image.save(cachePath)) {
-            if (!app.isAppCollectorGame && isPlaceholderBoxArt(image.size())) {
+            const bool isPlaceholder = !app.isAppCollectorGame &&
+                    isPlaceholderBoxArt(image.size());
+            rememberPlaceholderBoxArt(cachePath, isPlaceholder);
+            if (isPlaceholder) {
                 return QUrl("qrc:/res/no_app_image.png");
             }
             return QUrl::fromLocalFile(cachePath);

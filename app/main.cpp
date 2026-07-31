@@ -682,14 +682,7 @@ int main(int argc, char *argv[])
     }
 #endif
 
-#if defined(Q_OS_WIN32) && QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    // Qt 6's threaded render loop keeps scene graph synchronization, texture
-    // uploads, and buffer swaps off the Windows GUI thread. The basic loop made
-    // app-grid navigation visibly stall whenever large cover textures arrived.
-    if (!qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {
-        qputenv("QSG_RENDER_LOOP", "threaded");
-    }
-#elif !defined(Q_OS_WIN32)
+#if !defined(Q_OS_WIN32)
     // Other platforms retain the established non-threaded behavior because
     // streaming code may block the main thread while pumping events.
     if (!qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {

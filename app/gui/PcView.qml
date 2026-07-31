@@ -681,10 +681,10 @@ CenteredGridView {
             settings.lastRefreshTime = Date.now()
         }
 
-        function handleImageError(status) {
-            console.error("Background image load failed:", status)
+        function handleImageError(errorMessage) {
+            console.error("Background image load failed:", errorMessage)
             if (!source.toString().startsWith("file://")) {
-                source = "qrc:/res/gura.jpg"
+                source = "qrc:/res/gura.png"
             }
         }
 
@@ -924,6 +924,7 @@ CenteredGridView {
             loadingIndicator.visible = false
             backgroundImage.handleImageError(errorMessage)
         }
+        onBackgroundBusy: loadingIndicator.visible = false
         onSaveCompleted: function(success, message) {
             if (success) {
                 saveNotification.text = qsTr("Image saved to: %1").arg(message)

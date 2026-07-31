@@ -59,11 +59,15 @@ Switch {
 
             property real pressStartX: 0
             property real dragPosition: control.visualPosition
+            property real dragOffset: 0
             property bool dragging: false
 
             onPressed: function(mouse) {
                 pressStartX = mouse.x
                 dragPosition = control.visualPosition
+                var travel = width - handle.width - 6
+                var handleCenter = 3 + handle.width / 2 + dragPosition * travel
+                dragOffset = mouse.x - handleCenter
                 dragging = false
                 control.forceActiveFocus(Qt.MouseFocusReason)
             }
@@ -75,7 +79,9 @@ Switch {
                     dragging = true
                 }
                 if (dragging) {
-                    dragPosition = Math.max(0, Math.min(1, mouse.x / width))
+                    var travel = width - handle.width - 6
+                    dragPosition = Math.max(0, Math.min(1,
+                        (mouse.x - dragOffset - 3 - handle.width / 2) / travel))
                 }
             }
             onReleased: function(mouse) {

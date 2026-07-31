@@ -32,6 +32,7 @@ signals:
     void saveCompleted(bool success, const QString &message);
     void backgroundReady(const QString &filePath);
     void backgroundError(const QString &errorMessage);
+    void backgroundBusy();
 };
 
 #endif // IMAGEUTILS_H

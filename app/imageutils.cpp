@@ -7,12 +7,14 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
-#include <QMetaObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
-#include <QPointer>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTimer>
+
+#include <limits>
+#include <memory>
 
 #ifdef Q_OS_WIN
 #include <wincodec.h>
@@ -36,9 +38,15 @@ void ImageUtils::saveImageToFile(const QString &imageUrl, const QUrl &localPath)
             const QString filePath = localPath.toLocalFile();
             QFile file(filePath);
             if (file.open(QIODevice::WriteOnly)) {
-                file.write(reply->readAll());
+                const QByteArray payload = reply->readAll();
+                const bool written = file.write(payload) == payload.size();
                 file.close();
-                emit saveCompleted(true, filePath);
+                if (written && file.error() == QFileDevice::NoError) {
+                    emit saveCompleted(true, filePath);
+                }
+                else {
+                    emit saveCompleted(false, tr("Unable to write file"));
+                }
             }
             else {
                 emit saveCompleted(false, tr("Unable to write file"));
@@ -56,6 +64,7 @@ void ImageUtils::saveImageToFile(const QString &imageUrl, const QUrl &localPath)
 void ImageUtils::fetchAndSaveRandomBackground(const QString &apiUrl)
 {
     if (m_backgroundFetchInProgress) {
+        emit backgroundBusy();
         return;
     }
 
@@ -83,6 +92,7 @@ void ImageUtils::startBackgroundRequest()
     request.setRawHeader("Referer", m_backgroundApiUrl.toEncoded());
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setTransferTimeout(15000);
 
     QNetworkReply *reply = m_backgroundNetworkManager.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
@@ -100,25 +110,18 @@ void ImageUtils::startBackgroundRequest()
             return;
         }
 
-        const QPointer<ImageUtils> guard(this);
-        QThread *worker = QThread::create([guard, imageData]() {
-            const QString filePath = ImageUtils::decodeAndSaveBackground(imageData);
-            if (!guard) {
+        const auto result = std::make_shared<QString>();
+        QThread *worker = QThread::create([result, imageData]() {
+            *result = ImageUtils::decodeAndSaveBackground(imageData);
+        });
+        connect(worker, &QThread::finished, this, [this, result]() {
+            if (result->isEmpty()) {
+                retryOrFailBackground(tr("Unable to decode background image"));
                 return;
             }
 
-            QMetaObject::invokeMethod(guard.data(), [guard, filePath]() {
-                if (!guard) {
-                    return;
-                }
-                if (filePath.isEmpty()) {
-                    guard->retryOrFailBackground(guard->tr("Unable to decode background image"));
-                    return;
-                }
-
-                guard->m_backgroundFetchInProgress = false;
-                emit guard->backgroundReady(filePath);
-            }, Qt::QueuedConnection);
+            m_backgroundFetchInProgress = false;
+            emit backgroundReady(*result);
         });
         connect(worker, &QThread::finished, worker, &QObject::deleteLater);
         worker->start();
@@ -130,7 +133,9 @@ void ImageUtils::retryOrFailBackground(const QString &errorMessage)
     qWarning() << "fetchAndSaveRandomBackground: attempt" << m_backgroundAttempt
                << "failed:" << errorMessage;
     if (m_backgroundAttempt < 3) {
-        startBackgroundRequest();
+        QTimer::singleShot(500 * m_backgroundAttempt, this, [this]() {
+            startBackgroundRequest();
+        });
         return;
     }
 
@@ -162,8 +167,10 @@ QString ImageUtils::decodeAndSaveBackground(const QByteArray &imageData)
     QStringList filters;
     filters << "background_*.*";
     const QFileInfoList oldFiles = bgDir.entryInfoList(filters, QDir::Files, QDir::Time);
-    for (int i = 1; i < oldFiles.size(); ++i) {
-        QFile::remove(oldFiles[i].absoluteFilePath());
+    for (const QFileInfo &oldFile : oldFiles) {
+        if (oldFile.absoluteFilePath() != filePath) {
+            QFile::remove(oldFile.absoluteFilePath());
+        }
     }
     return filePath;
 }
@@ -211,6 +218,18 @@ QByteArray ImageUtils::convertToJpeg(const QByteArray &imageData)
         UINT height = 0;
         frame->GetSize(&width, &height);
 
+        const qint64 stride = static_cast<qint64>(width) * 4;
+        const qint64 bufferSize = stride * static_cast<qint64>(height);
+        static constexpr qint64 kMaximumDecodedBytes = 512LL * 1024 * 1024;
+        if (width == 0 || height == 0 ||
+                width > static_cast<UINT>((std::numeric_limits<int>::max)()) ||
+                height > static_cast<UINT>((std::numeric_limits<int>::max)()) ||
+                stride > (std::numeric_limits<UINT>::max)() ||
+                bufferSize <= 0 || bufferSize > kMaximumDecodedBytes ||
+                bufferSize > (std::numeric_limits<UINT>::max)()) {
+            goto cleanup;
+        }
+
         IWICFormatConverter *converter = nullptr;
         hr = factory->CreateFormatConverter(&converter);
         if (FAILED(hr)) goto cleanup;
@@ -223,14 +242,16 @@ QByteArray ImageUtils::convertToJpeg(const QByteArray &imageData)
             goto cleanup;
         }
 
-        QByteArray pixels(width * height * 4, 0);
-        hr = converter->CopyPixels(nullptr, width * 4, pixels.size(),
+        QByteArray pixels(static_cast<qsizetype>(bufferSize), 0);
+        hr = converter->CopyPixels(nullptr, static_cast<UINT>(stride),
+                                   static_cast<UINT>(bufferSize),
                                    reinterpret_cast<BYTE *>(pixels.data()));
         converter->Release();
         if (FAILED(hr)) goto cleanup;
 
         QImage wicImage(reinterpret_cast<const uchar *>(pixels.constData()),
-                        width, height, width * 4, QImage::Format_ARGB32);
+                        static_cast<int>(width), static_cast<int>(height),
+                        static_cast<qsizetype>(stride), QImage::Format_ARGB32);
         QBuffer buffer(&result);
         buffer.open(QIODevice::WriteOnly);
         wicImage.save(&buffer, "JPEG", 90);
