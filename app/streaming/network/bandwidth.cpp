@@ -102,7 +102,16 @@ void BandwidthCalculator::updateBandwidth()
     // 从系统获取实际网络使用情况
     if (SystemNetworkStats::getNetworkUsage(currentBytes, sentBytes))
     {
-        m_bytesReceived = currentBytes;
+        // 确保获取到的值有效
+        if (currentBytes >= 0 && sentBytes >= 0)
+        {
+            m_bytesReceived = currentBytes;
+        }
+        else
+        {
+            // 如果获取到的值无效，使用手动计算的值
+            currentBytes = m_bytesReceived.load();
+        }
     }
     else
     {
@@ -114,10 +123,15 @@ void BandwidthCalculator::updateBandwidth()
 
     // 计算带宽（bits per second）
     qint64 elapsedMs = m_elapsedTimer.restart();
-    if (elapsedMs > 0)
+    if (elapsedMs > 0 && bytesTransferred >= 0)
     {
         // 转换为Kbps (bits per second / 1000)
         m_currentBandwidthKbps = static_cast<int>((bytesTransferred * 8.0 * 1000) / elapsedMs / 1000);
+    }
+    else if (elapsedMs > 0)
+    {
+        // 如果字节传输为负值，重置为0
+        m_currentBandwidthKbps = 0;
     }
 
     m_lastBytesReceived = currentBytes;
@@ -205,16 +219,37 @@ bool SystemNetworkStats::getLinuxNetworkUsage(qint64 &bytesReceived, qint64 &byt
         {
             // 每个网络接口行格式：Interface: rx_bytes ... tx_bytes ...
             QString interface = parts[0].remove(":");
-            if (interface != "lo")
-            { // 忽略本地回环接口
-                bytesReceived += parts[1].toLongLong();
-                bytesSent += parts[9].toLongLong();
+            
+            // 忽略本地回环接口和虚拟接口
+            if (interface != "lo" && 
+                !interface.startsWith("docker") &&
+                !interface.startsWith("veth") &&
+                !interface.startsWith("br-") &&
+                !interface.startsWith("virbr") &&
+                !interface.startsWith("tun") &&
+                !interface.startsWith("tap") &&
+                !interface.startsWith("vmnet") &&
+                !interface.startsWith("vboxnet") &&
+                !interface.startsWith("wlan") &&  // 排除无线接口，专注于有线连接
+                !interface.startsWith("wl"))
+            {
+                bool ok1, ok2;
+                qint64 rxBytes = parts[1].toLongLong(&ok1);
+                qint64 txBytes = parts[9].toLongLong(&ok2);
+                
+                // 只统计有实际流量的接口，并且确保数值有效
+                if (ok1 && ok2 && rxBytes >= 0 && txBytes >= 0 && (rxBytes > 0 || txBytes > 0)) {
+                    bytesReceived += rxBytes;
+                    bytesSent += txBytes;
+                }
             }
         }
     }
 
     file.close();
-    return true;
+    
+    // 确保返回值有效
+    return bytesReceived >= 0 && bytesSent >= 0;
 }
 #elif defined(Q_OS_DARWIN)
 bool SystemNetworkStats::getMacOSNetworkUsage(qint64 &bytesReceived, qint64 &bytesSent)
