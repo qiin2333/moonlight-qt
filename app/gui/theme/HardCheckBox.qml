@@ -35,7 +35,7 @@ CheckBox {
             cursorShape: Qt.PointingHandCursor
 
             onPressed: control.forceActiveFocus(Qt.MouseFocusReason)
-            onClicked: control.toggle()
+            onClicked: control.click()
         }
 
         Behavior on color {
