@@ -32,7 +32,7 @@ GroupBox {
         color: Theme.accent
         font.family: control.titleFont.family
         font.pointSize: control.titleFont.pointSize
-        font.bold: true
+        font.weight: Font.ExtraBold
         font.capitalization: Font.AllUppercase
         font.letterSpacing: Theme.tracking(control.titleFont.pointSize, 0.08)
         elide: Text.ElideRight
