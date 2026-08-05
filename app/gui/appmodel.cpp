@@ -264,7 +264,7 @@ QVariantList AppModel::getConnectionAddresses()
     NvAddress remoteAddress;
     NvAddress manualAddress;
     NvAddress ipv6Address;
-    NvAddress activeAddress;
+    NvAddress pinnedAddress;
 
     {
         QReadLocker lock(&m_Computer->lock);
@@ -272,7 +272,7 @@ QVariantList AppModel::getConnectionAddresses()
         remoteAddress = m_Computer->remoteAddress;
         manualAddress = m_Computer->manualAddress;
         ipv6Address = m_Computer->ipv6Address;
-        activeAddress = m_Computer->activeAddress;
+        pinnedAddress = m_Computer->pinnedAddress;
     }
 
     // Add "Auto (default)" option
@@ -281,7 +281,9 @@ QVariantList AppModel::getConnectionAddresses()
     autoItem["port"] = 0;
     autoItem["display"] = tr("Auto (default)");
     autoItem["type"] = tr("Automatic selection with fallback");
-    autoItem["isActive"] = false;
+    // 没固定地址就是自动模式。这一位是弹窗预选的依据 —— 光看 activeAddress
+    // 分不出「自动选中的」和「用户固定的」。
+    autoItem["isActive"] = pinnedAddress.isNull();
     autoItem["isAuto"] = true;
     addresses.append(autoItem);
 
@@ -291,7 +293,9 @@ QVariantList AppModel::getConnectionAddresses()
         item["port"] = static_cast<int>(address.port());
         item["display"] = address.toString();
         item["type"] = getAddressType(address, localAddress, remoteAddress, manualAddress, ipv6Address);
-        item["isActive"] = address == activeAddress;
+        // 具体条目只在「被固定」时算选中；自动模式下选中的是上面的「自动」项，
+        // 实际生效的地址交给轮询，不在这里标。
+        item["isActive"] = !pinnedAddress.isNull() && address == pinnedAddress;
         item["isAuto"] = false;
         item["isTested"] = m_Computer->hasAddressTestSucceeded(address);
         addresses.append(item);
@@ -333,10 +337,7 @@ bool AppModel::setActiveAddress(QString address, int port)
         return false;
     }
 
-    {
-        QWriteLocker lock(&m_Computer->lock);
-        m_Computer->activeAddress = selectedAddress;
-    }
+    m_Computer->pinAddress(selectedAddress);
 
     return true;
 }
@@ -347,29 +348,7 @@ bool AppModel::resetToAutomaticAddress()
         return false;
     }
 
-    // 「固定某个地址」的全部机制就是把它放进 activeAddress：uniqueAddresses() 会把
-    // activeAddress 排在最前面，轮询取第一个能连上的（见 computermanager.cpp）。
-    // 所以「回到自动」就是让 activeAddress 退回自然顺序里的头一个地址，
-    // 后面的失败回退仍由轮询自己完成。
-    //
-    // 不能直接置空：activeAddress 同时是 NvHTTP 和串流真正使用的地址，置空会留下
-    // 一个到下次轮询为止的窗口期，期间点开始串流会连不上。
-    QWriteLocker lock(&m_Computer->lock);
-    const NvAddress candidates[] = {
-        m_Computer->localAddress,
-        m_Computer->remoteAddress,
-        m_Computer->ipv6Address,
-        m_Computer->manualAddress,
-    };
-    for (const NvAddress& address : candidates) {
-        if (!address.isNull()) {
-            m_Computer->activeAddress = address;
-            return true;
-        }
-    }
-
-    // 一个具体地址都没有（不该发生）。保持现状，别把能用的地址弄丢。
-    return false;
+    return m_Computer->resetToAutomaticAddress();
 }
 
 QVariantMap AppModel::getActiveAddressInfo()

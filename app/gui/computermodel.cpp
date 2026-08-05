@@ -189,7 +189,7 @@ QVariantList ComputerModel::getConnectionAddressesForComputer(int computerIndex)
     NvAddress remoteAddress;
     NvAddress manualAddress;
     NvAddress ipv6Address;
-    NvAddress activeAddress;
+    NvAddress pinnedAddress;
 
     {
         QReadLocker lock(&computer->lock);
@@ -197,8 +197,20 @@ QVariantList ComputerModel::getConnectionAddressesForComputer(int computerIndex)
         remoteAddress = computer->remoteAddress;
         manualAddress = computer->manualAddress;
         ipv6Address = computer->ipv6Address;
-        activeAddress = computer->activeAddress;
+        pinnedAddress = computer->pinnedAddress;
     }
+
+    // 「自动」放第一项，语义和 AppView 那份一致：没固定地址时它就是选中项。
+    // 之前这个列表没有自动项 —— 从这里固定过地址后，同一个入口反而没有解除的
+    // 手段，只能绕去应用列表。
+    QVariantMap autoItem;
+    autoItem["address"] = "";
+    autoItem["port"] = 0;
+    autoItem["display"] = tr("Auto (default)");
+    autoItem["type"] = tr("Automatic selection with fallback");
+    autoItem["isActive"] = pinnedAddress.isNull();
+    autoItem["isAuto"] = true;
+    addresses.append(autoItem);
 
     for (const NvAddress& address : selectableAddresses) {
         QVariantMap item;
@@ -206,7 +218,7 @@ QVariantList ComputerModel::getConnectionAddressesForComputer(int computerIndex)
         item["port"] = static_cast<int>(address.port());
         item["display"] = address.toString();
         item["type"] = getAddressType(address, localAddress, remoteAddress, manualAddress, ipv6Address);
-        item["isActive"] = address == activeAddress;
+        item["isActive"] = !pinnedAddress.isNull() && address == pinnedAddress;
         item["isTested"] = computer->hasAddressTestSucceeded(address);
         addresses.append(item);
     }
@@ -252,9 +264,21 @@ bool ComputerModel::setActiveAddressForComputer(int computerIndex, QString addre
         return false;
     }
 
-    {
-        QWriteLocker lock(&computer->lock);
-        computer->activeAddress = selectedAddress;
+    computer->pinAddress(selectedAddress);
+
+    emit dataChanged(createIndex(computerIndex, 0), createIndex(computerIndex, 0));
+    return true;
+}
+
+bool ComputerModel::resetToAutomaticAddressForComputer(int computerIndex)
+{
+    if (computerIndex < 0 || computerIndex >= m_Computers.count()) {
+        qWarning() << "Invalid computer index for resetToAutomaticAddressForComputer:" << computerIndex;
+        return false;
+    }
+
+    if (!m_Computers[computerIndex]->resetToAutomaticAddress()) {
+        return false;
     }
 
     emit dataChanged(createIndex(computerIndex, 0), createIndex(computerIndex, 0));

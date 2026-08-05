@@ -43,8 +43,6 @@ CenteredGridView {
     property bool hasMultipleAddresses: appModel.hasMultipleConnectionAddresses()
     // 当前活动地址信息
     property var activeAddressInfo: appModel.getActiveAddressInfo()
-    // 是否使用自动选择模式
-    property bool useAutoAddress: true
 
     // 显示器 / VDD 选择按钮。以前是裸 Rectangle + MouseArea，手柄和键盘完全够不到 ——
     // 而这个弹窗是切换 VDD 的唯一入口。换成 AbstractButton 才能进焦点链。
@@ -137,15 +135,13 @@ CenteredGridView {
         var addresses = appModel.getConnectionAddresses()
         ipDialog.addresses = addresses
 
-        // 当前用的是自动就落在「自动」那一项（它固定是第 0 项），
-        // 否则落在真正生效的那个地址上。
+        // 落在当前生效的那一项上。isActive 由 model 判定：没固定地址时是「自动」
+        // 那一项（固定在第 0 项），否则是被固定的那个地址。
         var activeIdx = 0
-        if (!useAutoAddress) {
-            for (var i = 0; i < addresses.length; i++) {
-                if (addresses[i].isActive && !addresses[i].isAuto) {
-                    activeIdx = i
-                    break
-                }
+        for (var i = 0; i < addresses.length; i++) {
+            if (addresses[i].isActive) {
+                activeIdx = i
+                break
             }
         }
         ipDialog.initialIndex = activeIdx
@@ -880,12 +876,8 @@ CenteredGridView {
 
         onAddressSelected: function(address) {
             if (address.isAuto) {
-                // 只把 QML 里的开关拨回来是不够的 —— 之前选具体地址时写进
-                // appModel 的固定值还在，不清掉的话「自动」有名无实。
-                useAutoAddress = true
                 appModel.resetToAutomaticAddress()
             } else {
-                useAutoAddress = false
                 appModel.setActiveAddress(address.address, address.port)
             }
             activeAddressInfo = appModel.getActiveAddressInfo()

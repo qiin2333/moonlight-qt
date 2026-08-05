@@ -113,23 +113,33 @@ CenteredGridView {
     function showAddressSelectionForComputer(computerIndex, computerName, openAppAfterSelection)
     {
         var addresses = computerModel.getConnectionAddressesForComputer(computerIndex)
-        if (addresses.length === 0) {
+
+        // 列表里第一项是「自动」这个伪条目，判断有没有可选地址得数真地址。
+        var realAddressCount = 0
+        for (var i = 0; i < addresses.length; i++) {
+            if (!addresses[i].isAuto) {
+                realAddressCount++
+            }
+        }
+
+        if (realAddressCount === 0) {
             errorDialog.text = qsTr("No connection IP addresses are available for %1.").arg(computerName)
             errorDialog.helpText = ""
             errorDialog.open()
             return
         }
 
-        if (addresses.length === 1) {
+        if (realAddressCount === 1) {
             if (openAppAfterSelection === true) {
                 openAppView(computerIndex, computerName, false)
             }
             return
         }
 
-        // 预选当前生效的那一项
+        // 预选当前生效的那一项。isActive 由 model 判定：没固定地址时是「自动」，
+        // 否则是被固定的那个地址。
         var activeIndex = 0
-        for (var i = 0; i < addresses.length; i++) {
+        for (i = 0; i < addresses.length; i++) {
             if (addresses[i].isActive) {
                 activeIndex = i
                 break
@@ -552,7 +562,10 @@ CenteredGridView {
         property bool openAppAfterSelection: false
 
         onAddressSelected: function(address) {
-            if (!computerModel.setActiveAddressForComputer(pcIndex, address.address, address.port)) {
+            var ok = address.isAuto
+                    ? computerModel.resetToAutomaticAddressForComputer(pcIndex)
+                    : computerModel.setActiveAddressForComputer(pcIndex, address.address, address.port)
+            if (!ok) {
                 errorDialog.text = qsTr("Unable to switch the connection IP for %1.").arg(pcName)
                 errorDialog.helpText = ""
                 errorDialog.open()
