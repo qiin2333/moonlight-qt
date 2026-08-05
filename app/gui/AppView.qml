@@ -93,16 +93,23 @@ CenteredGridView {
             verticalAlignment: Text.AlignVCenter
         }
 
+        // 向下的去向。chips 住在一个横向 Flow 里，焦点链的下一项是同一行的下一颗，
+        // 不是「下面那个控件」—— 纵向只能显式指定。为空表示这个方向没有去处，
+        // 吃掉按键。
+        property Item navDownItem: null
+
         function moveFocus(forward) {
             nextItemInFocusChain(forward).forceActiveFocus(Qt.TabFocusReason)
         }
 
         Keys.onReturnPressed: clicked()
         Keys.onEnterPressed: clicked()
+        // 左右沿焦点链走：Flow 的排列顺序就是焦点链顺序，横向是对得上的
         Keys.onRightPressed: moveFocus(true)
-        Keys.onDownPressed: moveFocus(true)
         Keys.onLeftPressed: moveFocus(false)
-        Keys.onUpPressed: moveFocus(false)
+        Keys.onDownPressed: if (navDownItem) navDownItem.forceActiveFocus(Qt.TabFocusReason)
+        // chips 上方没有可聚焦的东西（只有标题和分隔线），吃掉
+        Keys.onUpPressed: {}
     }
 
     // IP 弹窗按钮行。HardButton 只是块方角按钮，没带方向键处理；这一页不是 UI 导航
@@ -234,6 +241,7 @@ CenteredGridView {
                     DisplayChip {
                         text: model.displayName
                         selected: selectedDisplayId === model.displayGuid
+                        navDownItem: combinationModeCombo.visible ? combinationModeCombo : null
 
                         onClicked: {
                             selectedDisplayId = model.displayGuid
@@ -255,6 +263,7 @@ CenteredGridView {
                     selected: isVddSelected
                     selectedFill: Theme.acid
                     selectedBorder: Theme.acid
+                    navDownItem: combinationModeCombo.visible ? combinationModeCombo : null
 
                     onClicked: {
                         selectedDisplayId = "vdd"
