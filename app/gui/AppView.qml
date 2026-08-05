@@ -132,19 +132,7 @@ CenteredGridView {
 
     // IP选择弹窗
     function openIpDialog() {
-        var addresses = appModel.getConnectionAddresses()
-        ipDialog.addresses = addresses
-
-        // 落在当前生效的那一项上。isActive 由 model 判定：没固定地址时是「自动」
-        // 那一项（固定在第 0 项），否则是被固定的那个地址。
-        var activeIdx = 0
-        for (var i = 0; i < addresses.length; i++) {
-            if (addresses[i].isActive) {
-                activeIdx = i
-                break
-            }
-        }
-        ipDialog.initialIndex = activeIdx
+        ipDialog.addresses = appModel.getConnectionAddresses()
         ipDialog.open()
     }
 

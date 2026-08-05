@@ -21,11 +21,18 @@ NavigableDialog {
     // 列表上方那句提示，调用方自己填（PcView 要带主机名）
     property string promptText: ""
 
-    // 打开时预选第几项。两边算法不同（AppView 还要考虑「当前是自动」），
-    // 由调用方算好传进来。
-    property int initialIndex: 0
-
     signal addressSelected(var address)
+
+    // 打开时预选哪一项：model 已经用 isActive 标好了当前生效的条目
+    // （没固定地址时是「自动」，否则是被固定的那个），调用方不用自己算。
+    readonly property int activeIndex: {
+        for (var i = 0; i < addresses.length; i++) {
+            if (addresses[i].isActive) {
+                return i
+            }
+        }
+        return 0
+    }
 
     readonly property var currentAddress:
         addressCombo.currentIndex >= 0 && addressCombo.currentIndex < addresses.length
@@ -50,7 +57,7 @@ NavigableDialog {
     width: Math.max(320, Math.min(560, parent ? parent.width - 80 : 480))
 
     onOpened: {
-        addressCombo.currentIndex = initialIndex
+        addressCombo.currentIndex = activeIndex
 
         // 地址下拉是内容区唯一一个可聚焦的控件。这两页都不跑 UI 导航模式，手柄发的是
         // 真方向键，不接管上下的话会被 ComboBox 拿去换地址，底下的确定 / 取消永远

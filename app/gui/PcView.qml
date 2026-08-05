@@ -136,21 +136,11 @@ CenteredGridView {
             return
         }
 
-        // 预选当前生效的那一项。isActive 由 model 判定：没固定地址时是「自动」，
-        // 否则是被固定的那个地址。
-        var activeIndex = 0
-        for (i = 0; i < addresses.length; i++) {
-            if (addresses[i].isActive) {
-                activeIndex = i
-                break
-            }
-        }
-
+        // 预选交给 SelectAddressDialog 自己按 isActive 算
         selectAddressDialog.pcIndex = computerIndex
         selectAddressDialog.pcName = computerName
         selectAddressDialog.openAppAfterSelection = openAppAfterSelection === true
         selectAddressDialog.addresses = addresses
-        selectAddressDialog.initialIndex = activeIndex
         selectAddressDialog.promptText = qsTr("Choose the IP address to connect to %1:").arg(computerName)
         selectAddressDialog.open()
     }

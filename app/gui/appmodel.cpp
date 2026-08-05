@@ -253,12 +253,17 @@ void AppModel::setAppDirectLaunch(int appIndex, bool directLaunch)
 
 QVariantList AppModel::getConnectionAddresses()
 {
+    return buildConnectionAddressList(m_Computer);
+}
+
+QVariantList AppModel::buildConnectionAddressList(NvComputer* computer)
+{
     QVariantList addresses;
-    if (!m_Computer) {
+    if (!computer) {
         return addresses;
     }
 
-    QVector<NvAddress> allAddresses = m_Computer->uniqueAddresses();
+    QVector<NvAddress> allAddresses = computer->uniqueAddresses();
 
     NvAddress localAddress;
     NvAddress remoteAddress;
@@ -267,12 +272,12 @@ QVariantList AppModel::getConnectionAddresses()
     NvAddress pinnedAddress;
 
     {
-        QReadLocker lock(&m_Computer->lock);
-        localAddress = m_Computer->localAddress;
-        remoteAddress = m_Computer->remoteAddress;
-        manualAddress = m_Computer->manualAddress;
-        ipv6Address = m_Computer->ipv6Address;
-        pinnedAddress = m_Computer->pinnedAddress;
+        QReadLocker lock(&computer->lock);
+        localAddress = computer->localAddress;
+        remoteAddress = computer->remoteAddress;
+        manualAddress = computer->manualAddress;
+        ipv6Address = computer->ipv6Address;
+        pinnedAddress = computer->pinnedAddress;
     }
 
     // Add "Auto (default)" option
@@ -297,7 +302,7 @@ QVariantList AppModel::getConnectionAddresses()
         // 实际生效的地址交给轮询，不在这里标。
         item["isActive"] = !pinnedAddress.isNull() && address == pinnedAddress;
         item["isAuto"] = false;
-        item["isTested"] = m_Computer->hasAddressTestSucceeded(address);
+        item["isTested"] = computer->hasAddressTestSucceeded(address);
         addresses.append(item);
     }
 
