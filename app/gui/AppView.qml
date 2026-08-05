@@ -46,6 +46,71 @@ CenteredGridView {
     // 是否使用自动选择模式
     property bool useAutoAddress: true
 
+    // 显示器 / VDD 选择按钮。以前是裸 Rectangle + MouseArea，手柄和键盘完全够不到 ——
+    // 而这个弹窗是切换 VDD 的唯一入口。换成 AbstractButton 才能进焦点链。
+    //
+    // 这一页的手柄导航是「普通模式」（uiNavMode 为假，方向键原样发过来，没有 Tab），
+    // 所以四个方向都得自己接：左右在同一排里走，上下进出下面的组合模式下拉。
+    component DisplayChip: AbstractButton {
+        id: chip
+
+        property bool selected: false
+        property color selectedFill: Theme.accent
+        property color selectedBorder: Theme.accentStrong
+
+        implicitWidth: chipLabel.implicitWidth + Theme.spaceXl
+        implicitHeight: 32
+
+        activeFocusOnTab: true
+        hoverEnabled: true
+
+        HoverHandler {
+            cursorShape: Qt.PointingHandCursor
+        }
+
+        background: Rectangle {
+            radius: 0
+            color: chip.selected ? chip.selectedFill
+                                 : (chip.hovered ? Theme.surface : Theme.surface2)
+            // 焦点描边压过选中描边：选中与否已经靠填充色表达了，描边留给「焦点在哪」。
+            border.color: chip.visualFocus ? Theme.text
+                        : (chip.selected ? chip.selectedBorder : Theme.lineStrong)
+            border.width: chip.visualFocus ? 2 : 1
+
+            Behavior on color {
+                ColorAnimation { duration: Theme.durFast }
+            }
+        }
+
+        contentItem: Text {
+            id: chipLabel
+            text: chip.text
+            color: chip.selected ? Theme.ink : Theme.textDim
+            font.family: Theme.fontSans
+            font.pointSize: Theme.fontBody
+            font.bold: chip.selected
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        Keys.onReturnPressed: clicked()
+        Keys.onEnterPressed: clicked()
+        Keys.onRightPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
+        Keys.onLeftPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
+        Keys.onDownPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
+        Keys.onUpPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
+    }
+
+    // IP 弹窗按钮行。HardButton 只是块方角按钮，没带方向键处理；这一页不是 UI 导航
+    // 模式，手柄拿到的是原始方向键，所以左右和向上都得自己接。
+    component IpDialogButton: HardButton {
+        Keys.onReturnPressed: clicked()
+        Keys.onEnterPressed: clicked()
+        Keys.onLeftPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
+        Keys.onRightPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
+        Keys.onUpPressed: ipCombo.forceActiveFocus(Qt.TabFocusReason)
+    }
+
     // 加载显示器列表
     function loadDisplays() {
         var displays = appModel.getDisplayList()
@@ -100,6 +165,35 @@ CenteredGridView {
             accentBarWidth: Theme.accentBar
         }
 
+        // focus: true 只是把焦点给弹窗本体，手柄用户还得盲按一下才有高亮。
+        // 开的时候直接落到当前选中的显示器上。
+        onOpened: focusInitialItem()
+
+        // 关掉之后必须把焦点还回去，否则手柄和键盘导航就停在一个已销毁的
+        // 焦点域里，得摸鼠标点一下才恢复 —— 和 NavigableDialog 里那句是同一个原因。
+        onClosed: appGrid.forceActiveFocus()
+
+        function focusInitialItem() {
+            var fallback = null
+            for (var i = 0; i < displayChips.children.length; i++) {
+                var chip = displayChips.children[i]
+                // Repeater 自己也在 children 里，靠 activeFocusOnTab 把它筛掉
+                if (!chip.visible || !chip.enabled || !chip.activeFocusOnTab) {
+                    continue
+                }
+                if (chip.selected) {
+                    chip.forceActiveFocus(Qt.TabFocusReason)
+                    return
+                }
+                if (!fallback) {
+                    fallback = chip
+                }
+            }
+            if (fallback) {
+                fallback.forceActiveFocus(Qt.TabFocusReason)
+            }
+        }
+
         Column {
             anchors.left: parent.left
             anchors.right: parent.right
@@ -129,6 +223,7 @@ CenteredGridView {
             }
 
             Flow {
+                id: displayChips
                 width: parent.width
                 spacing: Theme.spaceSm
 
@@ -136,36 +231,17 @@ CenteredGridView {
                 Repeater {
                     model: ListModel { id: displayListModel }
 
-                    Rectangle {
-                        readonly property bool selected: selectedDisplayId === model.displayGuid
+                    DisplayChip {
+                        text: model.displayName
+                        selected: selectedDisplayId === model.displayGuid
 
-                        width: displayBtnLabel.implicitWidth + Theme.spaceXl
-                        height: 32
-                        color: selected ? Theme.accent : Theme.surface2
-                        border.color: selected ? Theme.accentStrong : Theme.lineStrong
-                        border.width: 1
-
-                        Text {
-                            id: displayBtnLabel
-                            anchors.centerIn: parent
-                            text: model.displayName
-                            color: parent.selected ? Theme.ink : Theme.textDim
-                            font.family: Theme.fontSans
-                            font.pointSize: Theme.fontBody
-                            font.bold: parent.selected
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                selectedDisplayId = model.displayGuid
-                                var saved = StreamingPreferences.customScreenMode
-                                for (var i = 0; i < physicalModeModel.count; i++) {
-                                    if (physicalModeModel.get(i).val === saved) {
-                                        combinationModeCombo.currentIndex = i
-                                        break
-                                    }
+                        onClicked: {
+                            selectedDisplayId = model.displayGuid
+                            var saved = StreamingPreferences.customScreenMode
+                            for (var i = 0; i < physicalModeModel.count; i++) {
+                                if (physicalModeModel.get(i).val === saved) {
+                                    combinationModeCombo.currentIndex = i
+                                    break
                                 }
                             }
                         }
@@ -173,34 +249,19 @@ CenteredGridView {
                 }
 
                 // VDD 按钮
-                Rectangle {
-                    width: vddBtnLabel.implicitWidth + Theme.spaceXl
-                    height: 32
-                    color: isVddSelected ? Theme.acid : Theme.surface2
-                    border.color: isVddSelected ? Theme.acid : Theme.lineStrong
-                    border.width: 1
+                DisplayChip {
+                    text: qsTr("VDD Display")
+                    selected: isVddSelected
+                    selectedFill: Theme.acid
+                    selectedBorder: Theme.acid
 
-                    Text {
-                        id: vddBtnLabel
-                        anchors.centerIn: parent
-                        text: qsTr("VDD Display")
-                        color: isVddSelected ? Theme.ink : Theme.textDim
-                        font.family: Theme.fontSans
-                        font.pointSize: Theme.fontBody
-                        font.bold: isVddSelected
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            selectedDisplayId = "vdd"
-                            var saved = StreamingPreferences.customVddScreenMode
-                            for (var i = 0; i < vddModeModel.count; i++) {
-                                if (vddModeModel.get(i).val === saved) {
-                                    combinationModeCombo.currentIndex = i
-                                    break
-                                }
+                    onClicked: {
+                        selectedDisplayId = "vdd"
+                        var saved = StreamingPreferences.customVddScreenMode
+                        for (var i = 0; i < vddModeModel.count; i++) {
+                            if (vddModeModel.get(i).val === saved) {
+                                combinationModeCombo.currentIndex = i
+                                break
                             }
                         }
                     }
@@ -229,6 +290,16 @@ CenteredGridView {
                     maximumWidth: parent.width
                     textRole: "text"
                     model: isVddSelected ? vddModeModel : physicalModeModel
+
+                    // ComboBox 自己会吃掉上下键去换选项，不接管的话手柄一旦落到这里
+                    // 就再也回不到上面那排显示器按钮了。展开状态下放行给列表。
+                    Keys.onUpPressed: function(event) {
+                        if (popup.opened) {
+                            event.accepted = false
+                            return
+                        }
+                        nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
+                    }
 
                     Component.onCompleted: {
                         var saved = StreamingPreferences.customScreenMode
@@ -841,6 +912,10 @@ CenteredGridView {
             accentBarWidth: Theme.accentBar
         }
 
+        // 同 displayDialog：开的时候给个明确的初始焦点，关的时候把焦点还给列表。
+        onOpened: ipCombo.forceActiveFocus(Qt.TabFocusReason)
+        onClosed: appGrid.forceActiveFocus()
+
         Column {
             anchors.left: parent.left
             anchors.right: parent.right
@@ -878,6 +953,16 @@ CenteredGridView {
                 maximumWidth: parent.width
                 model: ipDialog.addresses
                 textRole: "display"
+
+                // ComboBox 会吃掉上下键换选项，向下得手动放行到按钮行。
+                // 展开状态下留给列表自己用。
+                Keys.onDownPressed: function(event) {
+                    if (popup.opened) {
+                        event.accepted = false
+                        return
+                    }
+                    ipApplyButton.forceActiveFocus(Qt.TabFocusReason)
+                }
             }
 
             // 地址类型 / 未验证告警：都是机读信息，走等宽
@@ -914,7 +999,8 @@ CenteredGridView {
                 spacing: Theme.spaceMd
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                HardButton {
+                IpDialogButton {
+                    id: ipApplyButton
                     text: qsTr("Apply")
                     onClicked: {
                         if (ipCombo.currentIndex < 0 || ipCombo.currentIndex >= ipDialog.addresses.length) {
@@ -933,7 +1019,7 @@ CenteredGridView {
                     }
                 }
 
-                HardButton {
+                IpDialogButton {
                     text: qsTr("Cancel")
                     onClicked: ipDialog.close()
                 }
