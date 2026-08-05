@@ -880,12 +880,15 @@ CenteredGridView {
 
         onAddressSelected: function(address) {
             if (address.isAuto) {
+                // 只把 QML 里的开关拨回来是不够的 —— 之前选具体地址时写进
+                // appModel 的固定值还在，不清掉的话「自动」有名无实。
                 useAutoAddress = true
+                appModel.resetToAutomaticAddress()
             } else {
                 useAutoAddress = false
                 appModel.setActiveAddress(address.address, address.port)
-                activeAddressInfo = appModel.getActiveAddressInfo()
             }
+            activeAddressInfo = appModel.getActiveAddressInfo()
         }
 
         onClosed: appGrid.forceActiveFocus()

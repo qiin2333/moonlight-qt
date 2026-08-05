@@ -50,6 +50,9 @@ public:
 
     Q_INVOKABLE bool setActiveAddress(QString address, int port);
 
+    // Undo a setActiveAddress() pin and go back to automatic selection.
+    Q_INVOKABLE bool resetToAutomaticAddress();
+
     Q_INVOKABLE QVariantMap getActiveAddressInfo();
 
     // Defensive self-heal: re-read m_Computer->currentGameId and force-emit

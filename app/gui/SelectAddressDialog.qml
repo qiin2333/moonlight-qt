@@ -94,7 +94,10 @@ NavigableDialog {
         Text {
             width: parent.width
             visible: control.currentAddress !== null
-            text: visible ? qsTr("Type: %1").arg(control.currentAddress.type) : ""
+            // 短路判断直接看 currentAddress，别看 visible：两个绑定都依赖
+            // currentAddress，求值先后没有保证，靠 visible 挡的话在
+            // currentAddress 变成 null 的那一拍可能先算 text 就取空指针成员了。
+            text: control.currentAddress ? qsTr("Type: %1").arg(control.currentAddress.type) : ""
             color: Theme.textDim
             font.family: Theme.fontMono
             font.pointSize: Theme.fontBody

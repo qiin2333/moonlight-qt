@@ -341,6 +341,37 @@ bool AppModel::setActiveAddress(QString address, int port)
     return true;
 }
 
+bool AppModel::resetToAutomaticAddress()
+{
+    if (!m_Computer) {
+        return false;
+    }
+
+    // 「固定某个地址」的全部机制就是把它放进 activeAddress：uniqueAddresses() 会把
+    // activeAddress 排在最前面，轮询取第一个能连上的（见 computermanager.cpp）。
+    // 所以「回到自动」就是让 activeAddress 退回自然顺序里的头一个地址，
+    // 后面的失败回退仍由轮询自己完成。
+    //
+    // 不能直接置空：activeAddress 同时是 NvHTTP 和串流真正使用的地址，置空会留下
+    // 一个到下次轮询为止的窗口期，期间点开始串流会连不上。
+    QWriteLocker lock(&m_Computer->lock);
+    const NvAddress candidates[] = {
+        m_Computer->localAddress,
+        m_Computer->remoteAddress,
+        m_Computer->ipv6Address,
+        m_Computer->manualAddress,
+    };
+    for (const NvAddress& address : candidates) {
+        if (!address.isNull()) {
+            m_Computer->activeAddress = address;
+            return true;
+        }
+    }
+
+    // 一个具体地址都没有（不该发生）。保持现状，别把能用的地址弄丢。
+    return false;
+}
+
 QVariantMap AppModel::getActiveAddressInfo()
 {
     QVariantMap info;
