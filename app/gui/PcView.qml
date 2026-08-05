@@ -566,6 +566,12 @@ CenteredGridView {
                 }
             }
             addressCombo.currentIndex = activeIndex
+
+            // 上下键改为导航。不接管的话手柄在这个框里是走不通的：地址下拉是唯一
+            // 一个可聚焦的内容控件，上下会被 ComboBox 拿去换地址（这一页不是 UI
+            // 导航模式，手柄发的是真方向键），底部的确定 / 取消永远到不了。
+            // 按钮由 footer 按 standardButtons 生成，只能在这里取。
+            addressCombo.navDownItem = footer.standardButton(DialogButtonBox.Ok)
             addressCombo.forceActiveFocus()
         }
 
