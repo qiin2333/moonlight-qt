@@ -127,23 +127,21 @@ CenteredGridView {
             return
         }
 
-        var formattedAddresses = []
+        // 预选当前生效的那一项
+        var activeIndex = 0
         for (var i = 0; i < addresses.length; i++) {
-            var address = addresses[i]
-            formattedAddresses.push({
-                "address": address.address,
-                "port": address.port,
-                "displayText": address.display,
-                "type": address.type,
-                "isActive": address.isActive,
-                "isTested": address.isTested
-            })
+            if (addresses[i].isActive) {
+                activeIndex = i
+                break
+            }
         }
 
         selectAddressDialog.pcIndex = computerIndex
         selectAddressDialog.pcName = computerName
         selectAddressDialog.openAppAfterSelection = openAppAfterSelection === true
-        selectAddressDialog.addresses = formattedAddresses
+        selectAddressDialog.addresses = addresses
+        selectAddressDialog.initialIndex = activeIndex
+        selectAddressDialog.promptText = qsTr("Choose the IP address to connect to %1:").arg(computerName)
         selectAddressDialog.open()
     }
 
@@ -546,42 +544,15 @@ CenteredGridView {
         }
     }
 
-    NavigableDialog {
+    // 和 AppView 的地址选择框是同一个组件，只有提示语和落地方式不同
+    SelectAddressDialog {
         id: selectAddressDialog
         property int pcIndex: -1
         property string pcName: ""
         property bool openAppAfterSelection: false
-        property var addresses: []
 
-        title: qsTr("Select Connection IP")
-        standardButtons: DialogButtonBox.Ok | DialogButtonBox.Cancel
-        width: Math.max(320, Math.min(560, pcGrid.width - 40))
-
-        onOpened: {
-            var activeIndex = 0
-            for (var i = 0; i < addresses.length; i++) {
-                if (addresses[i].isActive) {
-                    activeIndex = i
-                    break
-                }
-            }
-            addressCombo.currentIndex = activeIndex
-
-            // 上下键改为导航。不接管的话手柄在这个框里是走不通的：地址下拉是唯一
-            // 一个可聚焦的内容控件，上下会被 ComboBox 拿去换地址（这一页不是 UI
-            // 导航模式，手柄发的是真方向键），底部的确定 / 取消永远到不了。
-            // 按钮由 footer 按 standardButtons 生成，只能在这里取。
-            addressCombo.navDownItem = footer.standardButton(DialogButtonBox.Ok)
-            addressCombo.forceActiveFocus()
-        }
-
-        onAccepted: {
-            if (addressCombo.currentIndex < 0 || addressCombo.currentIndex >= addresses.length) {
-                return
-            }
-
-            var selectedAddress = addresses[addressCombo.currentIndex]
-            if (!computerModel.setActiveAddressForComputer(pcIndex, selectedAddress.address, selectedAddress.port)) {
+        onAddressSelected: function(address) {
+            if (!computerModel.setActiveAddressForComputer(pcIndex, address.address, address.port)) {
                 errorDialog.text = qsTr("Unable to switch the connection IP for %1.").arg(pcName)
                 errorDialog.helpText = ""
                 errorDialog.open()
@@ -598,41 +569,6 @@ CenteredGridView {
             openAppAfterSelection = false
             pcIndex = -1
             pcName = ""
-        }
-
-        ColumnLayout {
-            width: parent.width
-            spacing: 8
-
-            Text {
-                text: qsTr("Choose the IP address to connect to %1:").arg(selectAddressDialog.pcName)
-                color: Theme.text
-                font.family: Theme.fontSans
-                font.pointSize: Theme.fontRowTitle
-                font.weight: Font.DemiBold
-                wrapMode: Text.Wrap
-                Layout.fillWidth: true
-            }
-
-            AutoResizingComboBox {
-                id: addressCombo
-                model: selectAddressDialog.addresses
-                textRole: "displayText"
-                maximumWidth: parent.width
-                popup.width: width
-                Layout.fillWidth: true
-            }
-
-            Label {
-                visible: addressCombo.currentIndex >= 0 &&
-                         addressCombo.currentIndex < selectAddressDialog.addresses.length
-                text: visible ? qsTr("Address type: %1").arg(selectAddressDialog.addresses[addressCombo.currentIndex].type) : ""
-                color: Theme.textDim
-                font.family: Theme.fontMono
-                font.pointSize: Theme.fontBody
-                wrapMode: Text.Wrap
-                Layout.fillWidth: true
-            }
         }
     }
 

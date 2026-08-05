@@ -112,20 +112,6 @@ CenteredGridView {
         Keys.onUpPressed: {}
     }
 
-    // IP 弹窗按钮行。HardButton 只是块方角按钮，没带方向键处理；这一页不是 UI 导航
-    // 模式，手柄拿到的是原始方向键，所以左右和向上都得自己接。
-    component IpDialogButton: HardButton {
-        function moveFocus(forward) {
-            nextItemInFocusChain(forward).forceActiveFocus(Qt.TabFocusReason)
-        }
-
-        Keys.onReturnPressed: clicked()
-        Keys.onEnterPressed: clicked()
-        Keys.onLeftPressed: moveFocus(false)
-        Keys.onRightPressed: moveFocus(true)
-        Keys.onUpPressed: ipCombo.forceActiveFocus(Qt.TabFocusReason)
-    }
-
     // 加载显示器列表
     function loadDisplays() {
         var displays = appModel.getDisplayList()
@@ -150,11 +136,11 @@ CenteredGridView {
     function openIpDialog() {
         var addresses = appModel.getConnectionAddresses()
         ipDialog.addresses = addresses
-        // Find current active index
+
+        // 当前用的是自动就落在「自动」那一项（它固定是第 0 项），
+        // 否则落在真正生效的那个地址上。
         var activeIdx = 0
-        if (useAutoAddress) {
-            activeIdx = 0 // "Auto (default)" is always index 0
-        } else {
+        if (!useAutoAddress) {
             for (var i = 0; i < addresses.length; i++) {
                 if (addresses[i].isActive && !addresses[i].isAuto) {
                     activeIdx = i
@@ -162,30 +148,31 @@ CenteredGridView {
                 }
             }
         }
-        ipCombo.currentIndex = activeIdx
+        ipDialog.initialIndex = activeIdx
         ipDialog.open()
     }
 
-    Popup {
+    // 走 NavigableDialog 而不是裸 Popup：方角 Panel、ink 遮罩、宽字距大写标题、
+    // 关闭时归还焦点，这些在那个壳里已经实现过一遍了。
+    NavigableDialog {
         id: displayDialog
-        modal: true
-        focus: true
+
+        title: qsTr("Display Settings")
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        anchors.centerIn: parent
+
+        // 宽度显式给，别让内容撑：下面的 Column 按 availableWidth 排版，
+        // 两边互相依赖就成环了。
         width: Math.min(500, appGrid.width - 40)
-        padding: Theme.spaceXl
 
-        background: Panel {
-            fill: Theme.surfaceLayer
-            accentBarWidth: Theme.accentBar
-        }
+        // 这个框没有确定 / 取消：选中即生效，靠 B / Esc / 点外面关掉。
+        // NavigableDialog 的 footer 在没有 standardButtons 时不显示。
 
-        // focus: true 只是把焦点给弹窗本体，手柄用户还得盲按一下才有高亮。
+        // 光把焦点给弹窗本体不够，手柄用户还得盲按一下才有高亮。
         // 开的时候直接落到当前选中的显示器上。
         onOpened: focusInitialItem()
 
-        // 关掉之后必须把焦点还回去，否则手柄和键盘导航就停在一个已销毁的
-        // 焦点域里，得摸鼠标点一下才恢复 —— 和 NavigableDialog 里那句是同一个原因。
+        // 基类的 onClosed 会把焦点还给 stackView，这里再收紧到应用网格本身。
+        // QML 的信号处理器是累加的，基类那份仍然会执行。
         onClosed: appGrid.forceActiveFocus()
 
         function focusInitialItem() {
@@ -202,27 +189,10 @@ CenteredGridView {
         }
 
         Column {
-            anchors.left: parent.left
-            anchors.right: parent.right
+            width: displayDialog.availableWidth
             spacing: Theme.spaceLg
 
-            // 标题
-            Text {
-                text: qsTr("Display Settings")
-                color: Theme.text
-                font.family: Theme.fontSans
-                font.pointSize: Theme.fontCardTitle
-                font.weight: Font.ExtraBold
-                font.capitalization: Font.AllUppercase
-                font.letterSpacing: Theme.tracking(Theme.fontCardTitle, 0.08)
-            }
-
-            // 分隔线
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
+            // 标题和它下面那条分隔线现在由 NavigableDialog 的 header 提供
 
             // 显示器选择区
             MicroLabel {
@@ -901,140 +871,24 @@ CenteredGridView {
         }
     }
 
-    Popup {
+    // 连接 IP 选择框。和 PcView 用的是同一个组件（那边是对某台主机切地址，
+    // 这边是在应用列表里切当前主机的地址），差别只有提示语和「自动」这一项。
+    SelectAddressDialog {
         id: ipDialog
-        property var addresses: []
 
-        modal: true
-        focus: true
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        anchors.centerIn: parent
-        width: Math.min(500, appGrid.width - 40)
-        padding: Theme.spaceXl
+        promptText: qsTr("Select the IP address to connect to this PC:")
 
-        background: Panel {
-            fill: Theme.surfaceLayer
-            accentBarWidth: Theme.accentBar
+        onAddressSelected: function(address) {
+            if (address.isAuto) {
+                useAutoAddress = true
+            } else {
+                useAutoAddress = false
+                appModel.setActiveAddress(address.address, address.port)
+                activeAddressInfo = appModel.getActiveAddressInfo()
+            }
         }
 
-        // 同 displayDialog：开的时候给个明确的初始焦点，关的时候把焦点还给列表。
-        onOpened: ipCombo.forceActiveFocus(Qt.TabFocusReason)
         onClosed: appGrid.forceActiveFocus()
-
-        Column {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            spacing: Theme.spaceLg
-
-            Text {
-                text: qsTr("Connection IP Settings")
-                color: Theme.text
-                font.family: Theme.fontSans
-                font.pointSize: Theme.fontCardTitle
-                font.weight: Font.ExtraBold
-                font.capitalization: Font.AllUppercase
-                font.letterSpacing: Theme.tracking(Theme.fontCardTitle, 0.08)
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
-
-            MicroLabel {
-                width: parent.width
-                text: qsTr("Select the IP address to connect to this PC:")
-                // 这句比一般微标签长，允许折行（MicroLabel 默认是单行省略）
-                elide: Text.ElideNone
-                wrapMode: Text.Wrap
-            }
-
-            // 走 AutoResizingComboBox 而不是裸 ComboBox：方角背景和方角展开面板
-            // 都在那个文件里统一定义，裸 ComboBox 会退回 FluentWinUI3 的圆角面板。
-            AutoResizingComboBox {
-                id: ipCombo
-                width: parent.width
-                maximumWidth: parent.width
-                model: ipDialog.addresses
-                textRole: "display"
-
-                // ComboBox 会吃掉上下键换选项，不接管就既走不到按钮行、又会静默改掉
-                // 选中的地址。这是弹窗里第一个控件，向上绕回按钮行末尾。
-                navUpItem: ipCancelButton
-                navDownItem: ipApplyButton
-            }
-
-            // 地址类型 / 未验证告警：都是机读信息，走等宽
-            Text {
-                visible: ipCombo.currentIndex >= 0 &&
-                         ipCombo.currentIndex < ipDialog.addresses.length
-                text: visible ? qsTr("Type: %1").arg(ipDialog.addresses[ipCombo.currentIndex].type) : ""
-                color: Theme.textDim
-                font.family: Theme.fontMono
-                font.pointSize: Theme.fontBody
-                wrapMode: Text.Wrap
-                width: parent.width
-            }
-
-            Text {
-                visible: ipCombo.currentIndex > 0 &&
-                         ipCombo.currentIndex < ipDialog.addresses.length &&
-                         !ipDialog.addresses[ipCombo.currentIndex].isTested
-                text: qsTr("Warning: This address has not been verified by polling yet.")
-                color: Theme.danger
-                font.family: Theme.fontMono
-                font.pointSize: Theme.fontCaption
-                wrapMode: Text.Wrap
-                width: parent.width
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
-
-            Row {
-                spacing: Theme.spaceMd
-                anchors.horizontalCenter: parent.horizontalCenter
-
-                IpDialogButton {
-                    id: ipApplyButton
-                    text: qsTr("Apply")
-                    onClicked: {
-                        if (ipCombo.currentIndex < 0 || ipCombo.currentIndex >= ipDialog.addresses.length) {
-                            return
-                        }
-
-                        var selected = ipDialog.addresses[ipCombo.currentIndex]
-                        if (selected.isAuto) {
-                            useAutoAddress = true
-                        } else {
-                            useAutoAddress = false
-                            appModel.setActiveAddress(selected.address, selected.port)
-                            activeAddressInfo = appModel.getActiveAddressInfo()
-                        }
-                        ipDialog.close()
-                    }
-                }
-
-                IpDialogButton {
-                    id: ipCancelButton
-                    text: qsTr("Cancel")
-                    onClicked: ipDialog.close()
-                }
-            }
-
-            Text {
-                text: qsTr("\"Auto\" uses the default address selection with automatic fallback. Selecting a specific IP will pin the connection to that address.")
-                color: Theme.textFaint
-                font.family: Theme.fontMono
-                font.pointSize: Theme.fontCaption
-                wrapMode: Text.Wrap
-                width: parent.width
-            }
-        }
     }
 
     NavigableMessageDialog {
