@@ -93,21 +93,29 @@ CenteredGridView {
             verticalAlignment: Text.AlignVCenter
         }
 
+        function moveFocus(forward) {
+            nextItemInFocusChain(forward).forceActiveFocus(Qt.TabFocusReason)
+        }
+
         Keys.onReturnPressed: clicked()
         Keys.onEnterPressed: clicked()
-        Keys.onRightPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
-        Keys.onLeftPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
-        Keys.onDownPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
-        Keys.onUpPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
+        Keys.onRightPressed: moveFocus(true)
+        Keys.onDownPressed: moveFocus(true)
+        Keys.onLeftPressed: moveFocus(false)
+        Keys.onUpPressed: moveFocus(false)
     }
 
     // IP 弹窗按钮行。HardButton 只是块方角按钮，没带方向键处理；这一页不是 UI 导航
     // 模式，手柄拿到的是原始方向键，所以左右和向上都得自己接。
     component IpDialogButton: HardButton {
+        function moveFocus(forward) {
+            nextItemInFocusChain(forward).forceActiveFocus(Qt.TabFocusReason)
+        }
+
         Keys.onReturnPressed: clicked()
         Keys.onEnterPressed: clicked()
-        Keys.onLeftPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
-        Keys.onRightPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
+        Keys.onLeftPressed: moveFocus(false)
+        Keys.onRightPressed: moveFocus(true)
         Keys.onUpPressed: ipCombo.forceActiveFocus(Qt.TabFocusReason)
     }
 
@@ -174,24 +182,16 @@ CenteredGridView {
         onClosed: appGrid.forceActiveFocus()
 
         function focusInitialItem() {
-            var fallback = null
             for (var i = 0; i < displayChips.children.length; i++) {
                 var chip = displayChips.children[i]
-                // Repeater 自己也在 children 里，靠 activeFocusOnTab 把它筛掉
-                if (!chip.visible || !chip.enabled || !chip.activeFocusOnTab) {
-                    continue
-                }
+                // Repeater 自己也在 children 里，但它没有 selected，会自动跳过
                 if (chip.selected) {
                     chip.forceActiveFocus(Qt.TabFocusReason)
                     return
                 }
-                if (!fallback) {
-                    fallback = chip
-                }
             }
-            if (fallback) {
-                fallback.forceActiveFocus(Qt.TabFocusReason)
-            }
+            // 没有物理显示器被选中时至少落在 VDD 上：它是静态声明的，一直都在
+            vddChip.forceActiveFocus(Qt.TabFocusReason)
         }
 
         Column {
@@ -250,6 +250,7 @@ CenteredGridView {
 
                 // VDD 按钮
                 DisplayChip {
+                    id: vddChip
                     text: qsTr("VDD Display")
                     selected: isVddSelected
                     selectedFill: Theme.acid
@@ -291,25 +292,10 @@ CenteredGridView {
                     textRole: "text"
                     model: isVddSelected ? vddModeModel : physicalModeModel
 
-                    // ComboBox 自己会吃掉上下键去换选项，不接管的话手柄一旦落到这里
-                    // 就再也回不到上面那排显示器按钮了，而且会静默改掉组合模式。
-                    // 展开状态下放行给列表。这是弹窗里最后一个控件，向下绕回第一颗
-                    // 显示器按钮，不留死键。
-                    Keys.onUpPressed: function(event) {
-                        if (popup.opened) {
-                            event.accepted = false
-                            return
-                        }
-                        nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
-                    }
-
-                    Keys.onDownPressed: function(event) {
-                        if (popup.opened) {
-                            event.accepted = false
-                            return
-                        }
-                        displayDialog.focusInitialItem()
-                    }
+                    // 收起状态下上下键改为导航：不然手柄落到这里就出不去了，
+                    // 而且一路把组合模式静默改掉。向上回到显示器按钮行的末尾；
+                    // 这是弹窗里最后一个控件，向下没有去处，吃掉即可。
+                    navUpItem: vddChip
 
                     Component.onCompleted: {
                         var saved = StreamingPreferences.customScreenMode
@@ -965,23 +951,9 @@ CenteredGridView {
                 textRole: "display"
 
                 // ComboBox 会吃掉上下键换选项，不接管就既走不到按钮行、又会静默改掉
-                // 选中的地址。展开状态下留给列表自己用。
-                Keys.onDownPressed: function(event) {
-                    if (popup.opened) {
-                        event.accepted = false
-                        return
-                    }
-                    ipApplyButton.forceActiveFocus(Qt.TabFocusReason)
-                }
-
-                // 这是弹窗里第一个控件，向上绕回按钮行的末尾（取消）
-                Keys.onUpPressed: function(event) {
-                    if (popup.opened) {
-                        event.accepted = false
-                        return
-                    }
-                    ipCancelButton.forceActiveFocus(Qt.TabFocusReason)
-                }
+                // 选中的地址。这是弹窗里第一个控件，向上绕回按钮行末尾。
+                navUpItem: ipCancelButton
+                navDownItem: ipApplyButton
             }
 
             // 地址类型 / 未验证告警：都是机读信息，走等宽

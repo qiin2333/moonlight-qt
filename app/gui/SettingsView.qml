@@ -60,28 +60,22 @@ FocusScope {
     // 焦点在内容区时，B / Esc 先退回分类栏；已经在分类栏了才放行给 main.qml
     // 去弹出整个设置页。之前不分级，手柄用户在内容区随手一个 B 就整页退出了。
     Keys.onEscapePressed: function(event) {
-        if (!rail.railFocused) {
+        event.accepted = !rail.railFocused
+        if (event.accepted) {
             rail.focusCurrent()
-            event.accepted = true
-        }
-        else {
-            event.accepted = false
         }
     }
 
     // 把焦点交给内容区的第一个可聚焦控件。
     //
-    // 不直接引用 basicPage.firstControl：那个只对基本设置页有效，其余六组还在
-    // LegacySettingsPage 里。分类栏在声明顺序上排在内容区前面，所以从它最后一项
-    // 往后走一格 Tab 就是内容区的第一个控件 —— 焦点链本身会跳过不可见的分类。
+    // 不直接引用某个页面的首个控件：那只对基本设置页有效，其余六组还在
+    // LegacySettingsPage 里，而且随分类切换。scrollArea 在声明顺序上排在分类栏
+    // 之后，往后走一格 Tab 就是它内部第一个可聚焦控件 —— 焦点链本身会跳过
+    // 不可见的分类。
     function focusContent() {
-        var last = rail.lastItem()
-        if (!last) {
-            return
-        }
-        var next = last.nextItemInFocusChain(true)
-        if (next) {
-            next.forceActiveFocus(Qt.TabFocusReason)
+        var first = scrollArea.nextItemInFocusChain(true)
+        if (first) {
+            first.forceActiveFocus(Qt.TabFocusReason)
         }
     }
 

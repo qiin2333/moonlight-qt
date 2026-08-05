@@ -56,26 +56,19 @@ Item {
         list.currentIndex = index
         list.positionViewAtIndex(index, ListView.Contain)
 
+        if (!focusIndex(index)) {
+            // 刚进页面时代理还没排版出来，下一帧再试一次
+            Qt.callLater(focusIndex, index)
+        }
+    }
+
+    // 聚焦第 index 项，返回是否成功（代理可能还没实例化）
+    function focusIndex(index) {
         var item = list.itemAtIndex(index)
         if (item) {
             item.forceActiveFocus(Qt.TabFocusReason)
         }
-        else {
-            // 刚进页面时代理可能还没排版出来，下一帧再试一次
-            Qt.callLater(focusIndexLater, index)
-        }
-    }
-
-    function focusIndexLater(index) {
-        var item = list.itemAtIndex(index)
-        if (item) {
-            item.forceActiveFocus(Qt.TabFocusReason)
-        }
-    }
-
-    // 分类栏在 Tab 链里的最后一项。SettingsView 靠它找到内容区的第一个控件。
-    function lastItem() {
-        return list.itemAtIndex(list.count - 1)
+        return !!item
     }
 
     implicitHeight: compact ? 46 : 0
@@ -133,31 +126,10 @@ Item {
 
             // 方向键按实际排布走：竖着的 rail 上下换项、右进内容；
             // 横着的 tab 条左右换项、下进内容。
-            Keys.onUpPressed: {
-                if (rail.compact) {
-                    return
-                }
-                moveFocus(false)
-            }
-            Keys.onDownPressed: {
-                if (rail.compact) {
-                    activate()
-                    return
-                }
-                moveFocus(true)
-            }
-            Keys.onLeftPressed: {
-                if (rail.compact) {
-                    moveFocus(false)
-                }
-            }
-            Keys.onRightPressed: {
-                if (rail.compact) {
-                    moveFocus(true)
-                    return
-                }
-                activate()
-            }
+            Keys.onUpPressed:    if (!rail.compact) moveFocus(false)
+            Keys.onLeftPressed:  if (rail.compact)  moveFocus(false)
+            Keys.onDownPressed:  rail.compact ? activate() : moveFocus(true)
+            Keys.onRightPressed: rail.compact ? moveFocus(true) : activate()
 
             // 方角 + 当前项左侧一条 accent 粗条（横向 tab 条时改成底部一条）。
             // 原来靠一圈描边表示当前项，方角化之后描边和卡片边框太像，粗条读起来更明确。
