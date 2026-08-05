@@ -292,13 +292,23 @@ CenteredGridView {
                     model: isVddSelected ? vddModeModel : physicalModeModel
 
                     // ComboBox 自己会吃掉上下键去换选项，不接管的话手柄一旦落到这里
-                    // 就再也回不到上面那排显示器按钮了。展开状态下放行给列表。
+                    // 就再也回不到上面那排显示器按钮了，而且会静默改掉组合模式。
+                    // 展开状态下放行给列表。这是弹窗里最后一个控件，向下绕回第一颗
+                    // 显示器按钮，不留死键。
                     Keys.onUpPressed: function(event) {
                         if (popup.opened) {
                             event.accepted = false
                             return
                         }
                         nextItemInFocusChain(false).forceActiveFocus(Qt.TabFocusReason)
+                    }
+
+                    Keys.onDownPressed: function(event) {
+                        if (popup.opened) {
+                            event.accepted = false
+                            return
+                        }
+                        displayDialog.focusInitialItem()
                     }
 
                     Component.onCompleted: {
@@ -954,14 +964,23 @@ CenteredGridView {
                 model: ipDialog.addresses
                 textRole: "display"
 
-                // ComboBox 会吃掉上下键换选项，向下得手动放行到按钮行。
-                // 展开状态下留给列表自己用。
+                // ComboBox 会吃掉上下键换选项，不接管就既走不到按钮行、又会静默改掉
+                // 选中的地址。展开状态下留给列表自己用。
                 Keys.onDownPressed: function(event) {
                     if (popup.opened) {
                         event.accepted = false
                         return
                     }
                     ipApplyButton.forceActiveFocus(Qt.TabFocusReason)
+                }
+
+                // 这是弹窗里第一个控件，向上绕回按钮行的末尾（取消）
+                Keys.onUpPressed: function(event) {
+                    if (popup.opened) {
+                        event.accepted = false
+                        return
+                    }
+                    ipCancelButton.forceActiveFocus(Qt.TabFocusReason)
                 }
             }
 
@@ -1020,6 +1039,7 @@ CenteredGridView {
                 }
 
                 IpDialogButton {
+                    id: ipCancelButton
                     text: qsTr("Cancel")
                     onClicked: ipDialog.close()
                 }

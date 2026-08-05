@@ -56,26 +56,21 @@ ComboBox {
     // so we can adjust the combo box width here too
     onActivated: recalculateWidth()
 
-    // 左右键在列表内部换选项，到首尾就把事件放开，交给上层做焦点移动。
-    // QML 的按键处理器默认 accepted = true，而 decrementCurrentIndex() 在第一项上
-    // 是空操作 —— 事件被吃掉又什么都没发生，手柄/键盘用户到了首尾就再也用左右键
-    // 离不开这个下拉了。
+    // 左右键不再直接换选项。
+    //
+    // 以前左右就是「改值」，于是手柄用户在设置页里横着扫一下就把分辨率、编解码器
+    // 这类关键项静默改掉了（issue #144 的另一半）。现在下拉统一走「A 打开列表 →
+    // 上下选 → A 确认 / B 取消」：改值必须是一次明确的操作。
+    // 键盘用户不受影响，ComboBox 自带的上下键换值还在。
+    //
+    // 展开状态下左右在纵向列表里没有意义，吃掉；收起状态下放行给上层做焦点移动
+    // （QML 的按键处理器默认 accepted = true，不显式放行就成了死键）。
     Keys.onLeftPressed: function(event) {
-        if (currentIndex > 0) {
-            decrementCurrentIndex()
-        }
-        else {
-            event.accepted = false
-        }
+        event.accepted = popup.opened
     }
 
     Keys.onRightPressed: function(event) {
-        if (currentIndex < count - 1) {
-            incrementCurrentIndex()
-        }
-        else {
-            event.accepted = false
-        }
+        event.accepted = popup.opened
     }
 
     // 方角化。FluentWinUI3 的圆角来自它自己 __config 里的背景，只能整块替掉。
@@ -174,8 +169,15 @@ ComboBox {
         leftInset: 0
         rightInset: 0
 
+        // 展开期间挂起 UI 导航模式，让上下键回到真正的方向键，在列表里逐项走
+        // （UI 导航模式下上下发的是 Tab / Shift+Tab，驱动不了下拉列表）。
+        // 关闭时必须还原成打开前的值，不能硬置为 true：PcView 和 AppView 里也有
+        // 下拉，那两页本来是普通模式，硬置之后上下就变成 Tab，网格导航直接废掉，
+        // 而且要进一次设置页再退出来才会恢复。
+        property bool savedUiNavMode: false
+
         onAboutToShow: {
-            // 手柄导航切回普通模式，方向键在下拉里选项之间走
+            savedUiNavMode = SdlGamepadKeyNavigation.getUiNavMode()
             SdlGamepadKeyNavigation.setUiNavMode(false)
 
             // 坐标和窗口高度都通过 Overlay 拿。别用 control.Window.height：
@@ -201,7 +203,7 @@ ComboBox {
         }
 
         onAboutToHide: {
-            SdlGamepadKeyNavigation.setUiNavMode(true)
+            SdlGamepadKeyNavigation.setUiNavMode(savedUiNavMode)
         }
 
         // 面板自带硬投影，右下会溢出一点，这是刻意的：投影必须落在页面上才成立

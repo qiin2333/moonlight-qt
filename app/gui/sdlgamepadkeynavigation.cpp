@@ -303,6 +303,11 @@ void SdlGamepadKeyNavigation::setUiNavMode(bool uiNavMode)
     m_UiNavMode = uiNavMode;
 }
 
+bool SdlGamepadKeyNavigation::getUiNavMode()
+{
+    return m_UiNavMode;
+}
+
 int SdlGamepadKeyNavigation::getConnectedGamepads()
 {
     Q_ASSERT(m_Enabled);

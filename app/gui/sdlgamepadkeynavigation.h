@@ -24,6 +24,8 @@ public:
 
     Q_INVOKABLE void setUiNavMode(bool settingsMode);
 
+    Q_INVOKABLE bool getUiNavMode();
+
     Q_INVOKABLE int getConnectedGamepads();
 
 private:
