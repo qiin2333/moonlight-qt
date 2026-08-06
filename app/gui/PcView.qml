@@ -101,16 +101,20 @@ CenteredGridView {
 
     function openAppView(computerIndex, computerName, showHiddenGames)
     {
-        var component = Qt.createComponent("AppView.qml")
-
-        // 组件造不出来时 createObject 返回 null，push(null) 只会往日志里丢一句
+        // 造不出来时 createObject 返回 null，push(null) 只会往日志里丢一句
         // 「nothing to push」就完了 —— 界面上表现为「点了没反应」，非常难查。
-        // 把真实原因摆出来。
-        if (component.status !== Component.Ready) {
-            console.error("Failed to load AppView.qml: " + component.errorString())
+        // status 和 createObject 的返回值都要看：status 只说明文件加载成功了，
+        // 实例化本身还可能失败（属性赋值出错等）。
+        function fail(reason) {
+            console.error("Failed to open AppView.qml: " + reason)
             errorDialog.text = qsTr("Unable to open the app list for %1.").arg(computerName)
-            errorDialog.helpText = component.errorString()
+            errorDialog.helpText = reason
             errorDialog.open()
+        }
+
+        var component = Qt.createComponent("AppView.qml")
+        if (component.status !== Component.Ready) {
+            fail(component.errorString())
             return
         }
 
@@ -118,7 +122,14 @@ CenteredGridView {
         if (showHiddenGames === true) {
             properties.showHiddenGames = true
         }
-        stackView.push(component.createObject(stackView, properties))
+
+        var appView = component.createObject(stackView, properties)
+        if (!appView) {
+            fail(component.errorString())
+            return
+        }
+
+        stackView.push(appView)
     }
 
     function showAddressSelectionForComputer(computerIndex, computerName, openAppAfterSelection)
@@ -344,10 +355,16 @@ CenteredGridView {
             id: pcContextMenuLoader
             asynchronous: true
             onLoaded: {
-                // 造好之前有人点过，把那次点击补上
+                // 造好之前有人点过，把那次点击补上。但要确认这一页还在最前面 ——
+                // 点完立刻返回或进入某台主机的话，菜单会弹在新页面上。
                 if (pcContextMenuLoader.parent.pendingMenuRequest !== 0) {
-                    pcContextMenuLoader.parent.openContextMenu(
-                        pcContextMenuLoader.parent.pendingMenuRequest === 2)
+                    if (pcGrid.StackView.status === StackView.Active) {
+                        pcContextMenuLoader.parent.openContextMenu(
+                            pcContextMenuLoader.parent.pendingMenuRequest === 2)
+                    }
+                    else {
+                        pcContextMenuLoader.parent.pendingMenuRequest = 0
+                    }
                 }
             }
             sourceComponent: NavigableMenu {

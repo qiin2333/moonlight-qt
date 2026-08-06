@@ -1,5 +1,8 @@
-// 不带版本号：HoverHandler 是 QtQuick 2.15 才有的类型，写 2.9 会让整个文件在
-// 运行期加载失败（qmlcachegen 编得过，是运行期的类型解析失败），点 PC 进不来。
+// 不带版本号。原来写的是 2.9，而下面 DisplayChip 用的 HoverHandler 是 QtQuick
+// 2.15（Qt 5.15）才有的类型 —— 运行期类型解析失败，整个文件加载不了，点 PC 进不来
+// （qmlcachegen 不做完整类型解析，所以编译期无感）。
+// 不写具体版本是跟 main.qml 一致：仓库里 35 个文件已经在用无版本号的
+// import QtQuick.Controls，那种写法本身就要求 Qt 5.15+，版本下限早就在那里了。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window 2.2
