@@ -196,6 +196,28 @@ CenteredGridView {
 
         property alias pcContextMenu : pcContextMenuLoader.item
 
+        // 右键菜单是异步 Loader 造的，刚进视野的条目上 item 还是 null。四个调用点
+        // 以前都直接用，读 null 的成员会抛 TypeError，这一次点击就被静默吃掉 ——
+        // 表现正是「点了没反应，再点一次才出来」。这里记下意图，等造好再开。
+        // 0 = 没有待处理，1 = open()，2 = popup()（跟着鼠标位置）
+        property int pendingMenuRequest: 0
+
+        function openContextMenu(atCursor) {
+            if (!pcContextMenuLoader.item) {
+                pendingMenuRequest = atCursor ? 2 : 1
+                return
+            }
+
+            pendingMenuRequest = 0
+            if (atCursor && pcContextMenuLoader.item.popup) {
+                pcContextMenuLoader.item.popup()
+            }
+            else {
+                // Qt 5.9 没有 popup()；键盘触发时也走这条，菜单落在条目上而不是光标处
+                pcContextMenuLoader.item.open()
+            }
+        }
+
         Rectangle {
             id: pcIcon
             anchors.horizontalCenter: parent.horizontalCenter
@@ -310,6 +332,13 @@ CenteredGridView {
         Loader {
             id: pcContextMenuLoader
             asynchronous: true
+            onLoaded: {
+                // 造好之前有人点过，把那次点击补上
+                if (pcContextMenuLoader.parent.pendingMenuRequest !== 0) {
+                    pcContextMenuLoader.parent.openContextMenu(
+                        pcContextMenuLoader.parent.pendingMenuRequest === 2)
+                }
+            }
             sourceComponent: NavigableMenu {
                 id: pcContextMenu
                 initiator: pcContextMenuLoader.parent
@@ -392,19 +421,13 @@ CenteredGridView {
                 }
             } else if (!model.online) {
                 // Using open() here because it may be activated by keyboard
-                pcContextMenu.open()
+                openContextMenu(false)
             }
         }
 
         onPressAndHold: {
             // popup() ensures the menu appears under the mouse cursor
-            if (pcContextMenu.popup) {
-                pcContextMenu.popup()
-            }
-            else {
-                // Qt 5.9 doesn't have popup()
-                pcContextMenu.open()
-            }
+            openContextMenu(true)
         }
 
         MouseArea {
@@ -418,7 +441,7 @@ CenteredGridView {
         Keys.onMenuPressed: {
             // We must use open() here so the menu is positioned on
             // the ItemDelegate and not where the mouse cursor is
-            pcContextMenu.open()
+            openContextMenu(false)
         }
 
         Keys.onDeletePressed: {
