@@ -1,4 +1,6 @@
-import QtQuick 2.9
+// 不带版本号：HoverHandler 是 QtQuick 2.15 才有的类型，写 2.9 会让整个文件在
+// 运行期加载失败（qmlcachegen 编得过，是运行期的类型解析失败），点 PC 进不来。
+import QtQuick
 import QtQuick.Controls
 import QtQuick.Window 2.2
 

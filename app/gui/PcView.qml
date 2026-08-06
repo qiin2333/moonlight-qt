@@ -102,12 +102,23 @@ CenteredGridView {
     function openAppView(computerIndex, computerName, showHiddenGames)
     {
         var component = Qt.createComponent("AppView.qml")
+
+        // 组件造不出来时 createObject 返回 null，push(null) 只会往日志里丢一句
+        // 「nothing to push」就完了 —— 界面上表现为「点了没反应」，非常难查。
+        // 把真实原因摆出来。
+        if (component.status !== Component.Ready) {
+            console.error("Failed to load AppView.qml: " + component.errorString())
+            errorDialog.text = qsTr("Unable to open the app list for %1.").arg(computerName)
+            errorDialog.helpText = component.errorString()
+            errorDialog.open()
+            return
+        }
+
         var properties = {"computerIndex": computerIndex, "objectName": computerName}
         if (showHiddenGames === true) {
             properties.showHiddenGames = true
         }
-        var appView = component.createObject(stackView, properties)
-        stackView.push(appView)
+        stackView.push(component.createObject(stackView, properties))
     }
 
     function showAddressSelectionForComputer(computerIndex, computerName, openAppAfterSelection)
