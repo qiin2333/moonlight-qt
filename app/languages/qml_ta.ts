@@ -543,97 +543,97 @@
 <context>
     <name>DisplaySettingsPage</name>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="23"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
         <source>Display</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="27"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="32"/>
         <source>Display mode</source>
         <translation>காட்சி முறை</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="33"/>
         <source>Fullscreen generally provides the best performance, but borderless windowed may work better with features like macOS Spaces, Alt+Tab, screenshot tools, on-screen overlays, etc.</source>
         <translation>ஃபுல்ச்கிரீன் பொதுவாக சிறந்த செயல்திறனை வழங்குகிறது, ஆனால் எல்லையற்ற சாளரங்கள் மேகோச் இடைவெளிகள், ஆல்ட்+தாவல், திரைக்காட்சி கருவிகள், திரையில் மேலடுக்குகள் போன்ற அம்சங்களுடன் சிறப்பாக செயல்படக்கூடும்.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="41"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
         <source>Fullscreen</source>
         <translation>முழு திரை</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
         <source>Borderless windowed</source>
         <translation>எல்லையற்ற சாளர</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="56"/>
         <source>Windowed</source>
         <translation>சாளரம்</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="59"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="64"/>
         <source>(Recommended)</source>
         <translation>(பரிந்துரைக்கப்படுகிறது)</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="103"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="108"/>
         <source>Stretch presentation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="104"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="109"/>
         <source>Ignores both client and host PC aspect ratios, which is required for displaying Half-SBS (Side-By-Side) 3D signals to AR/XR devices that only support Full-SBS (usually 1920x1080 per eye, meaning a total resolution of 3840x1080)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="111"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="116"/>
         <source>V-Sync</source>
         <translation>வி-ஒத்திசைவு</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="112"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="117"/>
         <source>Disabling V-Sync allows sub-frame rendering latency, but it can display visible tearing</source>
         <translation>V-Sync ஐ முடக்குவது துணை-சட்டரீதியான வழங்குதல் தாமதத்தை அனுமதிக்கிறது, ஆனால் இது புலப்படும் கிழிப்பைக் காட்டலாம்</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="118"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="123"/>
         <source>Frame pacing</source>
         <translation>பிரேம் வேகக்கட்டுப்பாடு</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="119"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="124"/>
         <source>Frame pacing reduces micro-stutter by delaying frames that come in too early</source>
         <translation>பிரேம் வேகக்கட்டுப்பாடு மிக விரைவாக வரும் பிரேம்களை தாமதப்படுத்துவதன் மூலம் மைக்ரோ-ச்டட்டரைக் குறைக்கிறது</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="128"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
         <source>HDR</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="131"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="136"/>
         <source>Enable HDR</source>
         <translation>HDR ஐ இயக்கவும்</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="138"/>
         <source>The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.</source>
         <translation>ச்ட்ரீம் எச்டிஆர்-திறன் கொண்டதாக இருக்கும், ஆனால் சில விளையாட்டுகளுக்கு எச்டிஆர் பயன்முறையை இயக்க உங்கள் புரவலன் கணினியில் எச்டிஆர் மானிட்டர் தேவைப்படலாம்.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="135"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="140"/>
         <source>HDR streaming is not supported on this PC.</source>
         <translation>இந்த கணினியில் எச்டிஆர் ச்ட்ரீமிங் ஆதரிக்கப்படவில்லை.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="143"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="148"/>
         <source>HDR format</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="144"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="149"/>
         <source>HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.</source>
         <translation type="unfinished"></translation>
     </message>

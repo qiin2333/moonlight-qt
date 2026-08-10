@@ -543,97 +543,97 @@
 <context>
     <name>DisplaySettingsPage</name>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="23"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
         <source>Display</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="27"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="32"/>
         <source>Display mode</source>
         <translation>顯示模式</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="33"/>
         <source>Fullscreen generally provides the best performance, but borderless windowed may work better with features like macOS Spaces, Alt+Tab, screenshot tools, on-screen overlays, etc.</source>
         <translation>全螢幕通常能夠提供最佳效能，但無邊框視窗較能支援 macOS Spaces、Alt+Tab、截圖工具、遊戲嵌入介面等功能。</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="41"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
         <source>Fullscreen</source>
         <translation>全螢幕</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
         <source>Borderless windowed</source>
         <translation>無邊框視窗</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="56"/>
         <source>Windowed</source>
         <translation>視窗化</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="59"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="64"/>
         <source>(Recommended)</source>
         <translation>(建議)</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="103"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="108"/>
         <source>Stretch presentation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="104"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="109"/>
         <source>Ignores both client and host PC aspect ratios, which is required for displaying Half-SBS (Side-By-Side) 3D signals to AR/XR devices that only support Full-SBS (usually 1920x1080 per eye, meaning a total resolution of 3840x1080)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="111"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="116"/>
         <source>V-Sync</source>
         <translation>垂直同步</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="112"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="117"/>
         <source>Disabling V-Sync allows sub-frame rendering latency, but it can display visible tearing</source>
         <translation>停用垂直同步可允許子畫面轉譯延遲，但會造成顯示畫面撕裂</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="118"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="123"/>
         <source>Frame pacing</source>
         <translation>影格調步</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="119"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="124"/>
         <source>Frame pacing reduces micro-stutter by delaying frames that come in too early</source>
         <translation>影格調步能夠延後顯示過早傳入的影格來減小延遲</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="128"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
         <source>HDR</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="131"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="136"/>
         <source>Enable HDR</source>
         <translation>啟用 HDR</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="138"/>
         <source>The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.</source>
         <translation>串流將支援 HDR，但一些遊戲可能需要你主機電腦上的 HDR 監視器以啟用 HDR 模式。</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="135"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="140"/>
         <source>HDR streaming is not supported on this PC.</source>
         <translation>此電腦不支援 HDR 串流。</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="143"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="148"/>
         <source>HDR format</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="144"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="149"/>
         <source>HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1477,7 +1477,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="178"/>
         <source>Minimize</source>
-        <translation type="unfinished">最小化</translation>
+        <translation>最小化</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
@@ -2172,7 +2172,7 @@
     <message>
         <location filename="../gui/SelectAddressDialog.qml" line="51"/>
         <source>Select Connection IP</source>
-        <translation type="unfinished">選擇連線 IP</translation>
+        <translation>選擇連線 IP</translation>
     </message>
     <message>
         <location filename="../gui/SelectAddressDialog.qml" line="107"/>

@@ -543,97 +543,97 @@
 <context>
     <name>DisplaySettingsPage</name>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="23"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
         <source>Display</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="27"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="32"/>
         <source>Display mode</source>
         <translation>Chế độ hiển thị</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="33"/>
         <source>Fullscreen generally provides the best performance, but borderless windowed may work better with features like macOS Spaces, Alt+Tab, screenshot tools, on-screen overlays, etc.</source>
         <translation>Toàn màn hình nói chung là cung cấp hiệu năng tốt nhất, nhưng cửa sổ không viền có thể sẽ hoạt động tốt hơn với các tính năng như macOS Spaces, Alt+Tab, các công cụ chụp màn hình, các lớp phủ trên màn hình, v.v.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="41"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
         <source>Fullscreen</source>
         <translation>Toàn màn hình</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
         <source>Borderless windowed</source>
         <translation>Cửa sổ không viền</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="56"/>
         <source>Windowed</source>
         <translation>Cửa sổ</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="59"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="64"/>
         <source>(Recommended)</source>
         <translation>(Được khuyến nghị)</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="103"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="108"/>
         <source>Stretch presentation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="104"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="109"/>
         <source>Ignores both client and host PC aspect ratios, which is required for displaying Half-SBS (Side-By-Side) 3D signals to AR/XR devices that only support Full-SBS (usually 1920x1080 per eye, meaning a total resolution of 3840x1080)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="111"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="116"/>
         <source>V-Sync</source>
         <translation>V-Sync</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="112"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="117"/>
         <source>Disabling V-Sync allows sub-frame rendering latency, but it can display visible tearing</source>
         <translation>Việc tắt V-Sync cho phép độ trễ kết xuất khung hình con, nhưng nó có thể hiển thị sự biến dạng hình ảnh có thể nhìn thấy được</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="118"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="123"/>
         <source>Frame pacing</source>
         <translation>Nhịp độ khung hình</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="119"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="124"/>
         <source>Frame pacing reduces micro-stutter by delaying frames that come in too early</source>
         <translation>Nhịp độ khung hình làm giảm sự khựng nhỏ bằng cách trì hoãn các khung hình đi đến quá sớm</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="128"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
         <source>HDR</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="131"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="136"/>
         <source>Enable HDR</source>
         <translation>Bật HDR</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="138"/>
         <source>The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.</source>
         <translation>Stream sẽ có khả năng là HDR, nhưng một số trò chơi có thể yêu cầu màn hình HDR trên PC chủ để bật chế độ HDR.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="135"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="140"/>
         <source>HDR streaming is not supported on this PC.</source>
         <translation>Việc stream HDR không được hỗ trợ trên PC này.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="143"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="148"/>
         <source>HDR format</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="144"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="149"/>
         <source>HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.</source>
         <translation type="unfinished"></translation>
     </message>

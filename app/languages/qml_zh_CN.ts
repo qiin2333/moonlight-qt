@@ -543,97 +543,97 @@
 <context>
     <name>DisplaySettingsPage</name>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="23"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
         <source>Display</source>
         <translation>显示</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="27"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="32"/>
         <source>Display mode</source>
         <translation>显示模式</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="33"/>
         <source>Fullscreen generally provides the best performance, but borderless windowed may work better with features like macOS Spaces, Alt+Tab, screenshot tools, on-screen overlays, etc.</source>
         <translation>全屏通常提供最好的性能，但是无边框窗口可以更好地与 macOS Spaces、Alt+Tab、屏幕截图工具、屏幕覆盖等功能配合使用。</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="41"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
         <source>Fullscreen</source>
         <translation>全屏</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
         <source>Borderless windowed</source>
         <translation>无边框窗口</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="56"/>
         <source>Windowed</source>
         <translation>窗口化</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="59"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="64"/>
         <source>(Recommended)</source>
         <translation>(推荐)</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="103"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="108"/>
         <source>Stretch presentation</source>
         <translation>拉伸画面</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="104"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="109"/>
         <source>Ignores both client and host PC aspect ratios, which is required for displaying Half-SBS (Side-By-Side) 3D signals to AR/XR devices that only support Full-SBS (usually 1920x1080 per eye, meaning a total resolution of 3840x1080)</source>
         <translation>忽略客户端和主机电脑的纵横比，用于在只支持 Full-SBS 的 AR/XR 设备上显示 Half-SBS（左右并排）3D 信号（通常为每只眼 1920×1080，总分辨率 3840×1080）。</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="111"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="116"/>
         <source>V-Sync</source>
         <translation>垂直同步</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="112"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="117"/>
         <source>Disabling V-Sync allows sub-frame rendering latency, but it can display visible tearing</source>
         <translation>禁用垂直同步可允许子帧渲染延迟，但会显示可见的撕裂</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="118"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="123"/>
         <source>Frame pacing</source>
         <translation>帧速调节</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="119"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="124"/>
         <source>Frame pacing reduces micro-stutter by delaying frames that come in too early</source>
         <translation>通过延迟过早进入的帧来减少卡顿</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="128"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
         <source>HDR</source>
         <translation>HDR</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="131"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="136"/>
         <source>Enable HDR</source>
         <translation>启用HDR</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="138"/>
         <source>The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.</source>
         <translation>HDR功能将在串流中可用，但一些游戏可能需要PC端接入HDR显示器以启用HDR模式。</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="135"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="140"/>
         <source>HDR streaming is not supported on this PC.</source>
         <translation>此PC不支持HDR。</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="143"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="148"/>
         <source>HDR format</source>
         <translation>HDR 格式</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="144"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="149"/>
         <source>HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.</source>
         <translation>HDR10（PQ）是标准的 HDR 格式。当主机未启用 HDR 时，HLG 与 SDR 显示器的兼容性更好。</translation>
     </message>

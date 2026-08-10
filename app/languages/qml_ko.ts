@@ -543,97 +543,97 @@
 <context>
     <name>DisplaySettingsPage</name>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="23"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
         <source>Display</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="27"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="32"/>
         <source>Display mode</source>
         <translation>디스플레이 모드</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="28"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="33"/>
         <source>Fullscreen generally provides the best performance, but borderless windowed may work better with features like macOS Spaces, Alt+Tab, screenshot tools, on-screen overlays, etc.</source>
         <translation>전체 화면은 일반적으로 최상의 성능을 제공하지만 테두리 없는 창은 macOS Spaces, Alt+Tab, 스크린샷 도구, 화면 오버레이 등과 같은 기능에서 더 잘 작동합니다.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="41"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
         <source>Fullscreen</source>
         <translation>전체 화면</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="46"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
         <source>Borderless windowed</source>
         <translation>테두리 없는 창</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="51"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="56"/>
         <source>Windowed</source>
         <translation>창</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="59"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="64"/>
         <source>(Recommended)</source>
         <translation>(권장)</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="103"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="108"/>
         <source>Stretch presentation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="104"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="109"/>
         <source>Ignores both client and host PC aspect ratios, which is required for displaying Half-SBS (Side-By-Side) 3D signals to AR/XR devices that only support Full-SBS (usually 1920x1080 per eye, meaning a total resolution of 3840x1080)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="111"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="116"/>
         <source>V-Sync</source>
         <translation>수직동기화</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="112"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="117"/>
         <source>Disabling V-Sync allows sub-frame rendering latency, but it can display visible tearing</source>
         <translation>수직동기화를 비활성화하면 서브프레임 렌더링 지연이 허용되지만 화면 찢김이 발생할 수 있습니다</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="118"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="123"/>
         <source>Frame pacing</source>
         <translation>프레임 조율</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="119"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="124"/>
         <source>Frame pacing reduces micro-stutter by delaying frames that come in too early</source>
         <translation>프레임 조율은 너무 일찍 들어오는 프레임을 지연시켜 미세한 끊김 현상을 줄입니다</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="128"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
         <source>HDR</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="131"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="136"/>
         <source>Enable HDR</source>
         <translation>HDR 활성화</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="133"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="138"/>
         <source>The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.</source>
         <translation>이 스트림은 HDR을 지원하지만 일부 게임에서는 HDR 모드를 활성화하기 위해 호스트 PC에 HDR 모니터가 필요할 수 있습니다.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="135"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="140"/>
         <source>HDR streaming is not supported on this PC.</source>
         <translation>이 PC에서는 HDR 스트리밍이 지원되지 않습니다.</translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="143"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="148"/>
         <source>HDR format</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/DisplaySettingsPage.qml" line="144"/>
+        <location filename="../gui/settings/DisplaySettingsPage.qml" line="149"/>
         <source>HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.</source>
         <translation type="unfinished"></translation>
     </message>

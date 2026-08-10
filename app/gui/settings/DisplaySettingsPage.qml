@@ -16,6 +16,11 @@ import SystemProperties 1.0
 Column {
     id: displayPage
 
+    // 换界面语言时要重建窗口模式下拉的文案。信号由 SettingsView 转发过来 ——
+    // 原来这段在基本设置页里，直接连的是 basicPage.languageChanged；搬过来之后那个 id
+    // 不在本文件作用域里，Component.onCompleted 一执行就是 ReferenceError。
+    signal languageChanged()
+
     width: parent ? parent.width : 0
     spacing: Theme.spaceLg
 
@@ -90,7 +95,7 @@ Column {
 
                 Component.onCompleted: {
                     reinitialize()
-                    basicPage.languageChanged.connect(reinitialize)
+                    displayPage.languageChanged.connect(reinitialize)
                 }
 
                 onActivated: {

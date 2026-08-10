@@ -230,5 +230,6 @@ FocusScope {
 
         // 语言切换需要重建若干下拉的模型
         settingsPage.languageChanged.connect(basicPage.languageChanged)
+        settingsPage.languageChanged.connect(displayPage.languageChanged)
     }
 }
