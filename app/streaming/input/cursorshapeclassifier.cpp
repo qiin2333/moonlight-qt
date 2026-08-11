@@ -43,7 +43,7 @@ CursorShapeMetrics measureCursorShape(int width,
         return metrics;
     }
 
-    if (bgra.size() != static_cast<qsizetype>(width) * height * 4) {
+    if (bgra.size() != static_cast<qint64>(width) * height * 4) {
         return metrics;
     }
 
@@ -55,8 +55,7 @@ CursorShapeMetrics measureCursorShape(int width,
     int bottom = -1;
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            const qsizetype alphaIndex =
-                (static_cast<qsizetype>(y) * width + x) * 4 + 3;
+            const int alphaIndex = (y * width + x) * 4 + 3;
             if (pixels[alphaIndex] <= OpaqueAlphaThreshold) {
                 continue;
             }
@@ -79,8 +78,7 @@ CursorShapeMetrics measureCursorShape(int width,
     int opaqueCount = 0;
     for (int y = 0; y < boxHeight; y++) {
         for (int x = 0; x < boxWidth; x++) {
-            const qsizetype alphaIndex =
-                (static_cast<qsizetype>(y + top) * width + (x + left)) * 4 + 3;
+            const int alphaIndex = ((y + top) * width + (x + left)) * 4 + 3;
             if (pixels[alphaIndex] > OpaqueAlphaThreshold) {
                 box[y * boxWidth + x] = 1;
                 opaqueCount++;

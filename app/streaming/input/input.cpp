@@ -662,8 +662,8 @@ void SdlInputHandler::updateRemoteCursor(const RemoteCursorUpdate& update)
     updateRemoteCursorVisibility(update.visible);
 
     if (update.hasShape) {
-        const qsizetype expectedSize =
-            static_cast<qsizetype>(update.width) * update.height * 4;
+        const qint64 expectedSize =
+            static_cast<qint64>(update.width) * update.height * 4;
         if (update.width == 0 || update.height == 0 ||
             update.hotspotX < 0 || update.hotspotX >= update.width ||
             update.hotspotY < 0 || update.hotspotY >= update.height ||

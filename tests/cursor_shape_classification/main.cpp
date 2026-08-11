@@ -14,7 +14,7 @@ public:
     Canvas(int width, int height)
         : m_width(width),
           m_height(height),
-          m_data(static_cast<qsizetype>(width) * height * 4, '\0')
+          m_data(width * height * 4, '\0')
     {
     }
 
@@ -23,7 +23,7 @@ public:
         if (x < 0 || y < 0 || x >= m_width || y >= m_height) {
             return;
         }
-        const qsizetype index = (static_cast<qsizetype>(y) * m_width + x) * 4;
+        const int index = (y * m_width + x) * 4;
         m_data[index + 0] = static_cast<char>(0xFF); // B
         m_data[index + 1] = static_cast<char>(0xFF); // G
         m_data[index + 2] = static_cast<char>(0xFF); // R
@@ -134,8 +134,7 @@ Canvas makeSizeWE(int s)
     const uchar* pixels = reinterpret_cast<const uchar*>(source.data().constData());
     for (int y = 0; y < source.height(); y++) {
         for (int x = 0; x < source.width(); x++) {
-            const qsizetype index =
-                (static_cast<qsizetype>(y) * source.width() + x) * 4 + 3;
+            const int index = (y * source.width() + x) * 4 + 3;
             if (pixels[index] != 0) {
                 canvas.plot(y, x);
             }
