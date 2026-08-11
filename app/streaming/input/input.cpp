@@ -431,10 +431,16 @@ void SdlInputHandler::applyCapturedCursorState()
     SDL_ShowCursor(getCapturedCursorVisibilityState());
 }
 
-Uint32 SdlInputHandler::remoteCursorHideTimerCallback(Uint32, void*)
+Uint32 SdlInputHandler::remoteCursorHideTimerCallback(Uint32 interval, void*)
 {
     // 定时器跑在 SDL 的定时器线程上，macOS 要求光标接口只在主线程调，绕回主循环去做
-    Session::queueCursorVisibilityFlush();
+    if (!Session::queueCursorVisibilityFlush()) {
+        // 事件队列满了。这里必须重试而不是就此收工：定时器一停，
+        // m_RemoteCursorHideTimer 就永远卡在一个已过期的 ID 上，
+        // updateRemoteCursorVisibility() 之后每次隐藏请求都会被那道
+        // "已经在等了" 的短路挡掉，直到主机下次说要显示才解开。
+        return interval;
+    }
     return 0;
 }
 
