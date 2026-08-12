@@ -170,22 +170,30 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
 
     const Obu& frameHeader = obus[frameHeaderIdx];
     const Obu& tileGroup = obus[tileGroupIdx];
-    if (frameHeader.payloadLength == 0) {
-        return length;
-    }
 
-    // An OBU_FRAME_HEADER payload ends with trailing_bits(): a one bit followed by
-    // zeroes out to the byte boundary. Inside an OBU_FRAME the frame header is
-    // followed by byte_alignment() instead, which is zeroes only. So the stop bit -
-    // the lowest set bit of the final byte - has to go.
-    uint8_t lastByte = data[frameHeader.payloadOffset + frameHeader.payloadLength - 1];
-    if (lastByte == 0) {
-        // Malformed: trailing_bits() always writes a stop bit into this byte.
+    // An OBU_FRAME_HEADER payload ends with trailing_bits(obu_size * 8 - payloadBits):
+    // a one bit, then zeroes all the way to the end of obu_size. An encoder that
+    // over-declares obu_size therefore leaves whole zero bytes at the end, which is
+    // legal.
+    //
+    // Inside an OBU_FRAME the frame header is followed by byte_alignment() instead,
+    // and that only pads to the next byte boundary - it can never span a whole byte.
+    // So two things have to happen here: the stop bit (the lowest set bit of the last
+    // non-zero byte) goes away, and any whole zero bytes after it get dropped.
+    // Keeping them would shift them into tile_group_obu()'s payload and corrupt the
+    // frame.
+    int frameHeaderLength = frameHeader.payloadLength;
+    while (frameHeaderLength > 0 && data[frameHeader.payloadOffset + frameHeaderLength - 1] == 0) {
+        frameHeaderLength--;
+    }
+    if (frameHeaderLength == 0) {
+        // Malformed: trailing_bits() always writes a stop bit somewhere.
         return length;
     }
+    uint8_t lastByte = data[frameHeader.payloadOffset + frameHeaderLength - 1];
     lastByte &= lastByte - 1;
 
-    uint64_t mergedPayloadLength = (uint64_t)frameHeader.payloadLength + tileGroup.payloadLength;
+    uint64_t mergedPayloadLength = (uint64_t)frameHeaderLength + tileGroup.payloadLength;
     int mergedHeaderLength = (frameHeader.headerLength - leb128Size(frameHeader.payloadLength)) +
                              leb128Size(mergedPayloadLength);
 
@@ -201,11 +209,11 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
     // move clobbers bytes a later move still needs to read.
     int mergedHeaderOffset = preambleLength + metadataLength;
     int frameHeaderDest = mergedHeaderOffset + mergedHeaderLength;
-    int tileGroupDest = frameHeaderDest + frameHeader.payloadLength;
+    int tileGroupDest = frameHeaderDest + frameHeaderLength;
 
     memmove(data + tileGroupDest, data + tileGroup.payloadOffset, tileGroup.payloadLength);
-    memmove(data + frameHeaderDest, data + frameHeader.payloadOffset, frameHeader.payloadLength);
-    data[frameHeaderDest + frameHeader.payloadLength - 1] = lastByte;
+    memmove(data + frameHeaderDest, data + frameHeader.payloadOffset, frameHeaderLength);
+    data[frameHeaderDest + frameHeaderLength - 1] = lastByte;
 
     // Reuse the frame header's OBU header so temporal_id/spatial_id survive, but
     // retype it to OBU_FRAME.

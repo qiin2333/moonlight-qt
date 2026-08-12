@@ -13,8 +13,9 @@ NVENC 在 **AV1 HDR** 路径下会把一帧拆成 `OBU_FRAME_HEADER(3)` + `OBU_T
 修法：**在送进 VideoToolbox 之前，把这两个 OBU 合并回单个 `OBU_FRAME`**。纯字节搬运，
 不需要解析熵编码内容，唯一的位级操作是清掉一个停止位。本文附完整可直接使用的 C 实现。
 
-这跟 HDR10+ 没关系 —— 是 AV1 HDR 通杀。只要你的客户端支持 AV1 且用 VideoToolbox 解码，
-连 NVENC 主机开 HDR 就会中招。
+这跟 HDR10+ 没关系。触发条件是**编码器选了拆开的 OBU 打包**，目前已知 NVENC 在 AV1 HDR
+路径下会这么发（AMF 不会，NVENC 的 AV1 SDR 也不会）。只要你的客户端支持 AV1 且用
+VideoToolbox 解码，连 NVENC 主机开 HDR 就会中招；换个别的编码器如果也这么打包，同样会中。
 
 ---
 
@@ -22,7 +23,7 @@ NVENC 在 **AV1 HDR** 路径下会把一帧拆成 `OBU_FRAME_HEADER(3)` + `OBU_T
 
 macOS 上表现为（iOS 上的日志文本会不同，但错误码一样）：
 
-```
+```text
 vt decoder cb: output image buffer is null: -12911
 HW accel end frame fail.
 avcodec_send_packet() failed
@@ -89,16 +90,26 @@ VideoToolbox 显然只实现了 `OBU_FRAME` 这条路。
 
 **1. `trailing_bits()` 必须处理**（唯一的位级操作，漏掉会解出花屏或直接失败）
 
-`OBU_FRAME_HEADER` 的载荷末尾是 `trailing_bits()`：一个 `1` 停止位 + 补零到字节边界。
-而在 `OBU_FRAME` 内部，`frame_header_obu()` 后面跟的是 `byte_alignment()` —— **纯补零，没有停止位**。
-所以合并时要**清掉 frame header 载荷最后一个字节的最低置位位**：
+`OBU_FRAME_HEADER` 的载荷末尾是 `trailing_bits(obu_size * 8 - payloadBits)`：一个 `1` 停止位，
+然后**一路补零到 `obu_size` 声明的末尾**。注意 `nbBits` 是按 `obu_size` 算的，所以编码器如果把
+`obu_size` 报大了，补零可以跨越整字节 —— **载荷最后一个字节合法地是 `0x00`**。
+
+而在 `OBU_FRAME` 内部，`frame_header_obu()` 后面跟的是 `byte_alignment()`：
 
 ```c
-lastByte &= lastByte - 1;   // 清掉最低的那个 1
+byte_alignment() {
+    while ( get_position( ) & 7 )
+        zero_bit
+}
 ```
 
-例：`0x88` → `0x80`。若最后一个字节是 `0x00`，说明码流非法（`trailing_bits()` 必然写入停止位），
-放弃重写。
+它**只补到下一个字节边界，永远跨不过一整个字节**。所以合并时要做两件事：
+
+1. 清掉停止位 —— 即**最后一个非零字节**的最低置位位（`lastByte &= lastByte - 1`，例 `0x88` → `0x80`）；
+2. **丢掉它后面所有的整零字节**。留着的话，它们会被挪进 `tile_group_obu()` 的载荷里，把帧解坏。
+
+只做第 1 件事、把零字节留下是**错的**，这是个很容易踩的坑。若整个载荷全是零，说明码流非法
+（`trailing_bits()` 必然在某处写入停止位），放弃重写。
 
 **2. 输出恒不变长，可以就地覆写**
 
@@ -121,7 +132,7 @@ metadata 是唯一需要临时暂存的部分 —— 它要往前挪，而 frame
 - 多个 tile group（多 tile 分片传输）
 - 多帧 TU
 - 任何 OBU 的 `obu_has_size_field == 0`（长度不可解，动不得）
-- frame header 载荷为空或末字节为 `0x00`
+- frame header 载荷全是 `0x00`（码流非法，找不到停止位）
 
 这样这段代码对所有非 NVENC-AV1-HDR 的场景都是零影响的空操作，爆炸半径最小。
 
@@ -342,22 +353,30 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
 
     Obu frameHeader = obus[frameHeaderIdx];
     Obu tileGroup = obus[tileGroupIdx];
-    if (frameHeader.payloadLength == 0) {
-        return length;
-    }
 
-    // An OBU_FRAME_HEADER payload ends with trailing_bits(): a one bit followed by
-    // zeroes out to the byte boundary. Inside an OBU_FRAME the frame header is
-    // followed by byte_alignment() instead, which is zeroes only. So the stop bit -
-    // the lowest set bit of the final byte - has to go.
-    uint8_t lastByte = data[frameHeader.payloadOffset + frameHeader.payloadLength - 1];
-    if (lastByte == 0) {
-        // Malformed: trailing_bits() always writes a stop bit into this byte.
+    // An OBU_FRAME_HEADER payload ends with trailing_bits(obu_size * 8 - payloadBits):
+    // a one bit, then zeroes all the way to the end of obu_size. An encoder that
+    // over-declares obu_size therefore leaves whole zero bytes at the end, which is
+    // legal.
+    //
+    // Inside an OBU_FRAME the frame header is followed by byte_alignment() instead,
+    // and that only pads to the next byte boundary - it can never span a whole byte.
+    // So two things have to happen here: the stop bit (the lowest set bit of the last
+    // non-zero byte) goes away, and any whole zero bytes after it get dropped.
+    // Keeping them would shift them into tile_group_obu()'s payload and corrupt the
+    // frame.
+    int frameHeaderLength = frameHeader.payloadLength;
+    while (frameHeaderLength > 0 && data[frameHeader.payloadOffset + frameHeaderLength - 1] == 0) {
+        frameHeaderLength--;
+    }
+    if (frameHeaderLength == 0) {
+        // Malformed: trailing_bits() always writes a stop bit somewhere.
         return length;
     }
+    uint8_t lastByte = data[frameHeader.payloadOffset + frameHeaderLength - 1];
     lastByte &= lastByte - 1;
 
-    uint64_t mergedPayloadLength = (uint64_t)frameHeader.payloadLength + tileGroup.payloadLength;
+    uint64_t mergedPayloadLength = (uint64_t)frameHeaderLength + tileGroup.payloadLength;
     int mergedHeaderLength = (frameHeader.headerLength - leb128Size(frameHeader.payloadLength)) +
                              leb128Size(mergedPayloadLength);
 
@@ -373,11 +392,11 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
     // move clobbers bytes a later move still needs to read.
     int mergedHeaderOffset = preambleLength + metadataLength;
     int frameHeaderDest = mergedHeaderOffset + mergedHeaderLength;
-    int tileGroupDest = frameHeaderDest + frameHeader.payloadLength;
+    int tileGroupDest = frameHeaderDest + frameHeaderLength;
 
     memmove(data + tileGroupDest, data + tileGroup.payloadOffset, tileGroup.payloadLength);
-    memmove(data + frameHeaderDest, data + frameHeader.payloadOffset, frameHeader.payloadLength);
-    data[frameHeaderDest + frameHeader.payloadLength - 1] = lastByte;
+    memmove(data + frameHeaderDest, data + frameHeader.payloadOffset, frameHeaderLength);
+    data[frameHeaderDest + frameHeaderLength - 1] = lastByte;
 
     // Reuse the frame header's OBU header so temporal_id/spatial_id survive, but
     // retype it to OBU_FRAME.
@@ -455,7 +474,8 @@ iOS 上解码器只有 VideoToolbox 一条路，所以判 AV1 就够了。
 | AMF 布局 `2,5,6` | 原样返回，字节全等 |
 | 两个 tile group | 原样返回，字节全等 |
 | 只有 tile group、没有 frame header | 原样返回，字节全等 |
-| frame header 末字节 `0x00` | 原样返回，字节全等 |
+| frame header 尾部有整零字节填充 | 零字节被截掉，输出与「没有填充」的同一帧**逐字节相同** |
+| frame header 载荷全为 `0x00` | 原样返回，字节全等 |
 | 合并后长度跨 leb128 边界（如 203） | 长度字段写成 `cb 01`，总长 208→206 |
 | `obu_extension_flag` 置位 | 合并头 `0x36`，ext 字节原样保留，长度正确 |
 
@@ -473,7 +493,7 @@ iOS 上解码器只有 VideoToolbox 一条路，所以判 AV1 就够了。
 
 moonlight-qt 上的实测结果（4K120、AV1 10-bit HDR、NVENC）：
 
-```
+```text
 Video stream is 3840x2160x120 (format 0x2000)
 Using AV1 OBU repack for VideoToolbox
 [av1] Total OBUs on this packet: 3.   OBU idx:0 type:2 / idx:1 type:1 / idx:2 type:6
