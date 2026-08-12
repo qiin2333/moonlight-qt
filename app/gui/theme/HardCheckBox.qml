@@ -9,6 +9,9 @@ CheckBox {
 
     font.family: Theme.fontSans
 
+    // 关掉 FluentWinUI3 那圈白色圆角双环，焦点改用下面的方角 FocusRing。
+    readonly property Item __focusFrameTarget: null
+
     indicator: Rectangle {
         implicitWidth: 18
         implicitHeight: 18
@@ -20,8 +23,14 @@ CheckBox {
         border.width: 1
         border.color: !control.enabled ? Theme.line
                     : control.checked ? Theme.accent
-                    : (control.hovered || control.visualFocus ? Theme.accent : Theme.lineStrong)
+                    : (control.hovered ? Theme.accent : Theme.lineStrong)
         opacity: control.enabled ? 1.0 : 0.45
+
+        // 勾选态本身就是 accent 填充 + accent 描边，这圈边框腾不出来表达焦点，
+        // 所以焦点走外挂环。只有键盘/手柄带来的焦点才画，鼠标点一下不该冒出个框。
+        FocusRing {
+            visible: control.visualFocus
+        }
 
         // Own clicks on the painted box. FluentWinUI3 can ignore a stationary
         // release on a replaced indicator, which makes a normal click appear
