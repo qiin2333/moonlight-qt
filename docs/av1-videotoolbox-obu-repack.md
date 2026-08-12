@@ -122,6 +122,8 @@ byte_alignment() {
 
 metadata 是唯一需要临时暂存的部分 —— 它要往前挪，而 frame header 的载荷要往后挪，
 两者会交叉。栈上 512 字节足够（HDR10+ T.35 / mastering display / MaxCLL 都远小于 100 字节）。
+这 512 字节算的是**所有待前移 metadata OBU 的头 + 载荷之和**：合计 **≤ 512 接受，≥ 513
+在任何拷贝发生之前就原样返回**，所以 `memcpy` 到栈缓冲永远不会越界。
 
 **3. 保守匹配，不认识就别动**
 
@@ -133,8 +135,12 @@ metadata 是唯一需要临时暂存的部分 —— 它要往前挪，而 frame
 - 多帧 TU
 - 任何 OBU 的 `obu_has_size_field == 0`（长度不可解，动不得）
 - frame header 载荷全是 `0x00`（码流非法，找不到停止位）
+- 待前移的 metadata 合计超过 512 字节
 
-这样这段代码对所有非 NVENC-AV1-HDR 的场景都是零影响的空操作，爆炸半径最小。
+反过来说，命中重写的条件只跟**布局**有关，跟是哪个编码器无关：任何编码器只要发出
+「frame header + metadata + tile group」这种拆开的形式，都会被合并。上面列出的情况
+则一律一个字节都不碰。所以对已经发 `OBU_FRAME` 的码流（AMF、NVENC 的 SDR 路径）
+以及所有非 AV1 / 非 VideoToolbox 的路径，这段代码是零影响的空操作。
 
 ### 完整实现（纯 C，可直接拖进 Xcode 工程）
 
@@ -476,6 +482,8 @@ iOS 上解码器只有 VideoToolbox 一条路，所以判 AV1 就够了。
 | 只有 tile group、没有 frame header | 原样返回，字节全等 |
 | frame header 尾部有整零字节填充 | 零字节被截掉，输出与「没有填充」的同一帧**逐字节相同** |
 | frame header 载荷全为 `0x00` | 原样返回，字节全等 |
+| metadata 合计 512 字节 | 正常重写（边界内） |
+| metadata 合计 513 字节 | 原样返回，字节全等（拷贝前就退出） |
 | 合并后长度跨 leb128 边界（如 203） | 长度字段写成 `cb 01`，总长 208→206 |
 | `obu_extension_flag` 置位 | 合并头 `0x36`，ext 字节原样保留，长度正确 |
 
@@ -491,7 +499,10 @@ iOS 上解码器只有 VideoToolbox 一条路，所以判 AV1 就够了。
    HDR10+ AV1 Metadata Handling Specification「metadata 须先于 frame header」的要求，
    AV1 的动态元数据理应也能被取出来用上。
 
-moonlight-qt 上的实测结果（4K120、AV1 10-bit HDR、NVENC）：
+moonlight-qt 上的实测结果（4K120、AV1 10-bit HDR、NVENC）。
+**注意：这份日志抓自 `fd6821b8`，也就是后来那个「截掉尾部整零填充」的修正（`66b7ef2e`）之前。**
+两者只在「编码器把 `obu_size` 报大、留下整字节补零」时输出才有差别，那次抓到的流里
+是否存在这种补零并没有单独确认，所以**当前 commit 的实机复测还没做**：
 
 ```text
 Video stream is 3840x2160x120 (format 0x2000)
