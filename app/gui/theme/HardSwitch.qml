@@ -12,6 +12,18 @@ Switch {
     padding: 0
     spacing: 0
 
+    function commitPointerToggle() {
+        if (!control.enabled) {
+            return
+        }
+
+        var previousChecked = control.checked
+        control.toggle()
+        if (control.checked !== previousChecked) {
+            control.toggled()
+        }
+    }
+
     indicator: Rectangle {
         id: track
         implicitWidth: 44
@@ -52,10 +64,10 @@ Switch {
         // FluentWinUI3 Switch regression where a stationary release is ignored,
         // while retaining both tap-to-toggle and drag-to-select behavior.
         //
-        // 提交状态一律走 click()，不能用 toggle()：toggle() 只是 setChecked(!checked)，
-        // 发的仅有 checkedChanged，不发 toggled()。而 ToggleRow 正是靠 toggled() 把值
-        // 写回偏好设置的（checked 是绑定，初始化阶段也会变，所以不能用 checkedChanged）。
-        // 用 toggle() 的结果就是：开关看着拨过去了，设置根本没保存。
+        // 这条自管的指针路径必须同时切换状态并发出 toggled()：ToggleRow 靠它把值
+        // 写回偏好设置，而 checkedChanged 在初始化恢复绑定值时也会触发，不能代替。
+        // 不使用 AbstractButton.click()，因为它从 Qt 6.8 才有；Steam Link 和部分
+        // Linux 构建仍使用更早的 Qt。
         MouseArea {
             id: pointerArea
             anchors.fill: parent
@@ -95,10 +107,10 @@ Switch {
                     // 拖回原位松手等于什么都没做。
                     var targetChecked = dragPosition >= 0.5
                     if (targetChecked !== control.checked) {
-                        control.click()
+                        control.commitPointerToggle()
                     }
                 } else {
-                    control.click()
+                    control.commitPointerToggle()
                 }
                 dragging = false
             }
