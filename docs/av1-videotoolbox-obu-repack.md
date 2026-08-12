@@ -499,20 +499,31 @@ iOS 上解码器只有 VideoToolbox 一条路，所以判 AV1 就够了。
    HDR10+ AV1 Metadata Handling Specification「metadata 须先于 frame header」的要求，
    AV1 的动态元数据理应也能被取出来用上。
 
-moonlight-qt 上的实测结果（4K120、AV1 10-bit HDR、NVENC）。
-**注意：这份日志抓自 `fd6821b8`，也就是后来那个「截掉尾部整零填充」的修正（`66b7ef2e`）之前。**
-两者只在「编码器把 `obu_size` 报大、留下整字节补零」时输出才有差别，那次抓到的流里
-是否存在这种补零并没有单独确认，所以**当前 commit 的实机复测还没做**：
+moonlight-qt 上的实测结果（M4、4K120、AV1 10-bit HDR、NVENC 主机）：
 
 ```text
-Video stream is 3840x2160x120 (format 0x2000)
+Video stream is 3840x2160x120 (format 0x2000)   # AV1 MAIN10，请求里 hdrMode=1
 Using AV1 OBU repack for VideoToolbox
+[av1] Format videotoolbox_vld chosen by get_format().
 [av1] Total OBUs on this packet: 3.   OBU idx:0 type:2 / idx:1 type:1 / idx:2 type:6
 Received HDR10+ dynamic metadata from the AV1 bitstream
 ```
 
-`-12911` / `HW accel end frame fail` / `avcodec_send_packet() failed` 各 0 次，
-0.00% 丢包，解码 6.52ms。
+- `-12911` / `output image buffer is null` / `HW accel end frame fail` /
+  `avcodec_send_packet() failed` **各 0 次**。
+- 整场会话里**没有出现过一个 `type:3` 或 `type:4`** —— 拆帧全部被合并掉了。
+- HDR10+ 那行**没有 `(ignored: ...)` 后缀**，说明渲染器真的取用了动态元数据。
+- 55.0 Rx / 55.0 De / 54.1 Rd，丢包 0.00%，解码 4.16ms。
+
+注意这里渲染器是 Vulkan(libplacebo)，但硬解走的仍然是 `videotoolbox_vld`
+（日志里的 `AV1 decode get format: videotoolbox_vld`），所以命中的正是原来黑屏的那条路。
+判断开关时要看的是 **hwaccel 是不是 VideoToolbox**，不是渲染器是什么。
+
+**这份实测能证明什么、不能证明什么：** 它证明了合并逻辑在真实码流上有效、且没有引入回归。
+但日志里只看得到重写**之后**的结果，看不出这台编码器有没有把 `obu_size` 报大、
+在 frame header 尾部留下整字节补零 —— 也就是「截掉尾部整零填充」那条分支
+**是否被实机走到过，无法从日志判定**。那条分支目前由单元测试覆盖
+（有补零和无补零的同一帧输出逐字节相同）。它是纯收紧的改动：没有补零时行为与不做截断完全一致。
 
 ### 回归
 
