@@ -103,13 +103,19 @@ byte_alignment() {
 }
 ```
 
-它**只补到下一个字节边界，永远跨不过一整个字节**。所以合并时要做两件事：
+它**只补到下一个字节边界，永远跨不过一整个字节**。所以合并时要做三件事：
 
 1. 清掉停止位 —— 即**最后一个非零字节**的最低置位位（`lastByte &= lastByte - 1`，例 `0x88` → `0x80`）；
 2. **丢掉它后面所有的整零字节**。留着的话，它们会被挪进 `tile_group_obu()` 的载荷里，把帧解坏。
+3. 如果清完停止位之后这个字节本身变成了 `0x00`（原值是 `0x80`），**把它也整个丢掉**，
+   而不是留一个零字节在那里。
 
-只做第 1 件事、把零字节留下是**错的**，这是个很容易踩的坑。若整个载荷全是零，说明码流非法
-（`trailing_bits()` 必然在某处写入停止位），放弃重写。
+第 3 条特别容易漏：`frame_header_obu()` 正好在字节边界结束时，`trailing_bits()` 补出来的就是
+整个 `0x80` 字节，概率大约 1/8，不是边角情况。而合并后 `byte_alignment()` 在这里一位都不补，
+所以那个字节必须消失。留成 `0x00` 跟第 2 条留着补零字节是**同一个 bug**，一样会解坏帧。
+
+只做第 1 件事是**错的**，这是个很容易踩的坑。若整个载荷全是零（或只有一个停止位），
+说明码流非法，放弃重写。
 
 **2. 输出恒不变长，可以就地覆写**
 
@@ -119,6 +125,11 @@ byte_alignment() {
 因为 `leb128(a+b) <= leb128(a) + leb128(b)`，新开销恒小于旧开销，所以**输出永远不比输入长**，
 不需要额外分配缓冲区。搬运顺序从后往前（先 tile group 再 frame header），
 保证没有一次 `memmove` 会踩到后面还要读的字节。
+
+这里有个坑：算「原 OBU 头去掉长度字段之后还剩几字节」时，必须用**长度字段实际占的字节数**，
+不能拿 `leb128Size(payloadLength)` 反推。AV1 的 leb128 **允许非最短编码**（载荷长度 1
+可以写成 `81 00`），拿规范长度去减会少减一个字节，结果在合并头和载荷之间留下游离字节，
+整个 TU 的 OBU 边界就错位了。所以解析时要把实际读到的字节数存下来。
 
 metadata 是唯一需要临时暂存的部分 —— 它要往前挪，而 frame header 的载荷要往后挪，
 两者会交叉。栈上 512 字节足够（HDR10+ T.35 / mastering display / MaxCLL 都远小于 100 字节）。
@@ -134,8 +145,11 @@ metadata 是唯一需要临时暂存的部分 —— 它要往前挪，而 frame
 - 多个 tile group（多 tile 分片传输）
 - 多帧 TU
 - 任何 OBU 的 `obu_has_size_field == 0`（长度不可解，动不得）
-- frame header 载荷全是 `0x00`（码流非法，找不到停止位）
+- frame header 载荷全是 `0x00`，或者除了停止位什么都没有（码流非法）
 - 待前移的 metadata 合计超过 512 字节
+- frame header 和 tile group 的 `obu_extension_flag` 不一致，或扩展字节
+  （`temporal_id` / `spatial_id`）不同 —— 合并会沿用 frame header 的 OBU 头，
+  两者不一致就等于把 tile group 挪进了别的时域/空域层
 
 反过来说，命中重写的条件只跟**布局**有关，跟是哪个编码器无关：任何编码器只要发出
 「frame header + metadata + tile group」这种拆开的形式，都会被合并。上面列出的情况
@@ -212,6 +226,7 @@ typedef struct {
     int type;
     int headerOffset;   // start of the OBU header
     int headerLength;   // header + leb128 size field
+    int sizeBytes;      // length of the leb128 size field as actually encoded
     int payloadOffset;
     int payloadLength;
 } Obu;
@@ -295,6 +310,7 @@ static int parseObus(const uint8_t* data, int length, Obu* obus)
         obus[count].type = (header >> 3) & 0x0F;
         obus[count].headerOffset = pos;
         obus[count].headerLength = headerLength;
+        obus[count].sizeBytes = sizeBytes;
         obus[count].payloadOffset = pos + headerLength;
         obus[count].payloadLength = (int)size;
         count++;
@@ -360,6 +376,19 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
     Obu frameHeader = obus[frameHeaderIdx];
     Obu tileGroup = obus[tileGroupIdx];
 
+    // The merged OBU_FRAME reuses the frame header's OBU header, so the tile group's
+    // header has to agree with it. If they disagree we'd silently move the tile group
+    // into a different temporal/spatial layer, so leave the whole thing alone.
+    uint8_t fhHeader = data[frameHeader.headerOffset];
+    uint8_t tgHeader = data[tileGroup.headerOffset];
+    if ((fhHeader & 0x04) != (tgHeader & 0x04)) {
+        return length;
+    }
+    if ((fhHeader & 0x04) &&
+        data[frameHeader.headerOffset + 1] != data[tileGroup.headerOffset + 1]) {
+        return length;
+    }
+
     // An OBU_FRAME_HEADER payload ends with trailing_bits(obu_size * 8 - payloadBits):
     // a one bit, then zeroes all the way to the end of obu_size. An encoder that
     // over-declares obu_size therefore leaves whole zero bytes at the end, which is
@@ -381,9 +410,21 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
     }
     uint8_t lastByte = data[frameHeader.payloadOffset + frameHeaderLength - 1];
     lastByte &= lastByte - 1;
+    if (lastByte == 0) {
+        // The byte held nothing but the stop bit (0x80), i.e. frame_header_obu() ended
+        // exactly on a byte boundary. byte_alignment() contributes nothing there, so
+        // this byte has to disappear rather than become a zero - same reason as above.
+        frameHeaderLength--;
+        if (frameHeaderLength == 0) {
+            return length;
+        }
+    }
 
     uint64_t mergedPayloadLength = (uint64_t)frameHeaderLength + tileGroup.payloadLength;
-    int mergedHeaderLength = (frameHeader.headerLength - leb128Size(frameHeader.payloadLength)) +
+    // Recover the OBU header bytes without its size field. Use the size field's actual
+    // encoded width, not leb128Size(): AV1 permits non-minimal leb128, so an encoder may
+    // have written e.g. 81 00 for a payload of 1.
+    int mergedHeaderLength = (frameHeader.headerLength - frameHeader.sizeBytes) +
                              leb128Size(mergedPayloadLength);
 
     int preambleLength = frameHeader.headerOffset;
@@ -402,7 +443,9 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
 
     memmove(data + tileGroupDest, data + tileGroup.payloadOffset, tileGroup.payloadLength);
     memmove(data + frameHeaderDest, data + frameHeader.payloadOffset, frameHeaderLength);
-    data[frameHeaderDest + frameHeaderLength - 1] = lastByte;
+    if (lastByte != 0) {
+        data[frameHeaderDest + frameHeaderLength - 1] = lastByte;
+    }
 
     // Reuse the frame header's OBU header so temporal_id/spatial_id survive, but
     // retype it to OBU_FRAME.
@@ -484,6 +527,9 @@ iOS 上解码器只有 VideoToolbox 一条路，所以判 AV1 就够了。
 | frame header 载荷全为 `0x00` | 原样返回，字节全等 |
 | metadata 合计 512 字节 | 正常重写（边界内） |
 | metadata 合计 513 字节 | 原样返回，字节全等（拷贝前就退出） |
+| frame header 末字节正好是 `0x80` | 该字节被整个丢掉，不是写成 `0x00` |
+| 长度字段用非最短 leb128（如 `81 00`） | 输出与最短编码的同一帧**逐字节相同** |
+| fh / tg 扩展头不一致 | 原样返回，字节全等 |
 | 合并后长度跨 leb128 边界（如 203） | 长度字段写成 `cb 01`，总长 208→206 |
 | `obu_extension_flag` 置位 | 合并头 `0x36`，ext 字节原样保留，长度正确 |
 

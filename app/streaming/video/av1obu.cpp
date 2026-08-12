@@ -23,6 +23,7 @@ struct Obu {
     int type;
     int headerOffset;   // start of the OBU header
     int headerLength;   // header + leb128 size field
+    int sizeBytes;      // length of the leb128 size field as actually encoded
     int payloadOffset;
     int payloadLength;
 };
@@ -106,6 +107,7 @@ static int parseObus(const uint8_t* data, int length, Obu* obus)
         obus[count].type = (header >> 3) & 0x0F;
         obus[count].headerOffset = pos;
         obus[count].headerLength = headerLength;
+        obus[count].sizeBytes = sizeBytes;
         obus[count].payloadOffset = pos + headerLength;
         obus[count].payloadLength = (int)size;
         count++;
@@ -171,6 +173,19 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
     const Obu& frameHeader = obus[frameHeaderIdx];
     const Obu& tileGroup = obus[tileGroupIdx];
 
+    // The merged OBU_FRAME reuses the frame header's OBU header, so the tile group's
+    // header has to agree with it. If they disagree we'd silently move the tile group
+    // into a different temporal/spatial layer, so leave the whole thing alone.
+    uint8_t fhHeader = data[frameHeader.headerOffset];
+    uint8_t tgHeader = data[tileGroup.headerOffset];
+    if ((fhHeader & 0x04) != (tgHeader & 0x04)) {
+        return length;
+    }
+    if ((fhHeader & 0x04) &&
+        data[frameHeader.headerOffset + 1] != data[tileGroup.headerOffset + 1]) {
+        return length;
+    }
+
     // An OBU_FRAME_HEADER payload ends with trailing_bits(obu_size * 8 - payloadBits):
     // a one bit, then zeroes all the way to the end of obu_size. An encoder that
     // over-declares obu_size therefore leaves whole zero bytes at the end, which is
@@ -192,9 +207,21 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
     }
     uint8_t lastByte = data[frameHeader.payloadOffset + frameHeaderLength - 1];
     lastByte &= lastByte - 1;
+    if (lastByte == 0) {
+        // The byte held nothing but the stop bit (0x80), i.e. frame_header_obu() ended
+        // exactly on a byte boundary. byte_alignment() contributes nothing there, so
+        // this byte has to disappear rather than become a zero - same reason as above.
+        frameHeaderLength--;
+        if (frameHeaderLength == 0) {
+            return length;
+        }
+    }
 
     uint64_t mergedPayloadLength = (uint64_t)frameHeaderLength + tileGroup.payloadLength;
-    int mergedHeaderLength = (frameHeader.headerLength - leb128Size(frameHeader.payloadLength)) +
+    // Recover the OBU header bytes without its size field. Use the size field's actual
+    // encoded width, not leb128Size(): AV1 permits non-minimal leb128, so an encoder may
+    // have written e.g. 81 00 for a payload of 1.
+    int mergedHeaderLength = (frameHeader.headerLength - frameHeader.sizeBytes) +
                              leb128Size(mergedPayloadLength);
 
     int preambleLength = frameHeader.headerOffset;
@@ -213,7 +240,9 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
 
     memmove(data + tileGroupDest, data + tileGroup.payloadOffset, tileGroup.payloadLength);
     memmove(data + frameHeaderDest, data + frameHeader.payloadOffset, frameHeaderLength);
-    data[frameHeaderDest + frameHeaderLength - 1] = lastByte;
+    if (lastByte != 0) {
+        data[frameHeaderDest + frameHeaderLength - 1] = lastByte;
+    }
 
     // Reuse the frame header's OBU header so temporal_id/spatial_id survive, but
     // retype it to OBU_FRAME.
