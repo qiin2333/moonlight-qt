@@ -160,9 +160,13 @@ public:
     // Purely diagnostic: it drives the performance overlay and the HDR10+ log
     // message, so a user can tell "the host never sent dynamic metadata" apart
     // from "it arrived and nothing used it".
+    //
+    // NB: Don't name an enumerator None here. X11's X.h defines None as a macro,
+    // and ffmpeg.cpp reaches it through vaapi.h -> va_x11.h -> Xlib.h before this
+    // header, so the qualified name expands to ToneMappingSource::0L on Linux.
     enum class ToneMappingSource {
         Unsupported,  // this renderer never tone maps HDR itself
-        None,         // it does, but the current frame isn't HDR
+        Sdr,          // it does, but the current frame isn't HDR
         Static,       // HDR10 static mastering metadata only
         PeakDetect,   // per-frame peak detection
         Hdr10Plus,    // ST 2094-40 dynamic metadata

@@ -1124,7 +1124,7 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
                                   std::memory_order_relaxed);
     }
     else {
-        m_ToneMappingSource.store(ToneMappingSource::None, std::memory_order_relaxed);
+        m_ToneMappingSource.store(ToneMappingSource::Sdr, std::memory_order_relaxed);
     }
 
     // Render the video image and overlays into the swapchain buffer

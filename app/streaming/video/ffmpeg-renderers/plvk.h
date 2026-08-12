@@ -113,9 +113,9 @@ private:
     // thread in renderFrame(), read on the receive thread by the stats overlay and the
     // HDR10+ log, so it has to be atomic. Purely diagnostic, hence relaxed ordering.
     //
-    // Starts at None rather than Unsupported: once plvk is the frontend renderer it is
+    // Starts at Sdr rather than Unsupported: once plvk is the frontend renderer it is
     // a renderer that tone maps, even before the first frame goes through.
-    std::atomic<ToneMappingSource> m_ToneMappingSource { ToneMappingSource::None };
+    std::atomic<ToneMappingSource> m_ToneMappingSource { ToneMappingSource::Sdr };
 
 #ifdef PLVK_USE_EARLY_RENDER_TO_WAIT
     pl_overlay m_EmptyOverlay = {};
