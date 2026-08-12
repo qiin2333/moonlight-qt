@@ -1922,6 +1922,7 @@ void FFmpegVideoDecoder::decoderThreadProc()
                     // Log the first frame that carries ST 2094-40, so a user reporting
                     // "HDR10+ does nothing" can be told apart from a host that never sent
                     // any. Once per session is enough; this is the decoder hot path.
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(56, 25, 100)
                     if (!m_LoggedHdr10PlusMetadata &&
                             av_frame_get_side_data(frame, AV_FRAME_DATA_DYNAMIC_HDR_PLUS) != nullptr) {
                         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
@@ -1929,6 +1930,7 @@ void FFmpegVideoDecoder::decoderThreadProc()
                                     (m_VideoFormat & VIDEO_FORMAT_MASK_AV1) ? "AV1" : "HEVC");
                         m_LoggedHdr10PlusMetadata = true;
                     }
+#endif
 
                     // Attach HDR metadata to the frame if it's not already present. We will defer to
                     // any metadata contained in the bitstream itself since that is guaranteed to be
