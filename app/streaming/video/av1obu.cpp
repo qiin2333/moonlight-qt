@@ -205,12 +205,16 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
         // Malformed: trailing_bits() always writes a stop bit somewhere.
         return length;
     }
-    uint8_t lastByte = data[frameHeader.payloadOffset + frameHeaderLength - 1];
-    lastByte &= lastByte - 1;
-    if (lastByte == 0) {
-        // The byte held nothing but the stop bit (0x80), i.e. frame_header_obu() ended
-        // exactly on a byte boundary. byte_alignment() contributes nothing there, so
-        // this byte has to disappear rather than become a zero - same reason as above.
+    uint8_t origLastByte = data[frameHeader.payloadOffset + frameHeaderLength - 1];
+    uint8_t lastByte = origLastByte & (origLastByte - 1);
+    // Exactly 0x80 means the stop bit was the first bit of the byte, i.e.
+    // frame_header_obu() ended on the previous byte boundary and this byte carries no
+    // payload bits at all. byte_alignment() contributes nothing there, so the byte has
+    // to disappear rather than become a zero - same reason as the zero bytes above.
+    // Any other single-bit value (0x20, 0x40, ...) still holds real payload bits ahead
+    // of the stop bit, so it stays as 0x00 and byte_alignment() pads out the rest.
+    bool dropLastByte = (origLastByte == 0x80);
+    if (dropLastByte) {
         frameHeaderLength--;
         if (frameHeaderLength == 0) {
             return length;
@@ -240,7 +244,7 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
 
     memmove(data + tileGroupDest, data + tileGroup.payloadOffset, tileGroup.payloadLength);
     memmove(data + frameHeaderDest, data + frameHeader.payloadOffset, frameHeaderLength);
-    if (lastByte != 0) {
+    if (!dropLastByte) {
         data[frameHeaderDest + frameHeaderLength - 1] = lastByte;
     }
 

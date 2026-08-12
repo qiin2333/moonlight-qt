@@ -107,12 +107,17 @@ byte_alignment() {
 
 1. 清掉停止位 —— 即**最后一个非零字节**的最低置位位（`lastByte &= lastByte - 1`，例 `0x88` → `0x80`）；
 2. **丢掉它后面所有的整零字节**。留着的话，它们会被挪进 `tile_group_obu()` 的载荷里，把帧解坏。
-3. 如果清完停止位之后这个字节本身变成了 `0x00`（原值是 `0x80`），**把它也整个丢掉**，
-   而不是留一个零字节在那里。
+3. 如果这个字节的**原值恰好是 `0x80`**，**把它也整个丢掉**，而不是留一个零字节在那里。
 
 第 3 条特别容易漏：`frame_header_obu()` 正好在字节边界结束时，`trailing_bits()` 补出来的就是
 整个 `0x80` 字节，概率大约 1/8，不是边角情况。而合并后 `byte_alignment()` 在这里一位都不补，
 所以那个字节必须消失。留成 `0x00` 跟第 2 条留着补零字节是**同一个 bug**，一样会解坏帧。
+
+但判据必须是**原值等于 `0x80`**，不能是「清完停止位之后等于 `0x00`」—— 后者太宽。
+比如 `0x20`（`0010 0000`）清完也是 `0x00`，可它的高 2 位是**真实的载荷位**（值恰好为零），
+只是 `frame_header_obu()` 在这个字节里只用掉了 2 位。这时 `byte_alignment()` 会补满剩下的
+6 位，字节仍然存在，必须原样留成 `0x00`。丢掉它就会把 `tile_group_obu()` 整体前移一个字节。
+只有原值 `0x80` 时停止位落在字节的第一位，整个字节不含任何载荷位，才该消失。
 
 只做第 1 件事是**错的**，这是个很容易踩的坑。若整个载荷全是零（或只有一个停止位），
 说明码流非法，放弃重写。
@@ -408,12 +413,16 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
         // Malformed: trailing_bits() always writes a stop bit somewhere.
         return length;
     }
-    uint8_t lastByte = data[frameHeader.payloadOffset + frameHeaderLength - 1];
-    lastByte &= lastByte - 1;
-    if (lastByte == 0) {
-        // The byte held nothing but the stop bit (0x80), i.e. frame_header_obu() ended
-        // exactly on a byte boundary. byte_alignment() contributes nothing there, so
-        // this byte has to disappear rather than become a zero - same reason as above.
+    uint8_t origLastByte = data[frameHeader.payloadOffset + frameHeaderLength - 1];
+    uint8_t lastByte = origLastByte & (origLastByte - 1);
+    // Exactly 0x80 means the stop bit was the first bit of the byte, i.e.
+    // frame_header_obu() ended on the previous byte boundary and this byte carries no
+    // payload bits at all. byte_alignment() contributes nothing there, so the byte has
+    // to disappear rather than become a zero - same reason as the zero bytes above.
+    // Any other single-bit value (0x20, 0x40, ...) still holds real payload bits ahead
+    // of the stop bit, so it stays as 0x00 and byte_alignment() pads out the rest.
+    int dropLastByte = (origLastByte == 0x80);
+    if (dropLastByte) {
         frameHeaderLength--;
         if (frameHeaderLength == 0) {
             return length;
@@ -443,7 +452,7 @@ int repackAv1TemporalUnit(uint8_t* data, int length)
 
     memmove(data + tileGroupDest, data + tileGroup.payloadOffset, tileGroup.payloadLength);
     memmove(data + frameHeaderDest, data + frameHeader.payloadOffset, frameHeaderLength);
-    if (lastByte != 0) {
+    if (!dropLastByte) {
         data[frameHeaderDest + frameHeaderLength - 1] = lastByte;
     }
 
@@ -528,6 +537,7 @@ iOS 上解码器只有 VideoToolbox 一条路，所以判 AV1 就够了。
 | metadata 合计 512 字节 | 正常重写（边界内） |
 | metadata 合计 513 字节 | 原样返回，字节全等（拷贝前就退出） |
 | frame header 末字节正好是 `0x80` | 该字节被整个丢掉，不是写成 `0x00` |
+| frame header 末字节是 `0x20` 等其他单比特值 | 该字节**保留**并写成 `0x00`（高位是真实载荷位） |
 | 长度字段用非最短 leb128（如 `81 00`） | 输出与最短编码的同一帧**逐字节相同** |
 | fh / tg 扩展头不一致 | 原样返回，字节全等 |
 | 合并后长度跨 leb128 边界（如 203） | 长度字段写成 `cb 01`，总长 208→206 |
