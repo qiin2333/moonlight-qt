@@ -51,6 +51,11 @@ Switch {
         // Own the pointer gesture on the painted track. This avoids the
         // FluentWinUI3 Switch regression where a stationary release is ignored,
         // while retaining both tap-to-toggle and drag-to-select behavior.
+        //
+        // 提交状态一律走 click()，不能用 toggle()：toggle() 只是 setChecked(!checked)，
+        // 发的仅有 checkedChanged，不发 toggled()。而 ToggleRow 正是靠 toggled() 把值
+        // 写回偏好设置的（checked 是绑定，初始化阶段也会变，所以不能用 checkedChanged）。
+        // 用 toggle() 的结果就是：开关看着拨过去了，设置根本没保存。
         MouseArea {
             id: pointerArea
             anchors.fill: parent
@@ -84,14 +89,16 @@ Switch {
                         (mouse.x - dragOffset - 3 - handle.width / 2) / travel))
                 }
             }
-            onReleased: function(mouse) {
+            onReleased: function() {
                 if (dragging) {
+                    // 拖到哪一侧就是哪一侧：只有真的换了边才提交，
+                    // 拖回原位松手等于什么都没做。
                     var targetChecked = dragPosition >= 0.5
                     if (targetChecked !== control.checked) {
-                        control.toggle()
+                        control.click()
                     }
                 } else {
-                    control.toggle()
+                    control.click()
                 }
                 dragging = false
             }
