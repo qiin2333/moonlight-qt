@@ -672,8 +672,11 @@ Column {
                             radius: 0
                             color: resetBitrateButton.down ? Theme.accentSoft
                                                            : (resetBitrateButton.hovered ? Theme.surface2 : "transparent")
+                            // 和 HardButton 一个规矩：hover / 按下 1px accent，focus 2px accent
                             border.width: resetBitrateButton.visualFocus ? 2 : 1
-                            border.color: resetBitrateButton.visualFocus ? Theme.accent : Theme.lineStrong
+                            border.color: resetBitrateButton.down || resetBitrateButton.hovered
+                                          || resetBitrateButton.visualFocus
+                                        ? Theme.accent : Theme.lineStrong
 
                             Behavior on color {
                                 ColorAnimation { duration: Theme.durFast }
