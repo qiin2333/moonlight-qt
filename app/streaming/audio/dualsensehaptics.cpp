@@ -54,7 +54,6 @@ struct DualSenseHapticsRenderer::Impl
     std::mutex mutex;
     std::condition_variable condition;
     std::deque<Packet> queue;
-    std::thread worker;
     std::atomic_bool stopping{false};
 
 #ifdef Q_OS_WIN32
@@ -71,7 +70,13 @@ struct DualSenseHapticsRenderer::Impl
     std::uint32_t prebufferedFrames = 0;
     std::chrono::steady_clock::time_point nextEndpointProbe{};
 
-    Impl() : worker([this] { run(); }) {}
+    // Keep this last: run() may access every member as soon as the thread starts.
+    std::thread worker;
+
+    Impl()
+    {
+        worker = std::thread([this] { run(); });
+    }
 
     ~Impl()
     {
@@ -277,7 +282,10 @@ struct DualSenseHapticsRenderer::Impl
 
         if (!audioClient) {
             const auto now = std::chrono::steady_clock::now();
-            if (now < nextEndpointProbe || !openEndpoint()) {
+            if (now < nextEndpointProbe) {
+                return;
+            }
+            if (!openEndpoint()) {
                 nextEndpointProbe = now + std::chrono::seconds(2);
                 return;
             }
