@@ -309,6 +309,14 @@ jobs:
 
         if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
           sudo apt install -y vulkan-sdk
+        else
+          # libplacebo 需要一个 SPIR-V 编译器，否则 Vulkan 渲染器编得出来但跑不起来。
+          # x86_64 是从 LunarG SDK 里拿 shaderc 2023.8.1，noble 自带的 libshaderc-dev
+          # 正好也是 2023.8，两个架构走同一条代码路径。
+          # 别换成 glslang：libplacebo 那边是用 cxx.find_library('SPIRV') 找的，
+          # 装到 /usr/local 也认不出来（试过，summary 里 glslang 一样是 NO），
+          # 而 shaderc 走 pkg-config，稳。
+          sudo apt install -y libshaderc-dev
         fi
 
         # Install XCB runtime libraries for Qt6 XCB platform plugin
@@ -329,13 +337,11 @@ jobs:
           sudo apt install libfuse2
         fi
 
-    # arm64 上没有 LunarG 源，这一步把 vulkan-sdk 提供的东西手工补齐：
-    #   - Vulkan-Headers/Loader：noble 自带的是 1.3.275，而 FFmpeg configure 卡的是
-    #     `vulkan >= 1.3.277`（pkg-config 版本号），差这么一点也过不去，不补的话
-    #     *_vulkan hwaccel 直接把 configure 打挂。vulkan.pc 是 Loader 装的，只装 Headers 不够。
-    #   - glslang：libplacebo 编 SPIR-V 要它。这里不用发行版包，是为了两个架构拿到的
-    #     版本一致（x86_64 那边是 LunarG SDK 里的）。
-    - name: Build Vulkan loader and glslang (aarch64)
+    # arm64 上没有 LunarG 源，Vulkan 那套要手工补：noble 自带的 loader 是 1.3.275，
+    # 而 FFmpeg configure 卡的是 `vulkan >= 1.3.277`（pkg-config 版本号），差这么一点
+    # 也过不去，不补的话 *_vulkan hwaccel 直接把 configure 打挂。vulkan.pc 是 Loader
+    # 装的，只装 Headers 不够，所以两个都得编。
+    - name: Build Vulkan loader (aarch64)
       if: matrix.arch == 'aarch64'
       run: |
         export VULKAN_VER=v1.4.313
@@ -350,20 +356,6 @@ jobs:
           -DBUILD_TESTS=OFF
         cmake --build Vulkan-Loader/build -j$(nproc)
         sudo cmake --install Vulkan-Loader/build
-        sudo ldconfig
-
-        export GLSLANG_VER=15.4.0
-        git clone --branch $GLSLANG_VER --depth 1 https://github.com/KhronosGroup/glslang.git
-        # ENABLE_OPT=OFF 省掉 SPIRV-Tools 依赖；libplacebo 只要 SPIRV +
-        # glslang-default-resource-limits 这两个 so 就够了。
-        cmake -S glslang -B glslang/build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=ON \
-          -DENABLE_OPT=OFF \
-          -DGLSLANG_TESTS=OFF \
-          -DENABLE_GLSLANG_BINARIES=OFF
-        cmake --build glslang/build -j$(nproc)
-        sudo cmake --install glslang/build
         sudo ldconfig
 
         pkg-config --modversion vulkan
@@ -446,6 +438,13 @@ jobs:
         fi
         git submodule update --init --recursive
         meson setup build -Dvulkan=enabled -Dopengl=disabled -Ddemos=false
+        # libplacebo 在两个 SPIR-V 编译器都找不到的情况下不会报错，只是在 summary 里
+        # 写 shaderc/glslang: NO，然后编出一个 Vulkan 渲染器跑不起来的库。arm64 第一版
+        # 就是这么静默退化的，所以在这儿拦一道。
+        if ! grep -qE "^ +(shaderc|glslang) +: +YES" build/meson-logs/meson-log.txt; then
+          echo "::error::libplacebo 没找到任何 SPIR-V 编译器（shaderc/glslang），Vulkan 渲染器会编得过但跑不起来"
+          exit 1
+        fi
         ninja -C build
         sudo ninja install -C build
         sudo ldconfig
