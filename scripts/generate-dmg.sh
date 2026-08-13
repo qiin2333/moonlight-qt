@@ -122,17 +122,11 @@ echo Creating DMG
 if [ "$SIGNING_IDENTITY" != "" ]; then
   create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --identity="$SIGNING_IDENTITY" --no-version-in-filename || fail "create-dmg failed!"
 else
-  create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --no-version-in-filename
-  CREATE_DMG_STATUS=$?
-  case $CREATE_DMG_STATUS in
-    0) ;;
-    2) ;;
-    *)
-      echo "create-dmg failed with status $CREATE_DMG_STATUS; falling back to hdiutil"
-      rm -f $INSTALLER_FOLDER/Moonlight.dmg
-      hdiutil create -volname Moonlight -srcfolder $BUILD_FOLDER/app/Moonlight.app -ov -format UDZO $INSTALLER_FOLDER/Moonlight.dmg || fail "fallback hdiutil DMG creation failed!"
-      ;;
-  esac
+  if ! create-dmg "$BUILD_FOLDER/app/Moonlight.app" "$INSTALLER_FOLDER" --no-version-in-filename; then
+    echo "create-dmg failed; falling back to hdiutil"
+    rm -f "$INSTALLER_FOLDER/Moonlight.dmg"
+    hdiutil create -volname "Moonlight V+" -srcfolder "$BUILD_FOLDER/app/Moonlight.app" -ov -format UDZO "$INSTALLER_FOLDER/Moonlight.dmg" || fail "fallback hdiutil DMG creation failed!"
+  fi
 fi
 
 if [ "$NOTARY_KEYCHAIN_PROFILE" != "" ]; then

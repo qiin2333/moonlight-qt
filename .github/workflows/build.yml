@@ -230,6 +230,7 @@ jobs:
       with:
         name: Moonlight-VPlus-r${{ env.BUILD_NUMBER }}.dmg
         path: build/installer-Release/Moonlight-VPlus-*.dmg
+        if-no-files-found: error
 
   build-linux:
     # x86_64 用标准 runner，aarch64 用 GitHub 的免费 ARM runner（公共仓库可用）。
