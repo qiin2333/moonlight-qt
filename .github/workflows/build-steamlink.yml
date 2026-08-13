@@ -40,8 +40,10 @@ jobs:
 
       - name: Resolve artifact version
         shell: bash
+        env:
+          INPUT_CI_VERSION: ${{ inputs.ci_version }}
         run: |
-          version='${{ inputs.ci_version }}'
+          version="$INPUT_CI_VERSION"
           if [[ -z "$version" ]]; then
             version=$(python3 scripts/derive-version.py --field artifact)
           fi
