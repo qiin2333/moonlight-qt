@@ -129,16 +129,25 @@ else
   fi
 fi
 
+# create-dmg names the image after CFBundleDisplayName, while the hdiutil
+# fallback uses Moonlight.dmg. The installer directory was cleaned above, so
+# require exactly one generated image and use its real path from here on.
+DMG_CANDIDATES=("$INSTALLER_FOLDER"/*.dmg)
+if [ "${#DMG_CANDIDATES[@]}" -ne 1 ] || [ ! -f "${DMG_CANDIDATES[0]}" ]; then
+  fail "Expected exactly one generated DMG in $INSTALLER_FOLDER"
+fi
+GENERATED_DMG="${DMG_CANDIDATES[0]}"
+
 if [ "$NOTARY_KEYCHAIN_PROFILE" != "" ]; then
   echo Uploading to App Notary service
-  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Moonlight.dmg || fail "Notary submission failed"
+  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait "$GENERATED_DMG" || fail "Notary submission failed"
 
   echo Stapling notary ticket to DMG
-  xcrun stapler staple -v $INSTALLER_FOLDER/Moonlight.dmg || fail "Notary ticket stapling failed!"
+  xcrun stapler staple -v "$GENERATED_DMG" || fail "Notary ticket stapling failed!"
 fi
 
 # 名字里带上架构。这里只出一个架构的包（见上面 MOONLIGHT_ARCH 的注释），叫
 # Moonlight-<版本>.dmg 的话下载的人无法从名字判断能不能装 —— Intel Mac 上装了
 # 才发现打不开。app 侧的更新器也靠这个后缀挑对应架构的资产。
-mv "$INSTALLER_FOLDER/Moonlight.dmg" "$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$MOONLIGHT_ARCH.dmg"
+mv "$GENERATED_DMG" "$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$MOONLIGHT_ARCH.dmg"
 echo Build successful
