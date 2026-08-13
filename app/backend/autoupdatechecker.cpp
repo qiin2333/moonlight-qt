@@ -135,6 +135,12 @@ QString AutoUpdateChecker::getPreferredAssetSuffix() const
     // Moonlight-<版本>.dmg。匹配不到就退回任意 .dmg，否则老版本的用户会看到
     // 「找不到更新包」。
     return QStringLiteral("-") + QSysInfo::buildCpuArchitecture() + QStringLiteral(".dmg");
+#elif defined(APP_IMAGE)
+    QString architecture = QSysInfo::buildCpuArchitecture().toLower();
+    if (architecture == QStringLiteral("arm64")) {
+        architecture = QStringLiteral("aarch64");
+    }
+    return QStringLiteral("-") + architecture + QStringLiteral(".AppImage");
 #else
     return QString();
 #endif
@@ -340,7 +346,10 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
                         // 退回打开 release 页面让用户自己看。
                         bool isOtherArchAsset =
                                 assetName.endsWith(QStringLiteral("-arm64.dmg"), Qt::CaseInsensitive) ||
-                                assetName.endsWith(QStringLiteral("-x86_64.dmg"), Qt::CaseInsensitive);
+                                assetName.endsWith(QStringLiteral("-x86_64.dmg"), Qt::CaseInsensitive) ||
+                                (!preferredSuffix.isEmpty() &&
+                                 (assetName.endsWith(QStringLiteral("-aarch64.AppImage"), Qt::CaseInsensitive) ||
+                                  assetName.endsWith(QStringLiteral("-x86_64.AppImage"), Qt::CaseInsensitive)));
 
                         if (fallbackUrl.isEmpty() && !isOtherArchAsset) {
                             fallbackUrl = assetObj["browser_download_url"].toString();

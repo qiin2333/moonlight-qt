@@ -172,19 +172,25 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Moonlight-VPlus-Portable-x64-r${{ env.BUILD_NUMBER }}
-        path: build/installer-x64-release/Moonlight-VPlus-Portable-x64-*.zip
+        path: |
+          build/installer-x64-release/Moonlight-VPlus-Portable-x64-*.zip
+          build/installer-x64-release/MoonlightPortable-x64-*.zip
 
     - name: Upload portable artifact arm64
       uses: actions/upload-artifact@v4
       with:
         name: Moonlight-VPlus-Portable-arm64-r${{ env.BUILD_NUMBER }}
-        path: build/installer-arm64-release/Moonlight-VPlus-Portable-arm64-*.zip
+        path: |
+          build/installer-arm64-release/Moonlight-VPlus-Portable-arm64-*.zip
+          build/installer-arm64-release/MoonlightPortable-arm64-*.zip
 
     - name: Upload executable artifact
       uses: actions/upload-artifact@v4
       with:
         name: Moonlight-VPlus-Setup-r${{ env.BUILD_NUMBER }}.exe
-        path: build/installer-Release/Moonlight-VPlus-Setup-*.exe
+        path: |
+          build/installer-Release/Moonlight-VPlus-Setup-*.exe
+          build/installer-Release/MoonlightSetup-*.exe
 
   build-macos:
     runs-on: macos-15

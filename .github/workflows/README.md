@@ -23,6 +23,9 @@
 - Linux: `Moonlight-VPlus-r{build_number}-{arch}.AppImage`
 - SteamLink: `Moonlight-VPlus-SteamLink-r{build_number}.zip`
 
+首个 V+ 品牌版本还会同时发布 `MoonlightPortable-*` 和 `MoonlightSetup-*`
+兼容别名，保证旧版 Windows 客户端能完成跨品牌升级。
+
 ## 平台特定配置
 
 ### Windows 构建
