@@ -21,6 +21,7 @@ ApplicationWindow {
     property bool clearOnBack: false
 
     id: window
+    title: Qt.application.displayName
     width: 1280
     height: 640
 
@@ -459,7 +460,7 @@ ApplicationWindow {
             Text {
                 id: wordmark
                 visible: toolBar.width > 700
-                text: "MOONLIGHT"
+                text: "MOONLIGHT V+ FOR PC"
                 color: Theme.text
                 font.family: Theme.fontSans
                 font.pointSize: Theme.fontCardTitle

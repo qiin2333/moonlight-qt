@@ -166,10 +166,10 @@ QString AutoUpdateChecker::getExpectedAssetPrefix() const
 {
 #if defined(Q_OS_WIN32)
     if (isPortableInstall()) {
-        return QStringLiteral("MoonlightPortable-%1-").arg(getCurrentBuildArch());
+        return QStringLiteral("Moonlight-VPlus-Portable-%1-").arg(getCurrentBuildArch());
     }
 
-    return QStringLiteral("MoonlightSetup-");
+    return QStringLiteral("Moonlight-VPlus-Setup-");
 #else
     return QString();
 #endif
@@ -311,6 +311,15 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
                         QString assetName = assetObj["name"].toString();
                         bool prefixMatches = expectedPrefix.isEmpty() ||
                                              assetName.startsWith(expectedPrefix, Qt::CaseInsensitive);
+#if defined(Q_OS_WIN32)
+                        // Accept pre-rebrand assets while users transition from Moonlight PC.
+                        if (!prefixMatches) {
+                            const QString legacyPrefix = isPortableInstall()
+                                    ? QStringLiteral("MoonlightPortable-%1-").arg(getCurrentBuildArch())
+                                    : QStringLiteral("MoonlightSetup-");
+                            prefixMatches = assetName.startsWith(legacyPrefix, Qt::CaseInsensitive);
+                        }
+#endif
                         bool suffixMatches = assetName.endsWith(expectedSuffix, Qt::CaseInsensitive);
 
                         if (!prefixMatches || !suffixMatches) {

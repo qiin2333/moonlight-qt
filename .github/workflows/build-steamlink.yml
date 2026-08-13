@@ -44,6 +44,6 @@ jobs:
       - name: Upload Binaries
         uses: actions/upload-artifact@v6
         with:
-          name: Moonlight-SteamLink-${{ env.CI_VERSION }}
+          name: Moonlight-VPlus-SteamLink-${{ env.CI_VERSION }}
           path: build/deploy-release/*
           if-no-files-found: error

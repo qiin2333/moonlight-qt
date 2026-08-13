@@ -146,5 +146,5 @@ fi
 # 名字里带上架构。这里只出一个架构的包（见上面 MOONLIGHT_ARCH 的注释），叫
 # Moonlight-<版本>.dmg 的话下载的人无法从名字判断能不能装 —— Intel Mac 上装了
 # 才发现打不开。app 侧的更新器也靠这个后缀挑对应架构的资产。
-mv "$INSTALLER_FOLDER/Moonlight.dmg" "$INSTALLER_FOLDER/Moonlight-$VERSION-$MOONLIGHT_ARCH.dmg"
+mv "$INSTALLER_FOLDER/Moonlight.dmg" "$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$MOONLIGHT_ARCH.dmg"
 echo Build successful
