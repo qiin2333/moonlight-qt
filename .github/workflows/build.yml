@@ -227,8 +227,12 @@ jobs:
 
   build-linux:
     # x86_64 用标准 runner，aarch64 用 GitHub 的免费 ARM runner（公共仓库可用）。
-    # 两边都钉在 22.04：AppImage 的 glibc 下限是跟着构建机走的，换成 24.04 会把
-    # Raspberry Pi OS bookworm（glibc 2.36）这类还很常见的 arm 机器挡在门外。
+    #
+    # 两边的基线故意不一样：x86_64 留在 22.04 把 AppImage 的 glibc 下限压到 2.35，
+    # 而 aarch64 必须上 24.04 —— Qt 官方的 linux_arm64 二进制（含 moc 这些 host 工具）
+    # 是在 glibc 2.38 上编的，放到 jammy 上跑 moc 直接 `GLIBC_2.38 not found`。
+    # 代价是 arm64 的 AppImage 需要 glibc >= 2.39，Debian 12 / RPi OS bookworm 用不了，
+    # 得等 trixie。想再往下压只能自己编 Qt，不值。
     name: build-linux (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
 
@@ -243,7 +247,7 @@ jobs:
             qt_arch: linux_gcc_64
             multiarch: x86_64-linux-gnu
           - arch: aarch64
-            runner: ubuntu-22.04-arm
+            runner: ubuntu-24.04-arm
             qt_host: linux_arm64
             qt_arch: linux_gcc_arm64
             multiarch: aarch64-linux-gnu
@@ -310,7 +314,15 @@ jobs:
         # Install XCB runtime libraries for Qt6 XCB platform plugin
         echo "Installing XCB runtime libraries..."
         sudo apt install -y libxcb1 libxcb-cursor0 libxcb-keysyms1 libxcb-image0 libxcb-shm0 libxcb-icccm4 libxcb-sync1 libxcb-xfixes0 libxcb-shape0 libxcb-randr0 libxcb-render0 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxcb-util1
-        sudo pip3 install meson
+
+        # 24.04 起 pip 是 externally-managed，`pip3 install` 会直接被 PEP 668 拒掉；
+        # 好在 noble 自带的 meson 已经 1.3，够 libplacebo（>= 0.63）用。jammy 的是
+        # 0.61，太老，只能继续走 pip。
+        if [[ $UBUNTU_RELEASE == "24.04" ]]; then
+          sudo apt install -y meson
+        else
+          sudo pip3 install meson
+        fi
 
         if [[ $UBUNTU_RELEASE == "22.04" ]]; then
           # Needed for AppImage
@@ -318,10 +330,11 @@ jobs:
         fi
 
     # arm64 上没有 LunarG 源，这一步把 vulkan-sdk 提供的东西手工补齐：
-    #   - Vulkan-Headers/Loader：jammy 自带的是 1.3.204，而 FFmpeg configure 卡的是
-    #     `vulkan >= 1.3.277`（pkg-config 版本号），不补的话 *_vulkan hwaccel 直接 configure 失败。
-    #     vulkan.pc 是 Loader 装的，只装 Headers 不够。
-    #   - glslang：libplacebo 编 SPIR-V 要它，而 jammy 的 libshaderc-dev 没有 arm64 包。
+    #   - Vulkan-Headers/Loader：noble 自带的是 1.3.275，而 FFmpeg configure 卡的是
+    #     `vulkan >= 1.3.277`（pkg-config 版本号），差这么一点也过不去，不补的话
+    #     *_vulkan hwaccel 直接把 configure 打挂。vulkan.pc 是 Loader 装的，只装 Headers 不够。
+    #   - glslang：libplacebo 编 SPIR-V 要它。这里不用发行版包，是为了两个架构拿到的
+    #     版本一致（x86_64 那边是 LunarG SDK 里的）。
     - name: Build Vulkan loader and glslang (aarch64)
       if: matrix.arch == 'aarch64'
       run: |
