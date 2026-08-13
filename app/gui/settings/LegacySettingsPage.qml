@@ -815,6 +815,24 @@ Column {
                 }
 
                 HardCheckBox {
+                    id: dualSenseHapticsCheck
+                    visible: Qt.platform.os === "windows"
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Play native DualSense haptics on a connected controller")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.enableDualSenseHaptics
+                    onCheckedChanged: {
+                        StreamingPreferences.enableDualSenseHaptics = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Receives games' authored DualSense haptic audio and writes it to channels 3 and 4 of a USB-connected DualSense. Bluetooth and ordinary rumble are unaffected. Changes apply to the next stream.")
+                }
+
+                HardCheckBox {
                     id: swapMouseButtonsCheck
                     hoverEnabled: true
                     width: parent.width

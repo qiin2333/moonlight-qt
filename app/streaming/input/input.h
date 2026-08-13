@@ -355,6 +355,7 @@ private:
     SDL_Window* m_Window;
     bool m_MultiController;
     bool m_GamepadMouse;
+    bool m_EnableDualSenseHaptics;
     bool m_SwapMouseButtons;
     bool m_SwapWinAltKeys;
     bool m_ReverseScrollDirection;

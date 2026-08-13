@@ -82,6 +82,7 @@ bool toSdlSystemCursor(NativeCursorShape shape, SDL_SystemCursor& systemCursor)
 SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight)
     : m_MultiController(prefs.multiController),
       m_GamepadMouse(prefs.gamepadMouse),
+      m_EnableDualSenseHaptics(prefs.enableDualSenseHaptics),
       m_SwapMouseButtons(prefs.swapMouseButtons),
       m_SwapWinAltKeys(prefs.swapWinAltKeys),
       m_ReverseScrollDirection(prefs.reverseScrollDirection),
