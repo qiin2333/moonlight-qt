@@ -185,6 +185,13 @@ void StreamingPreferences::reload()
                                               defaultDualSenseHapticsMode == DSHM_PHYSICAL).toBool() ?
                                    DSHM_PHYSICAL : DSHM_EMULATED;
     }
+#ifndef Q_OS_WIN32
+    // Native authored PCM currently requires the Windows WASAPI renderer.
+    // Do not retain a value that this build can neither negotiate nor render.
+    if (dualSenseHapticsMode == DSHM_PHYSICAL) {
+        dualSenseHapticsMode = DSHM_EMULATED;
+    }
+#endif
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     videoEnhancement = settings.value(SER_VIDEOENHANCEMENT, false).toBool();
     enableMicrophone = settings.value(SER_MICROPHONE, false).toBool();

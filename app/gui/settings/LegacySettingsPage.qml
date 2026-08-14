@@ -840,7 +840,15 @@ Column {
                             }
                         }
                         Component.onCompleted: {
-                            currentIndex = StreamingPreferences.dualSenseHapticsMode === StreamingPreferences.DSHM_EMULATED ? 1 : 0
+                            if (Qt.platform.os !== "windows") {
+                                dualSenseHapticsModeListModel.remove(0)
+                            }
+                            for (var i = 0; i < dualSenseHapticsModeListModel.count; i++) {
+                                if (dualSenseHapticsModeListModel.get(i).val === StreamingPreferences.dualSenseHapticsMode) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
                         }
                         onActivated: {
                             StreamingPreferences.dualSenseHapticsMode = dualSenseHapticsModeListModel.get(currentIndex).val
@@ -849,8 +857,9 @@ Column {
                         ToolTip.delay: 1000
                         ToolTip.timeout: 10000
                         ToolTip.visible: hovered
-                        ToolTip.text: currentIndex === 0 ?
-                            qsTr("Sends the original authored PCM to channels 3 and 4 of a USB-connected DualSense. The endpoint is checked before connecting.") :
+                        ToolTip.text: currentIndex >= 0 &&
+                                      dualSenseHapticsModeListModel.get(currentIndex).val === StreamingPreferences.DSHM_PHYSICAL ?
+                            qsTr("Sends the original authored PCM to channels 3 and 4 of a USB-connected DualSense. The endpoint is checked before connecting. Changes apply to the next stream.") :
                             qsTr("Receives a compact analyzed haptics signal and renders it through the connected controller's vibration motors. Changes apply to the next stream.")
                     }
                 }
