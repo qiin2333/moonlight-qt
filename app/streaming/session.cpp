@@ -3328,15 +3328,13 @@ void Session::start()
     k_ConnCallbacks.ds5HapticsIrV2 = nullptr;
     if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
 #ifdef Q_OS_WIN32
-        if (DualSenseHapticsRenderer::isAvailable()) {
-            enablePhysicalDualSenseHaptics = true;
-            k_ConnCallbacks.ds5HapticsPcm = Session::clDs5HapticsPcm;
-            if (m_DualSenseHapticsRenderer == nullptr) {
-                m_DualSenseHapticsRenderer = new DualSenseHapticsRenderer();
-            }
+        enablePhysicalDualSenseHaptics = true;
+        k_ConnCallbacks.ds5HapticsPcm = Session::clDs5HapticsPcm;
+        if (m_DualSenseHapticsRenderer == nullptr) {
+            m_DualSenseHapticsRenderer = new DualSenseHapticsRenderer();
         }
-        else {
-            emitLaunchWarning(tr("Physical DualSense haptics was selected, but no active USB DualSense four-channel audio endpoint was found."));
+        if (!DualSenseHapticsRenderer::isAvailable()) {
+            emitLaunchWarning(tr("Physical DualSense haptics was selected, but no active USB DualSense four-channel audio endpoint was found yet. Moonlight will keep checking during this stream."));
         }
 #else
         emitLaunchWarning(tr("Physical DualSense haptics is only available on Windows in this build."));
