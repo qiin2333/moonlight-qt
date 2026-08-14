@@ -127,7 +127,8 @@ struct RemoteCursorUpdate {
 class SdlInputHandler
 {
 public:
-    explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight);
+    explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight,
+                             bool enablePhysicalDualSenseHaptics);
 
     ~SdlInputHandler();
 

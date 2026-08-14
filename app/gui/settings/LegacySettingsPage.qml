@@ -814,22 +814,45 @@ Column {
                     ToolTip.text: qsTr("Sends native multi-touch trackpad contacts to compatible Sunshine hosts. Unsupported devices and hosts fall back to pointer input. Changes apply to the next stream.")
                 }
 
-                HardCheckBox {
-                    id: dualSenseHapticsCheck
-                    visible: Qt.platform.os === "windows"
-                    hoverEnabled: true
+                Row {
+                    spacing: 5
                     width: parent.width
-                    text: qsTr("Play native DualSense haptics on a connected controller")
-                    font.pointSize: 12
-                    checked: StreamingPreferences.enableDualSenseHaptics
-                    onCheckedChanged: {
-                        StreamingPreferences.enableDualSenseHaptics = checked
+
+                    Text {
+                        text: qsTr("DualSense haptics")
+                        font.pointSize: 12
+                        color: "white"
+                        anchors.verticalCenter: parent.verticalCenter
                     }
 
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 10000
-                    ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Receives games' authored DualSense haptic audio and writes it to channels 3 and 4 of a USB-connected DualSense. Bluetooth and ordinary rumble are unaffected. Changes apply to the next stream.")
+                    AutoResizingComboBox {
+                        id: dualSenseHapticsModeComboBox
+                        textRole: "text"
+                        model: ListModel {
+                            id: dualSenseHapticsModeListModel
+                            ListElement {
+                                text: qsTr("Physical DualSense (native HD haptics)")
+                                val: StreamingPreferences.DSHM_PHYSICAL
+                            }
+                            ListElement {
+                                text: qsTr("Simulated DualSense (analyzed vibration)")
+                                val: StreamingPreferences.DSHM_EMULATED
+                            }
+                        }
+                        Component.onCompleted: {
+                            currentIndex = StreamingPreferences.dualSenseHapticsMode === StreamingPreferences.DSHM_EMULATED ? 1 : 0
+                        }
+                        onActivated: {
+                            StreamingPreferences.dualSenseHapticsMode = dualSenseHapticsModeListModel.get(currentIndex).val
+                        }
+
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 10000
+                        ToolTip.visible: hovered
+                        ToolTip.text: currentIndex === 0 ?
+                            qsTr("Sends the original authored PCM to channels 3 and 4 of a USB-connected DualSense. The endpoint is checked before connecting.") :
+                            qsTr("Receives a compact analyzed haptics signal and renders it through the connected controller's vibration motors. Changes apply to the next stream.")
+                    }
                 }
 
                 HardCheckBox {

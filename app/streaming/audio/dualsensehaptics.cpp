@@ -382,6 +382,64 @@ struct DualSenseHapticsRenderer::Impl
 DualSenseHapticsRenderer::DualSenseHapticsRenderer() : m_Impl(std::make_unique<Impl>()) {}
 DualSenseHapticsRenderer::~DualSenseHapticsRenderer() = default;
 
+bool DualSenseHapticsRenderer::isAvailable()
+{
+#ifdef Q_OS_WIN32
+    const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const bool shouldUninitialize = SUCCEEDED(comResult);
+    if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE) {
+        return false;
+    }
+
+    bool found = false;
+    ComPtr<IMMDeviceEnumerator> enumerator;
+    ComPtr<IMMDeviceCollection> devices;
+    if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                   IID_PPV_ARGS(&enumerator))) &&
+        SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices))) {
+        UINT count = 0;
+        devices->GetCount(&count);
+        for (UINT i = 0; i < count && !found; i++) {
+            ComPtr<IMMDevice> device;
+            if (FAILED(devices->Item(i, &device))) continue;
+
+            std::wstring friendlyName;
+            ComPtr<IPropertyStore> properties;
+            if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &properties))) {
+                PROPVARIANT value;
+                PropVariantInit(&value);
+                if (SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &value)) &&
+                    value.vt == VT_LPWSTR && value.pwszVal != nullptr) {
+                    friendlyName = value.pwszVal;
+                }
+                PropVariantClear(&value);
+            }
+            if (!Impl::isDualSenseName(friendlyName)) continue;
+
+            ComPtr<IAudioClient> candidate;
+            if (FAILED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
+                                        reinterpret_cast<void**>(candidate.GetAddressOf())))) {
+                continue;
+            }
+            WAVEFORMATEX* mix = nullptr;
+            if (SUCCEEDED(candidate->GetMixFormat(&mix)) && mix != nullptr) {
+                bool isFloat = false;
+                WORD bits = 0;
+                found = Impl::classifyFormat(mix, isFloat, bits);
+            }
+            CoTaskMemFree(mix);
+        }
+    }
+
+    if (shouldUninitialize) {
+        CoUninitialize();
+    }
+    return found;
+#else
+    return false;
+#endif
+}
+
 void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
 {
 #ifdef Q_OS_WIN32
