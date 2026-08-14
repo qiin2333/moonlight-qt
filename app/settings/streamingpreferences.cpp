@@ -35,7 +35,6 @@
 #define SER_ABSMOUSEMODE "mouseacceleration"
 #define SER_ABSTOUCHMODE "abstouchmode"
 #define SER_NATIVETOUCHPAD "nativeTouchpad"
-#define SER_DUALSENSEHAPTICS "dualSenseHaptics"
 #define SER_DUALSENSEHAPTICSMODE "dualSenseHapticsMode"
 #define SER_STARTWINDOWED "startwindowed"
 #define SER_FRAMEPACING "framepacing"
@@ -171,19 +170,10 @@ void StreamingPreferences::reload()
 #else
     constexpr auto defaultDualSenseHapticsMode = DSHM_EMULATED;
 #endif
-    if (settings.contains(SER_DUALSENSEHAPTICSMODE)) {
-        dualSenseHapticsMode = static_cast<DualSenseHapticsMode>(
-            settings.value(SER_DUALSENSEHAPTICSMODE, defaultDualSenseHapticsMode).toInt());
-        if (dualSenseHapticsMode != DSHM_PHYSICAL && dualSenseHapticsMode != DSHM_EMULATED) {
-            dualSenseHapticsMode = defaultDualSenseHapticsMode;
-        }
-    }
-    else {
-        // The old checkbox disabled native PCM. Preserve that intent by moving
-        // unchecked users to the analyzed, device-independent renderer.
-        dualSenseHapticsMode = settings.value(SER_DUALSENSEHAPTICS,
-                                              defaultDualSenseHapticsMode == DSHM_PHYSICAL).toBool() ?
-                                   DSHM_PHYSICAL : DSHM_EMULATED;
+    dualSenseHapticsMode = static_cast<DualSenseHapticsMode>(
+        settings.value(SER_DUALSENSEHAPTICSMODE, defaultDualSenseHapticsMode).toInt());
+    if (dualSenseHapticsMode != DSHM_PHYSICAL && dualSenseHapticsMode != DSHM_EMULATED) {
+        dualSenseHapticsMode = defaultDualSenseHapticsMode;
     }
 #ifndef Q_OS_WIN32
     // Native authored PCM currently requires the Windows WASAPI renderer.
@@ -430,7 +420,6 @@ void StreamingPreferences::save()
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
     settings.setValue(SER_NATIVETOUCHPAD, enableNativeTouchpad);
     settings.setValue(SER_DUALSENSEHAPTICSMODE, dualSenseHapticsMode);
-    settings.remove(SER_DUALSENSEHAPTICS);
     settings.setValue(SER_FRAMEPACING, framePacing);
     settings.setValue(SER_VIDEOENHANCEMENT, videoEnhancement);
     settings.setValue(SER_STREAMRESOLUTIONSCALE, streamResolutionScale);

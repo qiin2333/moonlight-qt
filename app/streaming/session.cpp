@@ -92,6 +92,7 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     nullptr, // resolutionChanged (unused on Qt client)
     Session::clClipboardData,
     Session::clCursorUpdate,
+    nullptr,
     nullptr
 };
 

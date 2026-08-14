@@ -1,4 +1,5 @@
 #include "dualsensehaptics.h"
+#include "dualsensehapticsstream.h"
 
 #include "SDL_compat.h"
 
@@ -37,7 +38,6 @@ using Microsoft::WRL::ComPtr;
 namespace {
 constexpr std::size_t MaxQueuedPackets = 32;
 constexpr std::uint32_t PrebufferFrames = 720; // 15 ms at 48 kHz
-constexpr auto StreamStarvationTimeout = std::chrono::milliseconds(20);
 
 struct Packet
 {
@@ -63,9 +63,7 @@ struct DualSenseHapticsRenderer::Impl
     WORD bitsPerSample = 0;
     bool floatSamples = false;
     bool streamStarted = false;
-    bool sequenceValid = false;
-    std::uint32_t expectedSequence = 0;
-    std::uint16_t activeController = 0;
+    dualsense_haptics::PcmStreamTracker streamTracker;
     std::deque<Packet> prebuffer;
     std::uint32_t prebufferedFrames = 0;
     std::chrono::steady_clock::time_point nextEndpointProbe{};
@@ -195,16 +193,21 @@ struct DualSenseHapticsRenderer::Impl
         return false;
     }
 
-    void resetStream()
+    void resetAudioStream()
     {
         if (audioClient) {
             if (streamStarted) audioClient->Stop();
             audioClient->Reset();
         }
         streamStarted = false;
-        sequenceValid = false;
         prebuffer.clear();
         prebufferedFrames = 0;
+    }
+
+    void resetStream()
+    {
+        resetAudioStream();
+        streamTracker.reset();
     }
 
     bool writePacket(const Packet& packet)
@@ -262,23 +265,18 @@ struct DualSenseHapticsRenderer::Impl
 
     void process(Packet packet)
     {
-        if (packet.flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_END) {
-            resetStream();
+        const auto action = streamTracker.observe(packet.flags, packet.controllerNumber,
+                                                  packet.sequenceNumber);
+        if (action == dualsense_haptics::PcmStreamTracker::Action::Ignore) {
             return;
         }
-
-        const bool discontinuity =
-            (packet.flags & (LI_DS5_HAPTICS_PCM_FLAG_STREAM_START |
-                             LI_DS5_HAPTICS_PCM_FLAG_DISCONTINUITY)) ||
-            (sequenceValid && packet.sequenceNumber != expectedSequence) ||
-            (sequenceValid && packet.controllerNumber != activeController);
-        if (discontinuity) {
-            resetStream();
+        if (action == dualsense_haptics::PcmStreamTracker::Action::End) {
+            resetAudioStream();
+            return;
         }
-
-        activeController = packet.controllerNumber;
-        expectedSequence = packet.sequenceNumber + 1;
-        sequenceValid = true;
+        if (action == dualsense_haptics::PcmStreamTracker::Action::ResetAndAccept) {
+            resetAudioStream();
+        }
 
         if (!audioClient) {
             const auto now = std::chrono::steady_clock::now();
@@ -352,15 +350,7 @@ struct DualSenseHapticsRenderer::Impl
             Packet packet;
             {
                 std::unique_lock lock(mutex);
-                if (!condition.wait_for(lock, StreamStarvationTimeout,
-                                        [this] { return stopping || !queue.empty(); })) {
-                    if (streamStarted || !prebuffer.empty()) {
-                        SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
-                                    "DualSense haptics stream starved; resetting jitter buffer");
-                        resetStream();
-                    }
-                    continue;
-                }
+                condition.wait(lock, [this] { return stopping || !queue.empty(); });
                 if (stopping) break;
                 packet = std::move(queue.front());
                 queue.pop_front();
