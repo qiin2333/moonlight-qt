@@ -219,6 +219,7 @@ public:
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
     Q_PROPERTY(bool keepAwake MEMBER keepAwake NOTIFY keepAwakeChanged)
     Q_PROPERTY(CaptureSysKeysMode captureSysKeysMode MEMBER captureSysKeysMode NOTIFY captureSysKeysModeChanged)
+    Q_PROPERTY(bool captureAltF4 MEMBER captureAltF4 NOTIFY captureAltF4Changed)
     Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged)
     Q_PROPERTY(int customScreenMode MEMBER customScreenMode NOTIFY customScreenModeChanged)
     Q_PROPERTY(int customVddScreenMode MEMBER customVddScreenMode NOTIFY customVddScreenModeChanged)
@@ -286,6 +287,7 @@ public:
     UIDisplayMode uiDisplayMode;
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
+    bool captureAltF4;
     int customScreenMode;
     int customVddScreenMode;
     bool enableMicrophone;
@@ -344,6 +346,7 @@ signals:
     void reverseScrollDirectionChanged();
     void swapFaceButtonsChanged();
     void captureSysKeysModeChanged();
+    void captureAltF4Changed();
     void keepAwakeChanged();
     void languageChanged();
     void customScreenModeChanged();
