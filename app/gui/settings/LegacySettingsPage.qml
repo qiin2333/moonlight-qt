@@ -782,24 +782,6 @@ Column {
                 }
 
                 HardCheckBox {
-                    id: captureAltF4Check
-                    visible: Qt.platform.os === "windows"
-                    hoverEnabled: true
-                    width: parent.width
-                    text: qsTr("Send Alt+F4 to the remote computer")
-                    font.pointSize: 12
-                    checked: StreamingPreferences.captureAltF4
-                    onCheckedChanged: {
-                        StreamingPreferences.captureAltF4 = checked
-                    }
-
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 10000
-                    ToolTip.visible: hovered
-                    ToolTip.text: qsTr("This prevents Alt+F4 from closing the streaming window and sends the shortcut to the remote computer instead.")
-                }
-
-                HardCheckBox {
                     id: absoluteTouchCheck
                     hoverEnabled: true
                     width: parent.width

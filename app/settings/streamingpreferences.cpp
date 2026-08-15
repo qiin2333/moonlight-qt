@@ -63,7 +63,6 @@
 #define SER_REVERSESCROLL "reversescroll"
 #define SER_SWAPFACEBUTTONS "swapfacebuttons"
 #define SER_CAPTURESYSKEYS "capturesyskeys"
-#define SER_CAPTUREALTF4 "capturealtf4"
 #define SER_KEEPAWAKE "keepawake"
 #define SER_LANGUAGE "language"
 #define SER_CUSTOMSCREENMODE "customscreenmode"
@@ -233,7 +232,6 @@ void StreamingPreferences::reload()
     hdrMaxAverageBrightness = settings.value(SER_HDRMAXAVERAGEBRIGHTNESS, 1000.0).toDouble();
     captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS,
                                                          static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
-    captureAltF4 = settings.value(SER_CAPTUREALTF4, true).toBool();
     audioConfig = static_cast<AudioConfig>(settings.value(SER_AUDIOCFG,
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
@@ -461,7 +459,6 @@ void StreamingPreferences::save()
     settings.setValue(SER_REVERSESCROLL, reverseScrollDirection);
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
-    settings.setValue(SER_CAPTUREALTF4, captureAltF4);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
     settings.setValue(SER_CUSTOMSCREENMODE, customScreenMode);
     settings.setValue(SER_CUSTOMVDDSCREENMODE, customVddScreenMode);

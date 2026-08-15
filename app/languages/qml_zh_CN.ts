@@ -1180,16 +1180,6 @@
         <translation>总是</translation>
     </message>
     <message>
-        <location filename="../gui/settings/LegacySettingsPage.qml" line="789"/>
-        <source>Send Alt+F4 to the remote computer</source>
-        <translation>将 Alt+F4 发送到远程电脑</translation>
-    </message>
-    <message>
-        <location filename="../gui/settings/LegacySettingsPage.qml" line="799"/>
-        <source>This prevents Alt+F4 from closing the streaming window and sends the shortcut to the remote computer instead.</source>
-        <translation>这会阻止 Alt+F4 关闭串流窗口，改为将该快捷键发送到远程电脑。</translation>
-    </message>
-    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="787"/>
         <source>Use touchscreen as a virtual trackpad</source>
         <translation>将触摸屏用作虚拟触控板</translation>

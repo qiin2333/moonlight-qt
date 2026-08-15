@@ -179,9 +179,9 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     SDL_SetHint(SDL_HINT_ALLOW_ALT_TAB_WHILE_GRABBED, "0");
 
 #ifdef Q_OS_WIN32
-    // Alt+F4 should be delivered as keyboard input instead of closing the
-    // streaming window when remote handling is enabled.
-    SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, prefs.captureAltF4 ? "1" : "0");
+    // Keep Alt+F4 in the keyboard input path for the entire streaming session,
+    // including when the stream is running in a window.
+    SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, "1");
 #endif
 
     // Allow clicks to pass through to us when focusing the window. If we're in
