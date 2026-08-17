@@ -65,8 +65,9 @@
 #define SER_CAPTURESYSKEYS "capturesyskeys"
 #define SER_KEEPAWAKE "keepawake"
 #define SER_LANGUAGE "language"
-#define SER_CUSTOMSCREENMODE "customscreenmode"
-#define SER_CUSTOMVDDSCREENMODE "customvddscreenmode"
+#define SER_SCREENCOMBINATIONMODE "screencombinationmode"
+#define SER_LEGACY_CUSTOMSCREENMODE "customscreenmode"
+#define SER_LEGACY_CUSTOMVDDSCREENMODE "customvddscreenmode"
 #define SER_SHOWLOCALCURSOR "showLocalCursor"
 #define SER_MICROPHONE "microphone"
 #define SER_OVERLAYMENUPOS "overlaymenuposition"
@@ -249,8 +250,45 @@ void StreamingPreferences::reload()
                                                                                                                  : UIDisplayMode::UI_MAXIMIZED)).toInt());
     language = static_cast<Language>(settings.value(SER_LANGUAGE,
                                                     static_cast<int>(Language::LANG_AUTO)).toInt());
-    customScreenMode = settings.value(SER_CUSTOMSCREENMODE, -1).toInt();
-    customVddScreenMode = settings.value(SER_CUSTOMVDDSCREENMODE, -1).toInt();
+    if (settings.contains(SER_SCREENCOMBINATIONMODE)) {
+        screenCombinationMode = settings.value(SER_SCREENCOMBINATIONMODE, -1).toInt();
+    }
+    else {
+        const int legacyScreenMode = settings.value(SER_LEGACY_CUSTOMSCREENMODE, -1).toInt();
+        const int legacyVddMode = settings.value(SER_LEGACY_CUSTOMVDDSCREENMODE, -1).toInt();
+
+        if (legacyScreenMode != -1) {
+            screenCombinationMode = legacyScreenMode;
+        }
+        else {
+            // The old VDD modes used 1 and 2 for primary and secondary layouts.
+            // The unified Sunshine modes use 2 and 4 for those states.
+            switch (legacyVddMode) {
+            case 1:
+                screenCombinationMode = 2;
+                break;
+            case 2:
+                screenCombinationMode = 4;
+                break;
+            default:
+                screenCombinationMode = legacyVddMode;
+                break;
+            }
+        }
+    }
+
+    switch (screenCombinationMode) {
+    case -1:
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+        break;
+    default:
+        screenCombinationMode = -1;
+        break;
+    }
 
     // Perform default settings updates as required based on last default version
     if (defaultVer < 1) {
@@ -460,8 +498,9 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
-    settings.setValue(SER_CUSTOMSCREENMODE, customScreenMode);
-    settings.setValue(SER_CUSTOMVDDSCREENMODE, customVddScreenMode);
+    settings.setValue(SER_SCREENCOMBINATIONMODE, screenCombinationMode);
+    settings.remove(SER_LEGACY_CUSTOMSCREENMODE);
+    settings.remove(SER_LEGACY_CUSTOMVDDSCREENMODE);
     settings.setValue(SER_MICROPHONE, enableMicrophone);
     settings.setValue(SER_OVERLAYMENUPOS, static_cast<int>(overlayMenuPosition));
     settings.setValue(SER_AUTOUPDATECHECK, autoUpdateCheck);
