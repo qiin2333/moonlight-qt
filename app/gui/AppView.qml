@@ -124,6 +124,7 @@ CenteredGridView {
     // 加载显示器列表
     function loadDisplays() {
         var displays = appModel.getDisplayList()
+        var selectedDisplayStillAvailable = selectedDisplayId === "" || selectedDisplayId === "vdd"
         displayList = displays
         displayListModel.clear()
         for (var i = 0; i < displays.length; i++) {
@@ -133,6 +134,16 @@ CenteredGridView {
                 "displayTarget": displays[i].target,
                 "displayIndex": displays[i].index
             })
+
+            if (selectedDisplayId === displays[i].id &&
+                    selectedDisplayTarget === displays[i].target) {
+                selectedDisplayStillAvailable = true
+            }
+        }
+
+        if (!selectedDisplayStillAvailable) {
+            selectedDisplayId = ""
+            selectedDisplayTarget = ""
         }
     }
 
