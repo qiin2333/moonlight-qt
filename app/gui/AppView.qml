@@ -38,8 +38,10 @@ CenteredGridView {
     bottomMargin: 5
     cellWidth: 230; cellHeight: 297;
 
-    // 当前选中显示器: "" = 未选, "vdd" = VDD, 其他 = 物理显示器 guid
+    // 当前选中显示器的界面 ID: "" = 未选, "vdd" = VDD, 其他 = 唯一的物理显示器 ID
     property string selectedDisplayId: ""
+    // 实际发送给 Sunshine 的显示器目标；与界面 ID 分开，避免同名显示器互相覆盖
+    property string selectedDisplayTarget: ""
     // 当前选中是否 VDD
     property bool isVddSelected: selectedDisplayId === "vdd"
     // 物理显示器列表
@@ -127,7 +129,8 @@ CenteredGridView {
         for (var i = 0; i < displays.length; i++) {
             displayListModel.append({
                 "displayName": displays[i].name,
-                "displayGuid": displays[i].guid,
+                "displayId": displays[i].id,
+                "displayTarget": displays[i].target,
                 "displayIndex": displays[i].index
             })
         }
@@ -198,11 +201,15 @@ CenteredGridView {
 
                 DisplayChip {
                     id: hostDefaultChip
-                    text: qsTr("Default")
+                    //: Display option that lets the host choose the display.
+                    text: qsTr("Default", "display selection")
                     selected: selectedDisplayId === ""
                     navDownItem: combinationModeSelector.firstItem
 
-                    onClicked: selectedDisplayId = ""
+                    onClicked: {
+                        selectedDisplayId = ""
+                        selectedDisplayTarget = ""
+                    }
                 }
 
                 // 动态物理显示器按钮
@@ -211,10 +218,13 @@ CenteredGridView {
 
                     DisplayChip {
                         text: model.displayName
-                        selected: selectedDisplayId === model.displayGuid
+                        selected: selectedDisplayId === model.displayId
                         navDownItem: combinationModeSelector.firstItem
 
-                        onClicked: selectedDisplayId = model.displayGuid
+                        onClicked: {
+                            selectedDisplayId = model.displayId
+                            selectedDisplayTarget = model.displayTarget
+                        }
                     }
                 }
 
@@ -227,7 +237,10 @@ CenteredGridView {
                     selectedBorder: Theme.acid
                     navDownItem: combinationModeSelector.firstItem
 
-                    onClicked: selectedDisplayId = "vdd"
+                    onClicked: {
+                        selectedDisplayId = "vdd"
+                        selectedDisplayTarget = "vdd"
+                    }
                 }
             }
 
@@ -660,7 +673,7 @@ CenteredGridView {
             var segue = component.createObject(stackView, {
                                                    "appName": model.name,
                                                    "boxArtUrl": model.boxart,
-                                                   "session": appModel.createSessionForApp(index, selectedDisplayId),
+                                                   "session": appModel.createSessionForApp(index, selectedDisplayTarget),
                                                    "isResume": runningId === model.appid
                                                })
             stackView.push(segue)
@@ -843,7 +856,7 @@ CenteredGridView {
                 // successfully quitting the old app.
                 params.nextAppName = nextAppName
                 params.nextBoxArtUrl = appModel.data(appModel.index(nextAppIndex, 0), boxArtRole)
-                params.nextSession = appModel.createSessionForApp(nextAppIndex, selectedDisplayId)
+                params.nextSession = appModel.createSessionForApp(nextAppIndex, selectedDisplayTarget)
             }
             else {
                 params.nextAppName = null

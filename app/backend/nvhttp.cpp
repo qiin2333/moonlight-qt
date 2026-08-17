@@ -437,22 +437,24 @@ NvHTTP::getDisplays()
         for (int i = 0; i < displaysArray.size(); i++) {
             QJsonObject displayObj = displaysArray[i].toObject();
 
+            const QString displayName = displayObj.value("display_name").toString();
             QString friendlyName = displayObj.value("friendly_name").toString();
             if (friendlyName.isEmpty()) {
-                friendlyName = displayObj.value("display_name").toString();
+                friendlyName = displayName;
             }
             if (friendlyName.isEmpty()) {
                 friendlyName = QString("Display %1").arg(i + 1);
             }
 
-            QString guid = displayObj.value("device_id").toString();
-            if (guid.isEmpty()) {
-                guid = friendlyName;
+            QString displayTarget = displayObj.value("device_id").toString();
+            if (displayTarget.isEmpty()) {
+                displayTarget = displayName.isEmpty() ? friendlyName : displayName;
             }
 
             QVariantMap display;
             display["name"] = friendlyName;
-            display["guid"] = guid;
+            display["id"] = QStringLiteral("physical:%1:%2").arg(i).arg(displayTarget);
+            display["target"] = displayTarget;
             display["index"] = i;
             displays.append(display);
         }

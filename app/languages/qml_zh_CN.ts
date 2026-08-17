@@ -42,22 +42,21 @@
 <context>
     <name>AppView</name>
     <message>
-        <location filename="../gui/AppView.qml" line="153"/>
+        <location filename="../gui/AppView.qml" line="156"/>
         <source>Display Settings</source>
         <translation>显示设置</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="191"/>
+        <location filename="../gui/AppView.qml" line="194"/>
         <source>Select Display:</source>
         <translation>选择显示器：</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="201"/>
         <source>Default</source>
-        <translation>默认</translation>
+        <translation type="vanished">默认</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="224"/>
+        <location filename="../gui/AppView.qml" line="234"/>
         <source>VDD Display</source>
         <translation>VDD 虚拟显示器</translation>
     </message>
@@ -66,7 +65,7 @@
         <translation type="vanished">VDD 组合模式：</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="245"/>
+        <location filename="../gui/AppView.qml" line="258"/>
         <source>Screen Combination Mode:</source>
         <translation>屏幕组合模式：</translation>
     </message>
@@ -107,35 +106,35 @@
         <translation type="vanished">仅 VDD（关闭物理显示器）</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="557"/>
-        <location filename="../gui/AppView.qml" line="738"/>
+        <location filename="../gui/AppView.qml" line="570"/>
+        <location filename="../gui/AppView.qml" line="751"/>
         <source>Resume Game</source>
         <translation>继续游戏</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="578"/>
-        <location filename="../gui/AppView.qml" line="742"/>
+        <location filename="../gui/AppView.qml" line="591"/>
+        <location filename="../gui/AppView.qml" line="755"/>
         <source>Quit Game</source>
         <translation>退出游戏</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="617"/>
+        <location filename="../gui/AppView.qml" line="630"/>
         <source>Live</source>
         <translation>运行中</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="639"/>
+        <location filename="../gui/AppView.qml" line="652"/>
         <source>Hidden</source>
         <translation>已隐藏</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="738"/>
+        <location filename="../gui/AppView.qml" line="751"/>
         <source>Launch Game</source>
         <translation>启动游戏</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="511"/>
-        <location filename="../gui/AppView.qml" line="749"/>
+        <location filename="../gui/AppView.qml" line="524"/>
+        <location filename="../gui/AppView.qml" line="762"/>
         <source>Direct Launch</source>
         <translation>直接启动</translation>
     </message>
@@ -144,42 +143,49 @@
         <translation type="vanished">跟随主机</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="753"/>
+        <location filename="../gui/AppView.qml" line="205"/>
+        <source>Default</source>
+        <comment>display selection</comment>
+        <extracomment>Display option that lets the host choose the display.</extracomment>
+        <translation>默认</translation>
+    </message>
+    <message>
+        <location filename="../gui/AppView.qml" line="766"/>
         <source>Launch this app immediately when the host is selected, bypassing the app selection grid.</source>
         <translation>选择主机后立即启动此应用程序，绕过应用程序选择网格。</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="761"/>
+        <location filename="../gui/AppView.qml" line="774"/>
         <source>Hide Game</source>
         <translation>隐藏游戏</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="765"/>
+        <location filename="../gui/AppView.qml" line="778"/>
         <source>Hide this game from the app grid. To access hidden games, right-click on the host and choose %1.</source>
         <translation>从应用程序网格中隐藏此游戏。要访问隐藏的游戏，请右键单击主机并选择 %1。</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="765"/>
+        <location filename="../gui/AppView.qml" line="778"/>
         <source>View All Apps</source>
         <translation>查看所有应用程序</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="783"/>
+        <location filename="../gui/AppView.qml" line="796"/>
         <source>No Apps</source>
         <translation>没有应用</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="801"/>
+        <location filename="../gui/AppView.qml" line="814"/>
         <source>This computer doesn&apos;t seem to have any applications or some applications are hidden</source>
         <translation>这台计算机上似乎没有任何应用程序，或者有些应用程序已被隐藏</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="815"/>
+        <location filename="../gui/AppView.qml" line="828"/>
         <source>Select the IP address to connect to this PC:</source>
         <translation>选择连接这台计算机使用的 IP 地址：</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="835"/>
+        <location filename="../gui/AppView.qml" line="848"/>
         <source>Are you sure you want to quit %1? Any unsaved progress will be lost.</source>
         <translation>你确定要退出 %1 吗？所有未保存的游戏进度都将丢失。</translation>
     </message>
@@ -1426,7 +1432,7 @@
 <context>
     <name>NvHTTP</name>
     <message>
-        <location filename="../backend/nvhttp.cpp" line="495"/>
+        <location filename="../backend/nvhttp.cpp" line="497"/>
         <source>Missing audio capture device. Reinstalling GeForce Experience should resolve this error.</source>
         <translation>缺少音频捕获设备。重新安装 GeForce Experience 可以解决此错误。</translation>
     </message>
@@ -2242,67 +2248,71 @@
 <context>
     <name>ScreenCombinationModeSelector</name>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="33"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="21"/>
         <source>Follow host</source>
         <translation>跟随主机</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="34"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="22"/>
         <source>Use the Sunshine host setting without overriding it.</source>
         <translation>使用 Sunshine 主机端配置，不覆盖屏幕组合设置。</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="38"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="26"/>
         <source>No operation mode</source>
         <translation>无操作模式</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="39"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="27"/>
         <source>Send no-operation mode and keep the current display layout.</source>
         <translation>保持当前屏幕布局，不调整显示器拓扑。</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="43"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="31"/>
         <source>Activate mode</source>
         <translation>激活模式</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="44"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="32"/>
         <source>Activate the selected display for streaming.</source>
         <translation>自动激活指定显示器用于串流。</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="48"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="36"/>
         <source>Primary streaming mode</source>
         <translation>主屏串流模式</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="49"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="37"/>
         <source>Activate the selected display and set it as primary.</source>
         <translation>自动激活指定显示器并设为主显示器。</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="53"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="41"/>
         <source>Secondary streaming mode</source>
         <translation>副屏串流模式</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="54"/>
-        <source>Keep the physical display primary and use the Foundation display as secondary.</source>
-        <translation>物理屏为主屏，基地显示器作为副屏扩展。</translation>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="42"/>
+        <source>Keep the current primary display and use the selected display as secondary.</source>
+        <translation>保留当前主显示器，并将所选显示器作为副屏使用。</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="58"/>
+        <source>Keep the physical display primary and use the Foundation display as secondary.</source>
+        <translation type="vanished">物理屏为主屏，基地显示器作为副屏扩展。</translation>
+    </message>
+    <message>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="46"/>
         <source>Exclusive display streaming mode</source>
         <translation>仅启用指定显示器模式</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="59"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="47"/>
         <source>Use only the selected display and disable other displays.</source>
         <translation>仅保留指定显示器输出，关闭其他显示器。</translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="169"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="166"/>
         <source>Selected</source>
         <translation>已选择</translation>
     </message>

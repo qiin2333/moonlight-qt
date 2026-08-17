@@ -15,7 +15,39 @@ Item {
     property Item navDownItem: null
     readonly property int columns: compact ? 3 : 2
     readonly property Item firstItem: optionRepeater.count > 0 ? optionRepeater.itemAt(0) : null
-    readonly property int optionCount: modeModel.count
+    readonly property int optionCount: modes.length
+    readonly property var modes: [
+        {
+            "title": qsTr("Follow host"),
+            "description": qsTr("Use the Sunshine host setting without overriding it."),
+            "modeValue": StreamingPreferences.SCM_FOLLOW_HOST
+        },
+        {
+            "title": qsTr("No operation mode"),
+            "description": qsTr("Send no-operation mode and keep the current display layout."),
+            "modeValue": StreamingPreferences.SCM_NO_OPERATION
+        },
+        {
+            "title": qsTr("Activate mode"),
+            "description": qsTr("Activate the selected display for streaming."),
+            "modeValue": StreamingPreferences.SCM_ENSURE_ACTIVE
+        },
+        {
+            "title": qsTr("Primary streaming mode"),
+            "description": qsTr("Activate the selected display and set it as primary."),
+            "modeValue": StreamingPreferences.SCM_ENSURE_PRIMARY
+        },
+        {
+            "title": qsTr("Secondary streaming mode"),
+            "description": qsTr("Keep the current primary display and use the selected display as secondary."),
+            "modeValue": StreamingPreferences.SCM_ENSURE_SECONDARY
+        },
+        {
+            "title": qsTr("Exclusive display streaming mode"),
+            "description": qsTr("Use only the selected display and disable other displays."),
+            "modeValue": StreamingPreferences.SCM_ENSURE_ONLY_DISPLAY
+        }
+    ]
 
     implicitHeight: optionGrid.implicitHeight
 
@@ -23,41 +55,6 @@ Item {
         StreamingPreferences.screenCombinationMode = modeValue
         if (saveOnSelection) {
             StreamingPreferences.save()
-        }
-    }
-
-    ListModel {
-        id: modeModel
-
-        ListElement {
-            title: qsTr("Follow host")
-            description: qsTr("Use the Sunshine host setting without overriding it.")
-            modeValue: -1
-        }
-        ListElement {
-            title: qsTr("No operation mode")
-            description: qsTr("Send no-operation mode and keep the current display layout.")
-            modeValue: 0
-        }
-        ListElement {
-            title: qsTr("Activate mode")
-            description: qsTr("Activate the selected display for streaming.")
-            modeValue: 1
-        }
-        ListElement {
-            title: qsTr("Primary streaming mode")
-            description: qsTr("Activate the selected display and set it as primary.")
-            modeValue: 2
-        }
-        ListElement {
-            title: qsTr("Secondary streaming mode")
-            description: qsTr("Keep the physical display primary and use the Foundation display as secondary.")
-            modeValue: 4
-        }
-        ListElement {
-            title: qsTr("Exclusive display streaming mode")
-            description: qsTr("Use only the selected display and disable other displays.")
-            modeValue: 3
         }
     }
 
@@ -71,12 +68,12 @@ Item {
 
         Repeater {
             id: optionRepeater
-            model: modeModel
+            model: selector.modes
 
             AbstractButton {
                 id: optionButton
 
-                readonly property bool selected: StreamingPreferences.screenCombinationMode === model.modeValue
+                readonly property bool selected: StreamingPreferences.screenCombinationMode === modelData.modeValue
 
                 Layout.fillWidth: true
                 Layout.preferredWidth: (selector.width - optionGrid.columnSpacing * (selector.columns - 1)) / selector.columns
@@ -85,7 +82,7 @@ Item {
                 activeFocusOnTab: true
                 hoverEnabled: true
 
-                onClicked: selector.selectMode(model.modeValue)
+                onClicked: selector.selectMode(modelData.modeValue)
 
                 KeyNavigation.left: index % selector.columns > 0
                                     ? optionRepeater.itemAt(index - 1) : null
@@ -126,7 +123,7 @@ Item {
                         anchors.left: parent.left
                         anchors.leftMargin: Theme.spaceSm + (optionButton.selected ? Theme.accentBar : 0)
                         anchors.verticalCenter: parent.verticalCenter
-                        modeValue: model.modeValue
+                        modeValue: modelData.modeValue
                         selected: optionButton.selected
                     }
 
@@ -142,7 +139,7 @@ Item {
 
                         Text {
                             width: parent.width
-                            text: model.title
+                            text: modelData.title
                             color: Theme.text
                             font.family: Theme.fontSans
                             font.pointSize: selector.compact ? Theme.fontCaption : Theme.fontRowTitle
@@ -155,7 +152,7 @@ Item {
                         Text {
                             width: parent.width
                             visible: !selector.compact
-                            text: model.description
+                            text: modelData.description
                             color: Theme.textDim
                             font.family: Theme.fontMono
                             font.pointSize: Theme.fontCaption
@@ -176,7 +173,7 @@ Item {
                 ToolTip.delay: 500
                 ToolTip.timeout: 10000
                 ToolTip.visible: selector.compact && hovered
-                ToolTip.text: model.title + "\n" + model.description
+                ToolTip.text: modelData.title + "\n" + modelData.description
             }
         }
     }

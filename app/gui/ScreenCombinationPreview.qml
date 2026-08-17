@@ -1,11 +1,13 @@
 import QtQuick 2.9
 
+import StreamingPreferences 1.0
+
 import "theme"
 
 Canvas {
     id: preview
 
-    property int modeValue: -1
+    property int modeValue: StreamingPreferences.SCM_FOLLOW_HOST
     property bool selected: false
 
     antialiasing: true
@@ -108,28 +110,28 @@ Canvas {
         var middleY = screenY + screenHeight * 0.5
 
         switch (modeValue) {
-        case -1:
+        case StreamingPreferences.SCM_FOLLOW_HOST:
             drawDisplay(ctx, leftX, screenY, screenWidth, screenHeight, idleFill, idleStroke)
             drawDisplay(ctx, rightX, screenY, screenWidth, screenHeight, idleFill, idleStroke)
             drawConnection(ctx, leftX + screenWidth + 5, rightX - 5, middleY, idleStroke)
             drawGear(ctx, leftX + screenWidth * 0.5, middleY, idleStroke)
             break
-        case 0:
+        case StreamingPreferences.SCM_NO_OPERATION:
             drawDisplay(ctx, leftX, screenY, screenWidth, screenHeight, "transparent", mutedStroke)
             drawDisplay(ctx, rightX, screenY, screenWidth, screenHeight, "transparent", mutedStroke)
             drawPause(ctx, width * 0.5, middleY, idleStroke)
             break
-        case 1:
+        case StreamingPreferences.SCM_ENSURE_ACTIVE:
             drawDisplay(ctx, leftX, screenY, screenWidth, screenHeight, idleFill, idleStroke)
             drawArrow(ctx, leftX + screenWidth + 5, rightX - 5, middleY, Theme.accent)
             drawDisplay(ctx, rightX, screenY, screenWidth, screenHeight, activeFill, activeStroke)
             break
-        case 2:
+        case StreamingPreferences.SCM_ENSURE_PRIMARY:
             drawDisplay(ctx, leftX, screenY, screenWidth, screenHeight, idleFill, idleStroke)
             drawDisplay(ctx, rightX, screenY, screenWidth, screenHeight, activeFill, activeStroke)
             drawPrimaryBadge(ctx, rightX + screenWidth * 0.5, screenY - 2, activeStroke)
             break
-        case 4:
+        case StreamingPreferences.SCM_ENSURE_SECONDARY:
             drawDisplay(ctx, leftX, screenY, screenWidth, screenHeight,
                         Qt.rgba(0.93, 0.94, 0.92, 0.20), Theme.text)
             drawPrimaryBadge(ctx, leftX + screenWidth * 0.5, screenY - 2, Theme.text)
@@ -137,7 +139,7 @@ Canvas {
             drawDisplay(ctx, rightX, screenY, screenWidth, screenHeight,
                         Qt.rgba(0.22, 0.77, 0.73, 0.22), activeStroke)
             break
-        case 3:
+        case StreamingPreferences.SCM_ENSURE_ONLY_DISPLAY:
             var sideWidth = width * 0.22
             var sideHeight = height * 0.34
             var sideY = height * 0.29

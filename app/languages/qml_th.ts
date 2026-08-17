@@ -42,100 +42,102 @@
 <context>
     <name>AppView</name>
     <message>
-        <location filename="../gui/AppView.qml" line="153"/>
+        <location filename="../gui/AppView.qml" line="156"/>
         <source>Display Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="191"/>
+        <location filename="../gui/AppView.qml" line="194"/>
         <source>Select Display:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="201"/>
-        <source>Default</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../gui/AppView.qml" line="224"/>
+        <location filename="../gui/AppView.qml" line="234"/>
         <source>VDD Display</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="245"/>
+        <location filename="../gui/AppView.qml" line="258"/>
         <source>Screen Combination Mode:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="557"/>
-        <location filename="../gui/AppView.qml" line="738"/>
+        <location filename="../gui/AppView.qml" line="570"/>
+        <location filename="../gui/AppView.qml" line="751"/>
         <source>Resume Game</source>
         <translation>กลับสู่เกม</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="578"/>
-        <location filename="../gui/AppView.qml" line="742"/>
+        <location filename="../gui/AppView.qml" line="591"/>
+        <location filename="../gui/AppView.qml" line="755"/>
         <source>Quit Game</source>
         <translation>ออกจากเกม</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="617"/>
+        <location filename="../gui/AppView.qml" line="630"/>
         <source>Live</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="639"/>
+        <location filename="../gui/AppView.qml" line="652"/>
         <source>Hidden</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="738"/>
+        <location filename="../gui/AppView.qml" line="751"/>
         <source>Launch Game</source>
         <translation>เปิดเกม</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="511"/>
-        <location filename="../gui/AppView.qml" line="749"/>
+        <location filename="../gui/AppView.qml" line="524"/>
+        <location filename="../gui/AppView.qml" line="762"/>
         <source>Direct Launch</source>
         <translation>เปิดเกมโดยตรง</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="753"/>
+        <location filename="../gui/AppView.qml" line="205"/>
+        <source>Default</source>
+        <comment>display selection</comment>
+        <extracomment>Display option that lets the host choose the display.</extracomment>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/AppView.qml" line="766"/>
         <source>Launch this app immediately when the host is selected, bypassing the app selection grid.</source>
         <translation>เปิดแอปนี้ทันทีเมื่อโฮสต์ถูกเลือก โดยข้ามตารางเลือกแอป</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="761"/>
+        <location filename="../gui/AppView.qml" line="774"/>
         <source>Hide Game</source>
         <translation>ซ่อนเกม</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="765"/>
+        <location filename="../gui/AppView.qml" line="778"/>
         <source>Hide this game from the app grid. To access hidden games, right-click on the host and choose %1.</source>
         <translation>ซ่อนเกมนี้จากตารางแอป หากต้องการเข้าถึงเกมที่ซ่อนอยู่ ให้คลิกขวาที่โฮสต์แล้วเลือก %1</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="765"/>
+        <location filename="../gui/AppView.qml" line="778"/>
         <source>View All Apps</source>
         <translation>ดูแอปทั้งหมด</translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="783"/>
+        <location filename="../gui/AppView.qml" line="796"/>
         <source>No Apps</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="801"/>
+        <location filename="../gui/AppView.qml" line="814"/>
         <source>This computer doesn&apos;t seem to have any applications or some applications are hidden</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="815"/>
+        <location filename="../gui/AppView.qml" line="828"/>
         <source>Select the IP address to connect to this PC:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/AppView.qml" line="835"/>
+        <location filename="../gui/AppView.qml" line="848"/>
         <source>Are you sure you want to quit %1? Any unsaved progress will be lost.</source>
         <translation>คุณแน่ใจว่าคุณต้องการออกจาก %1? ความคืบหน้าใด ๆ ที่ไม่ได้ถูกบันทึกไว้จะสูญหายไป</translation>
     </message>
@@ -1338,7 +1340,7 @@
 <context>
     <name>NvHTTP</name>
     <message>
-        <location filename="../backend/nvhttp.cpp" line="495"/>
+        <location filename="../backend/nvhttp.cpp" line="497"/>
         <source>Missing audio capture device. Reinstalling GeForce Experience should resolve this error.</source>
         <translation>ไม่พบอุปกรณ์จับเสียง ติดตั้ง GeForce Experience ใหม่ควรจะแก้ไขข้อผิดพลาดนี้ได้</translation>
     </message>
@@ -2103,67 +2105,67 @@
 <context>
     <name>ScreenCombinationModeSelector</name>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="33"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="21"/>
         <source>Follow host</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="34"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="22"/>
         <source>Use the Sunshine host setting without overriding it.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="38"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="26"/>
         <source>No operation mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="39"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="27"/>
         <source>Send no-operation mode and keep the current display layout.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="43"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="31"/>
         <source>Activate mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="44"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="32"/>
         <source>Activate the selected display for streaming.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="48"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="36"/>
         <source>Primary streaming mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="49"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="37"/>
         <source>Activate the selected display and set it as primary.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="53"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="41"/>
         <source>Secondary streaming mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="54"/>
-        <source>Keep the physical display primary and use the Foundation display as secondary.</source>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="42"/>
+        <source>Keep the current primary display and use the selected display as secondary.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="58"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="46"/>
         <source>Exclusive display streaming mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="59"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="47"/>
         <source>Use only the selected display and disable other displays.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/ScreenCombinationModeSelector.qml" line="169"/>
+        <location filename="../gui/ScreenCombinationModeSelector.qml" line="166"/>
         <source>Selected</source>
         <translation type="unfinished"></translation>
     </message>

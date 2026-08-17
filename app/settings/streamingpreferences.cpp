@@ -250,45 +250,39 @@ void StreamingPreferences::reload()
                                                                                                                  : UIDisplayMode::UI_MAXIMIZED)).toInt());
     language = static_cast<Language>(settings.value(SER_LANGUAGE,
                                                     static_cast<int>(Language::LANG_AUTO)).toInt());
+    int storedScreenCombinationMode;
     if (settings.contains(SER_SCREENCOMBINATIONMODE)) {
-        screenCombinationMode = settings.value(SER_SCREENCOMBINATIONMODE, -1).toInt();
+        storedScreenCombinationMode = settings.value(SER_SCREENCOMBINATIONMODE, SCM_FOLLOW_HOST).toInt();
     }
     else {
         const int legacyScreenMode = settings.value(SER_LEGACY_CUSTOMSCREENMODE, -1).toInt();
         const int legacyVddMode = settings.value(SER_LEGACY_CUSTOMVDDSCREENMODE, -1).toInt();
 
         if (legacyScreenMode != -1) {
-            screenCombinationMode = legacyScreenMode;
+            storedScreenCombinationMode = legacyScreenMode;
         }
         else {
             // The old VDD modes used 1 and 2 for primary and secondary layouts.
             // The unified Sunshine modes use 2 and 4 for those states.
             switch (legacyVddMode) {
             case 1:
-                screenCombinationMode = 2;
+                storedScreenCombinationMode = SCM_ENSURE_PRIMARY;
                 break;
             case 2:
-                screenCombinationMode = 4;
+                storedScreenCombinationMode = SCM_ENSURE_SECONDARY;
                 break;
             default:
-                screenCombinationMode = legacyVddMode;
+                storedScreenCombinationMode = legacyVddMode;
                 break;
             }
         }
     }
 
-    switch (screenCombinationMode) {
-    case -1:
-    case 0:
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-        break;
-    default:
-        screenCombinationMode = -1;
-        break;
+    if (storedScreenCombinationMode < SCM_FOLLOW_HOST ||
+            storedScreenCombinationMode > SCM_ENSURE_SECONDARY) {
+        storedScreenCombinationMode = SCM_FOLLOW_HOST;
     }
+    screenCombinationMode = static_cast<ScreenCombinationMode>(storedScreenCombinationMode);
 
     // Perform default settings updates as required based on last default version
     if (defaultVer < 1) {
@@ -498,7 +492,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
-    settings.setValue(SER_SCREENCOMBINATIONMODE, screenCombinationMode);
+    settings.setValue(SER_SCREENCOMBINATIONMODE, static_cast<int>(screenCombinationMode));
     settings.remove(SER_LEGACY_CUSTOMSCREENMODE);
     settings.remove(SER_LEGACY_CUSTOMVDDSCREENMODE);
     settings.setValue(SER_MICROPHONE, enableMicrophone);
