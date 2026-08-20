@@ -41,11 +41,11 @@ ApplicationWindow {
         titleBar: titleDragRegion
     }
 
-    // Windows 使用真正的无边框窗口，避免不可见的系统边框占用全屏内容区；移动、
-    // 缩放和最大化由 WindowsWindowChrome 的原生命中测试提供。macOS 和 Linux
-    // 保留扩展客户区，由各自窗口系统继续处理原生标题栏行为。
+    // Windows 保留标准顶层窗口状态和系统命令，只由 WindowsWindowChrome 移除
+    // 非客户区并绘制自定义标题栏。macOS 和 Linux 保留扩展客户区，由各自窗口
+    // 系统继续处理原生标题栏行为。
     flags: Qt.platform.os === "windows"
-           ? Qt.Window | Qt.FramelessWindowHint
+           ? Qt.Window
            : Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
 
     // 加了上面那两个 flag 之后窗口的可绘制区域顶到了最上沿，但 ApplicationWindow 仍然
@@ -775,29 +775,22 @@ ApplicationWindow {
                 controlType: "minimize"
                 accessibleName: qsTr("Minimize")
                 highlightColor: Theme.acid
-                onClicked: window.showMinimized()
+                onClicked: windowsWindowChrome.minimize()
             }
 
             WindowControlButton {
-                controlType: window.visibility === Window.Maximized ? "restore" : "maximize"
-                accessibleName: window.visibility === Window.Maximized
+                controlType: windowsWindowChrome.maximized ? "restore" : "maximize"
+                accessibleName: windowsWindowChrome.maximized
                                 ? qsTr("Restore") : qsTr("Maximize")
                 highlightColor: Theme.accent
-                onClicked: {
-                    if (window.visibility === Window.Maximized) {
-                        window.showNormal()
-                    }
-                    else {
-                        window.showMaximized()
-                    }
-                }
+                onClicked: windowsWindowChrome.toggleMaximized()
             }
 
             WindowControlButton {
                 controlType: "close"
                 accessibleName: qsTr("Close")
                 highlightColor: Theme.danger
-                onClicked: window.close()
+                onClicked: windowsWindowChrome.close()
             }
         }
     }
