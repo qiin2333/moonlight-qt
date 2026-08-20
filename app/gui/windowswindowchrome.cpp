@@ -72,7 +72,7 @@ void WindowsWindowChrome::activate()
 
 bool WindowsWindowChrome::nativeEventFilter(const QByteArray& eventType,
                                             void* message,
-                                            qintptr* result)
+                                            WindowsWindowChrome::NativeEventResult* result)
 {
 #ifdef Q_OS_WIN32
     if (eventType != "windows_generic_MSG" || !m_Window || !m_TitleBar || !m_WindowId) {
@@ -96,17 +96,6 @@ bool WindowsWindowChrome::nativeEventFilter(const QByteArray& eventType,
             *result = 0;
             return true;
         }
-    }
-
-    if (nativeMessage->message == WM_NCLBUTTONDBLCLK && nativeMessage->wParam == HTCAPTION) {
-        if (m_Window->visibility() == QWindow::Maximized) {
-            m_Window->showNormal();
-        }
-        else {
-            m_Window->showMaximized();
-        }
-        *result = 0;
-        return true;
     }
 
     if (nativeMessage->message != WM_NCHITTEST ||

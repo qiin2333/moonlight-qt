@@ -17,6 +17,7 @@ import "Brand.js" as Brand
 
 ApplicationWindow {
     property bool pollingActive: false
+    property bool revealAfterFirstFrame: false
 
     // Set by SettingsView to force the back operation to pop all
     // pages except the initial view. This is required when doing
@@ -55,6 +56,13 @@ ApplicationWindow {
     // 窗口真正的顶边开始量。全屏时 contentItem.y 会变回 0，这个绑定跟着走。
     readonly property real chromeInset: contentItem.y
 
+    onFrameSwapped: {
+        if (revealAfterFirstFrame) {
+            revealAfterFirstFrame = false
+            opacity = 1
+        }
+    }
+
     // FluentWinUI3's ApplicationWindow is just "color: palette.window", and on macOS
     // that palette follows the system appearance regardless of the color scheme we
     // ask for. Pin it so pages we haven't given a background of their own (the
@@ -82,6 +90,10 @@ ApplicationWindow {
         // Show the window according to the user's preferences
         if (SystemProperties.hasDesktopEnvironment) {
             if (StreamingPreferences.uiDisplayMode == StreamingPreferences.UI_MAXIMIZED) {
+                if (Qt.platform.os === "windows") {
+                    window.opacity = 0
+                    window.revealAfterFirstFrame = true
+                }
                 window.showMaximized()
             }
             else if (StreamingPreferences.uiDisplayMode == StreamingPreferences.UI_FULLSCREEN) {

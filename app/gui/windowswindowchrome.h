@@ -13,6 +13,12 @@ class WindowsWindowChrome : public QObject, public QAbstractNativeEventFilter
     Q_PROPERTY(QQuickItem* titleBar READ titleBar WRITE setTitleBar NOTIFY titleBarChanged)
 
 public:
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    using NativeEventResult = qintptr;
+#else
+    using NativeEventResult = long;
+#endif
+
     explicit WindowsWindowChrome(QObject* parent = nullptr);
     ~WindowsWindowChrome() override;
 
@@ -24,7 +30,7 @@ public:
 
     Q_INVOKABLE void activate();
 
-    bool nativeEventFilter(const QByteArray& eventType, void* message, qintptr* result) override;
+    bool nativeEventFilter(const QByteArray& eventType, void* message, NativeEventResult* result) override;
 
 signals:
     void windowChanged();
