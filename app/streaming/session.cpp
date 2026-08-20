@@ -3707,6 +3707,7 @@ void Session::exec()
 
     // Toggle the stats overlay if requested by the user
     m_OverlayManager.setOverlayState(Overlay::OverlayDebug, m_Preferences->showPerformanceOverlay);
+    m_OverlayManager.setOverlayState(Overlay::OverlayDebugAudio, m_Preferences->showPerformanceOverlay);
 
     // Initialize mouse state for menu
     m_WasCapturedBeforeMenu = false;

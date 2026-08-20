@@ -1357,6 +1357,11 @@ bool D3D11VARenderer::createOverlayVertexBuffer(Overlay::OverlayType type, int w
         renderRect.x = (m_DisplayWidth - width) / 2; // 用整数除法把 overlay quad 对齐到整像素，避免半像素位置导致 bilinear blur
         renderRect.y = m_DisplayHeight - height;
     }
+    else if (type == Overlay::OverlayDebugAudio) {
+        // Top right
+        renderRect.x = m_DisplayWidth - width;
+        renderRect.y = m_DisplayHeight - height;
+    }
 
     renderRect.w = width;
     renderRect.h = height;

@@ -48,6 +48,11 @@ OverlayManager::OverlayManager() :
     m_Overlays[OverlayType::OverlayDebug].bgcolor = {0x00, 0x00, 0x00, 0x66};
     m_Overlays[OverlayType::OverlayDebug].textAlignment = TextAlignment::AlignBottom;
 
+    m_Overlays[OverlayType::OverlayDebugAudio].color = {0xBD, 0xF9, 0xE7, 0xFF};
+    m_Overlays[OverlayType::OverlayDebugAudio].fontSize = 20;
+    m_Overlays[OverlayType::OverlayDebugAudio].bgcolor = {0x00, 0x00, 0x00, 0x66};
+    m_Overlays[OverlayType::OverlayDebugAudio].textAlignment = TextAlignment::AlignBottom;
+
     m_Overlays[OverlayType::OverlayStatusUpdate].color = {0xCC, 0x00, 0x00, 0xFF};
     m_Overlays[OverlayType::OverlayStatusUpdate].fontSize = 36;
     m_Overlays[OverlayType::OverlayStatusUpdate].textAlignment = TextAlignment::AlignCenter;

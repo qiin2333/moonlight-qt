@@ -187,9 +187,9 @@ macx {
         CONFIG += discord-rpc libplacebo
     }
 
-    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework UniformTypeIdentifiers -framework Metal -framework MetalFx -framework QuartzCore
+    LIBS += -lobjc -framework Accelerate -framework AudioToolbox -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework UniformTypeIdentifiers -framework Metal -framework MetalFx -framework QuartzCore
 
-    # For libsoundio
+    # For the CoreAudio renderer and libsoundio
     LIBS += -framework CoreAudio -framework AudioUnit
 
     CONFIG += ffmpeg soundio
@@ -232,6 +232,7 @@ SOURCES += \
     streaming/clipboardipc.cpp \
     streaming/audio/audio.cpp \
     streaming/audio/dualsensehaptics.cpp \
+    streaming/audio/renderers/renderer.cpp \
     streaming/audio/renderers/sdlaud.cpp \
     streaming/network/bandwidth.cpp \
     gui/computermodel.cpp \
@@ -497,14 +498,24 @@ win32:!winrt {
     INCLUDEPATH += $$PWD/../third-party/AMF/amf
 }
 macx {
-    message(VideoToolbox renderer selected)
+    message(CoreAudio + VideoToolbox renderers selected)
+
+    DEFINES += HAVE_COREAUDIO
 
     SOURCES += \
+        streaming/audio/renderers/coreaudio/au_spatial_renderer.mm \
+        streaming/audio/renderers/coreaudio/coreaudio.cpp \
+        streaming/audio/renderers/coreaudio/TPCircularBuffer.c \
         streaming/video/ffmpeg-renderers/vt_base.mm \
         streaming/video/ffmpeg-renderers/vt_avsamplelayer.mm \
         streaming/video/ffmpeg-renderers/vt_metal.mm
 
     HEADERS += \
+        streaming/audio/renderers/coreaudio/AllocatedAudioBufferList.h \
+        streaming/audio/renderers/coreaudio/au_spatial_renderer.h \
+        streaming/audio/renderers/coreaudio/coreaudio.h \
+        streaming/audio/renderers/coreaudio/coreaudio_helpers.h \
+        streaming/audio/renderers/coreaudio/TPCircularBuffer.h \
         streaming/video/ffmpeg-renderers/vt.h
 }
 discord-rpc {

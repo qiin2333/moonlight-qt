@@ -25,6 +25,8 @@
 #define SER_HOSTAUDIO "hostaudio"
 #define SER_MULTICONT "multicontroller"
 #define SER_AUDIOCFG "audiocfg"
+#define SER_SPATIALAUDIOCFG "spatialaudiocfg"
+#define SER_SPATIALHEADTRACKING "spatialheadtracking"
 #define SER_VIDEOCFG "videocfg"
 #define SER_HDR "hdr"
 #define SER_YUV444 "yuv444"
@@ -235,6 +237,10 @@ void StreamingPreferences::reload()
                                                          static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
     audioConfig = static_cast<AudioConfig>(settings.value(SER_AUDIOCFG,
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
+    spatialAudioConfig = static_cast<SpatialAudioConfig>(settings.value(SER_SPATIALAUDIOCFG,
+                                                  static_cast<int>(SpatialAudioConfig::SAC_AUTO)).toInt());
+    // Head-tracking is off by default because it can introduce audio glitches
+    spatialHeadTracking = settings.value(SER_SPATIALHEADTRACKING, false).toBool();
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
                                                   static_cast<int>(VideoCodecConfig::VCC_AUTO)).toInt());
     videoDecoderSelection = static_cast<VideoDecoderSelection>(settings.value(SER_VIDEODEC,
@@ -469,6 +475,8 @@ void StreamingPreferences::save()
     settings.setValue(SER_DETECTNETBLOCKING, detectNetworkBlocking);
     settings.setValue(SER_SHOWPERFOVERLAY, showPerformanceOverlay);
     settings.setValue(SER_AUDIOCFG, static_cast<int>(audioConfig));
+    settings.setValue(SER_SPATIALAUDIOCFG, static_cast<int>(spatialAudioConfig));
+    settings.setValue(SER_SPATIALHEADTRACKING, spatialHeadTracking);
     settings.setValue(SER_HDR, enableHdr);
     settings.setValue(SER_HDRMODE, static_cast<int>(hdrMode));
     settings.setValue(SER_HDRBRIGHTNESSMODE, static_cast<int>(hdrBrightnessMode));

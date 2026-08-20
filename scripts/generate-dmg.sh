@@ -115,7 +115,25 @@ find $BUILD_FOLDER/app/Moonlight.app/ -name '*.dSYM' | xargs rm -rf
 
 if [ "$SIGNING_IDENTITY" != "" ]; then
   echo Signing app bundle
-  codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" $BUILD_FOLDER/app/Moonlight.app || fail "Signing failed!"
+
+  # The spatial audio entitlements (personalized HRTF and head-pose access) are
+  # restricted, so they only work if the signing team's provisioning profile
+  # grants them. Signing with entitlements the profile doesn't authorize gets the
+  # app rejected at launch or during notarization, so this stays opt-in. Spatial
+  # audio itself works without them; they only add personalized HRTF and head
+  # tracking. Set SPATIAL_AUDIO_ENTITLEMENTS=1 to request them.
+  if [ "$SPATIAL_AUDIO_ENTITLEMENTS" == "1" ]; then
+    echo Requesting spatial audio entitlements
+    codesign --force --deep --options runtime --timestamp \
+      --entitlements "$SOURCE_ROOT/app/deploy/macos/spatial-audio.entitlements" \
+      --sign "$SIGNING_IDENTITY" $BUILD_FOLDER/app/Moonlight.app || fail "Signing failed!"
+  else
+    codesign --force --deep --options runtime --timestamp \
+      --sign "$SIGNING_IDENTITY" $BUILD_FOLDER/app/Moonlight.app || fail "Signing failed!"
+  fi
+
+  echo "App signature:"
+  codesign -d --entitlements - -vvv $BUILD_FOLDER/app/Moonlight.app
 fi
 
 echo Creating DMG

@@ -501,6 +501,11 @@ public:
                 position = CGPointMake(CGRectGetMidX(bounds) - (size.width / 2),
                                        CGRectGetMaxY(bounds) - size.height);
                 break;
+            case Overlay::OverlayDebugAudio:
+                // Top right
+                position = CGPointMake(CGRectGetMaxX(bounds) - size.width,
+                                       CGRectGetMaxY(bounds) - size.height);
+                break;
             case Overlay::OverlayStatusUpdate:
             default:
                 // Bottom left
