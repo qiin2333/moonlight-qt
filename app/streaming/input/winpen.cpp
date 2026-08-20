@@ -221,6 +221,8 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
     const UINT32 pointerId = GET_POINTERID_WPARAM(static_cast<WPARAM>(wParamValue));
     const bool terminalMessage = message == WM_POINTERUP ||
             message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED;
+    const bool hasInputFocus =
+            (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS) != 0;
     if (pointerId == m_WindowsPenFallbackPointerId) {
         // Once SDL handles a pointer message, keep the rest of that pen's
         // proximity lifetime on the same path. WM_POINTERUP ends contact but
@@ -228,7 +230,9 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         if (message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED) {
             m_WindowsPenFallbackPointerId = 0;
         }
-        return false;
+        // While the window remains unfocused, consume the remainder locally.
+        // Once focus is gained, let SDL continue the fallback sequence.
+        return !hasInputFocus;
     }
 
     POINTER_INPUT_TYPE pointerType = PT_POINTER;
@@ -245,11 +249,15 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         return false;
     }
 
-    if (!(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
+    if (!hasInputFocus) {
         // Let the initial contact follow SDL's normal window activation path.
         // Once focus is lost, consume the remaining pen sequence locally so it
         // cannot re-enter through SDL's synthetic touch fallback after cancel.
-        return message != WM_POINTERDOWN;
+        if (message == WM_POINTERDOWN) {
+            routeWindowsPenPointerToSdl(pointerId);
+            return false;
+        }
+        return true;
     }
 
     if (m_WindowsPenPointerTracked && pointerId != m_WindowsPenPointerId) {

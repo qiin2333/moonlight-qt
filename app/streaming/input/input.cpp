@@ -983,6 +983,10 @@ void SdlInputHandler::setCaptureActive(bool active)
         // never retains contacts from the previous capture state.
         cancelNativeTouchpadContacts();
 
+#ifdef HAVE_WINDOWS_PEN_INPUT
+        cancelWindowsPenInput();
+#endif
+
         if (m_RemoteCursor != nullptr && SDL_GetCursor() == m_RemoteCursor) {
             SDL_SetCursor(SDL_GetDefaultCursor());
         }
