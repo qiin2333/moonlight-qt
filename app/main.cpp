@@ -340,6 +340,8 @@ static volatile LONG s_HitUnhandledException = 0;
 static WCHAR s_CrashLogDirectory[MAX_PATH] = {};
 static WCHAR s_CrashLogFileName[MAX_PATH] = {};
 static WCHAR s_CrashBuildVersion[128] = {};
+static constexpr size_t CRASH_DIAGNOSTIC_MESSAGE_LENGTH = 2048;
+static CHAR s_CrashUtf8Message[CRASH_DIAGNOSTIC_MESSAGE_LENGTH * 3 + 1] = {};
 static HANDLE s_CrashLogHandle = INVALID_HANDLE_VALUE;
 static HANDLE s_CrashFallbackHandle = INVALID_HANDLE_VALUE;
 static DWORD s_CrashStackGuaranteeError = ERROR_SUCCESS;
@@ -420,18 +422,17 @@ static void appendCrashDiagnostic(const WCHAR* message)
     }
 
     if (!IS_UNSPECIFIED_HANDLE(outputHandle)) {
-        CHAR utf8Message[4096];
         const int utf8Length = WideCharToMultiByte(CP_UTF8,
                                                    0,
                                                    message,
                                                    -1,
-                                                   utf8Message,
-                                                   sizeof(utf8Message),
+                                                   s_CrashUtf8Message,
+                                                   sizeof(s_CrashUtf8Message),
                                                    nullptr,
                                                    nullptr);
         if (utf8Length > 1) {
             DWORD bytesWritten;
-            WriteFile(outputHandle, utf8Message, utf8Length - 1, &bytesWritten, nullptr);
+            WriteFile(outputHandle, s_CrashUtf8Message, utf8Length - 1, &bytesWritten, nullptr);
             FlushFileBuffers(outputHandle);
         }
     }
@@ -479,7 +480,7 @@ LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
         memoryAddress = reinterpret_cast<const void*>(exceptionRecord->ExceptionInformation[1]);
     }
 
-    WCHAR diagnosticMessage[2048];
+    WCHAR diagnosticMessage[CRASH_DIAGNOSTIC_MESSAGE_LENGTH];
     _snwprintf_s(diagnosticMessage,
                 _countof(diagnosticMessage),
                 _TRUNCATE,
