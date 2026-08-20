@@ -19,6 +19,8 @@ bool SLAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION* o
         return false;
     }
 
+    setOpusConfig(opusConfig);
+
     // This number is pretty conservative (especially for surround), but
     // it's hard to avoid since we get crushed by CPU limitations.
     m_MaxQueuedAudioMs = 40 * opusConfig->channelCount / 2;
@@ -109,9 +111,16 @@ bool SLAudioRenderer::submitAudio(int bytesWritten)
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Too many queued audio frames: %d",
                     LiGetPendingAudioFrames());
+        m_ActiveWndAudioStats.totalGlitches++;
+        m_ActiveWndAudioStats.droppedOverload++;
     }
 
     return true;
+}
+
+int SLAudioRenderer::getCapabilities()
+{
+    return CAPABILITY_SLOW_OPUS_DECODER | CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION;
 }
 
 IAudioRenderer::AudioFormat SLAudioRenderer::getAudioBufferFormat()

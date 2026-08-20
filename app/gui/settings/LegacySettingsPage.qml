@@ -91,6 +91,71 @@ Column {
                     }
                 }
 
+                Label {
+                    width: parent.width
+                    id: resSpatialAudioTitle
+                    text: qsTr("Spatial audio")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                    visible: Qt.platform.os === "osx"
+                }
+
+                Row {
+                    spacing: 10
+                    width: parent.width
+                    visible: Qt.platform.os === "osx"
+
+                    AutoResizingComboBox {
+                        id: spatialAudioComboBox
+                        enabled: StreamingPreferences.audioConfig !== StreamingPreferences.AC_STEREO
+                        textRole: "text"
+                        model: ListModel {
+                            id: spatialAudioListModel
+                            ListElement {
+                                text: qsTr("Enabled")
+                                val: StreamingPreferences.SAC_AUTO
+                            }
+                            ListElement {
+                                text: qsTr("Disabled")
+                                val: StreamingPreferences.SAC_DISABLED
+                            }
+                        }
+                        Component.onCompleted: {
+                            var saved_sac = StreamingPreferences.spatialAudioConfig
+                            currentIndex = 0
+                            for (var i = 0; i < spatialAudioListModel.count; i++) {
+                                if (saved_sac === spatialAudioListModel.get(i).val) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
+                            activated(currentIndex)
+                        }
+                        onActivated: {
+                            StreamingPreferences.spatialAudioConfig = spatialAudioListModel.get(currentIndex).val
+                        }
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 5000
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Surround sound is rendered to spatial audio when playing through headphones, built-in speakers, or any 2-channel output device.")
+                    }
+
+                    HardCheckBox {
+                        id: spatialHeadTrackingCheck
+                        enabled: StreamingPreferences.audioConfig !== StreamingPreferences.AC_STEREO &&
+                                 StreamingPreferences.spatialAudioConfig !== StreamingPreferences.SAC_DISABLED
+                        text: qsTr("Enable head tracking")
+                        font.pointSize: 12
+                        checked: StreamingPreferences.spatialHeadTracking
+                        onCheckedChanged: {
+                            StreamingPreferences.spatialHeadTracking = checked
+                        }
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 5000
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Requires supported Apple or Beats headphones. May cause audio glitches.")
+                    }
+                }
 
                 HardCheckBox {
                     id: audioPcCheck

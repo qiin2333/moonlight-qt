@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Optional entitlements for the CoreAudio spatial renderer. Spatial audio
+	  itself needs none of these; they only enable the user's personalized HRTF
+	  profile and head tracking on supported Apple/Beats headphones.
+
+	  Both are restricted entitlements, so they have to be authorized by the
+	  signing team's provisioning profile. Sign with them by setting
+	  SPATIAL_AUDIO_ENTITLEMENTS=1 for scripts/generate-dmg.sh, and only if the
+	  profile grants them - an unauthorized entitlement fails notarization.
+
+	  Note: do not add com.apple.security.app-sandbox here. Moonlight is not a
+	  sandboxed app, and sandboxing it without the matching network and file
+	  entitlements breaks host discovery and streaming.
+	-->
+	<key>com.apple.developer.spatial-audio.profile-access</key>
+	<true/>
+	<key>com.apple.developer.coremotion.head-pose</key>
+	<true/>
+</dict>
+</plist>
