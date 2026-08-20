@@ -115,6 +115,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_WindowsPenWindow(nullptr),
       m_WindowsPenSubclassContext(nullptr),
       m_WindowsPenPointerId(0),
+      m_WindowsPenFallbackPointerId(0),
       m_WindowsPenSubclassInstalled(false),
       m_WindowsPenPointerTracked(false),
 #endif

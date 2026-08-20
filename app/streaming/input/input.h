@@ -265,6 +265,7 @@ private:
 #ifdef HAVE_WINDOWS_PEN_INPUT
     bool initializeWindowsPenInput();
     void cancelWindowsPenInput();
+    void routeWindowsPenPointerToSdl(Uint32 pointerId);
     void shutdownWindowsPenInput();
 #endif
 
@@ -423,6 +424,7 @@ private:
     void* m_WindowsPenWindow;
     void* m_WindowsPenSubclassContext;
     Uint32 m_WindowsPenPointerId;
+    Uint32 m_WindowsPenFallbackPointerId;
     bool m_WindowsPenSubclassInstalled;
     bool m_WindowsPenPointerTracked;
 #endif

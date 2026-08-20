@@ -147,7 +147,14 @@ void SdlInputHandler::cancelWindowsPenInput()
     }
 
     m_WindowsPenPointerId = 0;
+    m_WindowsPenFallbackPointerId = 0;
     m_WindowsPenPointerTracked = false;
+}
+
+void SdlInputHandler::routeWindowsPenPointerToSdl(Uint32 pointerId)
+{
+    cancelWindowsPenInput();
+    m_WindowsPenFallbackPointerId = pointerId;
 }
 
 void SdlInputHandler::shutdownWindowsPenInput()
@@ -212,16 +219,29 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
     }
 
     const UINT32 pointerId = GET_POINTERID_WPARAM(static_cast<WPARAM>(wParamValue));
-    POINTER_INPUT_TYPE pointerType = PT_POINTER;
-    bool isPen = GetPointerType(pointerId, &pointerType) && pointerType == PT_PEN;
     const bool terminalMessage = message == WM_POINTERUP ||
             message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED;
+    if (pointerId == m_WindowsPenFallbackPointerId) {
+        // Once SDL handles a pointer message, keep the rest of that pen's
+        // proximity lifetime on the same path. WM_POINTERUP ends contact but
+        // the pen may continue sending hover updates until it leaves range.
+        if (message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED) {
+            m_WindowsPenFallbackPointerId = 0;
+        }
+        return false;
+    }
+
+    POINTER_INPUT_TYPE pointerType = PT_POINTER;
+    bool isPen = GetPointerType(pointerId, &pointerType) && pointerType == PT_PEN;
     if (!isPen && terminalMessage && m_WindowsPenPointerTracked &&
             pointerId == m_WindowsPenPointerId) {
         // Windows can discard type/details before a terminal notification.
         isPen = true;
     }
     if (!isPen) {
+        if (m_WindowsPenPointerTracked && pointerId == m_WindowsPenPointerId) {
+            routeWindowsPenPointerToSdl(pointerId);
+        }
         return false;
     }
 
@@ -238,12 +258,15 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
 
     POINTER_PEN_INFO currentInfo = {};
     if (!GetPointerPenInfo(pointerId, &currentInfo)) {
-        if (!terminalMessage || !m_WindowsPenPointerTracked ||
-                pointerId != m_WindowsPenPointerId) {
+        if (!terminalMessage) {
+            routeWindowsPenPointerToSdl(pointerId);
             return false;
         }
 
-        if (message == WM_POINTERLEAVE) {
+        if (!m_WindowsPenPointerTracked || pointerId != m_WindowsPenPointerId) {
+            return false;
+        }
+        else if (message == WM_POINTERLEAVE) {
             LiSendPenEvent(LI_TOUCH_EVENT_HOVER_LEAVE, LI_TOOL_TYPE_PEN, 0,
                            0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                            LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
@@ -280,9 +303,10 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
     HWND hwnd = static_cast<HWND>(m_WindowsPenWindow);
     RECT clientRect = {};
     if (!GetClientRect(hwnd, &clientRect)) {
-        if ((terminalMessage || currentInfoCanceled) && cleanUpTerminalState()) {
-            return true;
+        if (terminalMessage || currentInfoCanceled) {
+            return cleanUpTerminalState();
         }
+        routeWindowsPenPointerToSdl(pointerId);
         return false;
     }
 
@@ -291,9 +315,10 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
                      static_cast<int>(clientRect.bottom - clientRect.top) };
     StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
     if (dst.w <= 0 || dst.h <= 0) {
-        if ((terminalMessage || currentInfoCanceled) && cleanUpTerminalState()) {
-            return true;
+        if (terminalMessage || currentInfoCanceled) {
+            return cleanUpTerminalState();
         }
+        routeWindowsPenPointerToSdl(pointerId);
         return false;
     }
 
@@ -404,9 +429,10 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
     }
 
     if (!sentAnySample) {
-        if ((terminalMessage || currentInfoCanceled) && cleanUpTerminalState()) {
-            return true;
+        if (terminalMessage || currentInfoCanceled) {
+            return cleanUpTerminalState();
         }
+        routeWindowsPenPointerToSdl(pointerId);
         return false;
     }
 
