@@ -334,8 +334,125 @@ void ffmpegLogToDiskHandler(void* ptr, int level, const char* fmt, va_list vl)
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <DbgHelp.h>
+#include <io.h>
 
 static UINT s_HitUnhandledException = 0;
+static WCHAR s_CrashLogDirectory[MAX_PATH] = {};
+static WCHAR s_CrashLogFileName[MAX_PATH] = {};
+static WCHAR s_CrashBuildVersion[128] = {};
+static HANDLE s_CrashLogHandle = INVALID_HANDLE_VALUE;
+static HANDLE s_CrashFallbackHandle = INVALID_HANDLE_VALUE;
+static DWORD s_CrashStackGuaranteeError = ERROR_SUCCESS;
+
+static void copyCrashDiagnosticString(WCHAR* destination, size_t destinationLength, const QString& source)
+{
+    const QString nativeSource = QDir::toNativeSeparators(source);
+    wcsncpy_s(destination,
+              destinationLength,
+              reinterpret_cast<const wchar_t*>(nativeSource.utf16()),
+              _TRUNCATE);
+}
+
+static void initializeCrashDiagnostics(const QString& logDirectory,
+                                       const QString& logFileName,
+                                       HANDLE logHandle,
+                                       HANDLE fallbackHandle)
+{
+    copyCrashDiagnosticString(s_CrashLogDirectory, _countof(s_CrashLogDirectory), logDirectory);
+    copyCrashDiagnosticString(s_CrashLogFileName, _countof(s_CrashLogFileName), logFileName);
+    copyCrashDiagnosticString(s_CrashBuildVersion,
+                              _countof(s_CrashBuildVersion),
+                              QString::fromUtf8(VERSION_STR));
+    s_CrashLogHandle = logHandle;
+    s_CrashFallbackHandle = fallbackHandle;
+
+    // Leave enough stack for the top-level handler on the GUI thread if the
+    // original failure is a stack overflow.
+    ULONG stackGuarantee = 64 * 1024;
+    if (!SetThreadStackGuarantee(&stackGuarantee)) {
+        s_CrashStackGuaranteeError = GetLastError();
+    }
+}
+
+static const WCHAR* exceptionCodeName(DWORD exceptionCode)
+{
+    switch (exceptionCode) {
+    case EXCEPTION_ACCESS_VIOLATION:         return L"EXCEPTION_ACCESS_VIOLATION";
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:   return L"EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+    case EXCEPTION_BREAKPOINT:              return L"EXCEPTION_BREAKPOINT";
+    case EXCEPTION_DATATYPE_MISALIGNMENT:   return L"EXCEPTION_DATATYPE_MISALIGNMENT";
+    case EXCEPTION_FLT_DIVIDE_BY_ZERO:      return L"EXCEPTION_FLT_DIVIDE_BY_ZERO";
+    case EXCEPTION_FLT_INVALID_OPERATION:   return L"EXCEPTION_FLT_INVALID_OPERATION";
+    case EXCEPTION_ILLEGAL_INSTRUCTION:     return L"EXCEPTION_ILLEGAL_INSTRUCTION";
+    case EXCEPTION_IN_PAGE_ERROR:           return L"EXCEPTION_IN_PAGE_ERROR";
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:      return L"EXCEPTION_INT_DIVIDE_BY_ZERO";
+    case EXCEPTION_PRIV_INSTRUCTION:        return L"EXCEPTION_PRIV_INSTRUCTION";
+    case EXCEPTION_STACK_OVERFLOW:          return L"EXCEPTION_STACK_OVERFLOW";
+    case 0xE06D7363:                        return L"MSVC_CPP_EXCEPTION";
+    default:                                return L"UNKNOWN_EXCEPTION";
+    }
+}
+
+static void appendCrashDiagnostic(const WCHAR* message)
+{
+    HANDLE outputHandle = INVALID_HANDLE_VALUE;
+    bool closeOutputHandle = false;
+
+    if (s_CrashLogFileName[0] != L'\0') {
+        outputHandle = CreateFileW(s_CrashLogFileName,
+                                   FILE_APPEND_DATA,
+                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                   nullptr,
+                                   OPEN_ALWAYS,
+                                   FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+                                   nullptr);
+        closeOutputHandle = outputHandle != INVALID_HANDLE_VALUE;
+    }
+
+    if (IS_UNSPECIFIED_HANDLE(outputHandle)) {
+        outputHandle = s_CrashLogHandle;
+    }
+    if (IS_UNSPECIFIED_HANDLE(outputHandle)) {
+        outputHandle = s_CrashFallbackHandle;
+    }
+    if (IS_UNSPECIFIED_HANDLE(outputHandle)) {
+        outputHandle = GetStdHandle(STD_ERROR_HANDLE);
+    }
+
+    if (!IS_UNSPECIFIED_HANDLE(outputHandle)) {
+        CHAR utf8Message[4096];
+        const int utf8Length = WideCharToMultiByte(CP_UTF8,
+                                                   0,
+                                                   message,
+                                                   -1,
+                                                   utf8Message,
+                                                   sizeof(utf8Message),
+                                                   nullptr,
+                                                   nullptr);
+        if (utf8Length > 1) {
+            DWORD bytesWritten;
+            WriteFile(outputHandle, utf8Message, utf8Length - 1, &bytesWritten, nullptr);
+            FlushFileBuffers(outputHandle);
+        }
+    }
+
+    if (closeOutputHandle) {
+        CloseHandle(outputHandle);
+    }
+
+    OutputDebugStringW(message);
+}
+
+static ULONGLONG currentUnixTimeSeconds()
+{
+    FILETIME fileTime;
+    GetSystemTimeAsFileTime(&fileTime);
+
+    ULARGE_INTEGER ticks;
+    ticks.LowPart = fileTime.dwLowDateTime;
+    ticks.HighPart = fileTime.dwHighDateTime;
+    return (ticks.QuadPart - 116444736000000000ULL) / 10000000ULL;
+}
 
 LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
 {
@@ -344,10 +461,61 @@ LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
+    const EXCEPTION_RECORD* exceptionRecord = ExceptionInfo ? ExceptionInfo->ExceptionRecord : nullptr;
+    const DWORD exceptionCode = exceptionRecord ? exceptionRecord->ExceptionCode : 0;
+    const void* exceptionAddress = exceptionRecord ? exceptionRecord->ExceptionAddress : nullptr;
+
+    HMODULE faultModule = nullptr;
+    WCHAR faultModulePath[MAX_PATH] = L"unknown";
+    const WCHAR* faultModuleName = faultModulePath;
+    ULONGLONG moduleOffset = 0;
+    if (exceptionAddress &&
+            GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                       GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCWSTR>(exceptionAddress),
+                               &faultModule)) {
+        if (GetModuleFileNameW(faultModule, faultModulePath, _countof(faultModulePath)) != 0) {
+            if (const WCHAR* lastSeparator = wcsrchr(faultModulePath, L'\\')) {
+                faultModuleName = lastSeparator + 1;
+            }
+        }
+        moduleOffset = reinterpret_cast<ULONG_PTR>(exceptionAddress) -
+                       reinterpret_cast<ULONG_PTR>(faultModule);
+    }
+
+    const WCHAR* memoryOperation = L"not-applicable";
+    const void* memoryAddress = nullptr;
+    if (exceptionRecord &&
+            (exceptionCode == EXCEPTION_ACCESS_VIOLATION || exceptionCode == EXCEPTION_IN_PAGE_ERROR) &&
+            exceptionRecord->NumberParameters >= 2) {
+        switch (exceptionRecord->ExceptionInformation[0]) {
+        case 0: memoryOperation = L"read"; break;
+        case 1: memoryOperation = L"write"; break;
+        case 8: memoryOperation = L"execute"; break;
+        default: memoryOperation = L"unknown"; break;
+        }
+        memoryAddress = reinterpret_cast<const void*>(exceptionRecord->ExceptionInformation[1]);
+    }
+
+    WCHAR diagnosticMessage[2048];
+    swprintf_s(diagnosticMessage,
+               L"[crash] Unhandled exception: code=0x%08lX (%ls), address=%p, "
+               L"module=%ls, module_offset=0x%llX, thread=%lu, operation=%ls, "
+               L"memory_address=%p, build=%ls\r\n",
+               exceptionCode,
+               exceptionCodeName(exceptionCode),
+               exceptionAddress,
+               faultModuleName,
+               moduleOffset,
+               GetCurrentThreadId(),
+               memoryOperation,
+               memoryAddress,
+               s_CrashBuildVersion);
+    appendCrashDiagnostic(diagnosticMessage);
+
     WCHAR dmpFileName[MAX_PATH];
     swprintf_s(dmpFileName, L"%ls\\Moonlight-%I64u.dmp",
-               (PWCHAR)QDir::toNativeSeparators(Path::getLogDir()).utf16(), QDateTime::currentSecsSinceEpoch());
-    QString qDmpFileName = QString::fromUtf16((const char16_t*)dmpFileName);
+               s_CrashLogDirectory, currentUnixTimeSeconds());
     HANDLE dumpHandle = CreateFileW(dmpFileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (dumpHandle != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION info;
@@ -368,16 +536,24 @@ LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
                                &info,
                                nullptr,
                                nullptr)) {
-            qCritical() << "Unhandled exception! Minidump written to:" << qDmpFileName;
+            swprintf_s(diagnosticMessage, L"[crash] Minidump written to: %ls\r\n", dmpFileName);
+            appendCrashDiagnostic(diagnosticMessage);
         }
         else {
-            qCritical() << "Unhandled exception! Failed to write dump:" << GetLastError();
+            swprintf_s(diagnosticMessage,
+                       L"[crash] Failed to write minidump: error=%lu\r\n",
+                       GetLastError());
+            appendCrashDiagnostic(diagnosticMessage);
         }
 
         CloseHandle(dumpHandle);
     }
     else {
-        qCritical() << "Unhandled exception! Failed to open dump file:" << qDmpFileName << "with error" << GetLastError();
+        swprintf_s(diagnosticMessage,
+                   L"[crash] Failed to open minidump file: path=%ls, error=%lu\r\n",
+                   dmpFileName,
+                   GetLastError());
+        appendCrashDiagnostic(diagnosticMessage);
     }
 
     // Sleep for a moment to allow the logging thread to finish up before crashing
@@ -534,6 +710,17 @@ int main(int argc, char *argv[])
     }
 #endif
 
+#ifdef Q_OS_WIN32
+    initializeCrashDiagnostics(Path::getLogDir(),
+                               s_LoggerFile && s_LoggerFile->isOpen()
+                                       ? s_LoggerFile->fileName()
+                                       : QString(),
+                               s_LoggerFile && s_LoggerFile->isOpen()
+                                       ? reinterpret_cast<HANDLE>(_get_osfhandle(s_LoggerFile->handle()))
+                                       : INVALID_HANDLE_VALUE,
+                               oldConErr);
+#endif
+
     // Serialize log messages on a single thread
     s_LoggerThread.setMaxThreadCount(1);
     s_LoggerTime.start();
@@ -548,6 +735,12 @@ int main(int argc, char *argv[])
     SDL_LogSetOutputFunction(sdlLogToDiskHandler, nullptr);
 #endif
     qInstallMessageHandler(qtLogToDiskHandler);
+#ifdef Q_OS_WIN32
+    if (s_CrashStackGuaranteeError != ERROR_SUCCESS) {
+        qWarning() << "Failed to reserve stack for crash diagnostics:"
+                   << s_CrashStackGuaranteeError;
+    }
+#endif
 #ifdef HAVE_FFMPEG
     av_log_set_callback(ffmpegLogToDiskHandler);
 #endif
