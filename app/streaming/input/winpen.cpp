@@ -38,6 +38,7 @@ struct WindowsPenSubclassContext
     std::mutex mutex;
     SdlInputHandler* inputHandler;
     std::atomic_bool orphaned{false};
+    std::atomic_bool windowDestroyed{false};
 };
 
 bool loadWindowSubclassApis()
@@ -82,6 +83,10 @@ LRESULT CALLBACK windowsPenSubclassProc(HWND hwnd, UINT message, WPARAM wParam, 
         return 0;
     }
 
+    if (message == WM_NCDESTROY && context) {
+        context->windowDestroyed.store(true);
+    }
+
     const LRESULT result = s_DefSubclassProc(hwnd, message, wParam, lParam);
     if (message == WM_NCDESTROY && context && context->orphaned.load()) {
         delete context;
@@ -104,11 +109,14 @@ bool SdlInputHandler::initializeWindowsPenInput()
     }
 
     HWND hwnd = info.info.win.window;
-    if (m_WindowsPenSubclassInstalled && m_WindowsPenWindow == hwnd) {
+    auto* installedContext =
+            static_cast<WindowsPenSubclassContext*>(m_WindowsPenSubclassContext);
+    if (m_WindowsPenSubclassInstalled && m_WindowsPenWindow == hwnd &&
+            installedContext && !installedContext->windowDestroyed.load()) {
         return true;
     }
 
-    shutdownWindowsPenInput();
+    shutdownWindowsPenInput(true);
 
     if (!loadWindowSubclassApis()) {
         SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
@@ -137,29 +145,56 @@ bool SdlInputHandler::initializeWindowsPenInput()
     return true;
 }
 
-void SdlInputHandler::cancelWindowsPenInput()
+bool SdlInputHandler::trySendWindowsPenCancel()
 {
-    if (m_WindowsPenPointerTracked &&
-            (LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS)) {
-        LiSendPenEvent(LI_TOUCH_EVENT_CANCEL_ALL, LI_TOOL_TYPE_UNKNOWN, 0,
-                       0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                       LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
+    if (!(LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS)) {
+        m_WindowsPenCancelPending = false;
+        return true;
+    }
+
+    m_WindowsPenCancelPending = LiSendPenEvent(
+            LI_TOUCH_EVENT_CANCEL_ALL, LI_TOOL_TYPE_UNKNOWN, 0,
+            0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+            LI_ROT_UNKNOWN, LI_TILT_UNKNOWN) != 0;
+    return !m_WindowsPenCancelPending;
+}
+
+void SdlInputHandler::cancelWindowsPenInput(bool suppressPointer)
+{
+    const Uint32 pointerId = m_WindowsPenPointerTracked ?
+                                 m_WindowsPenPointerId :
+                                 m_WindowsPenFallbackPointerId;
+    if (m_WindowsPenPointerTracked || m_WindowsPenFallbackPointerId != 0 ||
+            m_WindowsPenCancelPending) {
+        trySendWindowsPenCancel();
     }
 
     m_WindowsPenPointerId = 0;
     m_WindowsPenFallbackPointerId = 0;
     m_WindowsPenPointerTracked = false;
+
+    if (suppressPointer) {
+        if (pointerId != 0) {
+            m_WindowsPenSuppressedPointerId = pointerId;
+        }
+    }
+    else {
+        m_WindowsPenSuppressedPointerId = 0;
+    }
 }
 
 void SdlInputHandler::routeWindowsPenPointerToSdl(Uint32 pointerId)
 {
-    cancelWindowsPenInput();
+    // Both paths ultimately use LiSendPenEvent(), so keep the existing remote
+    // pen state and only switch the local event source.
+    m_WindowsPenPointerId = 0;
+    m_WindowsPenPointerTracked = false;
     m_WindowsPenFallbackPointerId = pointerId;
 }
 
-void SdlInputHandler::shutdownWindowsPenInput()
+void SdlInputHandler::shutdownWindowsPenInput(bool suppressPointer)
 {
-    cancelWindowsPenInput();
+    cancelWindowsPenInput(suppressPointer);
 
     auto* context = static_cast<WindowsPenSubclassContext*>(m_WindowsPenSubclassContext);
     if (context) {
@@ -169,7 +204,8 @@ void SdlInputHandler::shutdownWindowsPenInput()
         context->inputHandler = nullptr;
     }
 
-    bool detached = !m_WindowsPenSubclassInstalled;
+    bool detached = !m_WindowsPenSubclassInstalled ||
+            (context && context->windowDestroyed.load());
     HWND hwnd = static_cast<HWND>(m_WindowsPenWindow);
     if (!detached && (!hwnd || !IsWindow(hwnd))) {
         // Window destruction automatically removes its subclass callbacks.
@@ -223,6 +259,22 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
             message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED;
     const bool hasInputFocus =
             (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS) != 0;
+
+    if (m_WindowsPenCancelPending && !trySendWindowsPenCancel()) {
+        // Do not send more pen state until the remote reset has been queued.
+        return true;
+    }
+
+    if (pointerId == m_WindowsPenSuppressedPointerId) {
+        // The remote state for this pointer was cancelled during a focus,
+        // capture, or transport failure. Do not resume it with a MOVE that has
+        // no matching DOWN. Hover may resume after contact ends at UP.
+        if (terminalMessage) {
+            m_WindowsPenSuppressedPointerId = 0;
+        }
+        return true;
+    }
+
     if (pointerId == m_WindowsPenFallbackPointerId) {
         // Once SDL handles a pointer message, keep the rest of that pen's
         // proximity lifetime on the same path. WM_POINTERUP ends contact but
@@ -274,16 +326,7 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         if (!m_WindowsPenPointerTracked || pointerId != m_WindowsPenPointerId) {
             return false;
         }
-        else if (message == WM_POINTERLEAVE) {
-            LiSendPenEvent(LI_TOUCH_EVENT_HOVER_LEAVE, LI_TOOL_TYPE_PEN, 0,
-                           0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                           LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
-            m_WindowsPenPointerId = 0;
-            m_WindowsPenPointerTracked = false;
-        }
-        else {
-            cancelWindowsPenInput();
-        }
+        cancelWindowsPenInput();
         return true;
     }
 
@@ -292,16 +335,7 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
             return false;
         }
 
-        if (message == WM_POINTERLEAVE) {
-            LiSendPenEvent(LI_TOUCH_EVENT_HOVER_LEAVE, LI_TOOL_TYPE_PEN, 0,
-                           0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                           LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
-            m_WindowsPenPointerId = 0;
-            m_WindowsPenPointerTracked = false;
-        }
-        else {
-            cancelWindowsPenInput();
-        }
+        cancelWindowsPenInput();
         return true;
     };
 
@@ -355,9 +389,12 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         }
     };
 
+    bool coordinateConversionFailed = false;
+    bool transportFailed = false;
     auto sendPenSample = [&](const POINTER_PEN_INFO& sample) {
         POINT point = sample.pointerInfo.ptPixelLocation;
         if (!ScreenToClient(hwnd, &point)) {
+            coordinateConversionFailed = true;
             return false;
         }
 
@@ -409,13 +446,16 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
             }
         }
 
-        LiSendPenEvent(eventType, toolType, penButtons,
-                       normalizedX, normalizedY, pressure, 0.0f, 0.0f,
-                       rotation, tilt);
+        if (LiSendPenEvent(eventType, toolType, penButtons,
+                           normalizedX, normalizedY, pressure, 0.0f, 0.0f,
+                           rotation, tilt) != 0) {
+            transportFailed = true;
+            return false;
+        }
         return true;
     };
 
-    bool sentAnySample = false;
+    bool sentAllSamples = true;
     if (message == WM_POINTERUPDATE && currentInfo.pointerInfo.historyCount > 1) {
         const UINT32 capacity = std::min(currentInfo.pointerInfo.historyCount,
                                          MAX_PEN_HISTORY_SAMPLES);
@@ -425,18 +465,32 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
             const UINT32 valid = std::min(capacity, available);
             // Win32 returns newest-first. Send oldest-first to preserve stroke order.
             for (UINT32 i = valid; i > 0; --i) {
-                sentAnySample |= sendPenSample(history[i - 1]);
+                if (!sendPenSample(history[i - 1])) {
+                    sentAllSamples = false;
+                    break;
+                }
             }
         }
         else {
-            sentAnySample = sendPenSample(currentInfo);
+            sentAllSamples = sendPenSample(currentInfo);
         }
     }
     else {
-        sentAnySample = sendPenSample(currentInfo);
+        sentAllSamples = sendPenSample(currentInfo);
     }
 
-    if (!sentAnySample) {
+    if (!sentAllSamples && transportFailed) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
+                    "Windows pen input queue rejected an event; cancelling pointer %u",
+                    pointerId);
+        cancelWindowsPenInput(true);
+        if (terminalMessage || currentInfoCanceled) {
+            m_WindowsPenSuppressedPointerId = 0;
+        }
+        return true;
+    }
+
+    if (!sentAllSamples && coordinateConversionFailed) {
         if (terminalMessage || currentInfoCanceled) {
             return cleanUpTerminalState();
         }

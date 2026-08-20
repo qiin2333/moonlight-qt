@@ -116,8 +116,10 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_WindowsPenSubclassContext(nullptr),
       m_WindowsPenPointerId(0),
       m_WindowsPenFallbackPointerId(0),
+      m_WindowsPenSuppressedPointerId(0),
       m_WindowsPenSubclassInstalled(false),
       m_WindowsPenPointerTracked(false),
+      m_WindowsPenCancelPending(false),
 #endif
       m_NativeTouchpadEnabled(SDL_GetHintBoolean(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, SDL_FALSE) == SDL_TRUE),
       m_TouchpadFlushEventQueued(false),
@@ -855,7 +857,7 @@ void SdlInputHandler::notifyFocusLost()
     cancelNativeTouchpadContacts();
 
 #ifdef HAVE_WINDOWS_PEN_INPUT
-    cancelWindowsPenInput();
+    cancelWindowsPenInput(true);
 #endif
 
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
@@ -984,7 +986,7 @@ void SdlInputHandler::setCaptureActive(bool active)
         cancelNativeTouchpadContacts();
 
 #ifdef HAVE_WINDOWS_PEN_INPUT
-        cancelWindowsPenInput();
+        cancelWindowsPenInput(true);
 #endif
 
         if (m_RemoteCursor != nullptr && SDL_GetCursor() == m_RemoteCursor) {

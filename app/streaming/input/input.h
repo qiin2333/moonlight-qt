@@ -265,9 +265,10 @@ private:
 
 #ifdef HAVE_WINDOWS_PEN_INPUT
     bool initializeWindowsPenInput();
-    void cancelWindowsPenInput();
+    bool trySendWindowsPenCancel();
+    void cancelWindowsPenInput(bool suppressPointer = false);
     void routeWindowsPenPointerToSdl(Uint32 pointerId);
-    void shutdownWindowsPenInput();
+    void shutdownWindowsPenInput(bool suppressPointer = false);
 #endif
 
     void handleRelativeFingerEvent(SDL_TouchFingerEvent* event);
@@ -426,8 +427,10 @@ private:
     void* m_WindowsPenSubclassContext;
     Uint32 m_WindowsPenPointerId;
     Uint32 m_WindowsPenFallbackPointerId;
+    Uint32 m_WindowsPenSuppressedPointerId;
     bool m_WindowsPenSubclassInstalled;
     bool m_WindowsPenPointerTracked;
+    bool m_WindowsPenCancelPending;
 #endif
 
     enum NativeTouchpadTransport {
