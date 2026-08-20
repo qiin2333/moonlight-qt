@@ -4,12 +4,22 @@
 #include "SDL_compat.h"
 #include "streaming/streamutils.h"
 
+namespace {
+
+bool isSyntheticPointerMouseEvent(Uint32 deviceId, bool absoluteTouchMode)
+{
+    return deviceId == SDL_TOUCH_MOUSEID ||
+            (absoluteTouchMode && deviceId == SDL_PEN_MOUSEID);
+}
+
+}
+
 void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
 {
     int button;
 
-    if (event->which == SDL_TOUCH_MOUSEID) {
-        // Ignore synthetic mouse events
+    if (isSyntheticPointerMouseEvent(event->which, m_AbsoluteTouchMode)) {
+        // Ignore mouse events synthesized from touch or native pen input.
         return;
     }
 #ifdef HAVE_MACOS_NATIVE_TOUCHPAD
@@ -87,8 +97,8 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
         // Not capturing
         return;
     }
-    else if (event->which == SDL_TOUCH_MOUSEID) {
-        // Ignore synthetic mouse events
+    else if (isSyntheticPointerMouseEvent(event->which, m_AbsoluteTouchMode)) {
+        // Ignore mouse events synthesized from touch or native pen input.
         return;
     }
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
@@ -105,7 +115,7 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
     while (SDL_PeepEvents(&nextEvent, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0) {
         event = &nextEvent.motion;
 
-        if (event->which == SDL_TOUCH_MOUSEID) {
+        if (isSyntheticPointerMouseEvent(event->which, m_AbsoluteTouchMode)) {
             continue;
         }
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
@@ -190,8 +200,8 @@ void SdlInputHandler::handleMouseWheelEvent(SDL_MouseWheelEvent* event)
         // Not capturing
         return;
     }
-    else if (event->which == SDL_TOUCH_MOUSEID) {
-        // Ignore synthetic mouse events
+    else if (isSyntheticPointerMouseEvent(event->which, m_AbsoluteTouchMode)) {
+        // Ignore mouse events synthesized from touch or native pen input.
         return;
     }
     else if (m_NativeTouchpadEnabled &&

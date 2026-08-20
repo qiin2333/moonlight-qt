@@ -111,6 +111,12 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_AbsoluteMouseMode(prefs.absoluteMouseMode),
       m_AbsoluteTouchMode(prefs.absoluteTouchMode),
       m_DisabledTouchFeedback(false),
+#ifdef HAVE_WINDOWS_PEN_INPUT
+      m_WindowsPenWindow(nullptr),
+      m_WindowsPenPointerId(0),
+      m_WindowsPenSubclassInstalled(false),
+      m_WindowsPenPointerTracked(false),
+#endif
       m_NativeTouchpadEnabled(SDL_GetHintBoolean(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, SDL_FALSE) == SDL_TRUE),
       m_TouchpadFlushEventQueued(false),
       m_NativeTouchpadTransport(NTT_UNKNOWN),
@@ -336,6 +342,9 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
 
 SdlInputHandler::~SdlInputHandler()
 {
+#ifdef HAVE_WINDOWS_PEN_INPUT
+    shutdownWindowsPenInput();
+#endif
 #ifdef Q_OS_WIN32
     // Restore SDL's normal Alt+F4 handling outside the streaming session.
     SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, "0");
@@ -397,6 +406,10 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+
+#ifdef HAVE_WINDOWS_PEN_INPUT
+    initializeWindowsPenInput();
+#endif
 
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
     if (m_NativeTouchpadEnabled && !m_WindowsTouchpadInput) {
@@ -837,6 +850,10 @@ void SdlInputHandler::notifyFocusLost()
                 isCaptureActive() ? 1 : 0);
 
     cancelNativeTouchpadContacts();
+
+#ifdef HAVE_WINDOWS_PEN_INPUT
+    cancelWindowsPenInput();
+#endif
 
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.

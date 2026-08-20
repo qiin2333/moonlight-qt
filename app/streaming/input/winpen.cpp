@@ -1,0 +1,334 @@
+#include "input.h"
+
+#ifdef HAVE_WINDOWS_PEN_INPUT
+
+#include <Limelight.h>
+#include <SDL_syswm.h>
+#include <Windows.h>
+#include <CommCtrl.h>
+
+#include "streaming/streamutils.h"
+
+#include <QtMath>
+
+#include <algorithm>
+#include <vector>
+
+namespace {
+
+constexpr UINT_PTR WINDOWS_PEN_SUBCLASS_ID = 0x4D4C504E; // "MLPN"
+constexpr UINT32 MAX_PEN_HISTORY_SAMPLES = 128;
+
+using SetWindowSubclassFn = BOOL (WINAPI *)(HWND, SUBCLASSPROC, UINT_PTR, DWORD_PTR);
+using RemoveWindowSubclassFn = BOOL (WINAPI *)(HWND, SUBCLASSPROC, UINT_PTR);
+using DefSubclassProcFn = LRESULT (WINAPI *)(HWND, UINT, WPARAM, LPARAM);
+
+HMODULE s_ComCtl32 = nullptr;
+SetWindowSubclassFn s_SetWindowSubclass = nullptr;
+RemoveWindowSubclassFn s_RemoveWindowSubclass = nullptr;
+DefSubclassProcFn s_DefSubclassProc = nullptr;
+
+bool loadWindowSubclassApis()
+{
+    if (s_SetWindowSubclass && s_RemoveWindowSubclass && s_DefSubclassProc) {
+        return true;
+    }
+
+    if (!s_ComCtl32) {
+        s_ComCtl32 = LoadLibraryW(L"comctl32.dll");
+    }
+    if (!s_ComCtl32) {
+        return false;
+    }
+
+    s_SetWindowSubclass = reinterpret_cast<SetWindowSubclassFn>(
+            GetProcAddress(s_ComCtl32, "SetWindowSubclass"));
+    s_RemoveWindowSubclass = reinterpret_cast<RemoveWindowSubclassFn>(
+            GetProcAddress(s_ComCtl32, "RemoveWindowSubclass"));
+    s_DefSubclassProc = reinterpret_cast<DefSubclassProcFn>(
+            GetProcAddress(s_ComCtl32, "DefSubclassProc"));
+
+    return s_SetWindowSubclass && s_RemoveWindowSubclass && s_DefSubclassProc;
+}
+
+LRESULT CALLBACK windowsPenSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam,
+                                        UINT_PTR, DWORD_PTR refData)
+{
+    auto* inputHandler = reinterpret_cast<SdlInputHandler*>(refData);
+    if (inputHandler && inputHandler->handleWindowsPenPointerMessage(
+            message, static_cast<Uint64>(wParam))) {
+        // Consuming the native pen message also prevents Windows and SDL from
+        // promoting the same stroke into synthetic touch and mouse events.
+        return 0;
+    }
+
+    return s_DefSubclassProc(hwnd, message, wParam, lParam);
+}
+
+}
+
+bool SdlInputHandler::initializeWindowsPenInput()
+{
+    if (!m_AbsoluteTouchMode || !m_Window) {
+        return false;
+    }
+
+    SDL_SysWMinfo info;
+    SDL_VERSION(&info.version);
+    if (!SDL_GetWindowWMInfo(m_Window, &info) || info.subsystem != SDL_SYSWM_WINDOWS) {
+        return false;
+    }
+
+    HWND hwnd = info.info.win.window;
+    if (m_WindowsPenSubclassInstalled && m_WindowsPenWindow == hwnd) {
+        return true;
+    }
+
+    shutdownWindowsPenInput();
+
+    if (!loadWindowSubclassApis()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
+                    "Windows pen input unavailable: window subclass APIs not found");
+        return false;
+    }
+
+    if (!s_SetWindowSubclass(hwnd, windowsPenSubclassProc, WINDOWS_PEN_SUBCLASS_ID,
+                             reinterpret_cast<DWORD_PTR>(this))) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
+                    "Windows pen input unavailable: SetWindowSubclass() failed");
+        return false;
+    }
+
+    m_WindowsPenWindow = hwnd;
+    m_WindowsPenSubclassInstalled = true;
+    return true;
+}
+
+void SdlInputHandler::cancelWindowsPenInput()
+{
+    if (m_WindowsPenPointerTracked &&
+            (LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS)) {
+        LiSendPenEvent(LI_TOUCH_EVENT_CANCEL_ALL, LI_TOOL_TYPE_UNKNOWN, 0,
+                       0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                       LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
+    }
+
+    m_WindowsPenPointerId = 0;
+    m_WindowsPenPointerTracked = false;
+}
+
+void SdlInputHandler::shutdownWindowsPenInput()
+{
+    cancelWindowsPenInput();
+
+    if (m_WindowsPenSubclassInstalled && m_WindowsPenWindow &&
+            s_RemoveWindowSubclass && IsWindow(static_cast<HWND>(m_WindowsPenWindow))) {
+        HWND hwnd = static_cast<HWND>(m_WindowsPenWindow);
+        if (!s_RemoveWindowSubclass(hwnd, windowsPenSubclassProc,
+                                    WINDOWS_PEN_SUBCLASS_ID)) {
+            // If removal fails, clear the callback reference data so the
+            // subclass can no longer dereference this handler after teardown.
+            s_SetWindowSubclass(hwnd, windowsPenSubclassProc,
+                                WINDOWS_PEN_SUBCLASS_ID, 0);
+        }
+    }
+
+    m_WindowsPenWindow = nullptr;
+    m_WindowsPenSubclassInstalled = false;
+}
+
+bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint64 wParamValue)
+{
+    if (!m_AbsoluteTouchMode || !m_Window || !m_WindowsPenWindow ||
+            !(LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS)) {
+        return false;
+    }
+
+    switch (message) {
+    case WM_POINTERENTER:
+    case WM_POINTERDOWN:
+    case WM_POINTERUPDATE:
+    case WM_POINTERUP:
+    case WM_POINTERLEAVE:
+    case WM_POINTERCAPTURECHANGED:
+        break;
+    default:
+        return false;
+    }
+
+    const UINT32 pointerId = GET_POINTERID_WPARAM(static_cast<WPARAM>(wParamValue));
+    POINTER_INPUT_TYPE pointerType = PT_POINTER;
+    bool isPen = GetPointerType(pointerId, &pointerType) && pointerType == PT_PEN;
+    const bool terminalMessage = message == WM_POINTERUP ||
+            message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED;
+    if (!isPen && terminalMessage && m_WindowsPenPointerTracked &&
+            pointerId == m_WindowsPenPointerId) {
+        // Windows can discard type/details before a terminal notification.
+        isPen = true;
+    }
+    if (!isPen) {
+        return false;
+    }
+
+    if (!(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
+        // Let the initial contact follow SDL's normal window activation path.
+        // Once focus is lost, consume the remaining pen sequence locally so it
+        // cannot re-enter through SDL's synthetic touch fallback after cancel.
+        return message != WM_POINTERDOWN;
+    }
+
+    if (m_WindowsPenPointerTracked && pointerId != m_WindowsPenPointerId) {
+        cancelWindowsPenInput();
+    }
+
+    POINTER_PEN_INFO currentInfo = {};
+    if (!GetPointerPenInfo(pointerId, &currentInfo)) {
+        if (!terminalMessage || !m_WindowsPenPointerTracked ||
+                pointerId != m_WindowsPenPointerId) {
+            return false;
+        }
+
+        if (message == WM_POINTERLEAVE) {
+            LiSendPenEvent(LI_TOUCH_EVENT_HOVER_LEAVE, LI_TOOL_TYPE_PEN, 0,
+                           0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
+            m_WindowsPenPointerId = 0;
+            m_WindowsPenPointerTracked = false;
+        }
+        else {
+            cancelWindowsPenInput();
+        }
+        return true;
+    }
+
+    HWND hwnd = static_cast<HWND>(m_WindowsPenWindow);
+    RECT clientRect = {};
+    if (!GetClientRect(hwnd, &clientRect)) {
+        return false;
+    }
+
+    SDL_Rect src = { 0, 0, m_StreamWidth, m_StreamHeight };
+    SDL_Rect dst = { 0, 0, static_cast<int>(clientRect.right - clientRect.left),
+                     static_cast<int>(clientRect.bottom - clientRect.top) };
+    StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
+    if (dst.w <= 0 || dst.h <= 0) {
+        return false;
+    }
+
+    m_WindowsPenPointerId = pointerId;
+    m_WindowsPenPointerTracked = true;
+
+    auto eventTypeForSample = [message](const POINTER_PEN_INFO& sample) -> uint8_t {
+        if (sample.pointerInfo.pointerFlags & POINTER_FLAG_CANCELED) {
+            return LI_TOUCH_EVENT_CANCEL;
+        }
+
+        switch (message) {
+        case WM_POINTERDOWN:
+            return LI_TOUCH_EVENT_DOWN;
+        case WM_POINTERUP:
+            return LI_TOUCH_EVENT_UP;
+        case WM_POINTERLEAVE:
+            return LI_TOUCH_EVENT_HOVER_LEAVE;
+        case WM_POINTERCAPTURECHANGED:
+            return LI_TOUCH_EVENT_CANCEL;
+        case WM_POINTERENTER:
+        case WM_POINTERUPDATE:
+        default:
+            return (sample.pointerInfo.pointerFlags & POINTER_FLAG_INCONTACT) ?
+                        LI_TOUCH_EVENT_MOVE : LI_TOUCH_EVENT_HOVER;
+        }
+    };
+
+    auto sendPenSample = [&](const POINTER_PEN_INFO& sample) {
+        POINT point = sample.pointerInfo.ptPixelLocation;
+        if (!ScreenToClient(hwnd, &point)) {
+            return;
+        }
+
+        const int x = qMin(qMax(static_cast<int>(point.x), dst.x), dst.x + dst.w) - dst.x;
+        const int y = qMin(qMax(static_cast<int>(point.y), dst.y), dst.y + dst.h) - dst.y;
+        const float normalizedX = static_cast<float>(x) / dst.w;
+        const float normalizedY = static_cast<float>(y) / dst.h;
+
+        const bool inContact = (sample.pointerInfo.pointerFlags & POINTER_FLAG_INCONTACT) != 0;
+        float pressure = 0.0f;
+        if (inContact && (sample.penMask & PEN_MASK_PRESSURE)) {
+            pressure = qBound(0.0f, static_cast<float>(sample.pressure) / 1024.0f, 1.0f);
+        }
+
+        const uint8_t eventType = eventTypeForSample(sample);
+        const uint8_t toolType = (sample.penFlags & (PEN_FLAG_INVERTED | PEN_FLAG_ERASER)) ?
+                                     LI_TOOL_TYPE_ERASER : LI_TOOL_TYPE_PEN;
+        const uint8_t penButtons =
+                eventType == LI_TOUCH_EVENT_CANCEL ||
+                eventType == LI_TOUCH_EVENT_HOVER_LEAVE ? 0 :
+                (sample.penFlags & PEN_FLAG_BARREL ? LI_PEN_BUTTON_PRIMARY : 0);
+
+        // POINTER_PEN_INFO::rotation is barrel twist, while Moonlight rotation
+        // is the tool azimuth in the screen plane. Derive azimuth and tilt from
+        // the Windows X/Y tilt axes instead.
+        uint16_t rotation = LI_ROT_UNKNOWN;
+        uint8_t tilt = LI_TILT_UNKNOWN;
+        if (sample.penMask & (PEN_MASK_TILT_X | PEN_MASK_TILT_Y)) {
+            const int tiltX = (sample.penMask & PEN_MASK_TILT_X) ? sample.tiltX : 0;
+            const int tiltY = (sample.penMask & PEN_MASK_TILT_Y) ? sample.tiltY : 0;
+            const double tanX = qTan(qDegreesToRadians(static_cast<double>(tiltX)));
+            const double tanY = qTan(qDegreesToRadians(static_cast<double>(tiltY)));
+            const double tiltFromNormal = qAtan(qSqrt(tanX * tanX + tanY * tanY));
+            tilt = static_cast<uint8_t>(qBound(
+                    0, qRound(qRadiansToDegrees(tiltFromNormal)), 90));
+
+            if ((tiltX != 0 || tiltY != 0) &&
+                    qAbs(tiltX) != 90 && qAbs(tiltY) != 90) {
+                // Windows tilt axes use +X=right and +Y=toward the user.
+                // Moonlight rotation is clockwise from screen-up.
+                double rotationRad = qAtan2(tanX, -tanY);
+                if (rotationRad < 0.0) {
+                    rotationRad += qDegreesToRadians(360.0);
+                }
+                rotation = static_cast<uint16_t>(
+                        qRound(qRadiansToDegrees(rotationRad)) % 360);
+            }
+        }
+
+        LiSendPenEvent(eventType, toolType, penButtons,
+                       normalizedX, normalizedY, pressure, 0.0f, 0.0f,
+                       rotation, tilt);
+    };
+
+    if (message == WM_POINTERUPDATE && currentInfo.pointerInfo.historyCount > 1) {
+        const UINT32 capacity = std::min(currentInfo.pointerInfo.historyCount,
+                                         MAX_PEN_HISTORY_SAMPLES);
+        std::vector<POINTER_PEN_INFO> history(capacity);
+        UINT32 available = capacity;
+        if (GetPointerPenInfoHistory(pointerId, &available, history.data())) {
+            const UINT32 valid = std::min(capacity, available);
+            // Win32 returns newest-first. Send oldest-first to preserve stroke order.
+            for (UINT32 i = valid; i > 0; --i) {
+                sendPenSample(history[i - 1]);
+            }
+        }
+        else {
+            sendPenSample(currentInfo);
+        }
+    }
+    else {
+        sendPenSample(currentInfo);
+    }
+
+    if (!m_DisabledTouchFeedback) {
+        disableTouchFeedback();
+        m_DisabledTouchFeedback = true;
+    }
+
+    if (message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED ||
+            (currentInfo.pointerInfo.pointerFlags & POINTER_FLAG_CANCELED)) {
+        m_WindowsPenPointerId = 0;
+        m_WindowsPenPointerTracked = false;
+    }
+
+    return true;
+}
+
+#endif
