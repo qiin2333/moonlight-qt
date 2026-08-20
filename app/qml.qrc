@@ -12,7 +12,6 @@
         <file>gui/NavigableToolButton.qml</file>
         <file>gui/SelectAddressDialog.qml</file>
         <file>gui/WindowControlButton.qml</file>
-        <file>gui/WindowResizeArea.qml</file>
         <file>gui/NavigableItemDelegate.qml</file>
         <file>gui/NavigableMenuItem.qml</file>
         <file>gui/CliQuitStreamSegue.qml</file>

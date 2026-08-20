@@ -90,6 +90,7 @@ static QString getStartupApplicationDir(const char* argv0)
 #include "settings/streamingpreferences.h"
 #include "gui/sdlgamepadkeynavigation.h"
 #include "gui/windowplacement.h"
+#include "gui/windowswindowchrome.h"
 #include "imageutils.h"
 #include "uifont.h"
 #include "streaming/macpermissions.h"
@@ -1035,6 +1036,7 @@ int main(int argc, char *argv[])
                                                    });
     qmlRegisterType<ImageUtils>("ImageUtils", 1, 0, "ImageUtils");
     qmlRegisterType<WindowPlacement>("WindowPlacement", 1, 0, "WindowPlacement");
+    qmlRegisterType<WindowsWindowChrome>("WindowsWindowChrome", 1, 0, "WindowsWindowChrome");
 
     // Create the identity manager on the main thread
     IdentityManager::get();

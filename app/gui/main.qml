@@ -10,6 +10,7 @@ import StreamingPreferences 1.0
 import SystemProperties 1.0
 import SdlGamepadKeyNavigation 1.0
 import WindowPlacement 1.0
+import WindowsWindowChrome 1.0
 
 import "theme"
 import "Brand.js" as Brand
@@ -33,21 +34,18 @@ ApplicationWindow {
         enabled: StreamingPreferences.rememberWindowPosition
     }
 
-    // 去掉系统标题栏的外壳：内容顶到窗口最上沿、系统不再画标题栏底色，于是下面
-    // 那条 56px 的工具栏本身就成了标题栏，整个窗口从上到下都是我们自己的配色。
-    //
-    // 仍然是一个正常的原生窗口，resize 边缘、窗口阴影和任务栏集成都由系统管理。
-    // Windows 只关闭原生 caption buttons，改由工具栏右侧的自绘按钮提供窗口操作；
-    // 没有使用 FramelessWindowHint，因此不会丢掉系统边框行为。
-    flags: Qt.Window
-           | Qt.ExpandedClientAreaHint
-           | Qt.NoTitleBarBackgroundHint
-           // Windows otherwise keeps drawing the native window icon and title
-           // over our own wordmark. CustomizeWindowHint removes those default
-           // decorations; the three caption buttons are drawn below in QML.
-           | (Qt.platform.os === "windows"
-              ? Qt.CustomizeWindowHint
-              : 0)
+    WindowsWindowChrome {
+        id: windowsWindowChrome
+        window: window
+        titleBar: titleDragRegion
+    }
+
+    // Windows 使用真正的无边框窗口，避免不可见的系统边框占用全屏内容区；移动、
+    // 缩放和最大化由 WindowsWindowChrome 的原生命中测试提供。macOS 和 Linux
+    // 保留扩展客户区，由各自窗口系统继续处理原生标题栏行为。
+    flags: Qt.platform.os === "windows"
+           ? Qt.Window | Qt.FramelessWindowHint
+           : Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
 
     // 加了上面那两个 flag 之后窗口的可绘制区域顶到了最上沿，但 ApplicationWindow 仍然
     // 把 contentItem 往下缩了一个安全区（实测 macOS 上 contentItem.y = 32，正好是系统
@@ -79,6 +77,7 @@ ApplicationWindow {
         // Always fit the initial window to the current screen. If the user opted
         // in, restore the last normal window geometry before showing it.
         windowPlacement.restore()
+        windowsWindowChrome.activate()
 
         // Show the window according to the user's preferences
         if (SystemProperties.hasDesktopEnvironment) {
@@ -429,8 +428,8 @@ ApplicationWindow {
                 }
             }
 
-            // 标题区域占满工具栏中所有非按钮空间。把移动和双击处理放在这里，
-            // 不再依赖按钮后方的整栏 MouseArea，避免事件被工具栏子项遮住。
+            // 标题区域占满工具栏中所有非按钮空间。Windows 读取这块区域做原生
+            // 非客户区命中；Linux 继续使用下面的 MouseArea；macOS 由 AppKit 接管。
             Item {
                 id: titleDragRegion
                 Layout.fillHeight: true
@@ -484,7 +483,7 @@ ApplicationWindow {
                 MouseArea {
                     anchors.fill: parent
                     acceptedButtons: Qt.LeftButton
-                    enabled: !SystemProperties.isDarwin
+                    enabled: Qt.platform.os !== "windows" && !SystemProperties.isDarwin
 
                     property point pressPosition
                     property bool systemMoveStarted: false
@@ -757,7 +756,7 @@ ApplicationWindow {
             visible: Qt.platform.os === "windows" && toolBar.windowChromeVisible
             anchors.top: parent.top
             anchors.right: parent.right
-            height: 40
+            height: parent.height
             z: 2
 
             WindowControlButton {
@@ -789,12 +788,6 @@ ApplicationWindow {
                 onClicked: window.close()
             }
         }
-    }
-
-    WindowResizeArea {
-        window: window
-        topInset: window.chromeInset
-        z: 100
     }
 
     ErrorMessageDialog {
