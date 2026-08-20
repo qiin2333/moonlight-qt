@@ -281,9 +281,11 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
 
             if ((tiltX != 0 || tiltY != 0) &&
                     qAbs(tiltX) != 90 && qAbs(tiltY) != 90) {
-                // Windows tilt axes use +X=right and +Y=toward the user.
-                // Moonlight rotation is clockwise from screen-up.
-                double rotationRad = qAtan2(tanX, -tanY);
+                // Sunshine reconstructs Windows tilt axes as
+                // X=-sin(rotation)*tan(tilt), Y=cos(rotation)*tan(tilt).
+                // Use the inverse conversion so the remote axes match the
+                // local POINTER_PEN_INFO values instead of being flipped.
+                double rotationRad = qAtan2(-tanX, tanY);
                 if (rotationRad < 0.0) {
                     rotationRad += qDegreesToRadians(360.0);
                 }
