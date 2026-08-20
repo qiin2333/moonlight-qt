@@ -274,10 +274,19 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         // The remote state for this pointer was cancelled during a focus,
         // capture, or transport failure. Do not resume it with a MOVE that has
         // no matching DOWN. Hover may resume after contact ends at UP.
-        if (terminalMessage) {
+        if (message == WM_POINTERDOWN ||
+                IS_POINTER_NEW_WPARAM(static_cast<WPARAM>(wParamValue))) {
+            // Windows may recycle an ID after the old pointer lifetime ends
+            // without delivering its terminal message to this window. A new
+            // pointer marker is safe to treat as a fresh sequence.
             m_WindowsPenSuppressedPointerId = UINT32_MAX;
         }
-        return true;
+        else {
+            if (terminalMessage) {
+                m_WindowsPenSuppressedPointerId = UINT32_MAX;
+            }
+            return true;
+        }
     }
 
     if (pointerId == m_WindowsPenFallbackPointerId) {
