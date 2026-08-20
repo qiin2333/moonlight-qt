@@ -113,6 +113,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_DisabledTouchFeedback(false),
 #ifdef HAVE_WINDOWS_PEN_INPUT
       m_WindowsPenWindow(nullptr),
+      m_WindowsPenSubclassContext(nullptr),
       m_WindowsPenPointerId(0),
       m_WindowsPenSubclassInstalled(false),
       m_WindowsPenPointerTracked(false),
@@ -406,6 +407,7 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+    m_DisabledTouchFeedback = false;
 
 #ifdef HAVE_WINDOWS_PEN_INPUT
     initializeWindowsPenInput();

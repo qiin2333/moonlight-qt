@@ -421,6 +421,7 @@ private:
 
 #ifdef HAVE_WINDOWS_PEN_INPUT
     void* m_WindowsPenWindow;
+    void* m_WindowsPenSubclassContext;
     Uint32 m_WindowsPenPointerId;
     bool m_WindowsPenSubclassInstalled;
     bool m_WindowsPenPointerTracked;

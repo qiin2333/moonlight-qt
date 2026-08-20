@@ -12,6 +12,9 @@
 #include <QtMath>
 
 #include <algorithm>
+#include <atomic>
+#include <mutex>
+#include <new>
 #include <vector>
 
 namespace {
@@ -27,6 +30,15 @@ HMODULE s_ComCtl32 = nullptr;
 SetWindowSubclassFn s_SetWindowSubclass = nullptr;
 RemoveWindowSubclassFn s_RemoveWindowSubclass = nullptr;
 DefSubclassProcFn s_DefSubclassProc = nullptr;
+
+struct WindowsPenSubclassContext
+{
+    explicit WindowsPenSubclassContext(SdlInputHandler* handler) : inputHandler(handler) {}
+
+    std::mutex mutex;
+    SdlInputHandler* inputHandler;
+    std::atomic_bool orphaned{false};
+};
 
 bool loadWindowSubclassApis()
 {
@@ -54,15 +66,27 @@ bool loadWindowSubclassApis()
 LRESULT CALLBACK windowsPenSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam,
                                         UINT_PTR, DWORD_PTR refData)
 {
-    auto* inputHandler = reinterpret_cast<SdlInputHandler*>(refData);
-    if (inputHandler && inputHandler->handleWindowsPenPointerMessage(
-            message, static_cast<Uint64>(wParam))) {
+    auto* context = reinterpret_cast<WindowsPenSubclassContext*>(refData);
+    bool handled = false;
+    if (context) {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        if (context->inputHandler) {
+            handled = context->inputHandler->handleWindowsPenPointerMessage(
+                    message, static_cast<Uint64>(wParam));
+        }
+    }
+
+    if (handled) {
         // Consuming the native pen message also prevents Windows and SDL from
         // promoting the same stroke into synthetic touch and mouse events.
         return 0;
     }
 
-    return s_DefSubclassProc(hwnd, message, wParam, lParam);
+    const LRESULT result = s_DefSubclassProc(hwnd, message, wParam, lParam);
+    if (message == WM_NCDESTROY && context && context->orphaned.load()) {
+        delete context;
+    }
+    return result;
 }
 
 }
@@ -92,14 +116,23 @@ bool SdlInputHandler::initializeWindowsPenInput()
         return false;
     }
 
+    auto* context = new (std::nothrow) WindowsPenSubclassContext(this);
+    if (!context) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
+                    "Windows pen input unavailable: failed to allocate subclass context");
+        return false;
+    }
+
     if (!s_SetWindowSubclass(hwnd, windowsPenSubclassProc, WINDOWS_PEN_SUBCLASS_ID,
-                             reinterpret_cast<DWORD_PTR>(this))) {
+                             reinterpret_cast<DWORD_PTR>(context))) {
+        delete context;
         SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
                     "Windows pen input unavailable: SetWindowSubclass() failed");
         return false;
     }
 
     m_WindowsPenWindow = hwnd;
+    m_WindowsPenSubclassContext = context;
     m_WindowsPenSubclassInstalled = true;
     return true;
 }
@@ -121,19 +154,41 @@ void SdlInputHandler::shutdownWindowsPenInput()
 {
     cancelWindowsPenInput();
 
-    if (m_WindowsPenSubclassInstalled && m_WindowsPenWindow &&
-            s_RemoveWindowSubclass && IsWindow(static_cast<HWND>(m_WindowsPenWindow))) {
-        HWND hwnd = static_cast<HWND>(m_WindowsPenWindow);
-        if (!s_RemoveWindowSubclass(hwnd, windowsPenSubclassProc,
+    auto* context = static_cast<WindowsPenSubclassContext*>(m_WindowsPenSubclassContext);
+    if (context) {
+        // Wait for an in-flight callback to finish before invalidating the
+        // handler pointer. The context remains valid even if detachment fails.
+        std::lock_guard<std::mutex> lock(context->mutex);
+        context->inputHandler = nullptr;
+    }
+
+    bool detached = !m_WindowsPenSubclassInstalled;
+    HWND hwnd = static_cast<HWND>(m_WindowsPenWindow);
+    if (!detached && (!hwnd || !IsWindow(hwnd))) {
+        // Window destruction automatically removes its subclass callbacks.
+        detached = true;
+    }
+    else if (!detached && s_RemoveWindowSubclass &&
+             s_RemoveWindowSubclass(hwnd, windowsPenSubclassProc,
                                     WINDOWS_PEN_SUBCLASS_ID)) {
-            // If removal fails, clear the callback reference data so the
-            // subclass can no longer dereference this handler after teardown.
-            s_SetWindowSubclass(hwnd, windowsPenSubclassProc,
-                                WINDOWS_PEN_SUBCLASS_ID, 0);
+        detached = true;
+    }
+
+    if (context) {
+        if (detached) {
+            delete context;
+        }
+        else {
+            // The callback can no longer reach this handler. Keep the stable
+            // context alive until WM_NCDESTROY removes the subclass.
+            context->orphaned.store(true);
+            SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
+                        "Windows pen input: failed to remove window subclass");
         }
     }
 
     m_WindowsPenWindow = nullptr;
+    m_WindowsPenSubclassContext = nullptr;
     m_WindowsPenSubclassInstalled = false;
 }
 
@@ -201,9 +256,33 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         return true;
     }
 
+    auto cleanUpTerminalState = [&]() {
+        if (!m_WindowsPenPointerTracked || pointerId != m_WindowsPenPointerId) {
+            return false;
+        }
+
+        if (message == WM_POINTERLEAVE) {
+            LiSendPenEvent(LI_TOUCH_EVENT_HOVER_LEAVE, LI_TOOL_TYPE_PEN, 0,
+                           0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
+            m_WindowsPenPointerId = 0;
+            m_WindowsPenPointerTracked = false;
+        }
+        else {
+            cancelWindowsPenInput();
+        }
+        return true;
+    };
+
+    const bool currentInfoCanceled =
+            (currentInfo.pointerInfo.pointerFlags & POINTER_FLAG_CANCELED) != 0;
+
     HWND hwnd = static_cast<HWND>(m_WindowsPenWindow);
     RECT clientRect = {};
     if (!GetClientRect(hwnd, &clientRect)) {
+        if ((terminalMessage || currentInfoCanceled) && cleanUpTerminalState()) {
+            return true;
+        }
         return false;
     }
 
@@ -212,6 +291,9 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
                      static_cast<int>(clientRect.bottom - clientRect.top) };
     StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
     if (dst.w <= 0 || dst.h <= 0) {
+        if ((terminalMessage || currentInfoCanceled) && cleanUpTerminalState()) {
+            return true;
+        }
         return false;
     }
 
@@ -243,7 +325,7 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
     auto sendPenSample = [&](const POINTER_PEN_INFO& sample) {
         POINT point = sample.pointerInfo.ptPixelLocation;
         if (!ScreenToClient(hwnd, &point)) {
-            return;
+            return false;
         }
 
         const int x = qMin(qMax(static_cast<int>(point.x), dst.x), dst.x + dst.w) - dst.x;
@@ -297,8 +379,10 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         LiSendPenEvent(eventType, toolType, penButtons,
                        normalizedX, normalizedY, pressure, 0.0f, 0.0f,
                        rotation, tilt);
+        return true;
     };
 
+    bool sentAnySample = false;
     if (message == WM_POINTERUPDATE && currentInfo.pointerInfo.historyCount > 1) {
         const UINT32 capacity = std::min(currentInfo.pointerInfo.historyCount,
                                          MAX_PEN_HISTORY_SAMPLES);
@@ -308,15 +392,22 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
             const UINT32 valid = std::min(capacity, available);
             // Win32 returns newest-first. Send oldest-first to preserve stroke order.
             for (UINT32 i = valid; i > 0; --i) {
-                sendPenSample(history[i - 1]);
+                sentAnySample |= sendPenSample(history[i - 1]);
             }
         }
         else {
-            sendPenSample(currentInfo);
+            sentAnySample = sendPenSample(currentInfo);
         }
     }
     else {
-        sendPenSample(currentInfo);
+        sentAnySample = sendPenSample(currentInfo);
+    }
+
+    if (!sentAnySample) {
+        if ((terminalMessage || currentInfoCanceled) && cleanUpTerminalState()) {
+            return true;
+        }
+        return false;
     }
 
     if (!m_DisabledTouchFeedback) {
@@ -325,7 +416,7 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
     }
 
     if (message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED ||
-            (currentInfo.pointerInfo.pointerFlags & POINTER_FLAG_CANCELED)) {
+            currentInfoCanceled) {
         m_WindowsPenPointerId = 0;
         m_WindowsPenPointerTracked = false;
     }
