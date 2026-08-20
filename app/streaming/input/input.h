@@ -261,6 +261,7 @@ private:
     void emulateAbsoluteFingerEvent(SDL_TouchFingerEvent* event);
 
     void disableTouchFeedback();
+    static bool isPenTouchDevice(SDL_TouchID touchId);
 
 #ifdef HAVE_WINDOWS_PEN_INPUT
     bool initializeWindowsPenInput();

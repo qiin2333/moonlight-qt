@@ -1010,6 +1010,13 @@ void SdlInputHandler::setCaptureActive(bool active)
 
 void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
 {
+    // A stylus is a direct pointing device regardless of whether ordinary
+    // touchscreen contacts are configured to emulate a trackpad.
+    if (isPenTouchDevice(event->touchId)) {
+        handleAbsoluteFingerEvent(event);
+        return;
+    }
+
 #if SDL_VERSION_ATLEAST(2, 0, 10)
     SDL_TouchDeviceType deviceType = SDL_GetTouchDeviceType(event->touchId);
     if (deviceType == SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE && m_NativeTouchpadEnabled) {

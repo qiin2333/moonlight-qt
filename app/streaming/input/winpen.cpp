@@ -93,7 +93,7 @@ LRESULT CALLBACK windowsPenSubclassProc(HWND hwnd, UINT message, WPARAM wParam, 
 
 bool SdlInputHandler::initializeWindowsPenInput()
 {
-    if (!m_AbsoluteTouchMode || !m_Window) {
+    if (!m_Window) {
         return false;
     }
 
@@ -201,7 +201,7 @@ void SdlInputHandler::shutdownWindowsPenInput()
 
 bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint64 wParamValue)
 {
-    if (!m_AbsoluteTouchMode || !m_Window || !m_WindowsPenWindow ||
+    if (!m_Window || !m_WindowsPenWindow ||
             !(LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS)) {
         return false;
     }

@@ -7,15 +7,13 @@
 
 #include <QtMath>
 
-namespace {
-
-#if SDL_VERSION_ATLEAST(2, 0, 22)
-bool isPenTouchDevice(SDL_TouchID touchId)
+bool SdlInputHandler::isPenTouchDevice(SDL_TouchID touchId)
 {
     if (touchId == SDL_PEN_TOUCHID) {
         return true;
     }
 
+#if SDL_VERSION_ATLEAST(2, 0, 22)
     const int numTouchDevices = SDL_GetNumTouchDevices();
     for (int i = 0; i < numTouchDevices; i++) {
         if (touchId == SDL_GetTouchDevice(i)) {
@@ -25,11 +23,9 @@ bool isPenTouchDevice(SDL_TouchID touchId)
                      SDL_strcmp(touchName, "pen_input") == 0);
         }
     }
-
-    return false;
-}
 #endif
 
+    return false;
 }
 
 // How long the fingers must be stationary to start a right click
@@ -136,13 +132,11 @@ void SdlInputHandler::handleAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
 
     // Try to send it as a native pen/touch event, otherwise fall back to our touch emulation
     if (LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS) {
-#if SDL_VERSION_ATLEAST(2, 0, 22)
         if (isPenTouchDevice(event->touchId)) {
             LiSendPenEvent(eventType, LI_TOOL_TYPE_PEN, 0, vidrelx / dst.w, vidrely / dst.h, event->pressure,
                            0.0f, 0.0f, LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
         }
         else
-#endif
         {
             LiSendTouchEvent(eventType, pointerId, vidrelx / dst.w, vidrely / dst.h, event->pressure,
                              0.0f, 0.0f, LI_ROT_UNKNOWN);
