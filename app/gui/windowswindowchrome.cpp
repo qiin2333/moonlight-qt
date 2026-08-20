@@ -148,7 +148,7 @@ void WindowsWindowChrome::activate()
 void WindowsWindowChrome::minimize()
 {
 #ifdef Q_OS_WIN32
-    postSystemCommand(SC_MINIMIZE, "minimize");
+    postSystemCommand(SC_MINIMIZE, QStringLiteral("minimize"));
 #else
     if (m_Window) {
         m_Window->showMinimized();
@@ -160,10 +160,10 @@ void WindowsWindowChrome::toggleMaximized()
 {
 #ifdef Q_OS_WIN32
     if (isMaximized()) {
-        postSystemCommand(SC_RESTORE, "restore");
+        postSystemCommand(SC_RESTORE, QStringLiteral("restore"));
     }
     else {
-        postSystemCommand(SC_MAXIMIZE, "maximize");
+        postSystemCommand(SC_MAXIMIZE, QStringLiteral("maximize"));
     }
 #else
     if (m_Window) {
@@ -180,7 +180,7 @@ void WindowsWindowChrome::toggleMaximized()
 void WindowsWindowChrome::close()
 {
 #ifdef Q_OS_WIN32
-    postSystemCommand(SC_CLOSE, "close");
+    postSystemCommand(SC_CLOSE, QStringLiteral("close"));
 #else
     if (m_Window) {
         m_Window->close();
@@ -188,7 +188,7 @@ void WindowsWindowChrome::close()
 #endif
 }
 
-void WindowsWindowChrome::postSystemCommand(unsigned int command, const char* action)
+void WindowsWindowChrome::postSystemCommand(unsigned int command, const QString& action)
 {
 #ifdef Q_OS_WIN32
     if (!m_WindowId) {
@@ -203,6 +203,8 @@ void WindowsWindowChrome::postSystemCommand(unsigned int command, const char* ac
         return;
     }
 
+    // WM_SYSCOMMAND is asynchronous. Log once the resulting window-state
+    // messages have had a chance to update both the native and Qt state.
     QTimer::singleShot(100, this, [this, action]() {
         scheduleNativeStateUpdate();
         logWindowState(action, "button-after");
@@ -213,7 +215,7 @@ void WindowsWindowChrome::postSystemCommand(unsigned int command, const char* ac
 #endif
 }
 
-void WindowsWindowChrome::logWindowState(const char* action, const char* phase) const
+void WindowsWindowChrome::logWindowState(const QString& action, const char* phase) const
 {
 #ifdef Q_OS_WIN32
     if (!m_Window || !m_WindowId) {
@@ -239,7 +241,7 @@ void WindowsWindowChrome::logWindowState(const char* action, const char* phase) 
                               "nativeMinimized=%5 window=%6 normalWorkspace=%7 qtGeometry=%8 "
                               "dpr=%9 placementFlags=0x%10 showCmd=%11 monitor=%12 "
                               "monitorRect=%13 workRect=%14 qtScreen=%15")
-                       .arg(QString::fromLatin1(action),
+                       .arg(action,
                             QString::fromLatin1(phase),
                             QString::fromLatin1(visibilityName(m_Window->visibility())))
                        .arg(IsZoomed(nativeWindow) ? 1 : 0)

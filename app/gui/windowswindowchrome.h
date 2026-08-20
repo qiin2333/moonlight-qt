@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QQuickItem>
+#include <QString>
 #include <QWindow>
 
 class WindowsWindowChrome : public QObject, public QAbstractNativeEventFilter
@@ -44,8 +45,8 @@ signals:
     void maximizedChanged();
 
 private:
-    void postSystemCommand(unsigned int command, const char* action);
-    void logWindowState(const char* action, const char* phase) const;
+    void postSystemCommand(unsigned int command, const QString& action);
+    void logWindowState(const QString& action, const char* phase) const;
     void scheduleNativeStateUpdate();
 
     QPointer<QWindow> m_Window;

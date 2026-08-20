@@ -19,6 +19,16 @@ ApplicationWindow {
     property bool pollingActive: false
     property bool revealAfterFirstFrame: false
 
+    Timer {
+        id: revealFallbackTimer
+        interval: 1000
+        repeat: false
+        onTriggered: {
+            window.revealAfterFirstFrame = false
+            window.opacity = 1
+        }
+    }
+
     // Set by SettingsView to force the back operation to pop all
     // pages except the initial view. This is required when doing
     // a retranslate() because AppView breaks for some reason.
@@ -59,6 +69,7 @@ ApplicationWindow {
     onFrameSwapped: {
         if (revealAfterFirstFrame) {
             revealAfterFirstFrame = false
+            revealFallbackTimer.stop()
             opacity = 1
         }
     }
@@ -93,6 +104,7 @@ ApplicationWindow {
                 if (Qt.platform.os === "windows") {
                     window.opacity = 0
                     window.revealAfterFirstFrame = true
+                    revealFallbackTimer.start()
                 }
                 window.showMaximized()
             }

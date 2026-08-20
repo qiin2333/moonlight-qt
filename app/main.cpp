@@ -336,7 +336,7 @@ void ffmpegLogToDiskHandler(void* ptr, int level, const char* fmt, va_list vl)
 #include <DbgHelp.h>
 #include <io.h>
 
-static UINT s_HitUnhandledException = 0;
+static volatile LONG s_HitUnhandledException = 0;
 static WCHAR s_CrashLogDirectory[MAX_PATH] = {};
 static WCHAR s_CrashLogFileName[MAX_PATH] = {};
 static WCHAR s_CrashBuildVersion[128] = {};
@@ -465,24 +465,6 @@ LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
     const DWORD exceptionCode = exceptionRecord ? exceptionRecord->ExceptionCode : 0;
     const void* exceptionAddress = exceptionRecord ? exceptionRecord->ExceptionAddress : nullptr;
 
-    HMODULE faultModule = nullptr;
-    WCHAR faultModulePath[MAX_PATH] = L"unknown";
-    const WCHAR* faultModuleName = faultModulePath;
-    ULONGLONG moduleOffset = 0;
-    if (exceptionAddress &&
-            GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                       GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                               reinterpret_cast<LPCWSTR>(exceptionAddress),
-                               &faultModule)) {
-        if (GetModuleFileNameW(faultModule, faultModulePath, _countof(faultModulePath)) != 0) {
-            if (const WCHAR* lastSeparator = wcsrchr(faultModulePath, L'\\')) {
-                faultModuleName = lastSeparator + 1;
-            }
-        }
-        moduleOffset = reinterpret_cast<ULONG_PTR>(exceptionAddress) -
-                       reinterpret_cast<ULONG_PTR>(faultModule);
-    }
-
     const WCHAR* memoryOperation = L"not-applicable";
     const void* memoryAddress = nullptr;
     if (exceptionRecord &&
@@ -498,24 +480,28 @@ LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
     }
 
     WCHAR diagnosticMessage[2048];
-    swprintf_s(diagnosticMessage,
-               L"[crash] Unhandled exception: code=0x%08lX (%ls), address=%p, "
-               L"module=%ls, module_offset=0x%llX, thread=%lu, operation=%ls, "
-               L"memory_address=%p, build=%ls\r\n",
-               exceptionCode,
-               exceptionCodeName(exceptionCode),
-               exceptionAddress,
-               faultModuleName,
-               moduleOffset,
-               GetCurrentThreadId(),
-               memoryOperation,
-               memoryAddress,
-               s_CrashBuildVersion);
+    _snwprintf_s(diagnosticMessage,
+                _countof(diagnosticMessage),
+                _TRUNCATE,
+                L"[crash] Unhandled exception: code=0x%08lX (%ls), address=%p, "
+                L"thread=%lu, operation=%ls, "
+                L"memory_address=%p, build=%ls\r\n",
+                exceptionCode,
+                exceptionCodeName(exceptionCode),
+                exceptionAddress,
+                GetCurrentThreadId(),
+                memoryOperation,
+                memoryAddress,
+                s_CrashBuildVersion);
     appendCrashDiagnostic(diagnosticMessage);
 
-    WCHAR dmpFileName[MAX_PATH];
-    swprintf_s(dmpFileName, L"%ls\\Moonlight-%I64u.dmp",
-               s_CrashLogDirectory, currentUnixTimeSeconds());
+    WCHAR dmpFileName[MAX_PATH + 64];
+    _snwprintf_s(dmpFileName,
+                 _countof(dmpFileName),
+                 _TRUNCATE,
+                 L"%ls\\Moonlight-%I64u.dmp",
+                 s_CrashLogDirectory,
+                 currentUnixTimeSeconds());
     HANDLE dumpHandle = CreateFileW(dmpFileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (dumpHandle != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION info;
@@ -536,25 +522,61 @@ LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
                                &info,
                                nullptr,
                                nullptr)) {
-            swprintf_s(diagnosticMessage, L"[crash] Minidump written to: %ls\r\n", dmpFileName);
+            _snwprintf_s(diagnosticMessage,
+                         _countof(diagnosticMessage),
+                         _TRUNCATE,
+                         L"[crash] Minidump written to: %ls\r\n",
+                         dmpFileName);
             appendCrashDiagnostic(diagnosticMessage);
         }
         else {
-            swprintf_s(diagnosticMessage,
-                       L"[crash] Failed to write minidump: error=%lu\r\n",
-                       GetLastError());
+            _snwprintf_s(diagnosticMessage,
+                         _countof(diagnosticMessage),
+                         _TRUNCATE,
+                         L"[crash] Failed to write minidump: error=%lu\r\n",
+                         GetLastError());
             appendCrashDiagnostic(diagnosticMessage);
         }
 
         CloseHandle(dumpHandle);
     }
     else {
-        swprintf_s(diagnosticMessage,
-                   L"[crash] Failed to open minidump file: path=%ls, error=%lu\r\n",
-                   dmpFileName,
-                   GetLastError());
+        _snwprintf_s(diagnosticMessage,
+                     _countof(diagnosticMessage),
+                     _TRUNCATE,
+                     L"[crash] Failed to open minidump file: path=%ls, error=%lu\r\n",
+                     dmpFileName,
+                     GetLastError());
         appendCrashDiagnostic(diagnosticMessage);
     }
+
+    // Resolve the module only after the dump is safely written. These APIs may
+    // need the loader lock, which can already be held by the crashing thread.
+    HMODULE faultModule = nullptr;
+    WCHAR faultModulePath[MAX_PATH] = L"unknown";
+    const WCHAR* faultModuleName = faultModulePath;
+    ULONGLONG moduleOffset = 0;
+    if (exceptionAddress &&
+            GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                       GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCWSTR>(exceptionAddress),
+                               &faultModule)) {
+        if (GetModuleFileNameW(faultModule, faultModulePath, _countof(faultModulePath)) != 0) {
+            if (const WCHAR* lastSeparator = wcsrchr(faultModulePath, L'\\')) {
+                faultModuleName = lastSeparator + 1;
+            }
+        }
+        moduleOffset = reinterpret_cast<ULONG_PTR>(exceptionAddress) -
+                       reinterpret_cast<ULONG_PTR>(faultModule);
+    }
+
+    _snwprintf_s(diagnosticMessage,
+                 _countof(diagnosticMessage),
+                 _TRUNCATE,
+                 L"[crash] Fault module: module=%ls, module_offset=0x%llX\r\n",
+                 faultModuleName,
+                 moduleOffset);
+    appendCrashDiagnostic(diagnosticMessage);
 
     // Sleep for a moment to allow the logging thread to finish up before crashing
     if (g_AsyncLoggingEnabled) {
