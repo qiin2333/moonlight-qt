@@ -85,6 +85,10 @@ LRESULT CALLBACK windowsPenSubclassProc(HWND hwnd, UINT message, WPARAM wParam, 
 
     if (message == WM_NCDESTROY && context) {
         context->windowDestroyed.store(true);
+        if (s_RemoveWindowSubclass) {
+            s_RemoveWindowSubclass(hwnd, windowsPenSubclassProc,
+                                   WINDOWS_PEN_SUBCLASS_ID);
+        }
     }
 
     const LRESULT result = s_DefSubclassProc(hwnd, message, wParam, lParam);
@@ -164,22 +168,23 @@ void SdlInputHandler::cancelWindowsPenInput(bool suppressPointer)
     const Uint32 pointerId = m_WindowsPenPointerTracked ?
                                  m_WindowsPenPointerId :
                                  m_WindowsPenFallbackPointerId;
-    if (m_WindowsPenPointerTracked || m_WindowsPenFallbackPointerId != 0 ||
+    if (m_WindowsPenPointerTracked ||
+            m_WindowsPenFallbackPointerId != UINT32_MAX ||
             m_WindowsPenCancelPending) {
         trySendWindowsPenCancel();
     }
 
     m_WindowsPenPointerId = 0;
-    m_WindowsPenFallbackPointerId = 0;
+    m_WindowsPenFallbackPointerId = UINT32_MAX;
     m_WindowsPenPointerTracked = false;
 
     if (suppressPointer) {
-        if (pointerId != 0) {
+        if (pointerId != UINT32_MAX) {
             m_WindowsPenSuppressedPointerId = pointerId;
         }
     }
     else {
-        m_WindowsPenSuppressedPointerId = 0;
+        m_WindowsPenSuppressedPointerId = UINT32_MAX;
     }
 }
 
@@ -270,7 +275,7 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         // capture, or transport failure. Do not resume it with a MOVE that has
         // no matching DOWN. Hover may resume after contact ends at UP.
         if (terminalMessage) {
-            m_WindowsPenSuppressedPointerId = 0;
+            m_WindowsPenSuppressedPointerId = UINT32_MAX;
         }
         return true;
     }
@@ -280,7 +285,7 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         // proximity lifetime on the same path. WM_POINTERUP ends contact but
         // the pen may continue sending hover updates until it leaves range.
         if (message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED) {
-            m_WindowsPenFallbackPointerId = 0;
+            m_WindowsPenFallbackPointerId = UINT32_MAX;
         }
         // While the window remains unfocused, consume the remainder locally.
         // Once focus is gained, let SDL continue the fallback sequence.
@@ -485,7 +490,7 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
                     pointerId);
         cancelWindowsPenInput(true);
         if (terminalMessage || currentInfoCanceled) {
-            m_WindowsPenSuppressedPointerId = 0;
+            m_WindowsPenSuppressedPointerId = UINT32_MAX;
         }
         return true;
     }
@@ -503,8 +508,15 @@ bool SdlInputHandler::handleWindowsPenPointerMessage(unsigned int message, Uint6
         m_DisabledTouchFeedback = true;
     }
 
-    if (message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED ||
-            currentInfoCanceled) {
+    if (currentInfoCanceled && !terminalMessage) {
+        // A cancelled pointer can still be followed by messages for the same
+        // lifetime. Keep it suppressed until contact or proximity ends.
+        m_WindowsPenPointerId = 0;
+        m_WindowsPenPointerTracked = false;
+        m_WindowsPenSuppressedPointerId = pointerId;
+    }
+    else if (message == WM_POINTERLEAVE || message == WM_POINTERCAPTURECHANGED ||
+             currentInfoCanceled) {
         m_WindowsPenPointerId = 0;
         m_WindowsPenPointerTracked = false;
     }
