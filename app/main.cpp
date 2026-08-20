@@ -89,6 +89,7 @@ static QString getStartupApplicationDir(const char* argv0)
 #include "streaming/session.h"
 #include "settings/streamingpreferences.h"
 #include "gui/sdlgamepadkeynavigation.h"
+#include "gui/windowplacement.h"
 #include "imageutils.h"
 #include "uifont.h"
 #include "streaming/macpermissions.h"
@@ -1033,6 +1034,7 @@ int main(int argc, char *argv[])
                                                        return StreamingPreferences::get(qmlEngine);
                                                    });
     qmlRegisterType<ImageUtils>("ImageUtils", 1, 0, "ImageUtils");
+    qmlRegisterType<WindowPlacement>("WindowPlacement", 1, 0, "WindowPlacement");
 
     // Create the identity manager on the main thread
     IdentityManager::get();

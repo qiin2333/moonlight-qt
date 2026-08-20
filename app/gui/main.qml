@@ -9,6 +9,7 @@ import AutoUpdateChecker 1.0
 import StreamingPreferences 1.0
 import SystemProperties 1.0
 import SdlGamepadKeyNavigation 1.0
+import WindowPlacement 1.0
 
 import "theme"
 import "Brand.js" as Brand
@@ -25,6 +26,12 @@ ApplicationWindow {
     title: Qt.application.displayName
     width: 1280
     height: 640
+
+    WindowPlacement {
+        id: windowPlacement
+        window: window
+        enabled: StreamingPreferences.rememberWindowPosition
+    }
 
     // 去掉系统标题栏的外壳：内容顶到窗口最上沿、系统不再画标题栏底色，于是下面
     // 那条 56px 的工具栏本身就成了标题栏，整个窗口从上到下都是我们自己的配色。
@@ -69,6 +76,10 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        // Always fit the initial window to the current screen. If the user opted
+        // in, restore the last normal window geometry before showing it.
+        windowPlacement.restore()
+
         // Show the window according to the user's preferences
         if (SystemProperties.hasDesktopEnvironment) {
             if (StreamingPreferences.uiDisplayMode == StreamingPreferences.UI_MAXIMIZED) {
@@ -96,6 +107,8 @@ ApplicationWindow {
             SystemProperties.startAsyncLoad()
         }
     }
+
+    onClosing: windowPlacement.flush()
 
     function hasHardwareAccelerationChanged() {
         if (!SystemProperties.hasHardwareAcceleration && StreamingPreferences.videoDecoderSelection !== StreamingPreferences.VDS_FORCE_SOFTWARE) {
@@ -397,47 +410,6 @@ ApplicationWindow {
             }
         }
 
-        // 空白处拖动整个窗口，双击最大化/还原。
-        //
-        // macOS 上走不到这里：那边把系统标题栏那条带子拉高到了整条 bar
-        // （macwindowchrome.mm），拖动和双击缩放由 AppKit 自己接管，这个 MouseArea
-        // 拿不到 bar 区域的事件。这一份是给 Windows / Linux 用的。
-        //
-        // 声明在 RowLayout 之前：同层同 z 时后声明的先拿到事件，所以按钮和字标照常
-        // 响应，只有真正空着的地方才落到这里。
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-
-            property point pressPosition
-            property bool systemMoveStarted: false
-
-            onPressed: function(mouse) {
-                pressPosition = Qt.point(mouse.x, mouse.y)
-                systemMoveStarted = false
-            }
-            onPositionChanged: function(mouse) {
-                if (!pressed || systemMoveStarted) {
-                    return
-                }
-
-                var deltaX = Math.abs(mouse.x - pressPosition.x)
-                var deltaY = Math.abs(mouse.y - pressPosition.y)
-                if (Math.max(deltaX, deltaY) >= Qt.styleHints.startDragDistance) {
-                    systemMoveStarted = true
-                    window.startSystemMove()
-                }
-            }
-            onDoubleClicked: {
-                if (window.visibility === Window.Maximized) {
-                    window.showNormal()
-                }
-                else {
-                    window.showMaximized()
-                }
-            }
-        }
-
         RowLayout {
             spacing: Theme.spaceSm
             anchors.leftMargin: Theme.spaceLg + toolBar.windowButtonInsetLeft
@@ -457,46 +429,91 @@ ApplicationWindow {
                 }
             }
 
-            // 字标 + 页名面包屑，左对齐。窄窗口下字标先让位，页名一直留着。
-            Text {
-                id: wordmark
-                visible: toolBar.width > 700
-                text: "MOONLIGHT V+ FOR PC"
-                color: Theme.text
-                font.family: Theme.fontSans
-                font.pointSize: Theme.fontCardTitle
-                font.weight: Font.ExtraBold
-                font.letterSpacing: Theme.tracking(Theme.fontCardTitle, 0.1)
-                verticalAlignment: Text.AlignVCenter
-                Layout.fillHeight: true
-            }
-
-            Text {
-                visible: wordmark.visible
-                text: "/"
-                color: Theme.textFaint
-                font.family: Theme.fontMono
-                font.pointSize: Theme.fontCardTitle
-                verticalAlignment: Text.AlignVCenter
-                Layout.fillHeight: true
-                Layout.leftMargin: Theme.spaceXs
-                Layout.rightMargin: Theme.spaceXs
-            }
-
-            // 这一条必须始终存在：RowLayout 靠它 fillWidth 把右边那排按钮推到边上。
-            Text {
-                id: titleRowLabel
-                text: stackView.currentItem ? stackView.currentItem.objectName : ""
-                color: Theme.accent
-                font.family: Theme.fontSans
-                font.pointSize: Theme.fontRowTitle
-                font.weight: Font.Bold
-                font.capitalization: Font.AllUppercase
-                font.letterSpacing: Theme.tracking(Theme.fontRowTitle, 0.14)
-                elide: Text.ElideRight
-                verticalAlignment: Text.AlignVCenter
+            // 标题区域占满工具栏中所有非按钮空间。把移动和双击处理放在这里，
+            // 不再依赖按钮后方的整栏 MouseArea，避免事件被工具栏子项遮住。
+            Item {
+                id: titleDragRegion
                 Layout.fillHeight: true
                 Layout.fillWidth: true
+
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: Theme.spaceSm
+
+                    Text {
+                        id: wordmark
+                        visible: toolBar.width > 700
+                        text: "MOONLIGHT V+ FOR PC"
+                        color: Theme.text
+                        font.family: Theme.fontSans
+                        font.pointSize: Theme.fontCardTitle
+                        font.weight: Font.ExtraBold
+                        font.letterSpacing: Theme.tracking(Theme.fontCardTitle, 0.1)
+                        verticalAlignment: Text.AlignVCenter
+                        Layout.fillHeight: true
+                    }
+
+                    Text {
+                        visible: wordmark.visible
+                        text: "/"
+                        color: Theme.textFaint
+                        font.family: Theme.fontMono
+                        font.pointSize: Theme.fontCardTitle
+                        verticalAlignment: Text.AlignVCenter
+                        Layout.fillHeight: true
+                        Layout.leftMargin: Theme.spaceXs
+                        Layout.rightMargin: Theme.spaceXs
+                    }
+
+                    Text {
+                        id: titleRowLabel
+                        text: stackView.currentItem ? stackView.currentItem.objectName : ""
+                        color: Theme.accent
+                        font.family: Theme.fontSans
+                        font.pointSize: Theme.fontRowTitle
+                        font.weight: Font.Bold
+                        font.capitalization: Font.AllUppercase
+                        font.letterSpacing: Theme.tracking(Theme.fontRowTitle, 0.14)
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        Layout.fillHeight: true
+                        Layout.fillWidth: true
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton
+                    enabled: !SystemProperties.isDarwin
+
+                    property point pressPosition
+                    property bool systemMoveStarted: false
+
+                    onPressed: function(mouse) {
+                        pressPosition = Qt.point(mouse.x, mouse.y)
+                        systemMoveStarted = false
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!pressed || systemMoveStarted) {
+                            return
+                        }
+
+                        var deltaX = Math.abs(mouse.x - pressPosition.x)
+                        var deltaY = Math.abs(mouse.y - pressPosition.y)
+                        if (Math.max(deltaX, deltaY) >= Qt.styleHints.startDragDistance) {
+                            systemMoveStarted = true
+                            window.startSystemMove()
+                        }
+                    }
+                    onDoubleClicked: {
+                        if (window.visibility === Window.Maximized) {
+                            window.showNormal()
+                        }
+                        else {
+                            window.showMaximized()
+                        }
+                    }
+                }
             }
 
             Text {
@@ -772,6 +789,12 @@ ApplicationWindow {
                 onClicked: window.close()
             }
         }
+    }
+
+    WindowResizeArea {
+        window: window
+        topInset: window.chromeInset
+        z: 100
     }
 
     ErrorMessageDialog {
