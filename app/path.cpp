@@ -135,7 +135,7 @@ void Path::initialize(bool portable, const QString& portableRootDir)
         s_PortableRootDir = QDir(portableRootDir.isEmpty() ?
                                  QCoreApplication::applicationDirPath() :
                                  portableRootDir).absolutePath();
-        s_LogDir = s_PortableRootDir;
+        s_LogDir = QDir(s_PortableRootDir).filePath("logs");
         s_DumpDir = QDir(s_PortableRootDir).filePath("dumps");
         s_BoxArtCacheDir = s_PortableRootDir + "/boxart";
         s_QmlCacheDir = s_PortableRootDir + "/qmlcache";
@@ -146,17 +146,14 @@ void Path::initialize(bool portable, const QString& portableRootDir)
     }
     else {
         s_PortableRootDir.clear();
-#ifdef Q_OS_DARWIN
-        // On macOS, $TMPDIR is some random folder under /var/folders/ that nobody can
-        // easily find, so use the system's global tmp directory instead.
-        s_LogDir = "/tmp";
-#else
-        s_LogDir = QDir::tempPath();
-#endif
         const QString appLocalDataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
-        s_DumpDir = QDir(appLocalDataDir.isEmpty() ? QDir::tempPath() : appLocalDataDir)
-                .filePath("dumps");
+        const QString appStoragePath = appLocalDataDir.isEmpty()
+                ? QDir(QDir::tempPath()).filePath(QCoreApplication::applicationName())
+                : appLocalDataDir;
+        const QDir appStorageDir(appStoragePath);
+        s_LogDir = appStorageDir.filePath("logs");
+        s_DumpDir = appStorageDir.filePath("dumps");
         s_CacheDir = cacheDir;
         s_BoxArtCacheDir = cacheDir + "/boxart";
         s_QmlCacheDir = cacheDir + "/qmlcache";

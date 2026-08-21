@@ -331,6 +331,24 @@ void ffmpegLogToDiskHandler(void* ptr, int level, const char* fmt, va_list vl)
 
 #endif
 
+#ifdef LOG_TO_FILE
+static QString prepareLogDirectory()
+{
+    QDir logDirectory(Path::getLogDir());
+    if (logDirectory.exists() || logDirectory.mkpath(".")) {
+        return logDirectory.absolutePath();
+    }
+
+    QDir fallbackDirectory(QDir(QDir::tempPath()).filePath(QCoreApplication::applicationName() + "/logs"));
+    if (!fallbackDirectory.exists() && !fallbackDirectory.mkpath(".")) {
+        fallbackDirectory = QDir(QDir::tempPath());
+    }
+    qWarning() << "Failed to create log directory:" << logDirectory.absolutePath()
+               << "Falling back to:" << fallbackDirectory.absolutePath();
+    return fallbackDirectory.absolutePath();
+}
+#endif
+
 #ifdef Q_OS_WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -378,7 +396,7 @@ static void initializeCrashDiagnostics(const QString& dumpDirectory,
     }
 }
 
-static QString prepareCrashDumpDirectory()
+static QString prepareCrashDumpDirectory(const QString& fallbackLogDirectory)
 {
     QDir dumpDirectory(Path::getDumpDir());
     if (dumpDirectory.exists() || dumpDirectory.mkpath(".")) {
@@ -386,8 +404,8 @@ static QString prepareCrashDumpDirectory()
     }
 
     qWarning() << "Failed to create minidump directory:" << dumpDirectory.absolutePath()
-               << "Falling back to:" << Path::getLogDir();
-    return Path::getLogDir();
+               << "Falling back to:" << fallbackLogDirectory;
+    return fallbackLogDirectory;
 }
 
 static void pruneOldMinidumps(const QString& dumpDirectory)
@@ -750,14 +768,15 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef LOG_TO_FILE
-    QDir tempDir(Path::getLogDir());
+    const QString logDirectory = prepareLogDirectory();
+    QDir logDir(logDirectory);
 
 #ifdef Q_OS_WIN32
     // Only log to a file if the user didn't redirect stderr somewhere else
     if (IS_UNSPECIFIED_HANDLE(oldConErr))
 #endif
     {
-        s_LoggerFile = new QFile(tempDir.filePath(QString("Moonlight-%1.log").arg(QDateTime::currentSecsSinceEpoch())));
+        s_LoggerFile = new QFile(logDir.filePath(QString("Moonlight-%1.log").arg(QDateTime::currentSecsSinceEpoch())));
         if (s_LoggerFile->open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream(stderr) << "Redirecting log output to " << s_LoggerFile->fileName() << Qt::endl;
             s_LoggerStream.setDevice(s_LoggerFile);
@@ -766,7 +785,7 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef Q_OS_WIN32
-    const QString crashDumpDirectory = prepareCrashDumpDirectory();
+    const QString crashDumpDirectory = prepareCrashDumpDirectory(logDirectory);
     initializeCrashDiagnostics(crashDumpDirectory,
                                s_LoggerFile && s_LoggerFile->isOpen()
                                        ? s_LoggerFile->fileName()
@@ -809,10 +828,10 @@ int main(int argc, char *argv[])
 
 #ifdef LOG_TO_FILE
     // Prune the oldest existing logs if there are more than 10
-    QStringList existingLogNames = tempDir.entryList(QStringList("Moonlight-*.log"), QDir::NoFilter, QDir::SortFlag::Time);
+    QStringList existingLogNames = logDir.entryList(QStringList("Moonlight-*.log"), QDir::Files, QDir::SortFlag::Time);
     for (int i = 10; i < existingLogNames.size(); i++) {
         qInfo() << "Removing old log file:" << existingLogNames.at(i);
-        QFile(tempDir.filePath(existingLogNames.at(i))).remove();
+        QFile(logDir.filePath(existingLogNames.at(i))).remove();
     }
 #endif
 
