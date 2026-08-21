@@ -2162,7 +2162,7 @@ void Session::toggleFullscreen()
 
 // ---- Qt-based overlay menu methods ----
 
-void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
+void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition)
 {
     if (!m_MenuPanel || m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) return;
     if (!isStreamingWindowVisible()) return;
@@ -2198,14 +2198,19 @@ void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
     case StreamingPreferences::OMP_LEFT_EDGE:
         m_MenuPanel->showAtLeftEdge(parentRect.x(), parentRect.y(),
                                     parentRect.width(), parentRect.height(),
-                                    pointerGlobalY);
+                                    pointerGlobalPosition);
+        break;
+    case StreamingPreferences::OMP_TOP_EDGE:
+        m_MenuPanel->showAtTopEdge(parentRect.x(), parentRect.y(),
+                                   parentRect.width(), parentRect.height(),
+                                   pointerGlobalPosition);
         break;
     case StreamingPreferences::OMP_BUTTON:
         // Show menu at the button's position (top-right corner)
         m_MenuPanel->showAtCursor(parentRect.x(), parentRect.y(),
                                   parentRect.width(), parentRect.height(),
-                                  parentRect.right() - 39, parentRect.y() + 40,
-                                  pointerGlobalY.has_value());
+                                  QPoint(parentRect.right() - 39, parentRect.y() + 40),
+                                  pointerGlobalPosition.has_value());
         // Hide button while menu is visible
         if (m_MenuButton) {
             m_MenuButton->hideButton();
@@ -2215,7 +2220,7 @@ void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
     default:
         m_MenuPanel->showAtRightEdge(parentRect.x(), parentRect.y(),
                                      parentRect.width(), parentRect.height(),
-                                     pointerGlobalY);
+                                     pointerGlobalPosition);
         break;
     }
 
@@ -3939,7 +3944,7 @@ void Session::exec()
     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
         m_MenuButton = new OverlayMenuButton();
         m_MenuButton->setClickCallback([this]() {
-            showQtOverlayMenu(QCursor::pos().y());
+            showQtOverlayMenu(QCursor::pos());
         });
         // Show button at initial position
         const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
@@ -4405,8 +4410,10 @@ void Session::exec()
         case SDL_MOUSEMOTION:
         {
             // Qt overlay menu: edge detection with debounce (500ms cooldown after close)
-            // Only trigger for edge-based positions (not disabled, at-cursor, or button)
-            if (m_MenuPanel && !m_MenuPanel->isMenuVisible() &&
+            // Disabled and button modes do not perform per-motion edge checks.
+            if (m_MenuPanel &&
+                !m_MenuPanel->isMenuVisible() &&
+                !m_MenuPanel->isClosing() &&
                 m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_DISABLED &&
                 m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_BUTTON) {
                 Uint32 elapsed = SDL_GetTicks() - m_MenuCloseTicks;
@@ -4414,14 +4421,23 @@ void Session::exec()
                     int ww, wh;
                     SDL_GetWindowSize(m_Window, &ww, &wh);
                     bool atEdge = false;
-                    if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_LEFT_EDGE) {
+                    switch (m_Preferences->overlayMenuPosition) {
+                    case StreamingPreferences::OMP_LEFT_EDGE:
                         atEdge = (event.motion.x <= 5);
-                    } else {
-                        // OMP_RIGHT_EDGE
+                        break;
+                    case StreamingPreferences::OMP_TOP_EDGE:
+                        atEdge = (event.motion.y <= 5);
+                        break;
+                    case StreamingPreferences::OMP_DISABLED:
+                    case StreamingPreferences::OMP_BUTTON:
+                        break;
+                    case StreamingPreferences::OMP_RIGHT_EDGE:
+                    default:
                         atEdge = (event.motion.x >= ww - 5);
+                        break;
                     }
                     if (atEdge) {
-                        showQtOverlayMenu(QCursor::pos().y());
+                        showQtOverlayMenu(QCursor::pos());
                         break;
                     }
                 }

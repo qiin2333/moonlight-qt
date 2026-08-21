@@ -1010,6 +1010,11 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="505"/>
+        <source>Top edge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
         <source>Right edge</source>
         <translation>Borde derecho</translation>

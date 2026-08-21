@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QSemaphore>
+#include <QPoint>
 #include <QQuickWindow>
 
 #include <atomic>
@@ -197,7 +198,7 @@ private:
     void toggleFullscreen();
 
     // Qt-based overlay menu
-    void showQtOverlayMenu(std::optional<int> pointerGlobalY = std::nullopt);
+    void showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition = std::nullopt);
     void hideQtOverlayMenu();
     void toggleQtOverlayMenu();
     bool isStreamingWindowVisible() const;

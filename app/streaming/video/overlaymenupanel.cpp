@@ -22,10 +22,9 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
       m_CloseWhenPointerOutside(false),
       m_ContentOffset(0),
       m_Closing(false),
-      m_TargetX(0),
+      m_TargetPosition(),
       m_AnchorMode(AnchorMode::RightEdge),
-      m_CursorX(0), m_CursorY(0),
-      m_EdgePointerY(std::nullopt)
+      m_TriggerPosition(std::nullopt)
 {
     setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
              | Qt::WindowDoesNotAcceptFocus);
@@ -300,41 +299,53 @@ void OverlayMenuPanel::updateFileMappingState(FileMappingState state, const QStr
 // ---------------------------------------------------------------------------
 
 void OverlayMenuPanel::showAtRightEdge(int parentX, int parentY, int parentW, int parentH,
-                                       std::optional<int> pointerGlobalY)
+                                       std::optional<QPoint> pointerGlobalPosition)
 {
     m_AnchorMode = AnchorMode::RightEdge;
     m_ParentX = parentX;
     m_ParentY = parentY;
     m_ParentW = parentW;
     m_ParentH = parentH;
-    m_EdgePointerY = pointerGlobalY;
-    m_CloseWhenPointerOutside = pointerGlobalY.has_value();
+    m_TriggerPosition = pointerGlobalPosition;
+    m_CloseWhenPointerOutside = pointerGlobalPosition.has_value();
     showInternal();
 }
 
 void OverlayMenuPanel::showAtLeftEdge(int parentX, int parentY, int parentW, int parentH,
-                                      std::optional<int> pointerGlobalY)
+                                      std::optional<QPoint> pointerGlobalPosition)
 {
     m_AnchorMode = AnchorMode::LeftEdge;
     m_ParentX = parentX;
     m_ParentY = parentY;
     m_ParentW = parentW;
     m_ParentH = parentH;
-    m_EdgePointerY = pointerGlobalY;
-    m_CloseWhenPointerOutside = pointerGlobalY.has_value();
+    m_TriggerPosition = pointerGlobalPosition;
+    m_CloseWhenPointerOutside = pointerGlobalPosition.has_value();
+    showInternal();
+}
+
+void OverlayMenuPanel::showAtTopEdge(int parentX, int parentY, int parentW, int parentH,
+                                     std::optional<QPoint> pointerGlobalPosition)
+{
+    m_AnchorMode = AnchorMode::TopEdge;
+    m_ParentX = parentX;
+    m_ParentY = parentY;
+    m_ParentW = parentW;
+    m_ParentH = parentH;
+    m_TriggerPosition = pointerGlobalPosition;
+    m_CloseWhenPointerOutside = pointerGlobalPosition.has_value();
     showInternal();
 }
 
 void OverlayMenuPanel::showAtCursor(int parentX, int parentY, int parentW, int parentH,
-                                    int cursorX, int cursorY, bool pointerTriggered)
+                                    const QPoint& cursorPosition, bool pointerTriggered)
 {
     m_AnchorMode = AnchorMode::AtCursor;
     m_ParentX = parentX;
     m_ParentY = parentY;
     m_ParentW = parentW;
     m_ParentH = parentH;
-    m_CursorX = cursorX;
-    m_CursorY = cursorY;
+    m_TriggerPosition = cursorPosition;
     m_CloseWhenPointerOutside = pointerTriggered;
     showInternal();
 }
@@ -358,12 +369,21 @@ void OverlayMenuPanel::showInternal()
 
     // Calculate target geometry
     repositionWindow();
-    m_TargetX = x();
+    m_TargetPosition = position();
 
     // Slide direction depends on anchor mode
-    int slideDistance = 40;
-    int slideDir = (m_AnchorMode == AnchorMode::LeftEdge) ? -1 : 1;
-    setPosition(m_TargetX + slideDistance * slideDir, y());
+    const bool verticalSlide = m_AnchorMode == AnchorMode::TopEdge;
+    const int slideDirection = (m_AnchorMode == AnchorMode::LeftEdge || verticalSlide) ? -1 : 1;
+    const int slideDistance = 40;
+    const int targetCoordinate = verticalSlide ? m_TargetPosition.y() : m_TargetPosition.x();
+    const int startCoordinate = targetCoordinate + slideDistance * slideDirection;
+    m_SlideAnim->setPropertyName(verticalSlide ? QByteArrayLiteral("y") : QByteArrayLiteral("x"));
+    if (verticalSlide) {
+        setY(startCoordinate);
+    }
+    else {
+        setX(startCoordinate);
+    }
     setOpacity(0.0);
 
     show();
@@ -371,8 +391,8 @@ void OverlayMenuPanel::showInternal()
 
     // Animate slide
     m_SlideAnim->setDuration(220);
-    m_SlideAnim->setStartValue(m_TargetX + slideDistance * slideDir);
-    m_SlideAnim->setEndValue(m_TargetX);
+    m_SlideAnim->setStartValue(startCoordinate);
+    m_SlideAnim->setEndValue(targetCoordinate);
     m_SlideAnim->setEasingCurve(QEasingCurve::OutCubic);
 
     // Animate opacity: 0 → 1
@@ -413,38 +433,43 @@ void OverlayMenuPanel::repositionWindow()
     int titleH     = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
     int menuHeight = titleH + itemCount * m_ItemHeight + m_Padding * 2;
 
-    const int pointerY = m_EdgePointerY.value_or(0);
+    const QPoint triggerPosition = m_TriggerPosition.value_or(QPoint());
 
     int cx, cy; // content top-left position
 
     switch (m_AnchorMode) {
     case AnchorMode::LeftEdge:
         cx = qpX;
-        if (m_EdgePointerY.has_value()) {
-            cy = pointerY - m_ItemHeight / 2;
+        if (m_TriggerPosition.has_value()) {
+            cy = triggerPosition.y() - m_ItemHeight / 2;
         }
         else {
             cy = qpY + (qpH - menuHeight) / 2;
         }
         break;
 
+    case AnchorMode::TopEdge:
+        if (m_TriggerPosition.has_value()) {
+            cx = triggerPosition.x() - m_MenuWidth / 2;
+        }
+        else {
+            cx = qpX + (qpW - m_MenuWidth) / 2;
+        }
+        cy = qpY;
+        break;
+
     case AnchorMode::AtCursor: {
-        int qcX = m_CursorX;
-        int qcY = m_CursorY;
         // Position menu so cursor is near top-left corner
-        cx = qcX;
-        cy = qcY;
-        // Clamp within parent bounds
-        if (cx + m_MenuWidth > qpX + qpW) cx = qpX + qpW - m_MenuWidth;
-        if (cx < qpX) cx = qpX;
+        cx = triggerPosition.x();
+        cy = triggerPosition.y();
         break;
     }
 
     case AnchorMode::RightEdge:
     default:
         cx = qpX + qpW - m_MenuWidth;
-        if (m_EdgePointerY.has_value()) {
-            cy = pointerY - m_ItemHeight / 2;
+        if (m_TriggerPosition.has_value()) {
+            cy = triggerPosition.y() - m_ItemHeight / 2;
         }
         else {
             cy = qpY + (qpH - menuHeight) / 2;
@@ -452,9 +477,14 @@ void OverlayMenuPanel::repositionWindow()
         break;
     }
 
-    // Clamp vertical position within parent
-    if (cy < qpY) cy = qpY;
-    if (cy + menuHeight > qpY + qpH) cy = qpY + qpH - menuHeight;
+    // Clamp within the parent. If the menu is larger than the streaming
+    // window, keep its origin visible instead of pushing it past an edge.
+    cx = qpW >= m_MenuWidth
+            ? qBound(qpX, cx, qpX + qpW - m_MenuWidth)
+            : qpX;
+    cy = qpH >= menuHeight
+            ? qBound(qpY, cy, qpY + qpH - menuHeight)
+            : qpY;
 
     // Window includes shadow margin around content
     setGeometry(cx - m_ShadowMargin, cy - m_ShadowMargin,
@@ -509,11 +539,15 @@ void OverlayMenuPanel::closeMenu()
     m_ContentSlideAnim->stop();
     m_ContentOffset = 0;
 
-    // Animate slide out: current x → +30px right
-    int slideDistance = 30;
+    // Animate away from the edge that opened the menu.
+    const bool verticalSlide = m_AnchorMode == AnchorMode::TopEdge;
+    const int slideDirection = (m_AnchorMode == AnchorMode::LeftEdge || verticalSlide) ? -1 : 1;
+    const int slideDistance = 30;
+    const int startCoordinate = verticalSlide ? y() : x();
+    m_SlideAnim->setPropertyName(verticalSlide ? QByteArrayLiteral("y") : QByteArrayLiteral("x"));
     m_SlideAnim->setDuration(160);
-    m_SlideAnim->setStartValue(x());
-    m_SlideAnim->setEndValue(x() + slideDistance);
+    m_SlideAnim->setStartValue(startCoordinate);
+    m_SlideAnim->setEndValue(startCoordinate + slideDistance * slideDirection);
     m_SlideAnim->setEasingCurve(QEasingCurve::InCubic);
 
     // Animate opacity: current → 0

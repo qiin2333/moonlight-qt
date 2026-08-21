@@ -1107,6 +1107,11 @@
         <translation>悬浮菜单位置</translation>
     </message>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="505"/>
+        <source>Top edge</source>
+        <translation>顶部边缘</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
         <source>Right edge</source>
         <translation>右侧边缘</translation>

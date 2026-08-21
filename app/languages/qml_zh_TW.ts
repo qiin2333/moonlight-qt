@@ -1010,6 +1010,11 @@
         <translation>懸浮選單位置</translation>
     </message>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="505"/>
+        <source>Top edge</source>
+        <translation>頂部邊緣</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
         <source>Right edge</source>
         <translation>右側邊緣</translation>
