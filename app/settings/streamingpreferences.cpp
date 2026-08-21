@@ -362,6 +362,16 @@ void StreamingPreferences::reload()
     }
 }
 
+void StreamingPreferences::setOverlayMenuPosition(OverlayMenuPosition position)
+{
+    if (overlayMenuPosition == position) {
+        return;
+    }
+
+    overlayMenuPosition = position;
+    emit overlayMenuPositionChanged();
+}
+
 bool StreamingPreferences::retranslate()
 {
     static QTranslator* translator = nullptr;

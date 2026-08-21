@@ -130,6 +130,8 @@ public:
     };
     Q_ENUM(OverlayMenuPosition);
 
+    void setOverlayMenuPosition(OverlayMenuPosition position);
+
     enum HdrMode
     {
         HDR_PQ  = 1,   // HDR10/PQ (SMPTE ST 2084) - default

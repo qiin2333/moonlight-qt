@@ -10,6 +10,11 @@
 #include <QFontMetrics>
 #include <memory>
 
+namespace {
+constexpr qint64 PointerGracePeriodMs = 300;
+constexpr int PointerCheckIntervalMs = 150;
+}
+
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     : QRasterWindow(parent),
       m_CurrentLevel(0),
@@ -104,8 +109,18 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
 
     m_LeaveTimer.setSingleShot(true);
     connect(&m_LeaveTimer, &QTimer::timeout, this, [this]() {
-        if (m_Visible && !geometry().contains(QCursor::pos())) {
+        if (!m_Visible || !m_CloseWhenPointerOutside) {
+            return;
+        }
+
+        const QRect contentGeometry = geometry().adjusted(
+                m_ShadowMargin, m_ShadowMargin,
+                -m_ShadowMargin, -m_ShadowMargin);
+        if (!contentGeometry.contains(QCursor::pos())) {
             closeMenu();
+        }
+        else {
+            schedulePointerOutsideCheck();
         }
     });
 
@@ -144,9 +159,11 @@ void OverlayMenuPanel::buildMenuLevels()
 
     // === Level 0: Top-level categories ===
     MenuLevel top;
-    top.title = QString::fromUtf8("\xe6\x9d\x82\xe9\xb1\xbc\xe2\x99\xa1");  // 杂鱼♡
+    top.title = tr("Overlay Menu");
     top.items.push_back({tr("Quick Actions"), QString(),  MenuItemType::SubMenu,
                          MenuAction::MenuActionMax, 1, true, false, false});
+    top.items.push_back({tr("Menu Position"), QString(), MenuItemType::SubMenu,
+                         MenuAction::MenuActionMax, 3, true, false, false});
     top.items.push_back({tr("Bitrate"),       QString(),  MenuItemType::SubMenu,
                          MenuAction::MenuActionMax, 2, true, false, false});
     top.items.push_back({tr("Host Files"),    m_FileMappingDetail, MenuItemType::Action,
@@ -207,6 +224,21 @@ void OverlayMenuPanel::buildMenuLevels()
     bitrate.items.push_back({tr("100 Mbps"),  QString(), MenuItemType::Action,
                              MenuAction::SetBitrate100000, 0, true, false, false});
     m_MenuLevels.push_back(bitrate);
+
+    // === Level 3: Overlay menu placement ===
+    MenuLevel placement;
+    placement.title = tr("Menu Position");
+    placement.items.push_back({tr("Top edge"), QString(), MenuItemType::Action,
+                               MenuAction::SetMenuPlacementTop, 0, true, false, false});
+    placement.items.push_back({tr("Right edge"), QString(), MenuItemType::Action,
+                               MenuAction::SetMenuPlacementRight, 0, true, false, false});
+    placement.items.push_back({tr("Left edge"), QString(), MenuItemType::Action,
+                               MenuAction::SetMenuPlacementLeft, 0, true, false, false});
+    placement.items.push_back({tr("Floating button"), QString(), MenuItemType::Action,
+                               MenuAction::SetMenuPlacementButton, 0, true, false, false});
+    placement.items.push_back({tr("Disabled"), QString(), MenuItemType::Action,
+                               MenuAction::SetMenuPlacementDisabled, 0, true, false, false});
+    m_MenuLevels.push_back(placement);
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +307,30 @@ void OverlayMenuPanel::updateBitrateState(int bitrateKbps)
             }
         }
     }
+}
+
+void OverlayMenuPanel::updateMenuPositionState(MenuAction activePlacementAction)
+{
+    if (m_MenuLevels.size() <= 3) {
+        return;
+    }
+
+    QString activeLabel;
+    for (auto& item : m_MenuLevels[3].items) {
+        const bool active = item.action == activePlacementAction;
+        item.detail = active ? QString::fromUtf8("\342\234\223") : QString();
+        if (active) {
+            activeLabel = item.label;
+        }
+    }
+
+    for (auto& item : m_MenuLevels[0].items) {
+        if (item.type == MenuItemType::SubMenu && item.targetLevel == 3) {
+            item.detail = activeLabel;
+            break;
+        }
+    }
+    forceRepaint();
 }
 
 void OverlayMenuPanel::updateFileMappingState(FileMappingState state, const QString& detail)
@@ -411,15 +467,19 @@ void OverlayMenuPanel::showInternal()
     forceRepaint();
 }
 
-void OverlayMenuPanel::schedulePointerOutsideCheck()
+void OverlayMenuPanel::schedulePointerOutsideCheck(bool immediate)
 {
-    if (!m_Visible) {
+    if (!m_Visible || !m_CloseWhenPointerOutside) {
         return;
     }
 
-    constexpr qint64 LeaveGracePeriodMs = 300;
-    const qint64 remaining = LeaveGracePeriodMs - m_ShowTimer.elapsed();
-    m_LeaveTimer.start(static_cast<int>(qMax<qint64>(1, remaining)));
+    const qint64 remainingGrace = PointerGracePeriodMs - m_ShowTimer.elapsed();
+    if (remainingGrace > 0) {
+        m_LeaveTimer.start(static_cast<int>(remainingGrace));
+    }
+    else {
+        m_LeaveTimer.start(immediate ? 1 : PointerCheckIntervalMs);
+    }
 }
 
 void OverlayMenuPanel::repositionWindow()
@@ -430,7 +490,7 @@ void OverlayMenuPanel::repositionWindow()
     int qpH = m_ParentH;
 
     int itemCount  = (int)m_MenuLevels[m_CurrentLevel].items.size();
-    int titleH     = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
+    int titleH     = m_TitleHeight;
     int menuHeight = titleH + itemCount * m_ItemHeight + m_Padding * 2;
 
     const QPoint triggerPosition = m_TriggerPosition.value_or(QPoint());
@@ -580,11 +640,16 @@ int OverlayMenuPanel::itemAtPos(const QPoint& pos) const
     int ly = pos.y() - m_ShadowMargin;
     if (lx < 0 || lx >= m_MenuWidth || ly < 0) return -1;
 
-    int titleH = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
+    int titleH = m_TitleHeight;
 
-    // Title bar area — used as back button on sub-levels
-    if (m_CurrentLevel > 0 && ly < titleH) {
-        return -2;
+    if (ly < titleH) {
+        if (lx >= m_MenuWidth - m_TitleHeight) {
+            return -3; // close button
+        }
+        if (m_CurrentLevel > 0) {
+            return -2; // back button
+        }
+        return -1;
     }
     int localY = ly - titleH - m_Padding;
     if (localY < 0) return -1;
@@ -641,24 +706,38 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
     // Clip content
     p.setClipPath(bgPath);
 
-    // --- Title bar (only on sub-levels, serves as back button) ---
+    // --- Title bar: back navigation on sub-levels and close on every level ---
     const auto& level = m_MenuLevels[m_CurrentLevel];
     int textPad = (m_CurrentLevel == 0) ? 16 : 8;
-    int titleH = (m_CurrentLevel > 0) ? m_TitleHeight : 0;
+    int titleH = m_TitleHeight;
+    const bool backHovered = m_CurrentLevel > 0 && m_HoveredIndex == -2;
+    const bool closeHovered = m_HoveredIndex == -3;
 
-    if (m_CurrentLevel > 0) {
-        p.setFont(m_TitleFont);
-        bool titleHovered = (m_HoveredIndex == -2);
-        if (titleHovered) {
-            QPainterPath hlPath;
-            hlPath.addRoundedRect(QRectF(4, 2, cw - 8, m_TitleHeight - 4), 4, 4);
-            p.fillPath(hlPath, QColor(255, 255, 255, 15));
-        }
-        p.setPen(titleHovered ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 140));
-        QRect titleRect(textPad, 0, cw - 2 * textPad, m_TitleHeight);
-        p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter,
-                   QString::fromUtf8("\xe2\x97\x82 ") + level.title);
+    if (backHovered) {
+        QPainterPath hlPath;
+        hlPath.addRoundedRect(QRectF(4, 2, cw - m_TitleHeight - 4,
+                                     m_TitleHeight - 4), 4, 4);
+        p.fillPath(hlPath, QColor(255, 255, 255, 15));
     }
+
+    const QRect closeRect(cw - m_TitleHeight, 0, m_TitleHeight, m_TitleHeight);
+    if (closeHovered) {
+        p.fillRect(closeRect, QColor(196, 43, 28, 220));
+    }
+
+    p.setFont(m_TitleFont);
+    p.setPen(backHovered ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 160));
+    QRect titleRect(textPad, 0, cw - textPad - m_TitleHeight, m_TitleHeight);
+    const QString titleText = m_CurrentLevel > 0
+            ? QString::fromUtf8("\xe2\x97\x82 ") + level.title
+            : level.title;
+    p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter, titleText);
+
+    QFont closeFont = m_LabelFont;
+    closeFont.setPointSize(11);
+    p.setFont(closeFont);
+    p.setPen(QColor(255, 255, 255, closeHovered ? 255 : 170));
+    p.drawText(closeRect, Qt::AlignCenter, QString::fromUtf8("\xc3\x97"));
 
     // Apply content offset for level navigation animation
     if (m_ContentSlideAnim->state() != QAbstractAnimation::Running) {
@@ -681,6 +760,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         if (item.type == MenuItemType::SubMenu) {
             if (item.targetLevel == 1) return QChar(0xE713); // Settings gear
             if (item.targetLevel == 2) return QChar(0xE7F4); // DataSense (data/speed)
+            if (item.targetLevel == 3) return QChar(0xE707); // Map pin
         }
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE740); // FullScreen
@@ -703,6 +783,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         if (item.type == MenuItemType::SubMenu) {
             if (item.targetLevel == 1) return QChar(0xE8B8); // settings
             if (item.targetLevel == 2) return QChar(0xE1B2); // speed (bitrate)
+            if (item.targetLevel == 3) return QChar(0xE55F); // place
         }
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE5D0); // fullscreen
@@ -881,7 +962,9 @@ void OverlayMenuPanel::mouseMoveEvent(QMouseEvent* event)
 #endif
     if (newIdx != m_HoveredIndex) {
         m_HoveredIndex = newIdx;
-        setCursor((m_HoveredIndex >= 0 || m_HoveredIndex == -2) ? Qt::PointingHandCursor : Qt::ArrowCursor);
+        setCursor((m_HoveredIndex >= 0 || m_HoveredIndex == -2 || m_HoveredIndex == -3)
+                          ? Qt::PointingHandCursor
+                          : Qt::ArrowCursor);
         forceRepaint();
     }
 }
@@ -895,6 +978,11 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
 #else
     int idx = itemAtPos(event->pos());
 #endif
+
+    if (idx == -3) {
+        closeMenu();
+        return;
+    }
 
     // Title bar click → navigate back
     if (idx == -2) {
@@ -1062,7 +1150,7 @@ bool OverlayMenuPanel::event(QEvent* ev)
             // dropping the Leave event. Otherwise, leaving the panel quickly
             // after it opens would keep it visible until the cursor entered
             // and left the panel again.
-            schedulePointerOutsideCheck();
+            schedulePointerOutsideCheck(true);
         }
         return true;
     }

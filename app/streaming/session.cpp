@@ -220,6 +220,43 @@ QRect qtOverlayGeometryForSdlWindow(SDL_Window* window)
 #endif
 }
 
+OverlayMenuPanel::MenuAction menuPlacementActionForPreference(
+        StreamingPreferences::OverlayMenuPosition position)
+{
+    switch (position) {
+    case StreamingPreferences::OMP_TOP_EDGE:
+        return OverlayMenuPanel::MenuAction::SetMenuPlacementTop;
+    case StreamingPreferences::OMP_RIGHT_EDGE:
+        return OverlayMenuPanel::MenuAction::SetMenuPlacementRight;
+    case StreamingPreferences::OMP_LEFT_EDGE:
+        return OverlayMenuPanel::MenuAction::SetMenuPlacementLeft;
+    case StreamingPreferences::OMP_BUTTON:
+        return OverlayMenuPanel::MenuAction::SetMenuPlacementButton;
+    case StreamingPreferences::OMP_DISABLED:
+    default:
+        return OverlayMenuPanel::MenuAction::SetMenuPlacementDisabled;
+    }
+}
+
+std::optional<StreamingPreferences::OverlayMenuPosition> menuPlacementForAction(
+        OverlayMenuPanel::MenuAction action)
+{
+    switch (action) {
+    case OverlayMenuPanel::MenuAction::SetMenuPlacementTop:
+        return StreamingPreferences::OMP_TOP_EDGE;
+    case OverlayMenuPanel::MenuAction::SetMenuPlacementRight:
+        return StreamingPreferences::OMP_RIGHT_EDGE;
+    case OverlayMenuPanel::MenuAction::SetMenuPlacementLeft:
+        return StreamingPreferences::OMP_LEFT_EDGE;
+    case OverlayMenuPanel::MenuAction::SetMenuPlacementButton:
+        return StreamingPreferences::OMP_BUTTON;
+    case OverlayMenuPanel::MenuAction::SetMenuPlacementDisabled:
+        return StreamingPreferences::OMP_DISABLED;
+    default:
+        return std::nullopt;
+    }
+}
+
 #ifdef Q_OS_WIN32
 bool qtWindowNativeMonitorBounds(QWindow* window, QRect& bounds)
 {
@@ -2186,11 +2223,15 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition)
     // Flush stale mouse motion events from relative mode
     SDL_FlushEvent(SDL_MOUSEMOTION);
 
+    // Rebuild for the current gamepad set before applying dynamic menu state.
+    m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
+
     // Update dynamic state before showing
     m_MenuPanel->updateMicrophoneState(m_MicStream != nullptr);
     m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
-    m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
     m_MenuPanel->updateGamepadMouseState(m_InputHandler->isMouseEmulationActive());
+    m_MenuPanel->updateMenuPositionState(
+            menuPlacementActionForPreference(m_Preferences->overlayMenuPosition));
     updateFileMappingMenuState();
 
     // Show menu based on user preference
@@ -2295,6 +2336,12 @@ void Session::syncQtOverlayWindowsWithSdlWindowState()
 
 void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
 {
+    if (const auto placement = menuPlacementForAction(action)) {
+        m_Preferences->setOverlayMenuPosition(*placement);
+        m_Preferences->save();
+        return;
+    }
+
     // Map OverlayMenuPanel::MenuAction to SdlInputHandler::KeyCombo
     SdlInputHandler::KeyCombo combo;
     switch (action) {
@@ -3940,12 +3987,14 @@ void Session::exec()
                     m_DeferCaptureRestore ? "deferred" : "restored");
     });
 
-    // Create floating menu button if configured
+    // Keep a hidden button ready so placement can switch during a stream
+    // without creating a window from inside an input callback.
+    m_MenuButton = new OverlayMenuButton();
+    m_MenuButton->setClickCallback([this]() {
+        showQtOverlayMenu(QCursor::pos());
+    });
+
     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
-        m_MenuButton = new OverlayMenuButton();
-        m_MenuButton->setClickCallback([this]() {
-            showQtOverlayMenu(QCursor::pos());
-        });
         // Show button at initial position
         const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
         if (parentRect.isValid()) {

@@ -21,9 +21,10 @@
  * D3D11/SDL/EGL video rendering pipeline.
  *
  * Menu structure:
- *   Level 0 (Top):      Quick Actions >, Bitrate >, Fullscreen, Microphone [toggle], Disconnect
+ *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen, Microphone [toggle], Disconnect
  *   Level 1 (Actions):  Quit, Performance Stats, Mouse Mode, Cursor, Minimize, ...
  *   Level 2 (Bitrate):  1/2/5/10/20/30/50/100 Mbps
+ *   Level 3 (Position): Top, Right, Left, Floating button, Disabled
  *
  * Sub-level navigation uses a title bar with back button (◂ Title).
  * Win11 dark theme with Segoe MDL2 Assets icons, drop shadow, and slide animations.
@@ -57,6 +58,11 @@ public:
         SetBitrate30000,
         SetBitrate50000,
         SetBitrate100000,
+        SetMenuPlacementTop,
+        SetMenuPlacementRight,
+        SetMenuPlacementLeft,
+        SetMenuPlacementButton,
+        SetMenuPlacementDisabled,
         MenuActionMax
     };
 
@@ -110,6 +116,7 @@ public:
     // Update dynamic state before showing the menu
     void updateMicrophoneState(bool enabled);
     void updateBitrateState(int bitrateKbps);
+    void updateMenuPositionState(MenuAction activePlacementAction);
     void updateGamepadMouseState(bool enabled);
     void updateFileMappingState(FileMappingState state, const QString& detail);
     void setHasGamepads(bool has) {
@@ -154,7 +161,7 @@ private:
     void navigateToLevel(int level);
     void repositionWindow();
     void showInternal();     // shared show logic after geometry is set
-    void schedulePointerOutsideCheck();
+    void schedulePointerOutsideCheck(bool immediate = false);
     void forceRepaint();     // synchronous repaint (requestUpdate is async on Windows)
     int  itemAtPos(const QPoint& pos) const;
 

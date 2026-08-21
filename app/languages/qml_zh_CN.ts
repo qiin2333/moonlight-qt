@@ -1495,6 +1495,42 @@
 <context>
     <name>OverlayMenuPanel</name>
     <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="159"/>
+        <source>Overlay Menu</source>
+        <translation>悬浮菜单</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="162"/>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="227"/>
+        <source>Menu Position</source>
+        <translation>菜单位置</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="228"/>
+        <source>Top edge</source>
+        <translation>顶部边缘</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="230"/>
+        <source>Right edge</source>
+        <translation>右侧边缘</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="232"/>
+        <source>Left edge</source>
+        <translation>左侧边缘</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="234"/>
+        <source>Floating button</source>
+        <translation>悬浮按钮</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="236"/>
+        <source>Disabled</source>
+        <translation>禁用</translation>
+    </message>
+    <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="19"/>
         <source>Checking</source>
         <translation>检查中</translation>
