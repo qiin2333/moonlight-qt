@@ -504,7 +504,7 @@ void OverlayMenuPanel::repositionWindow()
     case AnchorMode::LeftEdge:
         cx = qpX;
         if (m_TriggerPosition.has_value()) {
-            cy = triggerPosition.y() - m_ItemHeight / 2;
+            cy = triggerPosition.y() - m_TitleHeight - m_Padding - m_ItemHeight / 2;
         }
         else {
             cy = qpY + (qpH - menuHeight) / 2;
@@ -532,7 +532,7 @@ void OverlayMenuPanel::repositionWindow()
     default:
         cx = qpX + qpW - m_MenuWidth;
         if (m_TriggerPosition.has_value()) {
-            cy = triggerPosition.y() - m_ItemHeight / 2;
+            cy = triggerPosition.y() - m_TitleHeight - m_Padding - m_ItemHeight / 2;
         }
         else {
             cy = qpY + (qpH - menuHeight) / 2;
