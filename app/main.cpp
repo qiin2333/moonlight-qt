@@ -359,8 +359,8 @@ static void copyCrashDiagnosticString(WCHAR* destination, size_t destinationLeng
 
 static void initializeCrashDiagnostics(const QString& dumpDirectory,
                                         const QString& logFileName,
-                                       HANDLE logHandle,
-                                       HANDLE fallbackHandle)
+                                        HANDLE logHandle,
+                                        HANDLE fallbackHandle)
 {
     copyCrashDiagnosticString(s_CrashDumpDirectory, _countof(s_CrashDumpDirectory), dumpDirectory);
     copyCrashDiagnosticString(s_CrashLogFileName, _countof(s_CrashLogFileName), logFileName);
