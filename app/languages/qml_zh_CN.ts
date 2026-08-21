@@ -953,7 +953,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="553"/>
         <source>Disabled</source>
-        <translation>无操作</translation>
+        <translation>禁用</translation>
     </message>
     <message>
         <source>Activate the display automatically</source>
@@ -1104,7 +1104,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="518"/>
         <source>Overlay menu position</source>
-        <translation>覆盖菜单位置</translation>
+        <translation>悬浮菜单位置</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
@@ -1119,7 +1119,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="549"/>
         <source>Floating button</source>
-        <translation>浮动按钮</translation>
+        <translation>悬浮按钮</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="569"/>

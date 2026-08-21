@@ -897,7 +897,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="553"/>
         <source>Disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>停用</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="153"/>
@@ -1007,22 +1007,22 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="518"/>
         <source>Overlay menu position</source>
-        <translation type="unfinished"></translation>
+        <translation>懸浮選單位置</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
         <source>Right edge (default)</source>
-        <translation type="unfinished"></translation>
+        <translation>右側邊緣（預設）</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="545"/>
         <source>Left edge</source>
-        <translation type="unfinished"></translation>
+        <translation>左側邊緣</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="549"/>
         <source>Floating button</source>
-        <translation type="unfinished"></translation>
+        <translation>懸浮按鈕</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="569"/>
