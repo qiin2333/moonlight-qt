@@ -16,6 +16,7 @@
 #include <QRegularExpression>
 #include <QFontDatabase>
 #include <QLocale>
+#include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
 
@@ -341,6 +342,7 @@ static WCHAR s_CrashLogDirectory[MAX_PATH] = {};
 static WCHAR s_CrashLogFileName[MAX_PATH] = {};
 static WCHAR s_CrashBuildVersion[128] = {};
 static constexpr size_t CRASH_DIAGNOSTIC_MESSAGE_LENGTH = 2048;
+static constexpr int MAX_MINIDUMP_FILES = 3;
 static CHAR s_CrashUtf8Message[CRASH_DIAGNOSTIC_MESSAGE_LENGTH * 3 + 1] = {};
 static HANDLE s_CrashLogHandle = INVALID_HANDLE_VALUE;
 static HANDLE s_CrashFallbackHandle = INVALID_HANDLE_VALUE;
@@ -373,6 +375,24 @@ static void initializeCrashDiagnostics(const QString& logDirectory,
     ULONG stackGuarantee = 64 * 1024;
     if (!SetThreadStackGuarantee(&stackGuarantee)) {
         s_CrashStackGuaranteeError = GetLastError();
+    }
+}
+
+static void pruneOldMinidumps(const QString& logDirectory)
+{
+    QDir directory(logDirectory);
+    const QStringList existingDumpNames = directory.entryList(
+            QStringList(QStringLiteral("Moonlight-*.dmp")),
+            QDir::Files,
+            QDir::Time);
+
+    // Keep one slot available for a crash in the current process. Pruning here
+    // avoids doing directory enumeration from the unhandled-exception handler.
+    for (int i = MAX_MINIDUMP_FILES - 1; i < existingDumpNames.size(); i++) {
+        const QString dumpName = existingDumpNames.at(i);
+        if (!QFile(directory.filePath(dumpName)).remove()) {
+            qWarning() << "Failed to remove old minidump:" << dumpName;
+        }
     }
 }
 
@@ -770,6 +790,7 @@ int main(int argc, char *argv[])
 
 #ifdef Q_OS_WIN32
     // Create a crash dump when we crash on Windows
+    pruneOldMinidumps(Path::getLogDir());
     SetUnhandledExceptionFilter(UnhandledExceptionHandler);
 #endif
 
