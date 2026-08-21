@@ -8,6 +8,7 @@
 
 QString Path::s_CacheDir;
 QString Path::s_LogDir;
+QString Path::s_DumpDir;
 QString Path::s_BoxArtCacheDir;
 QString Path::s_QmlCacheDir;
 QString Path::s_PortableRootDir;
@@ -16,6 +17,12 @@ QString Path::getLogDir()
 {
     Q_ASSERT(!s_LogDir.isEmpty());
     return s_LogDir;
+}
+
+QString Path::getDumpDir()
+{
+    Q_ASSERT(!s_DumpDir.isEmpty());
+    return s_DumpDir;
 }
 
 QString Path::getBoxArtCacheDir()
@@ -129,6 +136,7 @@ void Path::initialize(bool portable, const QString& portableRootDir)
                                  QCoreApplication::applicationDirPath() :
                                  portableRootDir).absolutePath();
         s_LogDir = s_PortableRootDir;
+        s_DumpDir = QDir(s_PortableRootDir).filePath("dumps");
         s_BoxArtCacheDir = s_PortableRootDir + "/boxart";
         s_QmlCacheDir = s_PortableRootDir + "/qmlcache";
 
@@ -145,8 +153,12 @@ void Path::initialize(bool portable, const QString& portableRootDir)
 #else
         s_LogDir = QDir::tempPath();
 #endif
-        s_CacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
-        s_BoxArtCacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/boxart";
-        s_QmlCacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/qmlcache";
+        const QString appLocalDataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+        s_DumpDir = QDir(appLocalDataDir.isEmpty() ? QDir::tempPath() : appLocalDataDir)
+                .filePath("dumps");
+        s_CacheDir = cacheDir;
+        s_BoxArtCacheDir = cacheDir + "/boxart";
+        s_QmlCacheDir = cacheDir + "/qmlcache";
     }
 }

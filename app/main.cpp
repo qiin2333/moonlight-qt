@@ -338,7 +338,7 @@ void ffmpegLogToDiskHandler(void* ptr, int level, const char* fmt, va_list vl)
 #include <io.h>
 
 static volatile LONG s_HitUnhandledException = 0;
-static WCHAR s_CrashLogDirectory[MAX_PATH] = {};
+static WCHAR s_CrashDumpDirectory[MAX_PATH] = {};
 static WCHAR s_CrashLogFileName[MAX_PATH] = {};
 static WCHAR s_CrashBuildVersion[128] = {};
 static constexpr size_t CRASH_DIAGNOSTIC_MESSAGE_LENGTH = 2048;
@@ -357,12 +357,12 @@ static void copyCrashDiagnosticString(WCHAR* destination, size_t destinationLeng
               _TRUNCATE);
 }
 
-static void initializeCrashDiagnostics(const QString& logDirectory,
-                                       const QString& logFileName,
+static void initializeCrashDiagnostics(const QString& dumpDirectory,
+                                        const QString& logFileName,
                                        HANDLE logHandle,
                                        HANDLE fallbackHandle)
 {
-    copyCrashDiagnosticString(s_CrashLogDirectory, _countof(s_CrashLogDirectory), logDirectory);
+    copyCrashDiagnosticString(s_CrashDumpDirectory, _countof(s_CrashDumpDirectory), dumpDirectory);
     copyCrashDiagnosticString(s_CrashLogFileName, _countof(s_CrashLogFileName), logFileName);
     copyCrashDiagnosticString(s_CrashBuildVersion,
                               _countof(s_CrashBuildVersion),
@@ -378,9 +378,21 @@ static void initializeCrashDiagnostics(const QString& logDirectory,
     }
 }
 
-static void pruneOldMinidumps(const QString& logDirectory)
+static QString prepareCrashDumpDirectory()
 {
-    QDir directory(logDirectory);
+    QDir dumpDirectory(Path::getDumpDir());
+    if (dumpDirectory.exists() || dumpDirectory.mkpath(".")) {
+        return dumpDirectory.absolutePath();
+    }
+
+    qWarning() << "Failed to create minidump directory:" << dumpDirectory.absolutePath()
+               << "Falling back to:" << Path::getLogDir();
+    return Path::getLogDir();
+}
+
+static void pruneOldMinidumps(const QString& dumpDirectory)
+{
+    QDir directory(dumpDirectory);
     const QStringList existingDumpNames = directory.entryList(
             QStringList(QStringLiteral("Moonlight-*.dmp")),
             QDir::Files,
@@ -521,7 +533,7 @@ LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
                  _countof(dmpFileName),
                  _TRUNCATE,
                  L"%ls\\Moonlight-%I64u.dmp",
-                 s_CrashLogDirectory,
+                 s_CrashDumpDirectory,
                  currentUnixTimeSeconds());
     HANDLE dumpHandle = CreateFileW(dmpFileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (dumpHandle != INVALID_HANDLE_VALUE) {
@@ -754,7 +766,8 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef Q_OS_WIN32
-    initializeCrashDiagnostics(Path::getLogDir(),
+    const QString crashDumpDirectory = prepareCrashDumpDirectory();
+    initializeCrashDiagnostics(crashDumpDirectory,
                                s_LoggerFile && s_LoggerFile->isOpen()
                                        ? s_LoggerFile->fileName()
                                        : QString(),
@@ -790,7 +803,7 @@ int main(int argc, char *argv[])
 
 #ifdef Q_OS_WIN32
     // Create a crash dump when we crash on Windows
-    pruneOldMinidumps(Path::getLogDir());
+    pruneOldMinidumps(crashDumpDirectory);
     SetUnhandledExceptionFilter(UnhandledExceptionHandler);
 #endif
 
