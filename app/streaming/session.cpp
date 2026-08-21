@@ -124,7 +124,41 @@ QScreen* qtScreenForSdlDisplay(int displayIndex)
         }
     }
 
-    return displayIndex < screens.size() ? screens.at(displayIndex) : nullptr;
+    SDL_Rect displayBounds;
+    if (SDL_GetDisplayBounds(displayIndex, &displayBounds) == 0) {
+        const QRect sdlBounds(displayBounds.x, displayBounds.y,
+                              displayBounds.w, displayBounds.h);
+        QList<QScreen*> sizeMatches;
+        for (QScreen* screen : screens) {
+            if (!screen) {
+                continue;
+            }
+            if (screen->geometry() == sdlBounds) {
+                return screen;
+            }
+
+            const qreal scale = screen->devicePixelRatio();
+            const QSize nativeSize(qRound(screen->geometry().width() * scale),
+                                   qRound(screen->geometry().height() * scale));
+            if (nativeSize == sdlBounds.size()) {
+                sizeMatches.append(screen);
+            }
+        }
+
+        if (QScreen* cursorScreen = QGuiApplication::screenAt(QCursor::pos())) {
+            if (sizeMatches.contains(cursorScreen)) {
+                return cursorScreen;
+            }
+        }
+        if (sizeMatches.size() == 1) {
+            return sizeMatches.first();
+        }
+    }
+
+    if (QScreen* cursorScreen = QGuiApplication::screenAt(QCursor::pos())) {
+        return cursorScreen;
+    }
+    return QGuiApplication::primaryScreen();
 }
 
 QRect qtOverlayGeometryForSdlWindow(SDL_Window* window)
@@ -141,33 +175,27 @@ QRect qtOverlayGeometryForSdlWindow(SDL_Window* window)
     }
 
     const int displayIndex = SDL_GetWindowDisplayIndex(window);
-    QScreen* screen = qtScreenForSdlDisplay(displayIndex);
 
-#ifdef Q_OS_WIN32
-    WindowsDisplayGeometry::Monitor monitor;
-    if ((!screen || !WindowsDisplayGeometry::monitorForScreen(screen, monitor))) {
-        const char* displayName = displayIndex >= 0 ? SDL_GetDisplayName(displayIndex) : nullptr;
-        WindowsDisplayGeometry::monitorForName(
-                displayName ? QString::fromUtf8(displayName) : QString(), monitor);
-    }
-
-    if (monitor.isValid()) {
-        if (!screen) {
-            screen = WindowsDisplayGeometry::screenForMonitor(monitor);
-        }
-        const qreal scale = WindowsDisplayGeometry::scaleFactor(monitor, screen);
-        const QPoint logicalOrigin = screen
-                ? screen->geometry().topLeft()
-                : QPoint(qRound(monitor.bounds.left() / scale),
-                         qRound(monitor.bounds.top() / scale));
-        return QRect(logicalOrigin.x() + qRound((x - monitor.bounds.left()) / scale),
-                     logicalOrigin.y() + qRound((y - monitor.bounds.top()) / scale),
-                     qMax(1, qRound(width / scale)),
-                     qMax(1, qRound(height / scale)));
-    }
-#elif defined(Q_OS_DARWIN)
+#ifdef Q_OS_DARWIN
     return QRect(x, y, width, height);
 #else
+#ifdef Q_OS_WIN32
+    WindowsDisplayGeometry::Monitor monitor;
+    if (WindowsDisplayGeometry::monitorForRect(
+                QRect(x, y, width, height), monitor)) {
+        QScreen* screen = WindowsDisplayGeometry::screenForMonitor(monitor);
+        if (screen) {
+            const qreal scale = WindowsDisplayGeometry::scaleFactor(monitor, screen);
+            const QPoint logicalOrigin = screen->geometry().topLeft();
+            return QRect(logicalOrigin.x() + qRound((x - monitor.bounds.left()) / scale),
+                         logicalOrigin.y() + qRound((y - monitor.bounds.top()) / scale),
+                         qMax(1, qRound(width / scale)),
+                         qMax(1, qRound(height / scale)));
+        }
+    }
+#endif
+
+    QScreen* screen = qtScreenForSdlDisplay(displayIndex);
     SDL_Rect displayBounds;
     if (screen && displayIndex >= 0 &&
             SDL_GetDisplayBounds(displayIndex, &displayBounds) == 0) {
@@ -178,13 +206,18 @@ QRect qtOverlayGeometryForSdlWindow(SDL_Window* window)
                      qMax(1, qRound(width / scale)),
                      qMax(1, qRound(height / scale)));
     }
-#endif
 
-    const qreal scale = screen ? screen->devicePixelRatio() : 1.0;
-    return QRect(qRound(x / scale),
-                 qRound(y / scale),
-                 qMax(1, qRound(width / scale)),
-                 qMax(1, qRound(height / scale)));
+    // Keep the overlay available if platform display metadata is incomplete.
+    // At this point screen is the cursor screen or the primary screen.
+    if (screen) {
+        const qreal scale = screen->devicePixelRatio();
+        const QSize logicalSize(qMax(1, qRound(width / scale)),
+                                qMax(1, qRound(height / scale)));
+        return QRect(screen->geometry().topLeft(), logicalSize);
+    }
+
+    return QRect(x, y, width, height);
+#endif
 }
 
 #ifdef Q_OS_WIN32

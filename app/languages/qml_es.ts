@@ -897,7 +897,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="553"/>
         <source>Disabled (default)</source>
-        <translation type="unfinished"></translation>
+        <translation>Desactivado (predeterminado)</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="153"/>
@@ -1012,7 +1012,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
         <source>Right edge</source>
-        <translation type="unfinished"></translation>
+        <translation>Borde derecho</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="545"/>
