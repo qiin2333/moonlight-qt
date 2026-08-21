@@ -806,6 +806,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
 
                 if (hasShortDetail) {
                     // Short status text or checkmark — Win11 accent color
+                    p.setFont(m_DetailFont);
                     p.setPen(QColor(110, 192, 232));
                     QRect cr(cw - textPad - detailWidth, itemY,
                              detailWidth, m_ItemHeight);
@@ -1022,7 +1023,7 @@ void OverlayMenuPanel::gamepadBack()
 bool OverlayMenuPanel::event(QEvent* ev)
 {
     if (ev->type() == QEvent::Leave) {
-        if (m_Visible) {
+        if (m_Visible && m_CloseWhenPointerOutside) {
             // During the grace period, defer the outside check instead of
             // dropping the Leave event. Otherwise, leaving the panel quickly
             // after it opens would keep it visible until the cursor entered
