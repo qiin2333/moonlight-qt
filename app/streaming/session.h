@@ -198,7 +198,8 @@ private:
     void toggleFullscreen();
 
     // Qt-based overlay menu
-    void showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition = std::nullopt);
+    void showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition = std::nullopt,
+                           bool closeWhenPointerOutside = true);
     void hideQtOverlayMenu();
     void toggleQtOverlayMenu();
     bool isStreamingWindowVisible() const;

@@ -2199,7 +2199,8 @@ void Session::toggleFullscreen()
 
 // ---- Qt-based overlay menu methods ----
 
-void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition)
+void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
+                                bool closeWhenPointerOutside)
 {
     if (!m_MenuPanel || m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) return;
     if (!isStreamingWindowVisible()) return;
@@ -2239,12 +2240,14 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition)
     case StreamingPreferences::OMP_LEFT_EDGE:
         m_MenuPanel->showAtLeftEdge(parentRect.x(), parentRect.y(),
                                     parentRect.width(), parentRect.height(),
-                                    pointerGlobalPosition);
+                                    pointerGlobalPosition,
+                                    closeWhenPointerOutside);
         break;
     case StreamingPreferences::OMP_TOP_EDGE:
         m_MenuPanel->showAtTopEdge(parentRect.x(), parentRect.y(),
                                    parentRect.width(), parentRect.height(),
-                                   pointerGlobalPosition);
+                                   pointerGlobalPosition,
+                                   closeWhenPointerOutside);
         break;
     case StreamingPreferences::OMP_BUTTON:
     {
@@ -2254,7 +2257,7 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition)
         m_MenuPanel->showAtCursor(parentRect.x(), parentRect.y(),
                                   parentRect.width(), parentRect.height(),
                                   menuPosition,
-                                  pointerGlobalPosition.has_value());
+                                  closeWhenPointerOutside && pointerGlobalPosition.has_value());
         // Hide button while menu is visible
         if (m_MenuButton) {
             m_MenuButton->hideButton();
@@ -2265,7 +2268,8 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition)
     default:
         m_MenuPanel->showAtRightEdge(parentRect.x(), parentRect.y(),
                                      parentRect.width(), parentRect.height(),
-                                     pointerGlobalPosition);
+                                     pointerGlobalPosition,
+                                     closeWhenPointerOutside);
         break;
     }
 
@@ -3994,8 +3998,9 @@ void Session::exec()
     // Keep a hidden button ready so placement can switch during a stream
     // without creating a window from inside an input callback.
     m_MenuButton = new OverlayMenuButton();
-    m_MenuButton->setClickCallback([this]() {
-        showQtOverlayMenu(QCursor::pos());
+    m_MenuButton->setClickCallback([this](const QPoint& globalPosition,
+                                          bool closeWhenPointerOutside) {
+        showQtOverlayMenu(globalPosition, closeWhenPointerOutside);
     });
 
     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {

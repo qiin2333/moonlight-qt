@@ -94,15 +94,18 @@ public:
 
     // Position the panel at the right edge of the given Qt logical parent rect.
     void showAtRightEdge(int parentX, int parentY, int parentW, int parentH,
-                         std::optional<QPoint> pointerGlobalPosition = std::nullopt);
+                         std::optional<QPoint> pointerGlobalPosition = std::nullopt,
+                         bool closeWhenPointerOutside = true);
 
     // Position the panel at the left edge of the given Qt logical parent rect.
     void showAtLeftEdge(int parentX, int parentY, int parentW, int parentH,
-                        std::optional<QPoint> pointerGlobalPosition = std::nullopt);
+                        std::optional<QPoint> pointerGlobalPosition = std::nullopt,
+                        bool closeWhenPointerOutside = true);
 
     // Position the panel at the top edge of the given Qt logical parent rect.
     void showAtTopEdge(int parentX, int parentY, int parentW, int parentH,
-                       std::optional<QPoint> pointerGlobalPosition = std::nullopt);
+                       std::optional<QPoint> pointerGlobalPosition = std::nullopt,
+                       bool closeWhenPointerOutside = true);
 
     // Position the panel at a specific Qt global logical position.
     void showAtCursor(int parentX, int parentY, int parentW, int parentH,

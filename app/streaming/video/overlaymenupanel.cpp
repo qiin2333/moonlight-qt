@@ -355,7 +355,8 @@ void OverlayMenuPanel::updateFileMappingState(FileMappingState state, const QStr
 // ---------------------------------------------------------------------------
 
 void OverlayMenuPanel::showAtRightEdge(int parentX, int parentY, int parentW, int parentH,
-                                       std::optional<QPoint> pointerGlobalPosition)
+                                       std::optional<QPoint> pointerGlobalPosition,
+                                       bool closeWhenPointerOutside)
 {
     m_AnchorMode = AnchorMode::RightEdge;
     m_ParentX = parentX;
@@ -363,12 +364,13 @@ void OverlayMenuPanel::showAtRightEdge(int parentX, int parentY, int parentW, in
     m_ParentW = parentW;
     m_ParentH = parentH;
     m_TriggerPosition = pointerGlobalPosition;
-    m_CloseWhenPointerOutside = pointerGlobalPosition.has_value();
+    m_CloseWhenPointerOutside = closeWhenPointerOutside && pointerGlobalPosition.has_value();
     showInternal();
 }
 
 void OverlayMenuPanel::showAtLeftEdge(int parentX, int parentY, int parentW, int parentH,
-                                      std::optional<QPoint> pointerGlobalPosition)
+                                      std::optional<QPoint> pointerGlobalPosition,
+                                      bool closeWhenPointerOutside)
 {
     m_AnchorMode = AnchorMode::LeftEdge;
     m_ParentX = parentX;
@@ -376,12 +378,13 @@ void OverlayMenuPanel::showAtLeftEdge(int parentX, int parentY, int parentW, int
     m_ParentW = parentW;
     m_ParentH = parentH;
     m_TriggerPosition = pointerGlobalPosition;
-    m_CloseWhenPointerOutside = pointerGlobalPosition.has_value();
+    m_CloseWhenPointerOutside = closeWhenPointerOutside && pointerGlobalPosition.has_value();
     showInternal();
 }
 
 void OverlayMenuPanel::showAtTopEdge(int parentX, int parentY, int parentW, int parentH,
-                                     std::optional<QPoint> pointerGlobalPosition)
+                                     std::optional<QPoint> pointerGlobalPosition,
+                                     bool closeWhenPointerOutside)
 {
     m_AnchorMode = AnchorMode::TopEdge;
     m_ParentX = parentX;
@@ -389,7 +392,7 @@ void OverlayMenuPanel::showAtTopEdge(int parentX, int parentY, int parentW, int 
     m_ParentW = parentW;
     m_ParentH = parentH;
     m_TriggerPosition = pointerGlobalPosition;
-    m_CloseWhenPointerOutside = pointerGlobalPosition.has_value();
+    m_CloseWhenPointerOutside = closeWhenPointerOutside && pointerGlobalPosition.has_value();
     showInternal();
 }
 
