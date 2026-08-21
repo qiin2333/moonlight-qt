@@ -72,7 +72,7 @@
 #include <utility>
 
 namespace {
-QRect qtWindowFrameForSdl(QWindow* window)
+QRect qtWindowCreationGeometryForSdl(QWindow* window)
 {
     if (!window) {
         return {};
@@ -80,20 +80,22 @@ QRect qtWindowFrameForSdl(QWindow* window)
 
 #ifdef Q_OS_WIN32
     const QRect nativeFrame = WindowsDisplayGeometry::windowRect(window);
-    if (nativeFrame.isValid()) {
-        return nativeFrame;
+    QRect nativeClient;
+    if (WindowsDisplayGeometry::clientRectForOverlappedWindow(
+                window, nativeFrame, nativeClient)) {
+        return nativeClient;
     }
 #endif
 
-    const QRect frame = window->frameGeometry();
+    const QRect client = window->geometry();
 #ifdef Q_OS_DARWIN
-    return frame;
+    return client;
 #else
     const qreal scale = window->devicePixelRatio();
-    return QRect(qRound(frame.x() * scale),
-                 qRound(frame.y() * scale),
-                 qMax(1, qRound(frame.width() * scale)),
-                 qMax(1, qRound(frame.height() * scale)));
+    return QRect(qRound(client.x() * scale),
+                 qRound(client.y() * scale),
+                 qMax(1, qRound(client.width() * scale)),
+                 qMax(1, qRound(client.height() * scale)));
 #endif
 }
 
@@ -3545,12 +3547,12 @@ void Session::exec()
     // 这里只改初始创建；运行中 Ctrl+Alt+Shift+F 退出全屏时走的是 toggleFullscreen()
     // 里的那次 getWindowDimensions()，恢复的仍然是串流分辨率大小。
     if (m_IsFullScreen && m_QtWindow != nullptr) {
-        const QRect guiFrame = qtWindowFrameForSdl(m_QtWindow);
-        if (guiFrame.width() > 0 && guiFrame.height() > 0) {
-            x = guiFrame.x();
-            y = guiFrame.y();
-            width = guiFrame.width();
-            height = guiFrame.height();
+        const QRect creationGeometry = qtWindowCreationGeometryForSdl(m_QtWindow);
+        if (creationGeometry.isValid()) {
+            x = creationGeometry.x();
+            y = creationGeometry.y();
+            width = creationGeometry.width();
+            height = creationGeometry.height();
         }
     }
 

@@ -28,6 +28,9 @@ bool monitorForScreen(QScreen* screen, Monitor& monitor);
 bool monitorForWindow(QWindow* window, Monitor& monitor);
 
 QRect windowRect(QWindow* window);
+bool clientRectForOverlappedWindow(QWindow* referenceWindow,
+                                   const QRect& frameRect,
+                                   QRect& clientRect);
 bool setWindowRect(QWindow* window, const QRect& geometry, quint32* errorCode = nullptr);
 bool isNormalWindow(QWindow* window);
 

@@ -219,6 +219,47 @@ QRect windowRect(QWindow* window)
     return {};
 }
 
+bool clientRectForOverlappedWindow(QWindow* referenceWindow,
+                                   const QRect& frameRect,
+                                   QRect& clientRect)
+{
+#if defined(Q_OS_WIN32)
+    const HWND nativeWindow = windowHandle(referenceWindow);
+    if (!nativeWindow || !frameRect.isValid()) {
+        return false;
+    }
+
+    RECT frameAdjustment = {};
+    const UINT dpi = GetDpiForWindow(nativeWindow);
+    if (!AdjustWindowRectExForDpi(&frameAdjustment,
+                                  WS_OVERLAPPEDWINDOW,
+                                  FALSE,
+                                  0,
+                                  dpi ? dpi : USER_DEFAULT_SCREEN_DPI)) {
+        return false;
+    }
+
+    const int frameWidth = frameAdjustment.right - frameAdjustment.left;
+    const int frameHeight = frameAdjustment.bottom - frameAdjustment.top;
+    const int clientWidth = frameRect.width() - frameWidth;
+    const int clientHeight = frameRect.height() - frameHeight;
+    if (clientWidth <= 0 || clientHeight <= 0) {
+        return false;
+    }
+
+    clientRect = QRect(frameRect.x() - frameAdjustment.left,
+                       frameRect.y() - frameAdjustment.top,
+                       clientWidth,
+                       clientHeight);
+    return true;
+#else
+    Q_UNUSED(referenceWindow)
+    Q_UNUSED(frameRect)
+    Q_UNUSED(clientRect)
+    return false;
+#endif
+}
+
 bool setWindowRect(QWindow* window, const QRect& geometry, quint32* errorCode)
 {
     if (errorCode) {
