@@ -164,7 +164,7 @@ private:
     void navigateToLevel(int level);
     void repositionWindow();
     void showInternal();     // shared show logic after geometry is set
-    void schedulePointerOutsideCheck(bool immediate = false);
+    void schedulePointerOutsideCheck();
     void forceRepaint();     // synchronous repaint (requestUpdate is async on Windows)
     int  itemAtPos(const QPoint& pos) const;
 

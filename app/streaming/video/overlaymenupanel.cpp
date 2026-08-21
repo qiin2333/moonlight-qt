@@ -470,7 +470,7 @@ void OverlayMenuPanel::showInternal()
     forceRepaint();
 }
 
-void OverlayMenuPanel::schedulePointerOutsideCheck(bool immediate)
+void OverlayMenuPanel::schedulePointerOutsideCheck()
 {
     if (!m_Visible || !m_CloseWhenPointerOutside) {
         return;
@@ -481,7 +481,7 @@ void OverlayMenuPanel::schedulePointerOutsideCheck(bool immediate)
         m_LeaveTimer.start(static_cast<int>(remainingGrace));
     }
     else {
-        m_LeaveTimer.start(immediate ? 1 : PointerCheckIntervalMs);
+        m_LeaveTimer.start(PointerCheckIntervalMs);
     }
 }
 
@@ -1153,7 +1153,7 @@ bool OverlayMenuPanel::event(QEvent* ev)
             // dropping the Leave event. Otherwise, leaving the panel quickly
             // after it opens would keep it visible until the cursor entered
             // and left the panel again.
-            schedulePointerOutsideCheck(true);
+            schedulePointerOutsideCheck();
         }
         return true;
     }
