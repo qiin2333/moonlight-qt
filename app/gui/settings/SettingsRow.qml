@@ -14,7 +14,7 @@ FocusScope {
     property string description: ""
     // 业务上是否该显示这一行（例如某功能在当前平台不可用）
     property bool applicable: true
-    readonly property bool stacked: width < 520
+    readonly property bool stacked: width < Theme.settingsRowStackBreakpoint
 
     default property alias controlContent: controlSlot.data
 

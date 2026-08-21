@@ -516,7 +516,12 @@ Column {
         }
 
         if (Qt.platform.os !== "windows") {
-            dualSenseHapticsModeListModel.remove(0)
+            for (var i = 0; i < dualSenseHapticsModeListModel.count; i++) {
+                if (dualSenseHapticsModeListModel.get(i).val === StreamingPreferences.DSHM_PHYSICAL) {
+                    dualSenseHapticsModeListModel.remove(i)
+                    break
+                }
+            }
             dualSenseHapticsRow.syncSelection()
         }
     }
