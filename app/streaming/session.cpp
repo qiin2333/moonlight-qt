@@ -9,6 +9,7 @@
 #include "backend/richpresencemanager.h"
 #include "backend/nvhttp.h"
 #include "backend/identitymanager.h"
+#include "gui/windowsdisplaygeometry.h"
 
 #include <Limelight.h>
 #include "SDL_compat.h"
@@ -78,13 +79,9 @@ QRect qtWindowFrameForSdl(QWindow* window)
     }
 
 #ifdef Q_OS_WIN32
-    RECT nativeRect = {};
-    const HWND nativeWindow = reinterpret_cast<HWND>(window->winId());
-    if (nativeWindow && GetWindowRect(nativeWindow, &nativeRect)) {
-        return QRect(nativeRect.left,
-                     nativeRect.top,
-                     nativeRect.right - nativeRect.left,
-                     nativeRect.bottom - nativeRect.top);
+    const QRect nativeFrame = WindowsDisplayGeometry::windowRect(window);
+    if (nativeFrame.isValid()) {
+        return nativeFrame;
     }
 #endif
 
@@ -103,23 +100,12 @@ QRect qtWindowFrameForSdl(QWindow* window)
 #ifdef Q_OS_WIN32
 bool qtWindowNativeMonitorBounds(QWindow* window, QRect& bounds)
 {
-    if (!window) {
+    WindowsDisplayGeometry::Monitor monitor;
+    if (!WindowsDisplayGeometry::monitorForWindow(window, monitor)) {
         return false;
     }
 
-    const HWND nativeWindow = reinterpret_cast<HWND>(window->winId());
-    const HMONITOR monitor = nativeWindow
-            ? MonitorFromWindow(nativeWindow, MONITOR_DEFAULTTONEAREST)
-            : nullptr;
-    MONITORINFO monitorInfo = { sizeof(monitorInfo) };
-    if (!monitor || !GetMonitorInfoW(monitor, &monitorInfo)) {
-        return false;
-    }
-
-    bounds = QRect(monitorInfo.rcMonitor.left,
-                   monitorInfo.rcMonitor.top,
-                   monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
-                   monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top);
+    bounds = monitor.bounds;
     return bounds.isValid();
 }
 #endif

@@ -1,14 +1,11 @@
 #include "windowplacement.h"
+#include "windowsdisplaygeometry.h"
 
 #include <QDebug>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QSettings>
 #include <QWindow>
-
-#ifdef Q_OS_WIN32
-#include <windows.h>
-#endif
 
 namespace {
 constexpr auto GeometryKey = "mainwindow/geometry";
@@ -51,40 +48,7 @@ QRect constrainedGeometry(const QRect& geometry,
     return result;
 }
 
-QScreen* screenForName(const QString& name)
-{
-    const auto screens = QGuiApplication::screens();
-    for (QScreen* screen : screens) {
-        if (screen->name() == name) {
-            return screen;
-        }
-    }
-
-    return nullptr;
-}
-
 #ifdef Q_OS_WIN32
-struct NativeMonitorGeometry
-{
-    HMONITOR handle = nullptr;
-    QRect monitor;
-    QRect workArea;
-    QString name;
-
-    bool isValid() const
-    {
-        return handle && monitor.isValid() && workArea.isValid();
-    }
-};
-
-QRect fromNativeRect(const RECT& rect)
-{
-    return QRect(rect.left,
-                 rect.top,
-                 rect.right - rect.left,
-                 rect.bottom - rect.top);
-}
-
 QString rectText(const QRect& rect)
 {
     return QStringLiteral("[%1,%2 %3x%4]")
@@ -94,114 +58,26 @@ QString rectText(const QRect& rect)
             .arg(rect.height());
 }
 
-bool populateNativeMonitorGeometry(HMONITOR monitor, NativeMonitorGeometry& geometry)
-{
-    if (!monitor) {
-        return false;
-    }
-
-    MONITORINFOEXW monitorInfo = {};
-    monitorInfo.cbSize = sizeof(monitorInfo);
-    if (!GetMonitorInfoW(monitor, reinterpret_cast<MONITORINFO*>(&monitorInfo))) {
-        return false;
-    }
-
-    geometry.handle = monitor;
-    geometry.monitor = fromNativeRect(monitorInfo.rcMonitor);
-    geometry.workArea = fromNativeRect(monitorInfo.rcWork);
-    geometry.name = QString::fromWCharArray(monitorInfo.szDevice);
-    return geometry.isValid();
-}
-
-struct MonitorSearchContext
-{
-    QString name;
-    NativeMonitorGeometry geometry;
-};
-
-BOOL CALLBACK findMonitorByName(HMONITOR monitor, HDC, LPRECT, LPARAM data)
-{
-    auto* context = reinterpret_cast<MonitorSearchContext*>(data);
-    NativeMonitorGeometry candidate;
-    if (populateNativeMonitorGeometry(monitor, candidate) &&
-            candidate.name.compare(context->name, Qt::CaseInsensitive) == 0) {
-        context->geometry = candidate;
-        return FALSE;
-    }
-    return TRUE;
-}
-
-bool nativeMonitorForName(const QString& name, NativeMonitorGeometry& geometry)
-{
-    if (name.isEmpty()) {
-        return false;
-    }
-
-    MonitorSearchContext context { name, {} };
-    EnumDisplayMonitors(nullptr,
-                        nullptr,
-                        findMonitorByName,
-                        reinterpret_cast<LPARAM>(&context));
-    if (context.geometry.isValid()) {
-        geometry = context.geometry;
-        return true;
-    }
-    return false;
-}
-
-bool nativeMonitorForScreen(QScreen* screen, NativeMonitorGeometry& geometry)
-{
-    if (!screen) {
-        return false;
-    }
-
-    if (nativeMonitorForName(screen->name(), geometry)) {
-        return true;
-    }
-
-    const QPoint center = screen->geometry().center();
-    const POINT nativeCenter { center.x(), center.y() };
-    return populateNativeMonitorGeometry(
-            MonitorFromPoint(nativeCenter, MONITOR_DEFAULTTONEAREST), geometry);
-}
-
-bool nativeMonitorForWindow(HWND window, NativeMonitorGeometry& geometry)
-{
-    return window && populateNativeMonitorGeometry(
-            MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST), geometry);
-}
-
-qreal nativeScaleForScreen(const NativeMonitorGeometry& monitor, QScreen* screen)
-{
-    if (screen && screen->geometry().width() > 0 && monitor.monitor.width() > 0) {
-        return static_cast<qreal>(monitor.monitor.width()) / screen->geometry().width();
-    }
-    if (screen && screen->devicePixelRatio() > 0) {
-        return screen->devicePixelRatio();
-    }
-    return 1.0;
-}
-
 QRect relativeLogicalToNative(const QRect& logicalGeometry,
-                              const NativeMonitorGeometry& monitor,
+                              const WindowsDisplayGeometry::Monitor& monitor,
                               qreal scale)
 {
-    return QRect(monitor.monitor.left() + qRound(logicalGeometry.left() * scale),
-                 monitor.monitor.top() + qRound(logicalGeometry.top() * scale),
+    return QRect(monitor.bounds.left() + qRound(logicalGeometry.left() * scale),
+                 monitor.bounds.top() + qRound(logicalGeometry.top() * scale),
                  qMax(1, qRound(logicalGeometry.width() * scale)),
                  qMax(1, qRound(logicalGeometry.height() * scale)));
 }
 
 QRect nativeToRelativeLogical(const QRect& nativeGeometry,
-                              const NativeMonitorGeometry& monitor,
+                              const WindowsDisplayGeometry::Monitor& monitor,
                               qreal scale)
 {
     if (scale <= 0) {
         scale = 1.0;
     }
 
-    return QRect(qRound((nativeGeometry.left() - monitor.monitor.left()) / scale),
-                 qRound((nativeGeometry.top() - monitor.monitor.top()) / scale),
+    return QRect(qRound((nativeGeometry.left() - monitor.bounds.left()) / scale),
+                 qRound((nativeGeometry.top() - monitor.bounds.top()) / scale),
                  qMax(1, qRound(nativeGeometry.width() / scale)),
                  qMax(1, qRound(nativeGeometry.height() / scale)));
 }
@@ -214,6 +90,11 @@ WindowPlacement::WindowPlacement(QObject* parent)
     m_SaveTimer.setInterval(300);
     m_SaveTimer.setSingleShot(true);
     connect(&m_SaveTimer, &QTimer::timeout, this, &WindowPlacement::saveNow);
+    if (qGuiApp) {
+        connect(qGuiApp, &QGuiApplication::screenRemoved, this, [this](QScreen*) {
+            scheduleSave();
+        });
+    }
 }
 
 QWindow* WindowPlacement::window() const
@@ -291,11 +172,16 @@ void WindowPlacement::restore()
 
 #ifdef Q_OS_WIN32
     const bool hasLegacyGeometry = m_Enabled && !hasSavedWindowsGeometry && savedGeometry.isValid();
-    QScreen* screen = hasSavedWindowsGeometry
-            ? screenForName(settings.value(ScreenNameKey).toString())
-            : (hasLegacyGeometry
-                       ? findSavedScreen(settings.value(ScreenNameKey).toString(), savedGeometry)
-                       : m_Window->screen());
+    QScreen* screen = m_Window->screen();
+    if (hasSavedWindowsGeometry) {
+        if (QScreen* savedScreen = WindowsDisplayGeometry::screenForName(
+                    settings.value(ScreenNameKey).toString())) {
+            screen = savedScreen;
+        }
+    }
+    else if (hasLegacyGeometry) {
+        screen = findSavedScreen(settings.value(ScreenNameKey).toString(), savedGeometry);
+    }
 #else
     QScreen* screen = hasSavedGeometry
             ? findSavedScreen(settings.value(ScreenNameKey).toString(), savedGeometry)
@@ -310,19 +196,21 @@ void WindowPlacement::restore()
 
     m_Restoring = true;
 #ifdef Q_OS_WIN32
-    const HWND nativeWindow = reinterpret_cast<HWND>(m_Window->winId());
-    NativeMonitorGeometry nativeMonitor;
+    WindowsDisplayGeometry::Monitor nativeMonitor;
     const QString savedNativeScreenName = settings.value(WindowsScreenNameKey).toString();
-    if (!nativeMonitorForName(savedNativeScreenName, nativeMonitor) &&
-            !nativeMonitorForScreen(screen, nativeMonitor)) {
-        nativeMonitorForWindow(nativeWindow, nativeMonitor);
+    if (!WindowsDisplayGeometry::monitorForName(savedNativeScreenName, nativeMonitor) &&
+            !WindowsDisplayGeometry::monitorForScreen(screen, nativeMonitor)) {
+        WindowsDisplayGeometry::monitorForWindow(m_Window, nativeMonitor);
     }
 
-    RECT currentWindowRect = {};
-    const bool hasCurrentWindowRect = nativeWindow && GetWindowRect(nativeWindow, &currentWindowRect);
-    if (nativeWindow && nativeMonitor.isValid() && hasCurrentWindowRect) {
-        const qreal scale = nativeScaleForScreen(nativeMonitor, screen);
-        QRect requestedNativeGeometry = fromNativeRect(currentWindowRect);
+    if (QScreen* matchingScreen = WindowsDisplayGeometry::screenForMonitor(nativeMonitor)) {
+        screen = matchingScreen;
+    }
+
+    const QRect currentWindowGeometry = WindowsDisplayGeometry::windowRect(m_Window);
+    if (nativeMonitor.isValid() && currentWindowGeometry.isValid()) {
+        const qreal scale = WindowsDisplayGeometry::scaleFactor(nativeMonitor, screen);
+        QRect requestedNativeGeometry = currentWindowGeometry;
         QRect logicalGeometry;
 
         if (hasSavedWindowsGeometry) {
@@ -338,18 +226,13 @@ void WindowPlacement::restore()
         const QRect constrainedNativeGeometry = constrainedGeometry(
                 requestedNativeGeometry, nativeMonitor.workArea, nativeInset);
 
-        if (!SetWindowPos(nativeWindow,
-                          nullptr,
-                          constrainedNativeGeometry.x(),
-                          constrainedNativeGeometry.y(),
-                          constrainedNativeGeometry.width(),
-                          constrainedNativeGeometry.height(),
-                          SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER)) {
-            qWarning() << "Failed to restore native window geometry:" << GetLastError();
+        quint32 errorCode = 0;
+        if (!WindowsDisplayGeometry::setWindowRect(
+                    m_Window, constrainedNativeGeometry, &errorCode)) {
+            qWarning() << "Failed to restore native window geometry:" << errorCode;
         }
 
-        RECT restoredWindowRect = {};
-        GetWindowRect(nativeWindow, &restoredWindowRect);
+        const QRect restoredWindowGeometry = WindowsDisplayGeometry::windowRect(m_Window);
         qInfo().noquote()
                 << QStringLiteral("Window placement restore screen=%1 saved=%2 requestedNative=%3 "
                                   "constrainedNative=%4 actualNative=%5 scale=%6")
@@ -358,7 +241,7 @@ void WindowPlacement::restore()
                                                           : QStringLiteral("default"),
                                 rectText(requestedNativeGeometry),
                                 rectText(constrainedNativeGeometry),
-                                rectText(fromNativeRect(restoredWindowRect)))
+                                rectText(restoredWindowGeometry))
                            .arg(scale);
     }
     else {
@@ -396,7 +279,7 @@ void WindowPlacement::flush()
 
 QScreen* WindowPlacement::findSavedScreen(const QString& name, const QRect& geometry)
 {
-    if (QScreen* screen = screenForName(name)) {
+    if (QScreen* screen = WindowsDisplayGeometry::screenForName(name)) {
         return screen;
     }
 
@@ -430,30 +313,32 @@ void WindowPlacement::saveNow()
 
     QSettings settings;
 #ifdef Q_OS_WIN32
-    const HWND nativeWindow = reinterpret_cast<HWND>(m_Window->winId());
-    if (!nativeWindow || IsIconic(nativeWindow) || IsZoomed(nativeWindow)) {
+    if (!WindowsDisplayGeometry::isNormalWindow(m_Window)) {
         return;
     }
 
-    RECT nativeWindowRect = {};
-    NativeMonitorGeometry nativeMonitor;
-    if (!GetWindowRect(nativeWindow, &nativeWindowRect) ||
-            !nativeMonitorForWindow(nativeWindow, nativeMonitor)) {
+    const QRect nativeGeometry = WindowsDisplayGeometry::windowRect(m_Window);
+    WindowsDisplayGeometry::Monitor nativeMonitor;
+    if (!nativeGeometry.isValid() ||
+            !WindowsDisplayGeometry::monitorForWindow(m_Window, nativeMonitor)) {
         return;
     }
 
-    QScreen* screen = m_Window->screen();
+    QScreen* screen = WindowsDisplayGeometry::screenForMonitor(nativeMonitor);
+    if (!screen) {
+        screen = m_Window->screen();
+    }
     if (!screen) {
         screen = QGuiApplication::screenAt(m_Window->geometry().center());
     }
-    const qreal scale = nativeScaleForScreen(nativeMonitor, screen);
-    const QRect nativeGeometry = fromNativeRect(nativeWindowRect);
+    const qreal scale = WindowsDisplayGeometry::scaleFactor(nativeMonitor, screen);
     const QRect logicalGeometry = nativeToRelativeLogical(
             nativeGeometry, nativeMonitor, scale);
 
     settings.setValue(WindowsOuterGeometryKey, logicalGeometry);
     settings.setValue(WindowsScreenNameKey, nativeMonitor.name);
     settings.setValue(ScreenNameKey, screen ? screen->name() : nativeMonitor.name);
+    settings.remove(GeometryKey);
     qInfo().noquote()
             << QStringLiteral("Window placement save screen=%1 native=%2 relativeLogical=%3 scale=%4")
                        .arg(nativeMonitor.name,
