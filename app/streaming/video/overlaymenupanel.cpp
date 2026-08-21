@@ -7,6 +7,7 @@
 #include <QPainterPath>
 #include <QCursor>
 #include <QFontDatabase>
+#include <QFontMetrics>
 #include <memory>
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
@@ -791,13 +792,23 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
                 QRect sr(labelX, itemY + topH, cw - labelX - textPad, m_ItemHeight - topH);
                 p.drawText(sr, Qt::AlignLeft | Qt::AlignTop, item.detail);
             } else {
-                QRect lr(labelX, itemY, cw - labelX - textPad, m_ItemHeight);
+                int detailWidth = 0;
+                if (hasShortDetail) {
+                    const QFontMetrics detailMetrics(m_DetailFont);
+                    detailWidth = qMax(20, detailMetrics.horizontalAdvance(item.detail) + 8);
+                }
+
+                const int detailGap = hasShortDetail ? 8 : 0;
+                QRect lr(labelX, itemY,
+                         cw - labelX - textPad - detailWidth - detailGap,
+                         m_ItemHeight);
                 p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
 
                 if (hasShortDetail) {
-                    // Checkmark — Win11 accent color
+                    // Short status text or checkmark — Win11 accent color
                     p.setPen(QColor(110, 192, 232));
-                    QRect cr(cw - textPad - 20, itemY, 20, m_ItemHeight);
+                    QRect cr(cw - textPad - detailWidth, itemY,
+                             detailWidth, m_ItemHeight);
                     p.drawText(cr, Qt::AlignRight | Qt::AlignVCenter, item.detail);
                 }
             }
