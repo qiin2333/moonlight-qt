@@ -10,6 +10,7 @@
 #include <QPropertyAnimation>
 #include <QVariantAnimation>
 #include <functional>
+#include <optional>
 #include <vector>
 
 /**
@@ -84,15 +85,19 @@ public:
     void setActionCallback(ActionCallback cb) { m_ActionCallback = cb; }
     void setCloseCallback(CloseCallback cb)   { m_CloseCallback = cb; }
 
-    // Position the panel at the right edge of the given parent rect (SDL pixel coords)
-    void showAtRightEdge(int parentX, int parentY, int parentW, int parentH);
+    // Position the panel at the right edge of the given parent rect (SDL pixel coords).
+    // pointerGlobalY, when present, is a Qt global logical coordinate.
+    void showAtRightEdge(int parentX, int parentY, int parentW, int parentH,
+                         std::optional<int> pointerGlobalY = std::nullopt);
 
-    // Position the panel at the left edge of the given parent rect (SDL pixel coords)
-    void showAtLeftEdge(int parentX, int parentY, int parentW, int parentH);
+    // Position the panel at the left edge of the given parent rect (SDL pixel coords).
+    // pointerGlobalY, when present, is a Qt global logical coordinate.
+    void showAtLeftEdge(int parentX, int parentY, int parentW, int parentH,
+                        std::optional<int> pointerGlobalY = std::nullopt);
 
     // Position the panel at a specific cursor position (SDL pixel coords)
     void showAtCursor(int parentX, int parentY, int parentW, int parentH,
-                      int cursorX, int cursorY);
+                      int cursorX, int cursorY, bool pointerTriggered = true);
 
     void closeMenu();
     bool isMenuVisible() const { return m_Visible; }
@@ -146,6 +151,7 @@ private:
     void navigateToLevel(int level);
     void repositionWindow();
     void showInternal();     // shared show logic after geometry is set
+    void schedulePointerOutsideCheck();
     void forceRepaint();     // synchronous repaint (requestUpdate is async on Windows)
     int  itemAtPos(const QPoint& pos) const;
 
@@ -181,6 +187,7 @@ private:
     // Anti-flicker: grace period after show
     QElapsedTimer m_ShowTimer;
     QTimer m_LeaveTimer;
+    bool m_CloseWhenPointerOutside;
 
     // Animations
     QPropertyAnimation* m_OpacityAnim;
@@ -190,7 +197,9 @@ private:
     bool   m_Closing;         // true while close animation is running
     int    m_TargetX;         // cached final x position for show animation
 
-    // Menu anchor mode and cursor position (for AtCursor mode)
+    // Menu anchor mode and pointer position. AtCursor uses SDL desktop
+    // coordinates; edge modes store Qt's global logical Y coordinate.
     AnchorMode m_AnchorMode;
-    int m_CursorX, m_CursorY; // SDL pixel coords for AtCursor mode
+    int m_CursorX, m_CursorY;
+    std::optional<int> m_EdgePointerY;
 };

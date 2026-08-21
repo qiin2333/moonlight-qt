@@ -2041,7 +2041,7 @@ void Session::toggleFullscreen()
 
 // ---- Qt-based overlay menu methods ----
 
-void Session::showQtOverlayMenu()
+void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
 {
     if (!m_MenuPanel || m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) return;
     if (!isStreamingWindowVisible()) return;
@@ -2054,8 +2054,7 @@ void Session::showQtOverlayMenu()
     // Save capture state and release mouse
     m_WasCapturedBeforeMenu = m_InputHandler->isCaptureActive();
     if (m_WasCapturedBeforeMenu) {
-        SDL_SetRelativeMouseMode(SDL_FALSE);
-        SDL_ShowCursor(SDL_ENABLE);
+        m_InputHandler->setCaptureActive(false);
     }
 
     // Flush stale mouse motion events from relative mode
@@ -2076,12 +2075,13 @@ void Session::showQtOverlayMenu()
     // Show menu based on user preference
     switch (m_Preferences->overlayMenuPosition) {
     case StreamingPreferences::OMP_LEFT_EDGE:
-        m_MenuPanel->showAtLeftEdge(wx, wy, ww, wh);
+        m_MenuPanel->showAtLeftEdge(wx, wy, ww, wh, pointerGlobalY);
         break;
     case StreamingPreferences::OMP_BUTTON:
         // Show menu at the button's position (top-right corner)
         m_MenuPanel->showAtCursor(wx, wy, ww, wh,
-                                  wx + ww - 40, wy + 40);
+                                  wx + ww - 40, wy + 40,
+                                  pointerGlobalY.has_value());
         // Hide button while menu is visible
         if (m_MenuButton) {
             m_MenuButton->hideButton();
@@ -2089,7 +2089,7 @@ void Session::showQtOverlayMenu()
         break;
     case StreamingPreferences::OMP_RIGHT_EDGE:
     default:
-        m_MenuPanel->showAtRightEdge(wx, wy, ww, wh);
+        m_MenuPanel->showAtRightEdge(wx, wy, ww, wh, pointerGlobalY);
         break;
     }
 
@@ -3808,7 +3808,7 @@ void Session::exec()
     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
         m_MenuButton = new OverlayMenuButton();
         m_MenuButton->setClickCallback([this]() {
-            showQtOverlayMenu();
+            showQtOverlayMenu(QCursor::pos().y());
         });
         // Show button at initial position
         int wx, wy, ww, wh;
@@ -3825,10 +3825,14 @@ void Session::exec()
     // event loop and is serviced via pipe polling below.
     constexpr Uint32 QT_UI_EVENT_PUMP_INTERVAL_MS = 10;
     Uint32 lastQtEventPumpTicks = 0;
-    auto processQtEventsDuringStream = [this, &lastQtEventPumpTicks](bool force = false) {
-        const bool qtUiVisible = (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
-                                 (m_Toast && m_Toast->isVisible());
-        if (!qtUiVisible) {
+    auto qtUiNeedsEventProcessing = [this]() {
+        return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
+               (m_MenuButton && m_MenuButton->isButtonVisible()) ||
+               (m_Toast && m_Toast->isVisible());
+    };
+    auto processQtEventsDuringStream = [&lastQtEventPumpTicks,
+                                        &qtUiNeedsEventProcessing](bool force = false) {
+        if (!qtUiNeedsEventProcessing()) {
             return;
         }
 
@@ -3890,6 +3894,9 @@ void Session::exec()
         // issues that could cause indefinite timeouts, delayed joystick detection,
         // and other problems.
         int waitTimeoutMs = (m_ClipboardHelper != nullptr && m_ClipboardHelper->isRunning()) ? 100 : 1000;
+        if (qtUiNeedsEventProcessing()) {
+            waitTimeoutMs = qMin(waitTimeoutMs, static_cast<int>(QT_UI_EVENT_PUMP_INTERVAL_MS));
+        }
         if (!SDL_WaitEventTimeout(&event, waitTimeoutMs)) {
             presence.runCallbacks();
             processClipboardHelperMessages();
@@ -4278,11 +4285,11 @@ void Session::exec()
                     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_LEFT_EDGE) {
                         atEdge = (event.motion.x <= 5);
                     } else {
-                        // OMP_RIGHT_EDGE (default)
+                        // OMP_RIGHT_EDGE
                         atEdge = (event.motion.x >= ww - 5);
                     }
                     if (atEdge) {
-                        showQtOverlayMenu();
+                        showQtOverlayMenu(QCursor::pos().y());
                         break;
                     }
                 }
