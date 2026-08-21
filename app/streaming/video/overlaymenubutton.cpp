@@ -1,12 +1,27 @@
 #include "overlaymenubutton.h"
 
+#include <QGuiApplication>
 #include <QScreen>
 #include <QPainterPath>
+#include <QStyleHints>
+
+namespace {
+QPoint globalMousePosition(QMouseEvent* event)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    return event->globalPosition().toPoint();
+#else
+    return event->globalPos();
+#endif
+}
+}
 
 OverlayMenuButton::OverlayMenuButton(QWindow* parent)
     : QRasterWindow(parent),
       m_Hovered(false),
-      m_ButtonVisible(false)
+      m_ButtonVisible(false),
+      m_Pressed(false),
+      m_Dragging(false)
 {
     setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
              | Qt::WindowDoesNotAcceptFocus);
@@ -22,17 +37,22 @@ OverlayMenuButton::~OverlayMenuButton()
 {
 }
 
-void OverlayMenuButton::repositionTo(int parentX, int parentY, int parentW, int /*parentH*/)
+void OverlayMenuButton::repositionTo(int parentX, int parentY, int parentW, int parentH)
 {
-    int qpX = parentX;
-    int qpY = parentY;
-    int qpW = parentW;
+    const QRect newParentGeometry(parentX, parentY, parentW, parentH);
+    QPoint newPosition;
 
-    // Position at top-right corner of the streaming window
-    int x = qpX + qpW - kButtonSize - kMargin;
-    int y = qpY + kMargin;
+    if (m_ParentGeometry.isValid()) {
+        // Preserve the button's offset when the streaming window moves or resizes.
+        newPosition = newParentGeometry.topLeft() + (position() - m_ParentGeometry.topLeft());
+    }
+    else {
+        newPosition = QPoint(newParentGeometry.right() - kButtonSize - kMargin + 1,
+                             newParentGeometry.top() + kMargin);
+    }
 
-    setGeometry(x, y, kButtonSize, kButtonSize);
+    m_ParentGeometry = newParentGeometry;
+    setGeometry(QRect(clampToParent(newPosition), QSize(kButtonSize, kButtonSize)));
 }
 
 void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int parentH)
@@ -46,8 +66,25 @@ void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int pa
 
 void OverlayMenuButton::hideButton()
 {
+    m_Pressed = false;
+    m_Dragging = false;
     m_ButtonVisible = false;
+    unsetCursor();
     hide();
+}
+
+QPoint OverlayMenuButton::clampToParent(const QPoint& position) const
+{
+    if (!m_ParentGeometry.isValid()) {
+        return position;
+    }
+
+    const int minX = m_ParentGeometry.left() + kMargin;
+    const int minY = m_ParentGeometry.top() + kMargin;
+    const int maxX = qMax(minX, m_ParentGeometry.right() - kButtonSize - kMargin + 1);
+    const int maxY = qMax(minY, m_ParentGeometry.bottom() - kButtonSize - kMargin + 1);
+    return QPoint(qBound(minX, position.x(), maxX),
+                  qBound(minY, position.y(), maxY));
 }
 
 void OverlayMenuButton::drawCrescentMoon(QPainter& p, qreal cx, qreal cy, qreal radius)
@@ -103,18 +140,53 @@ void OverlayMenuButton::paintEvent(QPaintEvent*)
 void OverlayMenuButton::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
-        if (m_ClickCallback) {
-            m_ClickCallback();
-        }
+        m_Pressed = true;
+        m_Dragging = false;
+        m_PressGlobalPosition = globalMousePosition(event);
+        m_WindowPositionAtPress = position();
+        event->accept();
     }
 }
 
-void OverlayMenuButton::mouseMoveEvent(QMouseEvent*)
+void OverlayMenuButton::mouseMoveEvent(QMouseEvent* event)
 {
     if (!m_Hovered) {
         m_Hovered = true;
         setOpacity(0.95);
         requestUpdate();
+    }
+
+    if (!m_Pressed) {
+        setCursor(Qt::OpenHandCursor);
+        return;
+    }
+
+    const QPoint delta = globalMousePosition(event) - m_PressGlobalPosition;
+    if (!m_Dragging && delta.manhattanLength() >= QGuiApplication::styleHints()->startDragDistance()) {
+        m_Dragging = true;
+        setCursor(Qt::ClosedHandCursor);
+    }
+
+    if (m_Dragging) {
+        setPosition(clampToParent(m_WindowPositionAtPress + delta));
+        event->accept();
+    }
+}
+
+void OverlayMenuButton::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() != Qt::LeftButton || !m_Pressed) {
+        return;
+    }
+
+    const bool activate = !m_Dragging;
+    m_Pressed = false;
+    m_Dragging = false;
+    setCursor(Qt::OpenHandCursor);
+    event->accept();
+
+    if (activate && m_ClickCallback) {
+        m_ClickCallback();
     }
 }
 

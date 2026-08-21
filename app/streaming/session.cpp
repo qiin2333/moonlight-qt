@@ -2247,16 +2247,20 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition)
                                    pointerGlobalPosition);
         break;
     case StreamingPreferences::OMP_BUTTON:
-        // Show menu at the button's position (top-right corner)
+    {
+        // Open next to the current button position, including after the user drags it.
+        const QPoint menuPosition = pointerGlobalPosition.value_or(
+                m_MenuButton ? m_MenuButton->geometry().center() : QCursor::pos());
         m_MenuPanel->showAtCursor(parentRect.x(), parentRect.y(),
                                   parentRect.width(), parentRect.height(),
-                                  QPoint(parentRect.right() - 39, parentRect.y() + 40),
+                                  menuPosition,
                                   pointerGlobalPosition.has_value());
         // Hide button while menu is visible
         if (m_MenuButton) {
             m_MenuButton->hideButton();
         }
         break;
+    }
     case StreamingPreferences::OMP_RIGHT_EDGE:
     default:
         m_MenuPanel->showAtRightEdge(parentRect.x(), parentRect.y(),

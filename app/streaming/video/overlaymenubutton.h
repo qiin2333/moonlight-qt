@@ -48,14 +48,21 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     bool event(QEvent* event) override;
 
 private:
     void drawCrescentMoon(QPainter& p, qreal cx, qreal cy, qreal radius);
+    QPoint clampToParent(const QPoint& position) const;
 
     ClickCallback m_ClickCallback;
     bool m_Hovered;
     bool m_ButtonVisible;
+    bool m_Pressed;
+    bool m_Dragging;
+    QPoint m_PressGlobalPosition;
+    QPoint m_WindowPositionAtPress;
+    QRect m_ParentGeometry;
 
     // Button size (logical pixels)
     static constexpr int kButtonSize = 36;
