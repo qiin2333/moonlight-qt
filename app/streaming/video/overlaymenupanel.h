@@ -85,17 +85,15 @@ public:
     void setActionCallback(ActionCallback cb) { m_ActionCallback = cb; }
     void setCloseCallback(CloseCallback cb)   { m_CloseCallback = cb; }
 
-    // Position the panel at the right edge of the given parent rect (SDL pixel coords).
-    // pointerGlobalY, when present, is a Qt global logical coordinate.
+    // Position the panel at the right edge of the given Qt logical parent rect.
     void showAtRightEdge(int parentX, int parentY, int parentW, int parentH,
                          std::optional<int> pointerGlobalY = std::nullopt);
 
-    // Position the panel at the left edge of the given parent rect (SDL pixel coords).
-    // pointerGlobalY, when present, is a Qt global logical coordinate.
+    // Position the panel at the left edge of the given Qt logical parent rect.
     void showAtLeftEdge(int parentX, int parentY, int parentW, int parentH,
                         std::optional<int> pointerGlobalY = std::nullopt);
 
-    // Position the panel at a specific cursor position (SDL pixel coords)
+    // Position the panel at a specific Qt global logical position.
     void showAtCursor(int parentX, int parentY, int parentW, int parentH,
                       int cursorX, int cursorY, bool pointerTriggered = true);
 
@@ -166,7 +164,7 @@ private:
     ActionCallback m_ActionCallback;
     CloseCallback  m_CloseCallback;
 
-    // Parent window rect (SDL pixel coords) for repositioning on level change
+    // Parent window rect in Qt global logical coordinates for level changes
     int m_ParentX, m_ParentY, m_ParentW, m_ParentH;
 
     // Layout constants (logical units, Qt 6 auto-scales)
@@ -197,8 +195,7 @@ private:
     bool   m_Closing;         // true while close animation is running
     int    m_TargetX;         // cached final x position for show animation
 
-    // Menu anchor mode and pointer position. AtCursor uses SDL desktop
-    // coordinates; edge modes store Qt's global logical Y coordinate.
+    // Menu anchor mode and pointer position in Qt global logical coordinates.
     AnchorMode m_AnchorMode;
     int m_CursorX, m_CursorY;
     std::optional<int> m_EdgePointerY;

@@ -99,6 +99,94 @@ QRect qtWindowCreationGeometryForSdl(QWindow* window)
 #endif
 }
 
+QScreen* qtScreenForSdlDisplay(int displayIndex)
+{
+    if (displayIndex < 0) {
+        return nullptr;
+    }
+
+    const char* displayName = SDL_GetDisplayName(displayIndex);
+    const QString name = displayName ? QString::fromUtf8(displayName) : QString();
+
+#ifdef Q_OS_WIN32
+    WindowsDisplayGeometry::Monitor monitor;
+    if (WindowsDisplayGeometry::monitorForName(name, monitor)) {
+        if (QScreen* screen = WindowsDisplayGeometry::screenForMonitor(monitor)) {
+            return screen;
+        }
+    }
+#endif
+
+    const auto screens = QGuiApplication::screens();
+    for (QScreen* screen : screens) {
+        if (screen && screen->name().compare(name, Qt::CaseInsensitive) == 0) {
+            return screen;
+        }
+    }
+
+    return displayIndex < screens.size() ? screens.at(displayIndex) : nullptr;
+}
+
+QRect qtOverlayGeometryForSdlWindow(SDL_Window* window)
+{
+    if (!window) {
+        return {};
+    }
+
+    int x, y, width, height;
+    SDL_GetWindowPosition(window, &x, &y);
+    SDL_GetWindowSize(window, &width, &height);
+    if (width <= 0 || height <= 0) {
+        return {};
+    }
+
+    const int displayIndex = SDL_GetWindowDisplayIndex(window);
+    QScreen* screen = qtScreenForSdlDisplay(displayIndex);
+
+#ifdef Q_OS_WIN32
+    WindowsDisplayGeometry::Monitor monitor;
+    if ((!screen || !WindowsDisplayGeometry::monitorForScreen(screen, monitor))) {
+        const char* displayName = displayIndex >= 0 ? SDL_GetDisplayName(displayIndex) : nullptr;
+        WindowsDisplayGeometry::monitorForName(
+                displayName ? QString::fromUtf8(displayName) : QString(), monitor);
+    }
+
+    if (monitor.isValid()) {
+        if (!screen) {
+            screen = WindowsDisplayGeometry::screenForMonitor(monitor);
+        }
+        const qreal scale = WindowsDisplayGeometry::scaleFactor(monitor, screen);
+        const QPoint logicalOrigin = screen
+                ? screen->geometry().topLeft()
+                : QPoint(qRound(monitor.bounds.left() / scale),
+                         qRound(monitor.bounds.top() / scale));
+        return QRect(logicalOrigin.x() + qRound((x - monitor.bounds.left()) / scale),
+                     logicalOrigin.y() + qRound((y - monitor.bounds.top()) / scale),
+                     qMax(1, qRound(width / scale)),
+                     qMax(1, qRound(height / scale)));
+    }
+#elif defined(Q_OS_DARWIN)
+    return QRect(x, y, width, height);
+#else
+    SDL_Rect displayBounds;
+    if (screen && displayIndex >= 0 &&
+            SDL_GetDisplayBounds(displayIndex, &displayBounds) == 0) {
+        const qreal scale = screen->devicePixelRatio();
+        const QPoint logicalOrigin = screen->geometry().topLeft();
+        return QRect(logicalOrigin.x() + qRound((x - displayBounds.x) / scale),
+                     logicalOrigin.y() + qRound((y - displayBounds.y) / scale),
+                     qMax(1, qRound(width / scale)),
+                     qMax(1, qRound(height / scale)));
+    }
+#endif
+
+    const qreal scale = screen ? screen->devicePixelRatio() : 1.0;
+    return QRect(qRound(x / scale),
+                 qRound(y / scale),
+                 qMax(1, qRound(width / scale)),
+                 qMax(1, qRound(height / scale)));
+}
+
 #ifdef Q_OS_WIN32
 bool qtWindowNativeMonitorBounds(QWindow* window, QRect& bounds)
 {
@@ -2051,6 +2139,11 @@ void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
         return; // Do not show
     }
 
+    const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+    if (!parentRect.isValid()) {
+        return;
+    }
+
     // Save capture state and release mouse
     m_WasCapturedBeforeMenu = m_InputHandler->isCaptureActive();
     if (m_WasCapturedBeforeMenu) {
@@ -2059,11 +2152,6 @@ void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
 
     // Flush stale mouse motion events from relative mode
     SDL_FlushEvent(SDL_MOUSEMOTION);
-
-    // Get SDL window position and size in screen coordinates
-    int wx, wy, ww, wh;
-    SDL_GetWindowPosition(m_Window, &wx, &wy);
-    SDL_GetWindowSize(m_Window, &ww, &wh);
 
     // Update dynamic state before showing
     m_MenuPanel->updateMicrophoneState(m_MicStream != nullptr);
@@ -2075,12 +2163,15 @@ void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
     // Show menu based on user preference
     switch (m_Preferences->overlayMenuPosition) {
     case StreamingPreferences::OMP_LEFT_EDGE:
-        m_MenuPanel->showAtLeftEdge(wx, wy, ww, wh, pointerGlobalY);
+        m_MenuPanel->showAtLeftEdge(parentRect.x(), parentRect.y(),
+                                    parentRect.width(), parentRect.height(),
+                                    pointerGlobalY);
         break;
     case StreamingPreferences::OMP_BUTTON:
         // Show menu at the button's position (top-right corner)
-        m_MenuPanel->showAtCursor(wx, wy, ww, wh,
-                                  wx + ww - 40, wy + 40,
+        m_MenuPanel->showAtCursor(parentRect.x(), parentRect.y(),
+                                  parentRect.width(), parentRect.height(),
+                                  parentRect.right() - 39, parentRect.y() + 40,
                                   pointerGlobalY.has_value());
         // Hide button while menu is visible
         if (m_MenuButton) {
@@ -2089,7 +2180,9 @@ void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
         break;
     case StreamingPreferences::OMP_RIGHT_EDGE:
     default:
-        m_MenuPanel->showAtRightEdge(wx, wy, ww, wh, pointerGlobalY);
+        m_MenuPanel->showAtRightEdge(parentRect.x(), parentRect.y(),
+                                     parentRect.width(), parentRect.height(),
+                                     pointerGlobalY);
         break;
     }
 
@@ -2097,7 +2190,8 @@ void Session::showQtOverlayMenu(std::optional<int> pointerGlobalY)
     QCoreApplication::processEvents(QEventLoop::AllEvents);
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Qt overlay menu shown at (%d,%d) %dx%d", wx, wy, ww, wh);
+                "Qt overlay menu shown at (%d,%d) %dx%d",
+                parentRect.x(), parentRect.y(), parentRect.width(), parentRect.height());
 }
 
 void Session::hideQtOverlayMenu()
@@ -2154,10 +2248,11 @@ void Session::syncQtOverlayWindowsWithSdlWindowState()
         return;
     }
 
-    int wx, wy, ww, wh;
-    SDL_GetWindowPosition(m_Window, &wx, &wy);
-    SDL_GetWindowSize(m_Window, &ww, &wh);
-    m_MenuButton->showButton(wx, wy, ww, wh);
+    const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+    if (parentRect.isValid()) {
+        m_MenuButton->showButton(parentRect.x(), parentRect.y(),
+                                 parentRect.width(), parentRect.height());
+    }
 }
 
 void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
@@ -2316,10 +2411,13 @@ void Session::showStreamingToast(const QString& message, int durationMs)
 {
     if (!m_Toast) return;
 
-    int wx, wy, ww, wh;
-    SDL_GetWindowPosition(m_Window, &wx, &wy);
-    SDL_GetWindowSize(m_Window, &ww, &wh);
-    m_Toast->showToast(wx, wy, ww, wh, message, durationMs);
+    const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+    if (!parentRect.isValid()) {
+        return;
+    }
+    m_Toast->showToast(parentRect.x(), parentRect.y(),
+                       parentRect.width(), parentRect.height(),
+                       message, durationMs);
     QCoreApplication::processEvents();
 }
 
@@ -3811,10 +3909,11 @@ void Session::exec()
             showQtOverlayMenu(QCursor::pos().y());
         });
         // Show button at initial position
-        int wx, wy, ww, wh;
-        SDL_GetWindowPosition(m_Window, &wx, &wy);
-        SDL_GetWindowSize(m_Window, &ww, &wh);
-        m_MenuButton->showButton(wx, wy, ww, wh);
+        const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+        if (parentRect.isValid()) {
+            m_MenuButton->showButton(parentRect.x(), parentRect.y(),
+                                     parentRect.width(), parentRect.height());
+        }
     }
 
     // Switch to async logging mode when we enter the SDL loop
