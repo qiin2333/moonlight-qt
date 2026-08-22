@@ -595,8 +595,8 @@ public:
 
     void close() override
     {
+        removeAliveListener();
         if (m_Unit != nullptr) {
-            removeAliveListener();
             AudioOutputUnitStop(m_Unit);
             AudioUnitUninitialize(m_Unit);
             AudioComponentInstanceDispose(m_Unit);
@@ -655,6 +655,12 @@ public:
             m_Scratch[i * EndpointChannelCount + HapticsChannelOffset + 1] = input[i * 2 + 1] / 32768.0f;
         }
 
+        // The ring holds an order of magnitude more than one packet, so if it
+        // stays full the device has stopped draining. Give up after a bounded
+        // grace period rather than relying on the alive listener alone: an
+        // endpoint that wedges without ever reporting itself dead would
+        // otherwise hold the worker here until the session tears down.
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(200);
         const auto bytes = static_cast<std::uint32_t>(m_Scratch.size() * sizeof(float));
         while (!stopping) {
             if (!m_Alive.load(std::memory_order_relaxed)) return false;
@@ -663,6 +669,11 @@ public:
                 // Nothing is draining the ring yet, so waiting would deadlock.
                 // The caller is not supposed to queue more than bufferFrames()
                 // before starting the stream.
+                return false;
+            }
+            if (std::chrono::steady_clock::now() >= deadline) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+                            "DualSense haptics endpoint stopped draining; reopening it");
                 return false;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
