@@ -896,8 +896,8 @@
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="553"/>
-        <source>Disabled</source>
-        <translation type="unfinished"></translation>
+        <source>Disabled (default)</source>
+        <translation>Desactivado (predeterminado)</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="153"/>
@@ -1010,9 +1010,14 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
-        <source>Right edge (default)</source>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="505"/>
+        <source>Top edge</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
+        <source>Right edge</source>
+        <translation>Borde derecho</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="545"/>
@@ -1347,6 +1352,42 @@
 </context>
 <context>
     <name>OverlayMenuPanel</name>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="159"/>
+        <source>Overlay Menu</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="162"/>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="227"/>
+        <source>Menu Position</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="228"/>
+        <source>Top edge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="230"/>
+        <source>Right edge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="232"/>
+        <source>Left edge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="234"/>
+        <source>Floating button</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="236"/>
+        <source>Disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="19"/>
         <source>Checking</source>

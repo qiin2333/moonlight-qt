@@ -952,8 +952,8 @@
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="553"/>
-        <source>Disabled</source>
-        <translation>无操作</translation>
+        <source>Disabled (default)</source>
+        <translation>禁用（默认）</translation>
     </message>
     <message>
         <source>Activate the display automatically</source>
@@ -1058,6 +1058,11 @@
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="448"/>
+        <source>Remember window position and size</source>
+        <translation>记住窗口位置和大小</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="448"/>
         <source>Show connection quality warnings</source>
         <translation>显示连接质量警告</translation>
     </message>
@@ -1099,12 +1104,17 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="518"/>
         <source>Overlay menu position</source>
-        <translation>覆盖菜单位置</translation>
+        <translation>悬浮菜单位置</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="505"/>
+        <source>Top edge</source>
+        <translation>顶部边缘</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="541"/>
-        <source>Right edge (default)</source>
-        <translation>右侧边缘（默认）</translation>
+        <source>Right edge</source>
+        <translation>右侧边缘</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="545"/>
@@ -1114,7 +1124,7 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="549"/>
         <source>Floating button</source>
-        <translation>浮动按钮</translation>
+        <translation>悬浮按钮</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="569"/>
@@ -1162,6 +1172,11 @@
         <translation>捕获系统快捷键</translation>
     </message>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="295"/>
+        <source>Capture mode</source>
+        <translation>捕获模式</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="627"/>
         <source>This enables the capture of system-wide keyboard shortcuts like Alt+Tab that would normally be handled by the client OS while streaming.</source>
         <translation>这样可以捕获系统范围的键盘快捷键，例如 Alt + Tab，这些快捷键通常在流式传输时由客户端系统处理。</translation>
@@ -1204,27 +1219,27 @@
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="727"/>
         <source>DualSense haptics</source>
-        <translation type="unfinished"></translation>
+        <translation>DualSense 触觉反馈</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="739"/>
         <source>Physical DualSense (native HD haptics)</source>
-        <translation type="unfinished"></translation>
+        <translation>实体 DualSense（原生高清触觉反馈）</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="743"/>
         <source>Simulated DualSense (analyzed vibration)</source>
-        <translation type="unfinished"></translation>
+        <translation>模拟 DualSense（分析后的振动）</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="767"/>
         <source>Sends the original authored PCM to channels 3 and 4 of a USB-connected DualSense. The endpoint is checked before connecting. Changes apply to the next stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>将原始触觉 PCM 数据发送到通过 USB 连接的 DualSense 第 3 和第 4 声道。连接前会检查音频端点。更改将在下次串流时生效。</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="768"/>
         <source>Receives a compact analyzed haptics signal and renders it through the connected controller&apos;s vibration motors. Changes apply to the next stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>接收经过分析的精简触觉信号，并通过已连接控制器的振动马达提供反馈。更改将在下次串流时生效。</translation>
     </message>
     <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="776"/>
@@ -1428,6 +1443,46 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>Steam链接或树莓派不支持性能覆盖。</translation>
     </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="179"/>
+        <source>Notifications and integrations</source>
+        <translation>通知与集成</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="237"/>
+        <source>Mouse</source>
+        <translation>鼠标</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="277"/>
+        <source>Keyboard</source>
+        <translation>键盘</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="296"/>
+        <source>Choose when system keyboard shortcuts are captured.</source>
+        <translation>选择何时捕获系统键盘快捷键。</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="315"/>
+        <source>Touch input</source>
+        <translation>触摸输入</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="413"/>
+        <source>Video pipeline</source>
+        <translation>视频处理</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="478"/>
+        <source>Network</source>
+        <translation>网络</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="505"/>
+        <source>Diagnostics</source>
+        <translation>诊断</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>
@@ -1439,6 +1494,42 @@
 </context>
 <context>
     <name>OverlayMenuPanel</name>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="159"/>
+        <source>Overlay Menu</source>
+        <translation>悬浮菜单</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="162"/>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="227"/>
+        <source>Menu Position</source>
+        <translation>菜单位置</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="228"/>
+        <source>Top edge</source>
+        <translation>顶部边缘</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="230"/>
+        <source>Right edge</source>
+        <translation>右侧边缘</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="232"/>
+        <source>Left edge</source>
+        <translation>左侧边缘</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="234"/>
+        <source>Floating button</source>
+        <translation>悬浮按钮</translation>
+    </message>
+    <message>
+        <location filename="../streaming/video/overlaymenupanel.cpp" line="236"/>
+        <source>Disabled</source>
+        <translation>禁用</translation>
+    </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="19"/>
         <source>Checking</source>
@@ -2629,12 +2720,12 @@
     <message>
         <location filename="../streaming/session.cpp" line="3345"/>
         <source>Physical DualSense haptics was selected, but no active USB DualSense four-channel audio endpoint was found yet. Moonlight will keep checking during this stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>已选择实体 DualSense 触觉反馈，但尚未发现活动的 USB DualSense 四声道音频端点。Moonlight 将在本次串流期间继续检测。</translation>
     </message>
     <message>
         <location filename="../streaming/session.cpp" line="3348"/>
         <source>Physical DualSense haptics is only available on Windows in this build.</source>
-        <translation type="unfinished"></translation>
+        <translation>此版本仅在 Windows 上支持实体 DualSense 触觉反馈。</translation>
     </message>
     <message>
         <location filename="../streaming/session.cpp" line="4143"/>

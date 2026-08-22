@@ -244,6 +244,9 @@ SOURCES += \
     path.cpp \
     settings/mappingmanager.cpp \
     gui/sdlgamepadkeynavigation.cpp \
+    gui/windowplacement.cpp \
+    gui/windowsdisplaygeometry.cpp \
+    gui/windowswindowchrome.cpp \
     streaming/video/overlaymanager.cpp \
     streaming/video/overlaymenupanel.cpp \
     streaming/video/overlaymenubutton.cpp \
@@ -300,6 +303,9 @@ HEADERS += \
     path.h \
     settings/mappingmanager.h \
     gui/sdlgamepadkeynavigation.h \
+    gui/windowplacement.h \
+    gui/windowsdisplaygeometry.h \
+    gui/windowswindowchrome.h \
     streaming/video/overlaymanager.h \
     streaming/video/overlaymenupanel.h \
     streaming/video/overlaymenubutton.h \

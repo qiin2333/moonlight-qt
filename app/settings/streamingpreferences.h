@@ -129,12 +129,15 @@ public:
 
     enum OverlayMenuPosition
     {
-        OMP_RIGHT_EDGE = 0,  // Default: show on right edge of streaming window
-        OMP_LEFT_EDGE  = 1,  // Show on left edge
-        OMP_DISABLED   = 3,  // Do not show overlay menu (keep old value for compat)
-        OMP_BUTTON     = 4,  // Show a floating button on the streaming window
+        OMP_DISABLED   = 0,  // Default: do not show the overlay menu
+        OMP_BUTTON     = 1,  // Show a floating button on the streaming window
+        OMP_TOP_EDGE   = 2,  // Show from the top edge of the streaming window
+        OMP_RIGHT_EDGE = 3,  // Show on right edge
+        OMP_LEFT_EDGE  = 4,  // Show on left edge
     };
     Q_ENUM(OverlayMenuPosition);
+
+    void setOverlayMenuPosition(OverlayMenuPosition position);
 
     enum HdrMode
     {
@@ -230,6 +233,7 @@ public:
     Q_PROPERTY(WindowMode windowMode MEMBER windowMode NOTIFY windowModeChanged)
     Q_PROPERTY(WindowMode recommendedFullScreenMode MEMBER recommendedFullScreenMode CONSTANT)
     Q_PROPERTY(UIDisplayMode uiDisplayMode MEMBER uiDisplayMode NOTIFY uiDisplayModeChanged)
+    Q_PROPERTY(bool rememberWindowPosition MEMBER rememberWindowPosition NOTIFY rememberWindowPositionChanged)
     Q_PROPERTY(bool swapMouseButtons MEMBER swapMouseButtons NOTIFY mouseButtonsChanged)
     Q_PROPERTY(bool swapWinAltKeys MEMBER swapWinAltKeys NOTIFY swapWinAltKeysChanged)
     Q_PROPERTY(bool muteOnFocusLoss MEMBER muteOnFocusLoss NOTIFY muteOnFocusLossChanged)
@@ -305,6 +309,7 @@ public:
     WindowMode windowMode;
     WindowMode recommendedFullScreenMode;
     UIDisplayMode uiDisplayMode;
+    bool rememberWindowPosition;
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
     ScreenCombinationMode screenCombinationMode;
@@ -342,6 +347,7 @@ signals:
     void enableYUV444Changed();
     void videoDecoderSelectionChanged();
     void uiDisplayModeChanged();
+    void rememberWindowPositionChanged();
     void windowModeChanged();
     void framePacingChanged();
     void videoEnhancementChanged();
