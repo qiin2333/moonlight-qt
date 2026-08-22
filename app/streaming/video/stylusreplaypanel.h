@@ -21,6 +21,8 @@ class QMouseEvent;
  */
 class StylusReplayPanel final : public QRasterWindow
 {
+    Q_OBJECT
+
 public:
     enum class Action {
         ChooseRecording,

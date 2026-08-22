@@ -166,20 +166,22 @@ void OverlayMenuPanel::buildMenuLevels()
                          MenuAction::MenuActionMax, 3, true, false, false});
     top.items.push_back({tr("Bitrate"),       QString(),  MenuItemType::SubMenu,
                          MenuAction::MenuActionMax, 2, true, false, false});
+    constexpr bool separatorAfterHostFiles =
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+            false;
+#else
+            true;
+#endif
     top.items.push_back({tr("Host Files"),    m_FileMappingDetail, MenuItemType::Action,
                          MenuAction::ShowHostFiles, 0, true,
                          m_FileMappingState == FileMappingState::Available ||
-                         m_FileMappingState == FileMappingState::Open, false});
+                         m_FileMappingState == FileMappingState::Open,
+                         separatorAfterHostFiles});
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
     top.items.push_back({tr("Function Tests"),
                          tr("Developer"),
                          MenuItemType::Action,
                          MenuAction::OpenStylusReplayPanel, 0, true, false, true});
-#else
-    top.items.push_back({tr("Host Files"),    m_FileMappingDetail, MenuItemType::Action,
-                         MenuAction::ShowHostFiles, 0, true,
-                         m_FileMappingState == FileMappingState::Available ||
-                         m_FileMappingState == FileMappingState::Open, true});   // separator
 #endif
     top.items.push_back({tr("Toggle Fullscreen"), QString(), MenuItemType::Action,
                          MenuAction::ToggleFullScreen, 0, true, false, false});

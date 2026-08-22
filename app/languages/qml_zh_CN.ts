@@ -2864,6 +2864,18 @@
         <source>Unable to open the recording picker (error %1)</source>
         <translation>无法打开录制文件选择窗口（错误 %1）</translation>
     </message>
+    <message>
+        <source>Stylus recording files (*.dat)</source>
+        <translation>手写笔录制文件 (*.dat)</translation>
+    </message>
+    <message>
+        <source>All files (*.*)</source>
+        <translation>所有文件 (*.*)</translation>
+    </message>
+    <message>
+        <source>Import stylus recording file</source>
+        <translation>导入手写笔录制文件</translation>
+    </message>
 </context>
 <context>
     <name>StylusReplayController</name>

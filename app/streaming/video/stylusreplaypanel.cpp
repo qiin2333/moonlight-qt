@@ -404,6 +404,9 @@ void StylusReplayPanel::mousePressEvent(QMouseEvent* event)
         m_Dragging = true;
         return;
     }
+    if (!isTargetEnabled(target)) {
+        return;
+    }
     dispatch(target);
 }
 

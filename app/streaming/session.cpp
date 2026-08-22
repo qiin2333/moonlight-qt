@@ -2324,7 +2324,8 @@ void Session::syncQtOverlayWindowsWithSdlWindowState()
             m_MenuPanel->closeMenu();
         }
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
-        if (m_StylusReplayTest && m_StylusReplayTest->isPanelVisible()) {
+        if (m_StylusReplayTest) {
+            // This also cancels a deferred request that has not become visible yet.
             m_StylusReplayTest->closePanel();
         }
 #endif

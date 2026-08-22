@@ -54,20 +54,36 @@ struct FileSelection {
     DWORD errorCode = 0;
 };
 
-FileSelection selectRecordingFile(HWND owner, const QString& initialDirectory)
+FileSelection selectRecordingFile(HWND owner,
+                                  const QString& initialDirectory,
+                                  const QString& recordingFilterLabel,
+                                  const QString& allFilesFilterLabel,
+                                  const QString& title)
 {
     std::array<wchar_t, 32768> filePath{};
+    // OPENFILENAMEW expects pairs of labels and patterns separated by NUL,
+    // followed by a second NUL at the end of the complete filter list.
+    std::wstring filter = recordingFilterLabel.toStdWString();
+    filter.push_back(L'\0');
+    filter.append(L"*.dat");
+    filter.push_back(L'\0');
+    filter.append(allFilesFilterLabel.toStdWString());
+    filter.push_back(L'\0');
+    filter.append(L"*.*");
+    filter.push_back(L'\0');
+    filter.push_back(L'\0');
+    const std::wstring nativeTitle = title.toStdWString();
     const std::wstring nativeInitialDirectory =
             QDir::toNativeSeparators(initialDirectory).toStdWString();
     OPENFILENAMEW dialog = {};
     dialog.lStructSize = sizeof(dialog);
     dialog.hwndOwner = owner;
-    dialog.lpstrFilter = L"手写笔录制文件 (*.dat)\0*.dat\0所有文件 (*.*)\0*.*\0\0";
+    dialog.lpstrFilter = filter.c_str();
     dialog.lpstrFile = filePath.data();
     dialog.nMaxFile = static_cast<DWORD>(filePath.size());
     dialog.lpstrInitialDir = nativeInitialDirectory.empty() ?
             nullptr : nativeInitialDirectory.c_str();
-    dialog.lpstrTitle = L"导入手写笔录制文件";
+    dialog.lpstrTitle = nativeTitle.c_str();
     dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
     dialog.lpstrDefExt = L"dat";
 
@@ -293,7 +309,11 @@ private:
                 reinterpret_cast<HWND>(m_Panel->winId()) :
                 sdlWindowHandle(m_StreamingWindow);
         const FileSelection selection =
-                selectRecordingFile(owner, m_LastDirectory);
+                selectRecordingFile(owner,
+                                    m_LastDirectory,
+                                    tr("Stylus recording files (*.dat)"),
+                                    tr("All files (*.*)"),
+                                    tr("Import stylus recording file"));
         if (!selection.path.isEmpty()) {
             m_LastDirectory = QFileInfo(selection.path).absolutePath();
             QString error;

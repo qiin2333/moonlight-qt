@@ -183,7 +183,7 @@ win32:!winrt {
 # Developer-only streaming diagnostics. The implementation and menu entries are
 # omitted unless the build environment explicitly enables them.
 MOONLIGHT_FUNCTION_TESTS_ENABLED = $$(MOONLIGHT_ENABLE_FUNCTION_TESTS)
-win32:equals(MOONLIGHT_FUNCTION_TESTS_ENABLED, 1) {
+win32:!winrt:equals(MOONLIGHT_FUNCTION_TESTS_ENABLED, 1) {
     DEFINES += MOONLIGHT_ENABLE_FUNCTION_TESTS
     LIBS += comdlg32.lib
     SOURCES += \
