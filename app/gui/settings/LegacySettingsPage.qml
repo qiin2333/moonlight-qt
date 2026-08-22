@@ -540,7 +540,9 @@ Column {
             captureSysKeysSelection = StreamingPreferences.captureSysKeysMode
         }
 
-        if (Qt.platform.os !== "windows") {
+        // Physical haptics needs an OS audio backend for the controller's
+        // four-channel endpoint. Only Windows and macOS have one.
+        if (Qt.platform.os !== "windows" && Qt.platform.os !== "osx") {
             for (var i = 0; i < dualSenseHapticsModeListModel.count; i++) {
                 if (dualSenseHapticsModeListModel.get(i).val === StreamingPreferences.DSHM_PHYSICAL) {
                     dualSenseHapticsModeListModel.remove(i)

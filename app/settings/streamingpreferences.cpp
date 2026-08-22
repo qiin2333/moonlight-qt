@@ -1,5 +1,6 @@
 #include "streamingpreferences.h"
 #include "utils.h"
+#include "streaming/audio/dualsensehaptics.h"
 
 #include <QSettings>
 #include <QTranslator>
@@ -224,7 +225,7 @@ void StreamingPreferences::reload()
     showLocalCursor = settings.value(SER_SHOWLOCALCURSOR, false).toBool();
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
     enableNativeTouchpad = settings.value(SER_NATIVETOUCHPAD, false).toBool();
-#ifdef Q_OS_WIN32
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
     constexpr auto defaultDualSenseHapticsMode = DSHM_PHYSICAL;
 #else
     constexpr auto defaultDualSenseHapticsMode = DSHM_EMULATED;
@@ -234,8 +235,7 @@ void StreamingPreferences::reload()
     if (dualSenseHapticsMode != DSHM_PHYSICAL && dualSenseHapticsMode != DSHM_EMULATED) {
         dualSenseHapticsMode = defaultDualSenseHapticsMode;
     }
-#ifndef Q_OS_WIN32
-    // Native authored PCM currently requires the Windows WASAPI renderer.
+#ifndef HAVE_PHYSICAL_DS5_HAPTICS
     // Do not retain a value that this build can neither negotiate nor render.
     if (dualSenseHapticsMode == DSHM_PHYSICAL) {
         dualSenseHapticsMode = DSHM_EMULATED;
