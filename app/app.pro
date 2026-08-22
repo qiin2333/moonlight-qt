@@ -278,6 +278,7 @@ HEADERS += \
     cli/startstream.h \
     settings/streamingpreferences.h \
     streaming/input/cursorshapeclassifier.h \
+    streaming/input/penhistory.h \
     streaming/input/input.h \
     streaming/session.h \
     streaming/filemappingclient.h \
