@@ -230,6 +230,7 @@ FocusScope {
                 height: visible ? implicitHeight : 0
                 onAboutRequested: {
                     settingsPage.category = "about"
+                    rail.focusCurrent()
                     scrollArea.contentY = 0
                 }
             }
