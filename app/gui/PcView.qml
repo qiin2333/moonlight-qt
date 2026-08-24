@@ -690,8 +690,7 @@ CenteredGridView {
                 if (StreamingPreferences.backgroundSource === StreamingPreferences.BGS_LOCAL) {
                     errorDialog.text = qsTr("The local background could not be loaded. Photography has been restored.")
                     errorDialog.open()
-                    StreamingPreferences.backgroundImageLocalPath = ""
-                    StreamingPreferences.save()
+                    restorePhotographyFromInvalidLocalImage()
                 }
                 else if (usesNetworkSource()) {
                     getBackgroundImage()
@@ -754,6 +753,13 @@ CenteredGridView {
             currentImageUrl = ""
         }
 
+        function restorePhotographyFromInvalidLocalImage() {
+            clearBackground()
+            // Clearing the local path also restores BGS_PHOTOGRAPHY in StreamingPreferences.
+            StreamingPreferences.backgroundImageLocalPath = ""
+            StreamingPreferences.save()
+        }
+
         function reloadFromPreferences(forceRefresh) {
             loadNewImageTimer.stop()
 
@@ -780,8 +786,7 @@ CenteredGridView {
                     errorDialog.text = validationError + "\n\n" + qsTr("Photography has been restored.")
                     errorDialog.open()
                 }
-                StreamingPreferences.backgroundImageLocalPath = ""
-                StreamingPreferences.save()
+                restorePhotographyFromInvalidLocalImage()
                 return
             }
 
@@ -1034,6 +1039,7 @@ CenteredGridView {
     // 壁纸遮罩强度由软件设置统一控制，默认值仍是原来的 72%。
     Rectangle {
         anchors.fill: parent
+        visible: StreamingPreferences.backgroundSource !== StreamingPreferences.BGS_NONE
         color: Qt.rgba(Theme.ink.r, Theme.ink.g, Theme.ink.b,
                        StreamingPreferences.backgroundOverlayOpacity / 100.0)
         z: -1
