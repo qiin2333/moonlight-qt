@@ -77,15 +77,20 @@ Column {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
+                    // 窄窗口时标题收缩省略，版本号不被裁掉
+                    width: parent.width - versionLine.implicitWidth - parent.spacing
                     text: "Moonlight V+ for PC"
                     color: Theme.text
                     font.family: Theme.fontSans
                     font.pointSize: Theme.fontHeroTitle
                     font.weight: Font.ExtraBold
                     font.letterSpacing: Theme.trackingTight(Theme.fontHeroTitle)
+                    elide: Text.ElideRight
                 }
 
                 SpecLine {
+                    id: versionLine
+
                     anchors.verticalCenter: parent.verticalCenter
                     tags: [qsTr("Version %1").arg(SystemProperties.versionString)]
                 }
