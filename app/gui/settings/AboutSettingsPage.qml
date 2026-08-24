@@ -77,8 +77,9 @@ Column {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    // 窄窗口时标题收缩省略，版本号不被裁掉
-                    width: parent.width - versionLine.implicitWidth - parent.spacing
+                    // 窄窗口时标题收缩省略，版本号不被裁掉；极窄时钳到 0，
+                    // 避免负宽度把版本行顶到负坐标
+                    width: Math.max(0, parent.width - versionLine.implicitWidth - parent.spacing)
                     text: "Moonlight V+ for PC"
                     color: Theme.text
                     font.family: Theme.fontSans
