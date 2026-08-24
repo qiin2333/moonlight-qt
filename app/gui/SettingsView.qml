@@ -121,6 +121,7 @@ FocusScope {
     // hidden PcView here duplicated its model, network work, and scene graph.
     Image {
         anchors.fill: parent
+        visible: StreamingPreferences.backgroundSource !== StreamingPreferences.BGS_NONE
         source: Window.window && Window.window.backgroundImageUrl !== ""
                 ? Window.window.backgroundImageUrl
                 : "qrc:/res/gura.png"
@@ -130,6 +131,7 @@ FocusScope {
 
     Rectangle {
         anchors.fill: parent
+        visible: StreamingPreferences.backgroundSource !== StreamingPreferences.BGS_NONE
         color: Qt.rgba(Theme.ink.r, Theme.ink.g, Theme.ink.b,
                        StreamingPreferences.backgroundOverlayOpacity / 100.0)
         z: -1

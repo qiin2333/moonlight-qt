@@ -1,6 +1,6 @@
 import QtQuick 2.9
 import QtQuick.Controls
-import QtQuick.Dialogs 6.3
+import Qt.labs.platform 1.1
 import "."
 import ".."
 import "../theme"
@@ -194,6 +194,7 @@ Column {
         subtitle: qsTr("Choose the background shown on the computer list and shared application pages.")
 
         ChoiceRow {
+            id: backgroundSourceRow
             title: qsTr("Background source")
             description: qsTr("Choose photography, Anime, a custom API, a local image, or no background.")
             maximumControlWidth: 260
@@ -202,7 +203,16 @@ Column {
             onValueActivated: function(value) {
                 if (value === StreamingPreferences.BGS_LOCAL &&
                         StreamingPreferences.backgroundImageLocalPath === "") {
+                    backgroundSourceRow.syncSelection()
                     localBackgroundFileDialog.open()
+                    return
+                }
+                if (value === StreamingPreferences.BGS_API &&
+                        StreamingPreferences.backgroundImageApi.trim() === "") {
+                    backgroundSourceRow.syncSelection()
+                    Qt.callLater(function() {
+                        backgroundApiField.forceActiveFocus(Qt.TabFocusReason)
+                    })
                     return
                 }
                 StreamingPreferences.backgroundSource = value
@@ -309,7 +319,7 @@ Column {
         fileMode: FileDialog.OpenFile
         nameFilters: [qsTr("Image files (*.jpg *.jpeg *.png *.webp *.bmp)")]
         onAccepted: {
-            settingsPage.applyLocalBackgroundImage(selectedFile.toString())
+            settingsPage.applyLocalBackgroundImage(file.toString())
         }
     }
 

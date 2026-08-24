@@ -839,7 +839,10 @@ CenteredGridView {
                 return
             }
 
-            if (!source.toString().startsWith("file://")) {
+            var displayingActiveCache = settings.cachedImagePath !== "" &&
+                    settings.cachedSourceKey === activeRequestKey &&
+                    source.toString() === cacheFileUrl(settings.cachedImagePath)
+            if (!displayingActiveCache) {
                 source = "qrc:/res/gura.png"
                 currentImageUrl = ""
             }
