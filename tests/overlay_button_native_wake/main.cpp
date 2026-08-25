@@ -64,7 +64,18 @@ int main(int argc, char* argv[])
                 TranslateMessage(&message);
                 DispatchMessageW(&message);
             }
+            // Match the production loop: consume the wake edge and dispatch
+            // the Qt events before accepting the next native-message burst.
+            settleQtEvents(button);
         }
+    }
+
+    require(PostMessageW(hwnd, WM_MOUSEMOVE, 0, MAKELPARAM(1, 1)) != FALSE,
+            "final pointer message must be queued");
+    MSG finalMessage;
+    while (PeekMessageW(&finalMessage, hwnd, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&finalMessage);
+        DispatchMessageW(&finalMessage);
     }
 
     require(button.needsEventProcessing(),
