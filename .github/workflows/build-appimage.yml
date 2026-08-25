@@ -25,6 +25,13 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+      - name: Validate Version
+        run: |
+          if [[ ! "$CI_VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::CI_VERSION must contain only letters, numbers, dots, underscores, or hyphens"
+            exit 1
+          fi
+
       - name: Checkout Repository
         uses: actions/checkout@v5
         with:
@@ -167,7 +174,7 @@ jobs:
 
       - name: Verify Binaries
         run: |
-          appimage="build/installer-release/Moonlight-VPlus-${{ env.CI_VERSION }}-x86_64.AppImage"
+          appimage="build/installer-release/Moonlight-VPlus-${CI_VERSION}-x86_64.AppImage"
 
           if [[ ! -s "$appimage" ]]; then
             echo "::error file=$appimage::AppImage is missing or empty"
