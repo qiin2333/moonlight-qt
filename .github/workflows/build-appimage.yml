@@ -169,6 +169,8 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: Moonlight-VPlus-LinuxAppImage-${{ env.CI_VERSION }}
-          path: build/installer-release/Moonlight-VPlus-${{ env.CI_VERSION }}-x86_64.AppImage
+          path: |
+            build/installer-release/Moonlight-VPlus-${{ env.CI_VERSION }}-x86_64.AppImage
+            build/installer-release/Moonlight-VPlus-${{ env.CI_VERSION }}-x86_64.AppImage.zsync
           compression-level: 0
           if-no-files-found: error

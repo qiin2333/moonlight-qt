@@ -658,6 +658,6 @@ jobs:
           **/*.zip
           **/*.dmg
           **/*.AppImage
-          **/*/AppImage.zsync
+          **/*.AppImage.zsync
       env:
         GITHUB_TOKEN: ${{ secrets.GH_BOT_TOKEN }}
