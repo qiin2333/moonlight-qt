@@ -87,7 +87,8 @@ if [ -n "$QT_PLUGIN_PATH" ] && [ -d "$QT_PLUGIN_PATH/multimedia" ]; then
   rm -f "$QT_PLUGIN_PATH/multimedia/libgstreamermediaplugin.so"
 fi
 pushd $INSTALLER_FOLDER
-OUTPUT="$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$APPIMAGE_ARCH.AppImage" \
+LDAI_UPDATE_INFORMATION="gh-releases-zsync|qiin2333|moonlight-qt|latest|Moonlight-VPlus-*-${APPIMAGE_ARCH}.AppImage.zsync" \
+LDAI_OUTPUT="$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$APPIMAGE_ARCH.AppImage" \
   VERSION=$VERSION $LINUXDEPLOY --appdir $DEPLOY_FOLDER \
   --library=/usr/local/lib/libSDL3.so.0 \
   --plugin qt --output appimage || fail "linuxdeploy failed!"
