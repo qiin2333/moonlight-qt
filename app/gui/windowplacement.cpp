@@ -242,7 +242,9 @@ bool WindowPlacement::restore(bool defaultMaximized)
             m_PlacementSettings.contains(QLatin1String(MaximizedKey));
     const bool savedMaximized = hasSavedMaximized &&
             m_PlacementSettings.value(QLatin1String(MaximizedKey)).toBool();
-    const bool selectedMaximized = defaultMaximized || savedMaximized;
+    const bool selectedMaximized = hasSavedMaximized
+            ? savedMaximized
+            : defaultMaximized;
 
     qInfo().noquote()
             << QStringLiteral("Window placement state restore saved=%1 fallbackMaximized=%2 "
