@@ -167,7 +167,7 @@ jobs:
 
       - name: Verify Binaries
         run: |
-          appimage="build/installer-release/Moonlight-VPlus-${VERSION}-${{ matrix.arch }}.AppImage"
+          appimage="build/installer-release/Moonlight-VPlus-${{ env.CI_VERSION }}-x86_64.AppImage"
 
           if [[ ! -s "$appimage" ]]; then
             echo "::error file=$appimage::AppImage is missing or empty"
