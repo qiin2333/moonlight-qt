@@ -80,8 +80,8 @@ int main(int argc, char* argv[])
 
     require(button.needsEventProcessing(),
             "native button input must request Qt event processing");
-    require(wakeCount > settledWakeCount,
-            "native button input must wake the owner loop");
+    require(wakeCount - settledWakeCount >= nativeMessageCount / 1000,
+            "each consumed native input burst must wake the owner loop");
 
     // A burst is represented by a bounded number of wake edges instead of one
     // SDL wake event per native message.
