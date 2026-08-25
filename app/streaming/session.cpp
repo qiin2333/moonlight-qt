@@ -4086,14 +4086,17 @@ void Session::exec()
     // Switch to async logging mode when we enter the SDL loop
     StreamUtils::enterAsyncLoggingMode();
 
-    // Hijack this thread to be the SDL main thread. Pump Qt only for visible
-    // streaming UI; clipboard sync runs in a helper process with its own Qt
-    // event loop and is serviced via pipe polling below.
+    // Hijack this thread to be the SDL main thread. Pump Qt periodically only
+    // while transient streaming UI is active; clipboard sync runs in a helper
+    // process with its own Qt event loop and is serviced via pipe polling below.
     constexpr Uint32 QT_UI_EVENT_PUMP_INTERVAL_MS = 10;
     Uint32 lastQtEventPumpTicks = 0;
     auto qtUiNeedsEventProcessing = [this]() {
+        // The floating button remains visible for the entire stream. Treating
+        // visibility as active Qt work forces this SDL loop to wake and drain
+        // all Qt events every 10 ms even while the button is idle, which can
+        // delay input and video processing.
         return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
-               (m_MenuButton && m_MenuButton->isButtonVisible()) ||
                (m_Toast && m_Toast->isVisible()) ||
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
                (m_StylusReplayTest && m_StylusReplayTest->isPanelVisible());
