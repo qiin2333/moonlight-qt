@@ -596,6 +596,20 @@ jobs:
         # Run the build script
         scripts/build-appimage.sh
 
+    - name: Verify AppImage
+      run: |
+        appimage="build/installer-release/Moonlight-VPlus-${VERSION}-${{ matrix.arch }}.AppImage"
+
+        if [[ ! -s "$appimage" ]]; then
+          echo "::error file=$appimage::AppImage is missing or empty"
+          exit 1
+        fi
+
+        if [[ ! -s "${appimage}.zsync" ]]; then
+          echo "::error file=${appimage}.zsync::zsync is missing or empty"
+          exit 1
+        fi
+
     - name: Upload AppImage artifact
       uses: actions/upload-artifact@v4
       with:
@@ -603,6 +617,7 @@ jobs:
         path: |
           build/installer-release/Moonlight-VPlus-*-${{ matrix.arch }}.AppImage
           build/installer-release/Moonlight-VPlus-*-${{ matrix.arch }}.AppImage.zsync
+        if-no-files-found: error
 
 
   build-steamlink:

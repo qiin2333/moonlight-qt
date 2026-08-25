@@ -165,6 +165,20 @@ jobs:
           sudo ldconfig
           scripts/build-appimage.sh
 
+      - name: Verify Binaries
+        run: |
+          appimage="build/installer-release/Moonlight-VPlus-${VERSION}-${{ matrix.arch }}.AppImage"
+
+          if [[ ! -s "$appimage" ]]; then
+            echo "::error file=$appimage::AppImage is missing or empty"
+            exit 1
+          fi
+
+          if [[ ! -s "${appimage}.zsync" ]]; then
+            echo "::error file=${appimage}.zsync::zsync is missing or empty"
+            exit 1
+          fi
+
       - name: Upload Binaries
         uses: actions/upload-artifact@v6
         with:
