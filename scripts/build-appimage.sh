@@ -86,12 +86,34 @@ if [ -n "$QT_PLUGIN_PATH" ] && [ -d "$QT_PLUGIN_PATH/multimedia" ]; then
   echo "Removing GStreamer multimedia backend..."
   rm -f "$QT_PLUGIN_PATH/multimedia/libgstreamermediaplugin.so"
 fi
+
+APPIMAGE_PATH="$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$APPIMAGE_ARCH.AppImage"
+APPIMAGE_UPDATE_INFORMATION="gh-releases-zsync|qiin2333|moonlight-qt|latest|Moonlight-VPlus-*-${APPIMAGE_ARCH}.AppImage.zsync"
+
 pushd $INSTALLER_FOLDER
-LDAI_UPDATE_INFORMATION="gh-releases-zsync|qiin2333|moonlight-qt|latest|Moonlight-VPlus-*-${APPIMAGE_ARCH}.AppImage.zsync" \
-LDAI_OUTPUT="$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$APPIMAGE_ARCH.AppImage" \
+LDAI_UPDATE_INFORMATION="$APPIMAGE_UPDATE_INFORMATION" \
+LDAI_OUTPUT="$APPIMAGE_PATH" \
   VERSION=$VERSION $LINUXDEPLOY --appdir $DEPLOY_FOLDER \
   --library=/usr/local/lib/libSDL3.so.0 \
   --plugin qt --output appimage || fail "linuxdeploy failed!"
 popd
+
+echo Verifying AppImage update metadata
+[ -s "$APPIMAGE_PATH" ] || fail "AppImage is missing or empty: $APPIMAGE_PATH"
+
+ZSYNC_PATH="${APPIMAGE_PATH}.zsync"
+[ -s "$ZSYNC_PATH" ] || fail "zsync metadata is missing or empty: $ZSYNC_PATH"
+
+ACTUAL_UPDATE_INFORMATION=$(env -u APPIMAGE_EXTRACT_AND_RUN \
+  "$APPIMAGE_PATH" --appimage-updateinformation) || \
+  fail "Unable to read AppImage update information"
+[ "$ACTUAL_UPDATE_INFORMATION" = "$APPIMAGE_UPDATE_INFORMATION" ] || \
+  fail "Unexpected AppImage update information: $ACTUAL_UPDATE_INFORMATION"
+
+APPIMAGE_FILENAME=$(basename "$APPIMAGE_PATH")
+grep -Fqx "Filename: $APPIMAGE_FILENAME" "$ZSYNC_PATH" || \
+  fail "zsync Filename does not match $APPIMAGE_FILENAME"
+grep -Fqx "URL: $APPIMAGE_FILENAME" "$ZSYNC_PATH" || \
+  fail "zsync URL does not match $APPIMAGE_FILENAME"
 
 echo Build successful
