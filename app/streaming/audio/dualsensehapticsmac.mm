@@ -1,14 +1,24 @@
 #include "dualsensehapticsmac.h"
 
 #include "dualsensehapticscalibration.h"
+#include "dualsensehapticsrouting.h"
 
 #include "SDL_compat.h"
 
 #include <algorithm>
+#include <condition_variable>
 #include <mutex>
+#include <thread>
 
 #import <CoreHaptics/CoreHaptics.h>
 #import <GameController/GameController.h>
+
+@interface MoonlightHapticInvalidationToken : NSObject
+@property(atomic, assign, getter=isInvalidated) BOOL invalidated;
+@end
+
+@implementation MoonlightHapticInvalidationToken
+@end
 
 @interface MoonlightDualSenseHapticState : NSObject
 @property(nonatomic, strong) GCController* controller;
@@ -16,6 +26,7 @@
 @property(nonatomic, strong) CHHapticEngine* rightEngine;
 @property(nonatomic, strong) id<CHHapticPatternPlayer> leftPlayer;
 @property(nonatomic, strong) id<CHHapticPatternPlayer> rightPlayer;
+@property(nonatomic, strong) MoonlightHapticInvalidationToken* invalidationToken;
 @end
 
 @implementation MoonlightDualSenseHapticState
@@ -26,6 +37,7 @@
     [_rightEngine release];
     [_leftPlayer release];
     [_rightPlayer release];
+    [_invalidationToken release];
     [super dealloc];
 }
 @end
@@ -38,28 +50,25 @@ bool isDualSenseController(GCController* controller)
            [controller.extendedGamepad isKindOfClass:[GCDualSenseGamepad class]];
 }
 
-GCController* findDualSense(std::uint16_t controllerNumber)
+struct DualSenseSelection
 {
-    NSMutableArray<GCController*>* fallbackControllers = [NSMutableArray array];
+    GCController* controller;
+    std::size_t count;
+};
+
+DualSenseSelection findDualSenseSelection()
+{
+    GCController* candidate = nil;
+    std::size_t candidateCount = 0;
     for (GCController* controller in GCController.controllers) {
         if (!isDualSenseController(controller)) {
             continue;
         }
-
-        if (controller.playerIndex != GCControllerPlayerIndexUnset &&
-            static_cast<NSInteger>(controller.playerIndex) == controllerNumber) {
-            return controller;
-        }
-        [fallbackControllers addObject:controller];
+        candidate = controller;
+        candidateCount++;
     }
 
-    // SDL and GameController share the player index on macOS. Some controllers
-    // remain unassigned until input begins, so retain a deterministic fallback
-    // for the common single-controller case and for initially unassigned pads.
-    if (controllerNumber < fallbackControllers.count) {
-        return fallbackControllers[controllerNumber];
-    }
-    return nil;
+    return {candidate, candidateCount};
 }
 
 id<CHHapticPatternPlayer> createPlayer(CHHapticEngine* engine, NSError** error)
@@ -75,12 +84,18 @@ id<CHHapticPatternPlayer> createPlayer(CHHapticEngine* engine, NSError** error)
                                      parameters:@[intensity, sharpness]
                                    relativeTime:0
                                        duration:GCHapticDurationInfinite];
+    CHHapticDynamicParameter* initialIntensity =
+        [[CHHapticDynamicParameter alloc]
+            initWithParameterID:CHHapticDynamicParameterIDHapticIntensityControl
+                           value:0.0f
+                    relativeTime:0];
     CHHapticPattern* pattern = [[CHHapticPattern alloc] initWithEvents:@[event]
-                                                            parameters:@[]
+                                                            parameters:@[initialIntensity]
                                                                  error:error];
     [intensity release];
     [sharpness release];
     [event release];
+    [initialIntensity release];
     if (pattern == nil) {
         return nil;
     }
@@ -94,6 +109,7 @@ id<CHHapticPatternPlayer> createPlayer(CHHapticEngine* engine, NSError** error)
 }
 
 bool startHandle(GCDeviceHaptics* haptics, GCHapticsLocality locality,
+                 MoonlightHapticInvalidationToken* invalidationToken,
                  CHHapticEngine** engineOut, id<CHHapticPatternPlayer>* playerOut)
 {
     if (![haptics.supportedLocalities containsObject:locality]) {
@@ -102,6 +118,14 @@ bool startHandle(GCDeviceHaptics* haptics, GCHapticsLocality locality,
 
     CHHapticEngine* engine = [haptics createEngineWithLocality:locality];
     NSError* error = nil;
+    engine.playsHapticsOnly = YES;
+    engine.stoppedHandler = ^(CHHapticEngineStoppedReason reason) {
+        (void)reason;
+        invalidationToken.invalidated = YES;
+    };
+    engine.resetHandler = ^{
+        invalidationToken.invalidated = YES;
+    };
     if (engine == nil || ![engine startAndReturnError:&error]) {
         SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
                     "Unable to start macOS DualSense haptic engine: %s",
@@ -123,7 +147,8 @@ bool startHandle(GCDeviceHaptics* haptics, GCHapticsLocality locality,
     return true;
 }
 
-MoonlightDualSenseHapticState* createState(GCController* controller)
+MoonlightDualSenseHapticState* createState(GCController* controller,
+                                           std::uint16_t controllerNumber)
 {
     GCDeviceHaptics* haptics = controller.haptics;
     if (haptics == nil) {
@@ -132,16 +157,20 @@ MoonlightDualSenseHapticState* createState(GCController* controller)
 
     MoonlightDualSenseHapticState* state = [[MoonlightDualSenseHapticState alloc] init];
     state.controller = controller;
+    MoonlightHapticInvalidationToken* invalidationToken =
+        [[MoonlightHapticInvalidationToken alloc] init];
+    state.invalidationToken = invalidationToken;
+    [invalidationToken release];
     CHHapticEngine* leftEngine = nil;
     CHHapticEngine* rightEngine = nil;
     id<CHHapticPatternPlayer> leftPlayer = nil;
     id<CHHapticPatternPlayer> rightPlayer = nil;
-    if (!startHandle(haptics, GCHapticsLocalityLeftHandle,
+    if (!startHandle(haptics, GCHapticsLocalityLeftHandle, state.invalidationToken,
                      &leftEngine, &leftPlayer)) {
         [state release];
         return nil;
     }
-    if (!startHandle(haptics, GCHapticsLocalityRightHandle,
+    if (!startHandle(haptics, GCHapticsLocalityRightHandle, state.invalidationToken,
                      &rightEngine, &rightPlayer)) {
         NSError* error = nil;
         [leftPlayer stopAtTime:CHHapticTimeImmediate error:&error];
@@ -156,7 +185,7 @@ MoonlightDualSenseHapticState* createState(GCController* controller)
 
     SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
                 "macOS native DualSense haptics ready for player %d",
-                static_cast<int>(controller.playerIndex));
+                static_cast<int>(controllerNumber));
     return [state autorelease];
 }
 
@@ -184,6 +213,15 @@ bool updatePlayer(id<CHHapticPatternPlayer> player,
 
 void stopState(MoonlightDualSenseHapticState* state)
 {
+    state.leftEngine.stoppedHandler = ^(CHHapticEngineStoppedReason reason) {
+        (void)reason;
+    };
+    state.leftEngine.resetHandler = ^{};
+    state.rightEngine.stoppedHandler = ^(CHHapticEngineStoppedReason reason) {
+        (void)reason;
+    };
+    state.rightEngine.resetHandler = ^{};
+
     NSError* error = nil;
     [state.leftPlayer stopAtTime:CHHapticTimeImmediate error:&error];
     error = nil;
@@ -197,48 +235,170 @@ void stopState(MoonlightDualSenseHapticState* state)
 struct MacDualSenseHapticsRenderer::Impl
 {
     std::mutex mutex;
+    std::condition_variable watchdogWake;
     NSMutableDictionary<NSNumber*, MoonlightDualSenseHapticState*>* states =
         [[NSMutableDictionary alloc] init];
+    dualsense_haptics::IrBackendLatch backendLatch;
+    dualsense_haptics::NativeStateLeaseTracker stateLeases;
+    int selectedLocalController = -1;
+    bool watchdogStopping = false;
+    std::thread watchdog;
+
+    Impl() :
+        watchdog([this] { runWatchdog(); })
+    {
+    }
 
     ~Impl()
     {
-        for (MoonlightDualSenseHapticState* state in states.allValues) {
-            stopState(state);
+        {
+            std::lock_guard lock(mutex);
+            watchdogStopping = true;
+            watchdogWake.notify_all();
         }
-        [states release];
+        watchdog.join();
+
+        @autoreleasepool {
+            std::lock_guard lock(mutex);
+            stopAll(false);
+            [states release];
+        }
     }
 
-    bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame)
+    void stopAll(bool latchFallback)
+    {
+        for (NSNumber* key in states) {
+            if (latchFallback) {
+                backendLatch.useFallback(key.unsignedShortValue);
+            }
+            stopState(states[key]);
+        }
+        [states removeAllObjects];
+        stateLeases.clear();
+        watchdogWake.notify_all();
+    }
+
+    void removeState(NSNumber* key, bool latchFallback)
+    {
+        MoonlightDualSenseHapticState* state = states[key];
+        if (state == nil) {
+            return;
+        }
+
+        const std::uint16_t controllerNumber = key.unsignedShortValue;
+        if (latchFallback) {
+            backendLatch.useFallback(controllerNumber);
+        }
+        stopState(state);
+        [states removeObjectForKey:key];
+        stateLeases.remove(controllerNumber);
+        watchdogWake.notify_all();
+    }
+
+    void runWatchdog()
+    {
+        std::unique_lock lock(mutex);
+        while (!watchdogStopping) {
+            const auto deadline = stateLeases.nextDeadline();
+            if (!deadline.has_value()) {
+                watchdogWake.wait(lock);
+                continue;
+            }
+
+            if (watchdogWake.wait_until(lock, *deadline) != std::cv_status::timeout) {
+                continue;
+            }
+
+            const auto expiredControllers = stateLeases.takeExpired();
+            @autoreleasepool {
+                for (std::uint16_t controllerNumber : expiredControllers) {
+                    NSNumber* key = @(controllerNumber);
+                    MoonlightDualSenseHapticState* state = states[key];
+                    if (state == nil) {
+                        continue;
+                    }
+
+                    SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+                                "macOS native DualSense haptics timed out for controller %u",
+                                static_cast<unsigned>(controllerNumber));
+                    stopState(state);
+                    [states removeObjectForKey:key];
+                }
+            }
+        }
+    }
+
+    void setControllerTarget(int controllerNumber)
     {
         std::lock_guard lock(mutex);
+        if (selectedLocalController == controllerNumber) {
+            return;
+        }
+        stopAll(true);
+        selectedLocalController = controllerNumber;
+    }
+
+    void reset()
+    {
+        std::lock_guard lock(mutex);
+        stopAll(false);
+        backendLatch.reset();
+    }
+
+    bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame, bool* startedNative)
+    {
+        std::lock_guard lock(mutex);
+        if (startedNative != nullptr) {
+            *startedNative = false;
+        }
+
+        const auto selection = findDualSenseSelection();
+        for (NSNumber* activeKey in states.allKeys) {
+            MoonlightDualSenseHapticState* activeState = states[activeKey];
+            const bool valid = !activeState.invalidationToken.isInvalidated &&
+                dualsense_haptics::canKeepNativeState(
+                    activeKey.unsignedShortValue,
+                    selectedLocalController,
+                    selection.count,
+                    activeState.controller == selection.controller);
+            if (!valid) {
+                removeState(activeKey, true);
+            }
+        }
+
         NSNumber* key = @(frame.controllerNumber);
         MoonlightDualSenseHapticState* state = states[key];
 
-        GCController* controller = findDualSense(frame.controllerNumber);
-        if (state != nil && state.controller != controller) {
-            stopState(state);
-            [states removeObjectForKey:key];
-            state = nil;
-        }
-
-        if (frame.flags & LI_DS5_HAPTICS_IR_FLAG_STREAM_END) {
+        const bool streamEnd = (frame.flags & LI_DS5_HAPTICS_IR_FLAG_STREAM_END) != 0;
+        if (!backendLatch.shouldAttemptNative(frame.controllerNumber, streamEnd)) {
             if (state != nil) {
-                stopState(state);
-                [states removeObjectForKey:key];
-                return true;
+                removeState(key, false);
             }
             return false;
         }
 
+        const bool silent = (frame.flags & LI_DS5_HAPTICS_IR_FLAG_SILENT) != 0;
+        if (silent && state == nil) {
+            return false;
+        }
+
+        GCController* controller = dualsense_haptics::canUseNativeController(
+            frame.controllerNumber, selectedLocalController, selection.count) ?
+                selection.controller : nil;
+
+        bool createdState = false;
         if (state == nil) {
             if (controller == nil) {
+                backendLatch.useFallback(frame.controllerNumber);
                 return false;
             }
-            state = createState(controller);
+            state = createState(controller, frame.controllerNumber);
             if (state == nil) {
+                backendLatch.useFallback(frame.controllerNumber);
                 return false;
             }
             states[key] = state;
+            createdState = true;
         }
 
         const auto output = dualsense_haptics::renderIrV2Native(frame);
@@ -248,9 +408,13 @@ struct MacDualSenseHapticsRenderer::Impl
             SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
                         "Unable to update macOS DualSense haptics: %s",
                         error.localizedDescription.UTF8String ?: "unknown error");
-            stopState(state);
-            [states removeObjectForKey:key];
+            removeState(key, true);
             return false;
+        }
+        stateLeases.renew(frame.controllerNumber);
+        watchdogWake.notify_all();
+        if (startedNative != nullptr) {
+            *startedNative = createdState;
         }
         return true;
     }
@@ -263,9 +427,24 @@ MacDualSenseHapticsRenderer::MacDualSenseHapticsRenderer() :
 
 MacDualSenseHapticsRenderer::~MacDualSenseHapticsRenderer() = default;
 
-bool MacDualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame)
+void MacDualSenseHapticsRenderer::setControllerTarget(int controllerNumber)
 {
     @autoreleasepool {
-        return m_Impl->submit(frame);
+        m_Impl->setControllerTarget(controllerNumber);
+    }
+}
+
+void MacDualSenseHapticsRenderer::reset()
+{
+    @autoreleasepool {
+        m_Impl->reset();
+    }
+}
+
+bool MacDualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame,
+                                         bool* startedNative)
+{
+    @autoreleasepool {
+        return m_Impl->submit(frame, startedNative);
     }
 }

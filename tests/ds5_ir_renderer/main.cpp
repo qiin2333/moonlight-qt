@@ -1,4 +1,5 @@
 #include "streaming/audio/dualsensehapticscalibration.h"
+#include "streaming/audio/dualsensehapticsrouting.h"
 #include "streaming/audio/dualsensehapticsstream.h"
 
 #define CHECK(condition) do { if (!(condition)) return __LINE__; } while (false)
@@ -29,6 +30,76 @@ int main()
     const auto nativeEnded = dualsense_haptics::renderIrV2Native(frame);
     CHECK(nativeEnded.left.intensity == 0.0f);
     CHECK(nativeEnded.right.intensity == 0.0f);
+
+    frame.flags = LI_DS5_HAPTICS_IR_FLAG_SILENT;
+    const auto silent = dualsense_haptics::renderIrV2(frame);
+    CHECK(silent.lowFrequency == 0);
+    CHECK(silent.highFrequency == 0);
+    const auto nativeSilent = dualsense_haptics::renderIrV2Native(frame);
+    CHECK(nativeSilent.left.intensity == 0.0f);
+    CHECK(nativeSilent.right.intensity == 0.0f);
+
+    using Candidate = dualsense_haptics::LocalControllerCandidate;
+    const Candidate singleDualSense[] = {{0, true}};
+    CHECK(dualsense_haptics::selectUniqueLocalDualSense(singleDualSense, 1, true) == 0);
+    CHECK(dualsense_haptics::selectUniqueLocalDualSense(singleDualSense, 1, false) == 0);
+
+    const Candidate mixedControllers[] = {{0, false}, {1, true}};
+    CHECK(dualsense_haptics::selectUniqueLocalDualSense(mixedControllers, 2, true) == 1);
+    const Candidate mergedControllers[] = {{0, false}, {0, true}};
+    CHECK(dualsense_haptics::selectUniqueLocalDualSense(mergedControllers, 2, false) == -1);
+
+    const Candidate twoDualSense[] = {{0, true}, {1, true}};
+    CHECK(dualsense_haptics::selectUniqueLocalDualSense(twoDualSense, 2, true) == -1);
+    CHECK(dualsense_haptics::selectUniqueLocalDualSense(nullptr, 0, true) == -1);
+
+    CHECK(!dualsense_haptics::canUseNativeController(0, 1, 1));
+    CHECK(dualsense_haptics::canUseNativeController(1, 1, 1));
+    CHECK(!dualsense_haptics::canUseNativeController(1, -1, 1));
+    CHECK(!dualsense_haptics::canUseNativeController(1, 1, 0));
+    CHECK(!dualsense_haptics::canUseNativeController(1, 1, 2));
+    CHECK(dualsense_haptics::canKeepNativeState(1, 1, 1, true));
+    CHECK(!dualsense_haptics::canKeepNativeState(1, 1, 2, true));
+    CHECK(!dualsense_haptics::canKeepNativeState(1, 1, 1, false));
+
+    dualsense_haptics::IrBackendLatch backendLatch;
+    CHECK(backendLatch.shouldAttemptNative(1, false));
+    backendLatch.useFallback(1);
+    CHECK(!backendLatch.shouldAttemptNative(1, false));
+    CHECK(!backendLatch.shouldAttemptNative(1, false));
+    backendLatch.useFallback(0);
+    CHECK(!backendLatch.shouldAttemptNative(0, false));
+    CHECK(!backendLatch.shouldAttemptNative(1, true));
+    CHECK(backendLatch.shouldAttemptNative(1, false));
+    CHECK(!backendLatch.shouldAttemptNative(0, false));
+    CHECK(!backendLatch.shouldAttemptNative(0, true));
+    CHECK(backendLatch.shouldAttemptNative(0, false));
+    backendLatch.useFallback(0);
+    backendLatch.useFallback(1);
+    backendLatch.reset();
+    CHECK(backendLatch.shouldAttemptNative(0, false));
+    CHECK(backendLatch.shouldAttemptNative(1, false));
+
+    using LeaseTracker = dualsense_haptics::NativeStateLeaseTracker;
+    using namespace std::chrono_literals;
+    LeaseTracker leases(250ms);
+    const auto leaseStart = LeaseTracker::TimePoint{};
+    CHECK(!leases.nextDeadline().has_value());
+    leases.renew(0, leaseStart);
+    CHECK(leases.nextDeadline() == leaseStart + 250ms);
+    leases.renew(0, leaseStart + 100ms);
+    CHECK(leases.takeExpired(leaseStart + 250ms).empty());
+    leases.renew(1, leaseStart);
+    const auto expiredLease = leases.takeExpired(leaseStart + 251ms);
+    CHECK(expiredLease.size() == 1);
+    CHECK(expiredLease[0] == 1);
+    CHECK(leases.takeExpired(leaseStart + 350ms).size() == 1);
+    leases.renew(0, leaseStart);
+    leases.remove(0);
+    CHECK(!leases.nextDeadline().has_value());
+    leases.renew(0, leaseStart);
+    leases.clear();
+    CHECK(!leases.nextDeadline().has_value());
 
     using Action = dualsense_haptics::PcmStreamTracker::Action;
     dualsense_haptics::PcmStreamTracker tracker;

@@ -51,7 +51,8 @@ inline NativeHapticOutput renderIrV2Native(const LI_DS5_HAPTICS_IR_FRAME_V2& fra
 
 inline RumbleOutput renderIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2& frame)
 {
-    if (frame.flags & LI_DS5_HAPTICS_IR_FLAG_STREAM_END) {
+    if (frame.flags & (LI_DS5_HAPTICS_IR_FLAG_STREAM_END |
+                       LI_DS5_HAPTICS_IR_FLAG_SILENT)) {
         return {0, 0};
     }
 

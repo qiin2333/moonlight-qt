@@ -1,4 +1,5 @@
 #include "streaming/session.h"
+#include "streaming/audio/dualsensehapticsrouting.h"
 
 #include <Limelight.h>
 #include "SDL_compat.h"
@@ -33,6 +34,28 @@ const int SdlInputHandler::k_ButtonMap[] = {
     PADDLE1_FLAG, PADDLE2_FLAG, PADDLE3_FLAG, PADDLE4_FLAG,
     TOUCHPAD_FLAG,
 };
+
+int SdlInputHandler::getNativeDualSenseControllerNumber() const
+{
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+    dualsense_haptics::LocalControllerCandidate controllers[MAX_GAMEPADS];
+    std::size_t controllerCount = 0;
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        if (m_GamepadState[i].controller == nullptr) {
+            continue;
+        }
+        controllers[controllerCount++] = {
+            m_GamepadState[i].index,
+            SDL_GameControllerGetType(m_GamepadState[i].controller) == SDL_CONTROLLER_TYPE_PS5,
+        };
+    }
+
+    return dualsense_haptics::selectUniqueLocalDualSense(
+        controllers, controllerCount, m_MultiController);
+#else
+    return -1;
+#endif
+}
 
 GamepadState*
 SdlInputHandler::findStateForGamepad(SDL_JoystickID id)
@@ -513,7 +536,7 @@ void SdlInputHandler::handleJoystickBatteryEvent(SDL_JoyBatteryEvent* event)
 
 #endif
 
-void SdlInputHandler::handleControllerDeviceEvent(SDL_ControllerDeviceEvent* event)
+void SdlInputHandler::handleControllerDeviceEvent(SDL_ControllerDeviceEvent* event, bool notifyHost)
 {
     GamepadState* state;
 
@@ -751,15 +774,23 @@ void SdlInputHandler::handleControllerDeviceEvent(SDL_ControllerDeviceEvent* eve
 #endif
             type == LI_CTYPE_PS;
 
-        LiSendControllerArrivalEvent(state->index, m_GamepadMask, type, supportedButtonFlags, capabilities);
+        state->supportedButtonFlags = supportedButtonFlags;
+        state->capabilities = capabilities;
+        state->type = type;
+        if (notifyHost) {
+            LiSendControllerArrivalEvent(state->index, m_GamepadMask, type,
+                                         supportedButtonFlags, capabilities);
+        }
 #else
 
         // Send an empty event to tell the PC we've arrived
-        sendGamepadState(state);
+        if (notifyHost) {
+            sendGamepadState(state);
+        }
 #endif
 
         // Send a power level if it's known at this time
-        if (powerLevel != SDL_JOYSTICK_POWER_UNKNOWN) {
+        if (notifyHost && powerLevel != SDL_JOYSTICK_POWER_UNKNOWN) {
             sendGamepadBatteryState(state, powerLevel);
         }
     }
@@ -793,12 +824,46 @@ void SdlInputHandler::handleControllerDeviceEvent(SDL_ControllerDeviceEvent* eve
                         state->index);
 
             // Send a final event to let the PC know this gamepad is gone
-            LiSendMultiControllerEvent(state->index, m_GamepadMask,
-                                       0, 0, 0, 0, 0, 0, 0);
+            if (notifyHost) {
+                LiSendMultiControllerEvent(state->index, m_GamepadMask,
+                                           0, 0, 0, 0, 0, 0, 0);
+            }
 
             // Clear all remaining state from this slot
             SDL_memset(state, 0, sizeof(*state));
         }
+    }
+}
+
+void SdlInputHandler::notifyHostOfConnectedGamepads()
+{
+    bool hasConnectedGamepad = false;
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        GamepadState* state = &m_GamepadState[i];
+        if (state->controller == nullptr) {
+            continue;
+        }
+
+        hasConnectedGamepad = true;
+
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+        LiSendControllerArrivalEvent(state->index, m_GamepadMask, state->type,
+                                     state->supportedButtonFlags, state->capabilities);
+#else
+        sendGamepadState(state);
+#endif
+
+        const SDL_JoystickPowerLevel powerLevel =
+            SDL_JoystickCurrentPowerLevel(SDL_GameControllerGetJoystick(state->controller));
+        if (powerLevel != SDL_JOYSTICK_POWER_UNKNOWN) {
+            sendGamepadBatteryState(state, powerLevel);
+        }
+    }
+
+    // A reconnect can race with removal of the final controller. Send an empty
+    // state so the host observes the current mask even when there is no arrival.
+    if (!hasConnectedGamepad) {
+        LiSendMultiControllerEvent(0, m_GamepadMask, 0, 0, 0, 0, 0, 0, 0);
     }
 }
 
@@ -901,6 +966,17 @@ void SdlInputHandler::rumbleTriggers(uint16_t controllerNumber, uint16_t leftTri
         SDL_GameControllerRumbleTriggers(m_GamepadState[controllerNumber].controller, leftTrigger, rightTrigger, 30000);
     }
 #endif
+}
+
+void SdlInputHandler::stopAllRumble()
+{
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        if (m_GamepadState[i].controller == nullptr) {
+            continue;
+        }
+        rumble(i, 0, 0);
+        rumbleTriggers(i, 0, 0);
+    }
 }
 
 void SdlInputHandler::setMotionEventState(uint16_t controllerNumber, uint8_t motionType, uint16_t reportRateHz)

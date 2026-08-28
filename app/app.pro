@@ -313,6 +313,7 @@ HEADERS += \
     streaming/audio/renderers/renderer.h \
     streaming/audio/dualsensehaptics.h \
     streaming/audio/dualsensehapticscalibration.h \
+    streaming/audio/dualsensehapticsrouting.h \
     streaming/audio/dualsensehapticsstream.h \
     streaming/audio/renderers/sdl.h \
     gui/computermodel.h \

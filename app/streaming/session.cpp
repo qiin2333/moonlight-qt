@@ -78,6 +78,22 @@
 #include <utility>
 
 namespace {
+
+int SDLCALL keepNonRumbleEvent(void*, SDL_Event* event)
+{
+    return event->type != SDL_USEREVENT ||
+           (event->user.code != SDL_CODE_GAMECONTROLLER_RUMBLE &&
+            event->user.code != SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS);
+}
+
+void stopControllerRumbleAtConnectionBoundary(SdlInputHandler* inputHandler)
+{
+    SDL_FilterEvents(keepNonRumbleEvent, nullptr);
+    if (inputHandler != nullptr) {
+        inputHandler->stopAllRumble();
+    }
+}
+
 QRect qtWindowCreationGeometryForSdl(QWindow* window)
 {
     if (!window) {
@@ -768,8 +784,12 @@ void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
     }
 
     Session* session = s_ActiveSession;
+    bool startedNative = false;
     if (session != nullptr && session->m_DualSenseHapticsRenderer != nullptr &&
-        session->m_DualSenseHapticsRenderer->submit(*frame)) {
+        session->m_DualSenseHapticsRenderer->submit(*frame, &startedNative)) {
+        if (startedNative) {
+            clRumble(frame->controllerNumber, 0, 0);
+        }
         return;
     }
 
@@ -1945,6 +1965,10 @@ private:
 
         // Finish cleanup of the connection state
         QMetaObject::invokeMethod(m_Session, &Session::stopMicrophone, Qt::BlockingQueuedConnection);
+        if (m_Session->m_DualSenseHapticsRenderer != nullptr) {
+            m_Session->m_DualSenseHapticsRenderer->setControllerTarget(-1);
+            m_Session->m_DualSenseHapticsRenderer->reset();
+        }
         LiStopConnection();
         delete m_Session->m_DualSenseHapticsRenderer;
         m_Session->m_DualSenseHapticsRenderer = nullptr;
@@ -3185,7 +3209,13 @@ bool Session::tryReconnect()
 
     // Stop ABR feedback (startConnectionAsync() restarts it) and the dead connection
     stopSunshineAbr();
+    stopControllerRumbleAtConnectionBoundary(m_InputHandler);
+    if (m_DualSenseHapticsRenderer != nullptr) {
+        m_DualSenseHapticsRenderer->setControllerTarget(-1);
+        m_DualSenseHapticsRenderer->reset();
+    }
     LiStopConnection();
+    stopControllerRumbleAtConnectionBoundary(m_InputHandler);
 
     // Total time budget for reconnect attempts before giving up
     const Uint32 graceMs = 60 * 1000;
@@ -3212,6 +3242,23 @@ bool Session::tryReconnect()
         return false;
     };
 
+    auto handleReconnectEvent = [this, &isCancelEvent](SDL_Event& ev) -> bool {
+        if (isCancelEvent(ev)) {
+            return true;
+        }
+
+        if (m_InputHandler != nullptr &&
+            (ev.type == SDL_CONTROLLERDEVICEADDED ||
+             ev.type == SDL_CONTROLLERDEVICEREMOVED)) {
+            m_InputHandler->handleControllerDeviceEvent(&ev.cdevice, false);
+            if (m_DualSenseHapticsRenderer != nullptr) {
+                m_DualSenseHapticsRenderer->setControllerTarget(
+                    m_InputHandler->getNativeDualSenseControllerNumber());
+            }
+        }
+        return false;
+    };
+
     while (!cancelled && SDL_GetTicks() - startTicks < graceMs) {
         // Update the on-screen indicator (re-shown each attempt so it stays up)
         Uint32 remainingMs = graceMs - (SDL_GetTicks() - startTicks);
@@ -3222,13 +3269,17 @@ bool Session::tryReconnect()
         // Run the connection start on a worker thread and pump events while we wait
         m_AsyncConnectionSuccess = false;
         m_HasReceivedVideo = false;
+        if (m_DualSenseHapticsRenderer != nullptr && m_InputHandler != nullptr) {
+            m_DualSenseHapticsRenderer->setControllerTarget(
+                m_InputHandler->getNativeDualSenseControllerNumber());
+        }
         AsyncConnectionStartThread thread(this);
         thread.start();
 
         while (thread.isRunning()) {
             SDL_Event ev;
             while (SDL_PollEvent(&ev)) {
-                if (isCancelEvent(ev)) {
+                if (handleReconnectEvent(ev)) {
                     cancelled = true;
                 }
             }
@@ -3251,20 +3302,27 @@ bool Session::tryReconnect()
                 m_ClipboardHelper->updateHostContext();
             }
             if (m_InputHandler != nullptr) {
+                m_InputHandler->notifyHostOfConnectedGamepads();
                 m_InputHandler->raiseAllKeys();
             }
             break;
         }
 
         // Failed: clean up the partial attempt and back off before retrying
+        stopControllerRumbleAtConnectionBoundary(m_InputHandler);
+        if (m_DualSenseHapticsRenderer != nullptr) {
+            m_DualSenseHapticsRenderer->setControllerTarget(-1);
+            m_DualSenseHapticsRenderer->reset();
+        }
         LiStopConnection();
+        stopControllerRumbleAtConnectionBoundary(m_InputHandler);
 
         Uint32 backoffUntil = SDL_GetTicks() + backoffMs;
         while (SDL_GetTicks() < backoffUntil &&
                SDL_GetTicks() - startTicks < graceMs) {
             SDL_Event ev;
             while (SDL_PollEvent(&ev)) {
-                if (isCancelEvent(ev)) {
+                if (handleReconnectEvent(ev)) {
                     cancelled = true;
                     break;
                 }
@@ -3699,6 +3757,10 @@ void Session::start()
     // NB: m_InputHandler must be initialized before starting the connection.
     m_InputHandler = new SdlInputHandler(*m_Preferences, m_StreamConfig.width,
                                          m_StreamConfig.height, enablePhysicalDualSenseHaptics);
+    if (m_DualSenseHapticsRenderer != nullptr) {
+        m_DualSenseHapticsRenderer->setControllerTarget(
+            m_InputHandler->getNativeDualSenseControllerNumber());
+    }
 
     // Kick off the async connection thread then return to the caller to pump the event loop
     auto thread = new AsyncConnectionStartThread(this);
@@ -3790,6 +3852,9 @@ void Session::exec()
             m_ClipboardHelper->stop();
             delete m_ClipboardHelper;
             m_ClipboardHelper = nullptr;
+        }
+        if (m_DualSenseHapticsRenderer != nullptr) {
+            m_DualSenseHapticsRenderer->setControllerTarget(-1);
         }
         delete m_InputHandler;
         m_InputHandler = nullptr;
@@ -3922,6 +3987,9 @@ void Session::exec()
                 m_ClipboardHelper->stop();
                 delete m_ClipboardHelper;
                 m_ClipboardHelper = nullptr;
+            }
+            if (m_DualSenseHapticsRenderer != nullptr) {
+                m_DualSenseHapticsRenderer->setControllerTarget(-1);
             }
             delete m_InputHandler;
             m_InputHandler = nullptr;
@@ -4732,6 +4800,10 @@ void Session::exec()
         case SDL_CONTROLLERDEVICEADDED:
         case SDL_CONTROLLERDEVICEREMOVED:
             m_InputHandler->handleControllerDeviceEvent(&event.cdevice);
+            if (m_DualSenseHapticsRenderer != nullptr) {
+                m_DualSenseHapticsRenderer->setControllerTarget(
+                    m_InputHandler->getNativeDualSenseControllerNumber());
+            }
             break;
         case SDL_JOYDEVICEADDED:
             m_InputHandler->handleJoystickArrivalEvent(&event.jdevice);
@@ -4838,6 +4910,9 @@ DispatchDeferredCleanup:
     // Destroy the input handler now. This must be destroyed
     // before allowwing the UI to continue execution or it could
     // interfere with SDLGamepadKeyNavigation.
+    if (m_DualSenseHapticsRenderer != nullptr) {
+        m_DualSenseHapticsRenderer->setControllerTarget(-1);
+    }
     delete m_InputHandler;
     m_InputHandler = nullptr;
 
