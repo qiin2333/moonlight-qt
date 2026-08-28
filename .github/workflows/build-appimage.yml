@@ -38,10 +38,15 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Validate Version
+      - name: Validate Inputs
         run: |
           if [[ ! "$CI_VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
             echo "::error::CI_VERSION must contain only letters, numbers, dots, underscores, or hyphens"
+            exit 1
+          fi
+
+          if [[ "$APPIMAGE_UPDATE_TAG" != "latest" && "$APPIMAGE_UPDATE_TAG" != "latest-pre" ]]; then
+            echo "::error::APPIMAGE_UPDATE_TAG must be either 'latest' or 'latest-pre'"
             exit 1
           fi
 
