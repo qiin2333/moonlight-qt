@@ -767,6 +767,12 @@ void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
         return;
     }
 
+    Session* session = s_ActiveSession;
+    if (session != nullptr && session->m_DualSenseHapticsRenderer != nullptr &&
+        session->m_DualSenseHapticsRenderer->submit(*frame)) {
+        return;
+    }
+
     // IR lanes preserve authored left/right intent, while SDL exposes the
     // common low/high-frequency motor model. Fold both lanes into spectral
     // energy here; device-specific renderers can replace this calibration.
@@ -825,6 +831,11 @@ void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlag
     // Based on the following SDL code:
     // https://github.com/libsdl-org/SDL/blob/120c76c84bbce4c1bfed4e9eb74e10678bd83120/test/testgamecontroller.c#L286-L307
     DualSenseOutputReport *state = (DualSenseOutputReport *) SDL_malloc(sizeof(DualSenseOutputReport));
+    if (state == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT,
+                     "Unable to allocate DualSense adaptive trigger report");
+        return;
+    }
     SDL_zero(*state);
     state->validFlag0 = (eventFlags & DS_EFFECT_RIGHT_TRIGGER) | (eventFlags & DS_EFFECT_LEFT_TRIGGER);
     state->rightTriggerEffectType = typeRight;
@@ -833,7 +844,12 @@ void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlag
     SDL_memcpy(state->leftTriggerEffect, left, sizeof(state->leftTriggerEffect));
 
     setControllerLEDEvent.user.data2 = (void *) state;
-    SDL_PushEvent(&setControllerLEDEvent);
+    if (SDL_PushEvent(&setControllerLEDEvent) <= 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT,
+                     "Unable to queue DualSense adaptive trigger effect: %s",
+                     SDL_GetError());
+        SDL_free(state);
+    }
 }
 
 
@@ -3671,6 +3687,11 @@ void Session::start()
 #endif
     }
     else {
+#ifdef Q_OS_MACOS
+        if (m_DualSenseHapticsRenderer == nullptr) {
+            m_DualSenseHapticsRenderer = new DualSenseHapticsRenderer();
+        }
+#endif
         k_ConnCallbacks.ds5HapticsIrV2 = Session::clDs5HapticsIrV2;
     }
 

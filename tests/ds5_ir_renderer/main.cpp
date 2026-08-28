@@ -15,10 +15,20 @@ int main()
     CHECK(active.lowFrequency > 0);
     CHECK(active.highFrequency > 0);
 
+    const auto native = dualsense_haptics::renderIrV2Native(frame);
+    CHECK(native.left.intensity > 0.0f);
+    CHECK(native.right.intensity > 0.0f);
+    CHECK(native.left.sharpness < native.right.sharpness);
+    CHECK(native.left.intensity <= 1.0f);
+    CHECK(native.right.intensity <= 1.0f);
+
     frame.flags = LI_DS5_HAPTICS_IR_FLAG_STREAM_END;
     const auto ended = dualsense_haptics::renderIrV2(frame);
     CHECK(ended.lowFrequency == 0);
     CHECK(ended.highFrequency == 0);
+    const auto nativeEnded = dualsense_haptics::renderIrV2Native(frame);
+    CHECK(nativeEnded.left.intensity == 0.0f);
+    CHECK(nativeEnded.right.intensity == 0.0f);
 
     using Action = dualsense_haptics::PcmStreamTracker::Action;
     dualsense_haptics::PcmStreamTracker tracker;

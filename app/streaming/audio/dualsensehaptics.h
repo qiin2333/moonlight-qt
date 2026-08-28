@@ -15,6 +15,7 @@ public:
 
     static bool isAvailable();
     void submit(const LI_DS5_HAPTICS_PCM_FRAME& frame);
+    bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame);
 
 private:
     struct Impl;
