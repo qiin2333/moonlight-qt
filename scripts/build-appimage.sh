@@ -90,13 +90,13 @@ fi
 APPIMAGE_PATH="$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$APPIMAGE_ARCH.AppImage"
 APPIMAGE_UPDATE_INFORMATION="gh-releases-zsync|qiin2333|moonlight-qt|latest|Moonlight-VPlus-*-${APPIMAGE_ARCH}.AppImage.zsync"
 
-pushd $INSTALLER_FOLDER
+pushd "$INSTALLER_FOLDER" || fail "Unable to enter install folder: $INSTALLER_FOLDER"
 LDAI_UPDATE_INFORMATION="$APPIMAGE_UPDATE_INFORMATION" \
 LDAI_OUTPUT="$APPIMAGE_PATH" \
-  VERSION=$VERSION $LINUXDEPLOY --appdir $DEPLOY_FOLDER \
+  VERSION="$VERSION" "$LINUXDEPLOY" --appdir "$DEPLOY_FOLDER" \
   --library=/usr/local/lib/libSDL3.so.0 \
   --plugin qt --output appimage || fail "linuxdeploy failed!"
-popd
+popd || fail "Unable to leave install folder"
 
 echo Verifying AppImage update metadata
 [ -s "$APPIMAGE_PATH" ] || fail "AppImage is missing or empty: $APPIMAGE_PATH"
