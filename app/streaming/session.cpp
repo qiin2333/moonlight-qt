@@ -3178,6 +3178,75 @@ void Session::updateDualSenseHapticsControllerTarget()
     }
 }
 
+void Session::handleSdlUserEvent(const SDL_UserEvent& event)
+{
+    switch (event.code) {
+    case SDL_CODE_FRAME_READY:
+        if (m_VideoDecoder != nullptr) {
+            m_VideoDecoder->renderFrameOnMainThread();
+        }
+        break;
+    case SDL_CODE_FLUSH_WINDOW_EVENT_BARRIER:
+        m_FlushingWindowEventsRef--;
+        break;
+    case SDL_CODE_GAMECONTROLLER_RUMBLE:
+        m_InputHandler->rumble((uint16_t)(uintptr_t)event.data1,
+                               (uint16_t)((uintptr_t)event.data2 >> 16),
+                               (uint16_t)((uintptr_t)event.data2 & 0xFFFF));
+        break;
+    case SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS:
+        m_InputHandler->rumbleTriggers((uint16_t)(uintptr_t)event.data1,
+                                       (uint16_t)((uintptr_t)event.data2 >> 16),
+                                       (uint16_t)((uintptr_t)event.data2 & 0xFFFF));
+        break;
+    case SDL_CODE_GAMECONTROLLER_SET_MOTION_EVENT_STATE:
+        m_InputHandler->setMotionEventState((uint16_t)(uintptr_t)event.data1,
+                                            (uint8_t)((uintptr_t)event.data2 >> 16),
+                                            (uint16_t)((uintptr_t)event.data2 & 0xFFFF));
+        break;
+    case SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED:
+        m_InputHandler->setControllerLED((uint16_t)(uintptr_t)event.data1,
+                                         (uint8_t)((uintptr_t)event.data2 >> 16),
+                                         (uint8_t)((uintptr_t)event.data2 >> 8),
+                                         (uint8_t)((uintptr_t)event.data2));
+        break;
+    case SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS:
+        m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.data1,
+                                            (DualSenseOutputReport *)event.data2);
+        break;
+    case SDL_CODE_FLUSH_TOUCHPAD_FRAME:
+        m_InputHandler->flushPendingTouchpadFrameEvent();
+        break;
+    case SDL_CODE_FLUSH_CURSOR_VISIBILITY:
+        if (m_InputHandler != nullptr) {
+            m_InputHandler->flushPendingRemoteCursorHide();
+        }
+        break;
+    case SDL_CODE_CURSOR_UPDATE:
+    {
+        std::shared_ptr<RemoteCursorUpdate> cursorUpdate;
+        {
+            std::lock_guard<std::mutex> lock(m_CursorUpdateMutex);
+            cursorUpdate.swap(m_PendingCursorUpdate);
+            m_CursorUpdateEventQueued = false;
+        }
+        if (cursorUpdate != nullptr && m_InputHandler != nullptr) {
+            m_InputHandler->updateRemoteCursor(*cursorUpdate);
+        }
+        break;
+    }
+#ifdef Q_OS_WIN32
+    case SDL_CODE_PROCESS_QT_OVERLAY_EVENTS:
+        // The actual Qt processing happens after SDL dispatch below.
+        // Keeping this event side-effect free also coalesces bursts of
+        // native button messages without re-entering Qt from Win32.
+        break;
+#endif
+    default:
+        SDL_assert(false);
+    }
+}
+
 class AsyncConnectionStartThread : public QThread
 {
 public:
@@ -3252,6 +3321,11 @@ bool Session::tryReconnect()
     auto handleReconnectEvent = [this, &isCancelEvent](SDL_Event& ev) -> bool {
         if (isCancelEvent(ev)) {
             return true;
+        }
+
+        if (ev.type == SDL_USEREVENT) {
+            handleSdlUserEvent(ev.user);
+            return false;
         }
 
         if (m_InputHandler != nullptr &&
@@ -4375,71 +4449,7 @@ void Session::exec()
             goto DispatchDeferredCleanup;
 
         case SDL_USEREVENT:
-            switch (event.user.code) {
-            case SDL_CODE_FRAME_READY:
-                if (m_VideoDecoder != nullptr) {
-                    m_VideoDecoder->renderFrameOnMainThread();
-                }
-                break;
-            case SDL_CODE_FLUSH_WINDOW_EVENT_BARRIER:
-                m_FlushingWindowEventsRef--;
-                break;
-            case SDL_CODE_GAMECONTROLLER_RUMBLE:
-                m_InputHandler->rumble((uint16_t)(uintptr_t)event.user.data1,
-                                       (uint16_t)((uintptr_t)event.user.data2 >> 16),
-                                       (uint16_t)((uintptr_t)event.user.data2 & 0xFFFF));
-                break;
-            case SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS:
-                m_InputHandler->rumbleTriggers((uint16_t)(uintptr_t)event.user.data1,
-                                               (uint16_t)((uintptr_t)event.user.data2 >> 16),
-                                               (uint16_t)((uintptr_t)event.user.data2 & 0xFFFF));
-                break;
-            case SDL_CODE_GAMECONTROLLER_SET_MOTION_EVENT_STATE:
-                m_InputHandler->setMotionEventState((uint16_t)(uintptr_t)event.user.data1,
-                                                    (uint8_t)((uintptr_t)event.user.data2 >> 16),
-                                                    (uint16_t)((uintptr_t)event.user.data2 & 0xFFFF));
-                break;
-            case SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED:
-                m_InputHandler->setControllerLED((uint16_t)(uintptr_t)event.user.data1,
-                                                 (uint8_t)((uintptr_t)event.user.data2 >> 16),
-                                                 (uint8_t)((uintptr_t)event.user.data2 >> 8),
-                                                 (uint8_t)((uintptr_t)event.user.data2));
-                break;
-            case SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS:
-                m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.user.data1,
-                                                    (DualSenseOutputReport *)event.user.data2);
-                break;
-            case SDL_CODE_FLUSH_TOUCHPAD_FRAME:
-                m_InputHandler->flushPendingTouchpadFrameEvent();
-                break;
-            case SDL_CODE_FLUSH_CURSOR_VISIBILITY:
-                if (m_InputHandler != nullptr) {
-                    m_InputHandler->flushPendingRemoteCursorHide();
-                }
-                break;
-            case SDL_CODE_CURSOR_UPDATE:
-            {
-                std::shared_ptr<RemoteCursorUpdate> cursorUpdate;
-                {
-                    std::lock_guard<std::mutex> lock(m_CursorUpdateMutex);
-                    cursorUpdate.swap(m_PendingCursorUpdate);
-                    m_CursorUpdateEventQueued = false;
-                }
-                if (cursorUpdate != nullptr && m_InputHandler != nullptr) {
-                    m_InputHandler->updateRemoteCursor(*cursorUpdate);
-                }
-                break;
-            }
-#ifdef Q_OS_WIN32
-            case SDL_CODE_PROCESS_QT_OVERLAY_EVENTS:
-                // The actual Qt processing happens after SDL dispatch below.
-                // Keeping this event side-effect free also coalesces bursts of
-                // native button messages without re-entering Qt from Win32.
-                break;
-#endif
-            default:
-                SDL_assert(false);
-            }
+            handleSdlUserEvent(event.user);
             break;
 
         case SDL_WINDOWEVENT:
