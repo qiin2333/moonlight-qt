@@ -1969,6 +1969,7 @@ private:
             m_Session->m_DualSenseHapticsRenderer->setControllerTarget(-1);
         }
         LiStopConnection();
+        stopControllerRumbleAtConnectionBoundary(nullptr);
         delete m_Session->m_DualSenseHapticsRenderer;
         m_Session->m_DualSenseHapticsRenderer = nullptr;
 
@@ -3862,6 +3863,7 @@ void Session::exec()
         if (m_DualSenseHapticsRenderer != nullptr) {
             m_DualSenseHapticsRenderer->setControllerTarget(-1);
         }
+        stopControllerRumbleAtConnectionBoundary(m_InputHandler);
         delete m_InputHandler;
         m_InputHandler = nullptr;
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
@@ -3997,6 +3999,7 @@ void Session::exec()
             if (m_DualSenseHapticsRenderer != nullptr) {
                 m_DualSenseHapticsRenderer->setControllerTarget(-1);
             }
+            stopControllerRumbleAtConnectionBoundary(m_InputHandler);
             delete m_InputHandler;
             m_InputHandler = nullptr;
             SDL_QuitSubSystem(SDL_INIT_VIDEO);
@@ -4926,6 +4929,7 @@ DispatchDeferredCleanup:
     if (m_DualSenseHapticsRenderer != nullptr) {
         m_DualSenseHapticsRenderer->setControllerTarget(-1);
     }
+    stopControllerRumbleAtConnectionBoundary(m_InputHandler);
     delete m_InputHandler;
     m_InputHandler = nullptr;
 
