@@ -314,6 +314,8 @@ jobs:
     # 得等 trixie。想再往下压只能自己编 Qt，不值。
     name: build-linux (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    env:
+      APPIMAGE_UPDATE_TAG: ${{ github.event_name == 'release' && github.event.release.prerelease && 'latest-pre' || 'latest' }}
 
     strategy:
       # 一边挂了不要连累另一边，方便单独看是哪个架构的问题。

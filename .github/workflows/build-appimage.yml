@@ -12,9 +12,21 @@ on:
         required: false
         default: manual
         type: string
+      appimage_update_tag:
+        description: AppImage update channel
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+          - latest-pre
   workflow_call:
     inputs:
       ci_version:
+        required: true
+        type: string
+      appimage_update_tag:
+        description: AppImage update channel
         required: true
         type: string
 
@@ -22,6 +34,7 @@ jobs:
   build:
     env:
       CI_VERSION: ${{ inputs.ci_version }}
+      APPIMAGE_UPDATE_TAG: ${{ inputs.appimage_update_tag }}
     runs-on: ubuntu-22.04
 
     steps:
