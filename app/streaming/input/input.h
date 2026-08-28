@@ -268,6 +268,8 @@ private:
 
     void sendGamepadBatteryState(GamepadState* state, SDL_JoystickPowerLevel level);
 
+    void sendGamepadArrival(GamepadState* state, SDL_JoystickPowerLevel powerLevel);
+
     void handleAbsoluteFingerEvent(SDL_TouchFingerEvent* event);
 
     void emulateAbsoluteFingerEvent(SDL_TouchFingerEvent* event);

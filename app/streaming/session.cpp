@@ -786,7 +786,7 @@ void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
     Session* session = s_ActiveSession;
     bool startedNative = false;
     if (session != nullptr && session->m_DualSenseHapticsRenderer != nullptr &&
-        session->m_DualSenseHapticsRenderer->submit(*frame, &startedNative)) {
+        session->m_DualSenseHapticsRenderer->submit(*frame, startedNative)) {
         if (startedNative) {
             clRumble(frame->controllerNumber, 0, 0);
         }
@@ -1967,7 +1967,6 @@ private:
         QMetaObject::invokeMethod(m_Session, &Session::stopMicrophone, Qt::BlockingQueuedConnection);
         if (m_Session->m_DualSenseHapticsRenderer != nullptr) {
             m_Session->m_DualSenseHapticsRenderer->setControllerTarget(-1);
-            m_Session->m_DualSenseHapticsRenderer->reset();
         }
         LiStopConnection();
         delete m_Session->m_DualSenseHapticsRenderer;
@@ -3173,6 +3172,15 @@ void Session::notifyMouseEmulationMode(bool enabled)
     }
 }
 
+void Session::updateDualSenseHapticsControllerTarget()
+{
+    if (m_DualSenseHapticsRenderer != nullptr) {
+        m_DualSenseHapticsRenderer->setControllerTarget(
+            m_InputHandler != nullptr ?
+                m_InputHandler->getNativeDualSenseControllerNumber() : -1);
+    }
+}
+
 class AsyncConnectionStartThread : public QThread
 {
 public:
@@ -3212,10 +3220,12 @@ bool Session::tryReconnect()
     stopControllerRumbleAtConnectionBoundary(m_InputHandler);
     if (m_DualSenseHapticsRenderer != nullptr) {
         m_DualSenseHapticsRenderer->setControllerTarget(-1);
-        m_DualSenseHapticsRenderer->reset();
     }
     LiStopConnection();
     stopControllerRumbleAtConnectionBoundary(m_InputHandler);
+    if (m_DualSenseHapticsRenderer != nullptr) {
+        m_DualSenseHapticsRenderer->reset();
+    }
 
     // Total time budget for reconnect attempts before giving up
     const Uint32 graceMs = 60 * 1000;
@@ -3251,10 +3261,7 @@ bool Session::tryReconnect()
             (ev.type == SDL_CONTROLLERDEVICEADDED ||
              ev.type == SDL_CONTROLLERDEVICEREMOVED)) {
             m_InputHandler->handleControllerDeviceEvent(&ev.cdevice, false);
-            if (m_DualSenseHapticsRenderer != nullptr) {
-                m_DualSenseHapticsRenderer->setControllerTarget(
-                    m_InputHandler->getNativeDualSenseControllerNumber());
-            }
+            updateDualSenseHapticsControllerTarget();
         }
         return false;
     };
@@ -3269,10 +3276,7 @@ bool Session::tryReconnect()
         // Run the connection start on a worker thread and pump events while we wait
         m_AsyncConnectionSuccess = false;
         m_HasReceivedVideo = false;
-        if (m_DualSenseHapticsRenderer != nullptr && m_InputHandler != nullptr) {
-            m_DualSenseHapticsRenderer->setControllerTarget(
-                m_InputHandler->getNativeDualSenseControllerNumber());
-        }
+        updateDualSenseHapticsControllerTarget();
         AsyncConnectionStartThread thread(this);
         thread.start();
 
@@ -3312,10 +3316,12 @@ bool Session::tryReconnect()
         stopControllerRumbleAtConnectionBoundary(m_InputHandler);
         if (m_DualSenseHapticsRenderer != nullptr) {
             m_DualSenseHapticsRenderer->setControllerTarget(-1);
-            m_DualSenseHapticsRenderer->reset();
         }
         LiStopConnection();
         stopControllerRumbleAtConnectionBoundary(m_InputHandler);
+        if (m_DualSenseHapticsRenderer != nullptr) {
+            m_DualSenseHapticsRenderer->reset();
+        }
 
         Uint32 backoffUntil = SDL_GetTicks() + backoffMs;
         while (SDL_GetTicks() < backoffUntil &&
@@ -3757,10 +3763,7 @@ void Session::start()
     // NB: m_InputHandler must be initialized before starting the connection.
     m_InputHandler = new SdlInputHandler(*m_Preferences, m_StreamConfig.width,
                                          m_StreamConfig.height, enablePhysicalDualSenseHaptics);
-    if (m_DualSenseHapticsRenderer != nullptr) {
-        m_DualSenseHapticsRenderer->setControllerTarget(
-            m_InputHandler->getNativeDualSenseControllerNumber());
-    }
+    updateDualSenseHapticsControllerTarget();
 
     // Kick off the async connection thread then return to the caller to pump the event loop
     auto thread = new AsyncConnectionStartThread(this);
@@ -4800,10 +4803,7 @@ void Session::exec()
         case SDL_CONTROLLERDEVICEADDED:
         case SDL_CONTROLLERDEVICEREMOVED:
             m_InputHandler->handleControllerDeviceEvent(&event.cdevice);
-            if (m_DualSenseHapticsRenderer != nullptr) {
-                m_DualSenseHapticsRenderer->setControllerTarget(
-                    m_InputHandler->getNativeDualSenseControllerNumber());
-            }
+            updateDualSenseHapticsControllerTarget();
             break;
         case SDL_JOYDEVICEADDED:
             m_InputHandler->handleJoystickArrivalEvent(&event.jdevice);

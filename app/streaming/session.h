@@ -178,6 +178,8 @@ private:
     // unexpected network interruption. Returns true if streaming resumed.
     bool tryReconnect();
 
+    void updateDualSenseHapticsControllerTarget();
+
     // Emit the appropriate error dialog for a connection termination code.
     void displayTerminationError(int errorCode);
 

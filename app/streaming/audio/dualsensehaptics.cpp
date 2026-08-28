@@ -493,16 +493,14 @@ void DualSenseHapticsRenderer::reset()
 }
 
 bool DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame,
-                                      bool* startedNative)
+                                      bool& startedNative)
 {
 #ifdef Q_OS_MACOS
     return m_Impl->macRenderer != nullptr &&
            m_Impl->macRenderer->submit(frame, startedNative);
 #else
     (void)frame;
-    if (startedNative != nullptr) {
-        *startedNative = false;
-    }
+    startedNative = false;
     return false;
 #endif
 }

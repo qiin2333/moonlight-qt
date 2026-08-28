@@ -16,7 +16,7 @@ public:
 
     void setControllerTarget(int controllerNumber);
     void reset();
-    bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame, bool* startedNative);
+    bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame, bool& startedNative);
 
 private:
     struct Impl;

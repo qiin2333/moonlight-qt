@@ -58,10 +58,6 @@ int main()
     CHECK(!dualsense_haptics::canUseNativeController(1, -1, 1));
     CHECK(!dualsense_haptics::canUseNativeController(1, 1, 0));
     CHECK(!dualsense_haptics::canUseNativeController(1, 1, 2));
-    CHECK(dualsense_haptics::canKeepNativeState(1, 1, 1, true));
-    CHECK(!dualsense_haptics::canKeepNativeState(1, 1, 2, true));
-    CHECK(!dualsense_haptics::canKeepNativeState(1, 1, 1, false));
-
     dualsense_haptics::IrBackendLatch backendLatch;
     CHECK(backendLatch.shouldAttemptNative(1, false));
     backendLatch.useFallback(1);
@@ -79,27 +75,6 @@ int main()
     backendLatch.reset();
     CHECK(backendLatch.shouldAttemptNative(0, false));
     CHECK(backendLatch.shouldAttemptNative(1, false));
-
-    using LeaseTracker = dualsense_haptics::NativeStateLeaseTracker;
-    using namespace std::chrono_literals;
-    LeaseTracker leases(250ms);
-    const auto leaseStart = LeaseTracker::TimePoint{};
-    CHECK(!leases.nextDeadline().has_value());
-    leases.renew(0, leaseStart);
-    CHECK(leases.nextDeadline() == leaseStart + 250ms);
-    leases.renew(0, leaseStart + 100ms);
-    CHECK(leases.takeExpired(leaseStart + 250ms).empty());
-    leases.renew(1, leaseStart);
-    const auto expiredLease = leases.takeExpired(leaseStart + 251ms);
-    CHECK(expiredLease.size() == 1);
-    CHECK(expiredLease[0] == 1);
-    CHECK(leases.takeExpired(leaseStart + 350ms).size() == 1);
-    leases.renew(0, leaseStart);
-    leases.remove(0);
-    CHECK(!leases.nextDeadline().has_value());
-    leases.renew(0, leaseStart);
-    leases.clear();
-    CHECK(!leases.nextDeadline().has_value());
 
     using Action = dualsense_haptics::PcmStreamTracker::Action;
     dualsense_haptics::PcmStreamTracker tracker;

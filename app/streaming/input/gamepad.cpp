@@ -176,6 +176,21 @@ void SdlInputHandler::sendGamepadBatteryState(GamepadState* state, SDL_JoystickP
     LiSendControllerBatteryEvent(state->index, batteryState, batteryPercentage);
 }
 
+void SdlInputHandler::sendGamepadArrival(GamepadState* state,
+                                         SDL_JoystickPowerLevel powerLevel)
+{
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+    LiSendControllerArrivalEvent(state->index, m_GamepadMask, state->type,
+                                 state->supportedButtonFlags, state->capabilities);
+#else
+    sendGamepadState(state);
+#endif
+
+    if (powerLevel != SDL_JOYSTICK_POWER_UNKNOWN) {
+        sendGamepadBatteryState(state, powerLevel);
+    }
+}
+
 Uint32 SdlInputHandler::mouseEmulationTimerCallback(Uint32 interval, void *param)
 {
     auto gamepad = reinterpret_cast<GamepadState*>(param);
@@ -777,21 +792,10 @@ void SdlInputHandler::handleControllerDeviceEvent(SDL_ControllerDeviceEvent* eve
         state->supportedButtonFlags = supportedButtonFlags;
         state->capabilities = capabilities;
         state->type = type;
-        if (notifyHost) {
-            LiSendControllerArrivalEvent(state->index, m_GamepadMask, type,
-                                         supportedButtonFlags, capabilities);
-        }
-#else
-
-        // Send an empty event to tell the PC we've arrived
-        if (notifyHost) {
-            sendGamepadState(state);
-        }
 #endif
 
-        // Send a power level if it's known at this time
-        if (notifyHost && powerLevel != SDL_JOYSTICK_POWER_UNKNOWN) {
-            sendGamepadBatteryState(state, powerLevel);
+        if (notifyHost) {
+            sendGamepadArrival(state, powerLevel);
         }
     }
     else if (event->type == SDL_CONTROLLERDEVICEREMOVED) {
@@ -846,18 +850,9 @@ void SdlInputHandler::notifyHostOfConnectedGamepads()
 
         hasConnectedGamepad = true;
 
-#if SDL_VERSION_ATLEAST(2, 0, 14)
-        LiSendControllerArrivalEvent(state->index, m_GamepadMask, state->type,
-                                     state->supportedButtonFlags, state->capabilities);
-#else
-        sendGamepadState(state);
-#endif
-
         const SDL_JoystickPowerLevel powerLevel =
             SDL_JoystickCurrentPowerLevel(SDL_GameControllerGetJoystick(state->controller));
-        if (powerLevel != SDL_JOYSTICK_POWER_UNKNOWN) {
-            sendGamepadBatteryState(state, powerLevel);
-        }
+        sendGamepadArrival(state, powerLevel);
     }
 
     // A reconnect can race with removal of the final controller. Send an empty

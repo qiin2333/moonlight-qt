@@ -6,8 +6,10 @@
 #include "SDL_compat.h"
 
 #include <algorithm>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <optional>
 #include <thread>
 
 #import <CoreHaptics/CoreHaptics.h>
@@ -186,7 +188,7 @@ MoonlightDualSenseHapticState* createState(GCController* controller,
     SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
                 "macOS native DualSense haptics ready for player %d",
                 static_cast<int>(controllerNumber));
-    return [state autorelease];
+    return state;
 }
 
 bool updatePlayer(id<CHHapticPatternPlayer> player,
@@ -234,13 +236,19 @@ void stopState(MoonlightDualSenseHapticState* state)
 
 struct MacDualSenseHapticsRenderer::Impl
 {
+    using Clock = std::chrono::steady_clock;
+    // IR arrives every 5 ms, so this tolerates packet loss while bounding an
+    // infinite Core Haptics player if the final silent/end frame is dropped.
+    static constexpr std::chrono::milliseconds StateLeaseTimeout{250};
+
     std::mutex mutex;
     std::condition_variable watchdogWake;
-    NSMutableDictionary<NSNumber*, MoonlightDualSenseHapticState*>* states =
-        [[NSMutableDictionary alloc] init];
+    // Conservative routing admits at most one native controller at a time.
+    MoonlightDualSenseHapticState* state = nil;
     dualsense_haptics::IrBackendLatch backendLatch;
-    dualsense_haptics::NativeStateLeaseTracker stateLeases;
     int selectedLocalController = -1;
+    int stateController = -1;
+    std::optional<Clock::time_point> leaseDeadline;
     bool watchdogStopping = false;
     std::thread watchdog;
 
@@ -254,76 +262,59 @@ struct MacDualSenseHapticsRenderer::Impl
         {
             std::lock_guard lock(mutex);
             watchdogStopping = true;
-            watchdogWake.notify_all();
+            watchdogWake.notify_one();
         }
         watchdog.join();
 
         @autoreleasepool {
             std::lock_guard lock(mutex);
-            stopAll(false);
-            [states release];
+            clearState(false);
         }
     }
 
-    void stopAll(bool latchFallback)
+    void clearState(bool latchFallback)
     {
-        for (NSNumber* key in states) {
+        leaseDeadline.reset();
+        if (state != nil) {
             if (latchFallback) {
-                backendLatch.useFallback(key.unsignedShortValue);
+                backendLatch.useFallback(static_cast<std::uint16_t>(stateController));
             }
-            stopState(states[key]);
+            stopState(state);
+            [state release];
+            state = nil;
+            stateController = -1;
         }
-        [states removeAllObjects];
-        stateLeases.clear();
-        watchdogWake.notify_all();
-    }
-
-    void removeState(NSNumber* key, bool latchFallback)
-    {
-        MoonlightDualSenseHapticState* state = states[key];
-        if (state == nil) {
-            return;
-        }
-
-        const std::uint16_t controllerNumber = key.unsignedShortValue;
-        if (latchFallback) {
-            backendLatch.useFallback(controllerNumber);
-        }
-        stopState(state);
-        [states removeObjectForKey:key];
-        stateLeases.remove(controllerNumber);
-        watchdogWake.notify_all();
+        watchdogWake.notify_one();
     }
 
     void runWatchdog()
     {
         std::unique_lock lock(mutex);
         while (!watchdogStopping) {
-            const auto deadline = stateLeases.nextDeadline();
-            if (!deadline.has_value()) {
-                watchdogWake.wait(lock);
+            if (!leaseDeadline.has_value()) {
+                watchdogWake.wait(lock, [this] {
+                    return watchdogStopping || leaseDeadline.has_value();
+                });
                 continue;
             }
 
-            if (watchdogWake.wait_until(lock, *deadline) != std::cv_status::timeout) {
+            const auto observedDeadline = *leaseDeadline;
+            if (watchdogWake.wait_until(lock, observedDeadline, [this, observedDeadline] {
+                    return watchdogStopping || !leaseDeadline.has_value() ||
+                           *leaseDeadline != observedDeadline;
+                })) {
                 continue;
             }
 
-            const auto expiredControllers = stateLeases.takeExpired();
+            if (!leaseDeadline.has_value() || Clock::now() < *leaseDeadline) {
+                continue;
+            }
+
             @autoreleasepool {
-                for (std::uint16_t controllerNumber : expiredControllers) {
-                    NSNumber* key = @(controllerNumber);
-                    MoonlightDualSenseHapticState* state = states[key];
-                    if (state == nil) {
-                        continue;
-                    }
-
-                    SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
-                                "macOS native DualSense haptics timed out for controller %u",
-                                static_cast<unsigned>(controllerNumber));
-                    stopState(state);
-                    [states removeObjectForKey:key];
-                }
+                SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+                            "macOS native DualSense haptics timed out for controller %d",
+                            stateController);
+                clearState(false);
             }
         }
     }
@@ -334,51 +325,50 @@ struct MacDualSenseHapticsRenderer::Impl
         if (selectedLocalController == controllerNumber) {
             return;
         }
-        stopAll(true);
+        clearState(true);
         selectedLocalController = controllerNumber;
     }
 
     void reset()
     {
         std::lock_guard lock(mutex);
-        stopAll(false);
+        clearState(false);
         backendLatch.reset();
+        selectedLocalController = -1;
     }
 
-    bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame, bool* startedNative)
+    bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame, bool& startedNative)
     {
         std::lock_guard lock(mutex);
-        if (startedNative != nullptr) {
-            *startedNative = false;
-        }
+        startedNative = false;
 
         const auto selection = findDualSenseSelection();
-        for (NSNumber* activeKey in states.allKeys) {
-            MoonlightDualSenseHapticState* activeState = states[activeKey];
-            const bool valid = !activeState.invalidationToken.isInvalidated &&
-                dualsense_haptics::canKeepNativeState(
-                    activeKey.unsignedShortValue,
+        if (state != nil) {
+            const bool valid = stateController >= 0 &&
+                !state.invalidationToken.isInvalidated &&
+                dualsense_haptics::canUseNativeController(
+                    static_cast<std::uint16_t>(stateController),
                     selectedLocalController,
-                    selection.count,
-                    activeState.controller == selection.controller);
+                    selection.count) &&
+                state.controller == selection.controller;
             if (!valid) {
-                removeState(activeKey, true);
+                clearState(true);
             }
         }
 
-        NSNumber* key = @(frame.controllerNumber);
-        MoonlightDualSenseHapticState* state = states[key];
+        MoonlightDualSenseHapticState* frameState =
+            stateController == frame.controllerNumber ? state : nil;
 
         const bool streamEnd = (frame.flags & LI_DS5_HAPTICS_IR_FLAG_STREAM_END) != 0;
         if (!backendLatch.shouldAttemptNative(frame.controllerNumber, streamEnd)) {
-            if (state != nil) {
-                removeState(key, false);
+            if (frameState != nil) {
+                clearState(false);
             }
             return false;
         }
 
         const bool silent = (frame.flags & LI_DS5_HAPTICS_IR_FLAG_SILENT) != 0;
-        if (silent && state == nil) {
+        if (silent && frameState == nil) {
             return false;
         }
 
@@ -387,35 +377,34 @@ struct MacDualSenseHapticsRenderer::Impl
                 selection.controller : nil;
 
         bool createdState = false;
-        if (state == nil) {
+        if (frameState == nil) {
             if (controller == nil) {
                 backendLatch.useFallback(frame.controllerNumber);
                 return false;
             }
-            state = createState(controller, frame.controllerNumber);
-            if (state == nil) {
+            frameState = createState(controller, frame.controllerNumber);
+            if (frameState == nil) {
                 backendLatch.useFallback(frame.controllerNumber);
                 return false;
             }
-            states[key] = state;
+            state = frameState;
+            stateController = frame.controllerNumber;
             createdState = true;
         }
 
         const auto output = dualsense_haptics::renderIrV2Native(frame);
         NSError* error = nil;
-        if (!updatePlayer(state.leftPlayer, output.left, &error) ||
-            !updatePlayer(state.rightPlayer, output.right, &error)) {
+        if (!updatePlayer(frameState.leftPlayer, output.left, &error) ||
+            !updatePlayer(frameState.rightPlayer, output.right, &error)) {
             SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
                         "Unable to update macOS DualSense haptics: %s",
                         error.localizedDescription.UTF8String ?: "unknown error");
-            removeState(key, true);
+            clearState(true);
             return false;
         }
-        stateLeases.renew(frame.controllerNumber);
-        watchdogWake.notify_all();
-        if (startedNative != nullptr) {
-            *startedNative = createdState;
-        }
+        leaseDeadline = Clock::now() + StateLeaseTimeout;
+        watchdogWake.notify_one();
+        startedNative = createdState;
         return true;
     }
 };
@@ -442,7 +431,7 @@ void MacDualSenseHapticsRenderer::reset()
 }
 
 bool MacDualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame,
-                                         bool* startedNative)
+                                         bool& startedNative)
 {
     @autoreleasepool {
         return m_Impl->submit(frame, startedNative);
