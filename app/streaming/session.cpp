@@ -4500,12 +4500,15 @@ void Session::exec()
         lastSdrWhiteCheckTicks = now;
 
         const int displayIndex = SDL_GetWindowDisplayIndex(m_Window);
-        const char* displayName = displayIndex >= 0 ? SDL_GetDisplayName(displayIndex) : nullptr;
-        if (displayName == nullptr) {
+        QScreen* clientScreen = qtScreenForSdlDisplay(displayIndex);
+        if (clientScreen == nullptr || clientScreen->name().isEmpty()) {
             return;
         }
 
-        const float nits = queryDisplaySdrWhiteNits(QString::fromUtf8(displayName), false);
+        // SDL exposes a friendly monitor name on Windows, while DisplayConfig
+        // source paths use the GDI device name (for example, \\.\DISPLAY1).
+        // QScreen::name() is the latter, so resolve the SDL display first.
+        const float nits = queryDisplaySdrWhiteNits(clientScreen->name(), false);
         if (nits < 50.0f || qAbs(nits - m_LastClientSdrWhiteNits) < 0.5f) {
             return;
         }

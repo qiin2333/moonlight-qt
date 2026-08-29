@@ -2168,10 +2168,23 @@ bool D3D11VARenderer::needsTestFrame()
 
 void D3D11VARenderer::setHdrMode(bool enabled)
 {
-    // m_VideoProcessor needs to be available to be set,
-    // and it makes sense only when HDR is enabled from the UI
-    if (!enabled || !m_VideoProcessor || !(m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT))
+    auto clearSwapChainHdrMetadata = [this]() {
+        if (!m_SwapChain) {
+            return;
+        }
+
+        HRESULT hr = m_SwapChain->SetHDRMetaData(
+            DXGI_HDR_METADATA_TYPE_NONE, 0, nullptr);
+        if (FAILED(hr)) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "IDXGISwapChain4::SetHDRMetaData(NONE) failed: %x", hr);
+        }
+    };
+
+    if (!enabled || !(m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT)) {
+        clearSwapChainHdrMetadata();
         return;
+    }
 
     DXGI_HDR_METADATA_HDR10 streamHDRMetaData = {};
     DXGI_HDR_METADATA_HDR10 outputHDRMetaData = {};
@@ -2193,32 +2206,46 @@ void D3D11VARenderer::setHdrMode(bool enabled)
         streamHDRMetaData.MaxContentLightLevel = hdrMetadata.maxContentLightLevel;
         streamHDRMetaData.MaxFrameAverageLightLevel = hdrMetadata.maxFrameAverageLightLevel;
 
-        m_VideoContext->VideoProcessorSetStreamHDRMetaData(
-            m_VideoProcessor.Get(),
-            0,
-            DXGI_HDR_METADATA_TYPE_HDR10,
-            sizeof(DXGI_HDR_METADATA_HDR10),
-            &streamHDRMetaData
-            );
+        if (m_VideoProcessor && m_VideoContext) {
+            m_VideoContext->VideoProcessorSetStreamHDRMetaData(
+                m_VideoProcessor.Get(),
+                0,
+                DXGI_HDR_METADATA_TYPE_HDR10,
+                sizeof(DXGI_HDR_METADATA_HDR10),
+                &streamHDRMetaData
+                );
+        }
 
         // The direct shader path bypasses the video processor, so publishing
         // HDR10 metadata only on the VP is insufficient. Attach it to the
         // swapchain too, allowing DWM/the display driver to map PQ content with
         // the actual mastering and content-light information.
-        HRESULT swapChainHr = m_SwapChain->SetHDRMetaData(
-            DXGI_HDR_METADATA_TYPE_HDR10,
-            sizeof(DXGI_HDR_METADATA_HDR10),
-            &streamHDRMetaData);
-        if (FAILED(swapChainHr)) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "IDXGISwapChain4::SetHDRMetaData(HDR10) failed: %x",
-                        swapChainHr);
+        if (m_SwapChain) {
+            HRESULT swapChainHr = m_SwapChain->SetHDRMetaData(
+                DXGI_HDR_METADATA_TYPE_HDR10,
+                sizeof(DXGI_HDR_METADATA_HDR10),
+                &streamHDRMetaData);
+            if (FAILED(swapChainHr)) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "IDXGISwapChain4::SetHDRMetaData(HDR10) failed: %x",
+                            swapChainHr);
+            }
         }
 
         streamSet = true;
     }
+    else {
+        clearSwapChainHdrMetadata();
+    }
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "Set stream HDR mode: %s", streamSet ? "enabled" : "disabled");
+
+    // Swapchain metadata is also used by the direct shader path. Everything
+    // below is video-processor-specific and can be skipped when VP creation
+    // failed without disabling the renderer.
+    if (!m_VideoProcessor || !m_VideoContext) {
+        return;
+    }
 
     // Prepare HDR Meta Data to match the monitor HDR specifications
     int appAdapterIndex = 0;
