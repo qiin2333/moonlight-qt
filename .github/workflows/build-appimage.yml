@@ -12,21 +12,9 @@ on:
         required: false
         default: manual
         type: string
-      appimage_update_tag:
-        description: AppImage update channel
-        required: true
-        default: latest
-        type: choice
-        options:
-          - latest
-          - latest-pre
   workflow_call:
     inputs:
       ci_version:
-        required: true
-        type: string
-      appimage_update_tag:
-        description: AppImage update channel
         required: true
         type: string
 
@@ -34,19 +22,13 @@ jobs:
   build:
     env:
       CI_VERSION: ${{ inputs.ci_version }}
-      APPIMAGE_UPDATE_TAG: ${{ inputs.appimage_update_tag }}
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Validate Inputs
+      - name: Validate Version
         run: |
           if [[ ! "$CI_VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
             echo "::error::CI_VERSION must contain only letters, numbers, dots, underscores, or hyphens"
-            exit 1
-          fi
-
-          if [[ "$APPIMAGE_UPDATE_TAG" != "latest" && "$APPIMAGE_UPDATE_TAG" != "latest-pre" ]]; then
-            echo "::error::APPIMAGE_UPDATE_TAG must be either 'latest' or 'latest-pre'"
             exit 1
           fi
 
