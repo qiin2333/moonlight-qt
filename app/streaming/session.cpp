@@ -122,7 +122,14 @@ QRect qtWindowCreationGeometryForSdl(QWindow* window)
 #endif
 }
 
-QScreen* qtScreenForSdlDisplay(int displayIndex)
+enum class SdlDisplayMatchPolicy
+{
+    AllowFallback,
+    ExactOnly,
+};
+
+QScreen* qtScreenForSdlDisplay(int displayIndex,
+                               SdlDisplayMatchPolicy matchPolicy = SdlDisplayMatchPolicy::AllowFallback)
 {
     if (displayIndex < 0) {
         return nullptr;
@@ -168,14 +175,20 @@ QScreen* qtScreenForSdlDisplay(int displayIndex)
             }
         }
 
-        if (QScreen* cursorScreen = QGuiApplication::screenAt(QCursor::pos())) {
-            if (sizeMatches.contains(cursorScreen)) {
-                return cursorScreen;
-            }
-        }
         if (sizeMatches.size() == 1) {
             return sizeMatches.first();
         }
+        if (matchPolicy == SdlDisplayMatchPolicy::AllowFallback) {
+            if (QScreen* cursorScreen = QGuiApplication::screenAt(QCursor::pos())) {
+                if (sizeMatches.contains(cursorScreen)) {
+                    return cursorScreen;
+                }
+            }
+        }
+    }
+
+    if (matchPolicy == SdlDisplayMatchPolicy::ExactOnly) {
+        return nullptr;
     }
 
     if (QScreen* cursorScreen = QGuiApplication::screenAt(QCursor::pos())) {
@@ -4500,7 +4513,8 @@ void Session::exec()
         lastSdrWhiteCheckTicks = now;
 
         const int displayIndex = SDL_GetWindowDisplayIndex(m_Window);
-        QScreen* clientScreen = qtScreenForSdlDisplay(displayIndex);
+        QScreen* clientScreen = qtScreenForSdlDisplay(
+            displayIndex, SdlDisplayMatchPolicy::ExactOnly);
         if (clientScreen == nullptr || clientScreen->name().isEmpty()) {
             return;
         }

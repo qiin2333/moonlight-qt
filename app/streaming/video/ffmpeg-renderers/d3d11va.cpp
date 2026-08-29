@@ -2168,7 +2168,16 @@ bool D3D11VARenderer::needsTestFrame()
 
 void D3D11VARenderer::setHdrMode(bool enabled)
 {
-    auto clearSwapChainHdrMetadata = [this]() {
+    auto clearHdrMetadata = [this]() {
+        if (m_VideoProcessor && m_VideoContext) {
+            m_VideoContext->VideoProcessorSetStreamHDRMetaData(
+                m_VideoProcessor.Get(),
+                0,
+                DXGI_HDR_METADATA_TYPE_NONE,
+                0,
+                nullptr);
+        }
+
         if (!m_SwapChain) {
             return;
         }
@@ -2182,7 +2191,7 @@ void D3D11VARenderer::setHdrMode(bool enabled)
     };
 
     if (!enabled || !(m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT)) {
-        clearSwapChainHdrMetadata();
+        clearHdrMetadata();
         return;
     }
 
@@ -2235,7 +2244,7 @@ void D3D11VARenderer::setHdrMode(bool enabled)
         streamSet = true;
     }
     else {
-        clearSwapChainHdrMetadata();
+        clearHdrMetadata();
     }
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "Set stream HDR mode: %s", streamSet ? "enabled" : "disabled");
