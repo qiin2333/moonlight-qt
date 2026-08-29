@@ -50,6 +50,20 @@ jobs:
     - name: Check QML type resolution
       run: scripts/qmllint-check.sh
 
+  version-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Test version derivation
+      run: python3 -m unittest discover -s tests/derive_version -p 'test_*.py'
+
   build-windows:
     runs-on: windows-2022
     steps:
@@ -314,6 +328,8 @@ jobs:
     # 得等 trixie。想再往下压只能自己编 Qt，不值。
     name: build-linux (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    env:
+      APPIMAGE_UPDATE_TAG: ${{ github.event_name == 'release' && github.event.release.prerelease && 'latest-pre' || 'latest' }}
 
     strategy:
       # 一边挂了不要连累另一边，方便单独看是哪个架构的问题。
@@ -658,7 +674,7 @@ jobs:
 
   release:
     if: github.event_name == 'release'
-    needs: [qml-lint, build-windows, build-macos, build-linux, build-steamlink]
+    needs: [qml-lint, version-tests, build-windows, build-macos, build-linux, build-steamlink]
     runs-on: ubuntu-latest
 
     steps:

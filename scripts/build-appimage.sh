@@ -15,6 +15,12 @@ INSTALLER_FOLDER=$BUILD_ROOT/installer-$BUILD_CONFIG
 VERSION=$(python3 "$SOURCE_ROOT/scripts/derive-version.py" --source-root "$SOURCE_ROOT" --field artifact)
 APPIMAGE_ARCH=$(uname -m)
 LINUXDEPLOY=linuxdeploy-$APPIMAGE_ARCH.AppImage
+APPIMAGE_UPDATE_TAG="${APPIMAGE_UPDATE_TAG:-latest}"
+
+case "$APPIMAGE_UPDATE_TAG" in
+	latest|latest-pre) ;;
+	*) fail "Invalid APPIMAGE_UPDATE_TAG: $APPIMAGE_UPDATE_TAG"
+esac
 
 command -v qmake6 >/dev/null 2>&1 || fail "Unable to find 'qmake6' in your PATH!"
 command -v $LINUXDEPLOY >/dev/null 2>&1 || fail "Unable to find '$LINUXDEPLOY' in your PATH!"
@@ -88,7 +94,7 @@ if [ -n "$QT_PLUGIN_PATH" ] && [ -d "$QT_PLUGIN_PATH/multimedia" ]; then
 fi
 
 APPIMAGE_PATH="$INSTALLER_FOLDER/Moonlight-VPlus-$VERSION-$APPIMAGE_ARCH.AppImage"
-APPIMAGE_UPDATE_INFORMATION="gh-releases-zsync|qiin2333|moonlight-qt|latest|Moonlight-VPlus-*-${APPIMAGE_ARCH}.AppImage.zsync"
+APPIMAGE_UPDATE_INFORMATION="gh-releases-zsync|qiin2333|moonlight-qt|$APPIMAGE_UPDATE_TAG|Moonlight-VPlus-*-${APPIMAGE_ARCH}.AppImage.zsync"
 
 pushd "$INSTALLER_FOLDER" || fail "Unable to enter install folder: $INSTALLER_FOLDER"
 LDAI_UPDATE_INFORMATION="$APPIMAGE_UPDATE_INFORMATION" \
