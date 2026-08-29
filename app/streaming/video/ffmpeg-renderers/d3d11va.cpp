@@ -2173,8 +2173,8 @@ void D3D11VARenderer::setHdrMode(bool enabled)
     if (!enabled || !m_VideoProcessor || !(m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT))
         return;
 
-    DXGI_HDR_METADATA_HDR10 streamHDRMetaData;
-    DXGI_HDR_METADATA_HDR10 outputHDRMetaData;
+    DXGI_HDR_METADATA_HDR10 streamHDRMetaData = {};
+    DXGI_HDR_METADATA_HDR10 outputHDRMetaData = {};
 
     // Prepare HDR Meta Data for Streamed content
     bool streamSet = false;
@@ -2190,8 +2190,8 @@ void D3D11VARenderer::setHdrMode(bool enabled)
         streamHDRMetaData.WhitePoint[1] = hdrMetadata.whitePoint.y;
         streamHDRMetaData.MaxMasteringLuminance = hdrMetadata.maxDisplayLuminance;
         streamHDRMetaData.MinMasteringLuminance = hdrMetadata.minDisplayLuminance;
-        streamHDRMetaData.MaxContentLightLevel = 0;
-        streamHDRMetaData.MaxFrameAverageLightLevel = 0;
+        streamHDRMetaData.MaxContentLightLevel = hdrMetadata.maxContentLightLevel;
+        streamHDRMetaData.MaxFrameAverageLightLevel = hdrMetadata.maxFrameAverageLightLevel;
 
         m_VideoContext->VideoProcessorSetStreamHDRMetaData(
             m_VideoProcessor.Get(),
@@ -2200,6 +2200,20 @@ void D3D11VARenderer::setHdrMode(bool enabled)
             sizeof(DXGI_HDR_METADATA_HDR10),
             &streamHDRMetaData
             );
+
+        // The direct shader path bypasses the video processor, so publishing
+        // HDR10 metadata only on the VP is insufficient. Attach it to the
+        // swapchain too, allowing DWM/the display driver to map PQ content with
+        // the actual mastering and content-light information.
+        HRESULT swapChainHr = m_SwapChain->SetHDRMetaData(
+            DXGI_HDR_METADATA_TYPE_HDR10,
+            sizeof(DXGI_HDR_METADATA_HDR10),
+            &streamHDRMetaData);
+        if (FAILED(swapChainHr)) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "IDXGISwapChain4::SetHDRMetaData(HDR10) failed: %x",
+                        swapChainHr);
+        }
 
         streamSet = true;
     }
