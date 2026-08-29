@@ -2168,7 +2168,17 @@ bool D3D11VARenderer::needsTestFrame()
 
 void D3D11VARenderer::setHdrMode(bool enabled)
 {
-    auto clearHdrMetadata = [this]() {
+    auto clearVideoProcessorOutputHdrMetadata = [this]() {
+        if (m_VideoProcessor && m_VideoContext) {
+            m_VideoContext->VideoProcessorSetOutputHDRMetaData(
+                m_VideoProcessor.Get(),
+                DXGI_HDR_METADATA_TYPE_NONE,
+                0,
+                nullptr);
+        }
+    };
+
+    auto clearHdrMetadata = [this, &clearVideoProcessorOutputHdrMetadata]() {
         if (m_VideoProcessor && m_VideoContext) {
             m_VideoContext->VideoProcessorSetStreamHDRMetaData(
                 m_VideoProcessor.Get(),
@@ -2177,6 +2187,7 @@ void D3D11VARenderer::setHdrMode(bool enabled)
                 0,
                 nullptr);
         }
+        clearVideoProcessorOutputHdrMetadata();
 
         if (!m_SwapChain) {
             return;
@@ -2255,6 +2266,10 @@ void D3D11VARenderer::setHdrMode(bool enabled)
     if (!m_VideoProcessor || !m_VideoContext) {
         return;
     }
+
+    // The display may have changed since the last call. Clear the previous
+    // output metadata before probing so lookup failures cannot retain it.
+    clearVideoProcessorOutputHdrMetadata();
 
     // Prepare HDR Meta Data to match the monitor HDR specifications
     int appAdapterIndex = 0;
