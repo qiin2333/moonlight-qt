@@ -309,6 +309,7 @@ jobs:
 
     - name: Test macOS overlay event wakeups
       run: |
+        python3 setup-deps.py
         pushd tests/overlay_button_native_wake
         qmake overlay_button_native_wake.pro
         make -j"$(sysctl -n hw.ncpu)"
