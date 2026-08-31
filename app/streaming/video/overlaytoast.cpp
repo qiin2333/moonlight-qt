@@ -94,7 +94,8 @@ void OverlayToast::showToast(int parentX, int parentY, int parentW, int parentH,
 
     // This is an independent top-level window, so make its font/rendering
     // context follow the stream window's monitor before measuring text.
-    QScreen* targetScreen = QGuiApplication::screenAt(QPoint(parentX, parentY));
+    const QPoint parentCenter(parentX + parentW / 2, parentY + parentH / 2);
+    QScreen* targetScreen = QGuiApplication::screenAt(parentCenter);
     if (targetScreen == nullptr) {
         targetScreen = QGuiApplication::primaryScreen();
     }
