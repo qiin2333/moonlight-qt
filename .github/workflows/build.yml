@@ -311,7 +311,7 @@ jobs:
       run: |
         pushd tests/overlay_button_native_wake
         qmake overlay_button_native_wake.pro
-        make -j$(sysctl -n hw.ncpu)
+        make -j"$(sysctl -n hw.ncpu)"
         ./overlay_button_native_wake
         popd
 
