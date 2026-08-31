@@ -55,6 +55,26 @@ void sendPointerMotion(Display* display, const QPoint& globalPosition)
                                  CurrentTime),
             "XTest pointer motion must be accepted");
     XSync(display, False);
+
+    Window root = None;
+    Window child = None;
+    int rootX = 0;
+    int rootY = 0;
+    int windowX = 0;
+    int windowY = 0;
+    unsigned int state = 0;
+    require(XQueryPointer(display,
+                          DefaultRootWindow(display),
+                          &root,
+                          &child,
+                          &rootX,
+                          &rootY,
+                          &windowX,
+                          &windowY,
+                          &state),
+            "X11 pointer position must be queryable");
+    require(rootX == globalPosition.x() && rootY == globalPosition.y(),
+            "XTest pointer motion must reach the requested root coordinates");
 }
 
 void sendClick(Display* display, int count = 1)
@@ -66,6 +86,30 @@ void sendClick(Display* display, int count = 1)
                 "XTest button release must be accepted");
     }
     XSync(display, False);
+}
+
+QPoint nativeWindowCenter(Display* display, WId windowId)
+{
+    const Window window = static_cast<Window>(windowId);
+    XWindowAttributes attributes = {};
+    require(XGetWindowAttributes(display, window, &attributes),
+            "overlay button X11 attributes must be available");
+    require(attributes.map_state == IsViewable,
+            "overlay button X11 window must be viewable");
+
+    int rootX = 0;
+    int rootY = 0;
+    Window child = None;
+    require(XTranslateCoordinates(display,
+                                  window,
+                                  DefaultRootWindow(display),
+                                  attributes.width / 2,
+                                  attributes.height / 2,
+                                  &rootX,
+                                  &rootY,
+                                  &child),
+            "overlay button center must translate to root coordinates");
+    return QPoint(rootX, rootY);
 }
 }
 
@@ -101,8 +145,7 @@ int main(int argc, char* argv[])
     drainSemaphore(wakeSemaphore);
 
     require(button.winId() != 0, "overlay button must have an X11 window");
-    const QPoint buttonCenter = button.position() +
-            QPoint(button.width() / 2, button.height() / 2);
+    const QPoint buttonCenter = nativeWindowCenter(display, button.winId());
 
     // Move onto the button and finish that Qt pass first. The click below is
     // then delivered while the pointer is stationary, which exercises X11's
@@ -146,8 +189,7 @@ int main(int argc, char* argv[])
     button.showButton(100, 100, 800, 600);
     settleQtEvents(button);
     drainSemaphore(wakeSemaphore);
-    const QPoint reattachedButtonCenter = button.position() +
-            QPoint(button.width() / 2, button.height() / 2);
+    const QPoint reattachedButtonCenter = nativeWindowCenter(display, button.winId());
     sendPointerMotion(display, reattachedButtonCenter);
     require(wakeSemaphore.tryAcquire(1, 1000),
             "pointer motion must wake a re-shown overlay button");
