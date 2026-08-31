@@ -29,6 +29,9 @@ struct MountState;
 }
 
 class DualSenseHapticsRenderer;
+#ifdef Q_OS_DARWIN
+class MacQtEventPumpInputGuard;
+#endif
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
 class StylusReplayTest;
 #endif
@@ -214,6 +217,7 @@ private:
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void showStreamingToast(const QString& message, int durationMs = 2000);
+    void processQtOverlayEvents();
     void updateFileMappingMenuState();
     bool openFileMappingMountPath();
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
@@ -399,6 +403,9 @@ private:
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
     OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification
+#ifdef Q_OS_DARWIN
+    std::unique_ptr<MacQtEventPumpInputGuard> m_MacQtEventPumpInputGuard;
+#endif
     OverlayMenuPanel::FileMappingState m_FileMappingState;
     QString m_FileMappingDetail;
     QString m_FileMappingToast;

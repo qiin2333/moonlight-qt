@@ -25,6 +25,10 @@
 #include "video/ffmpeg.h"
 #endif
 
+#ifdef Q_OS_DARWIN
+#include "streaming/video/macqteventpumpinputguard.h"
+#endif
+
 #ifdef HAVE_SLVIDEO
 #include "video/slvid.h"
 #endif
@@ -48,7 +52,8 @@
 #define SDL_CODE_FLUSH_TOUCHPAD_FRAME 106
 #define SDL_CODE_CURSOR_UPDATE 107
 #define SDL_CODE_FLUSH_CURSOR_VISIBILITY 108
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
 #define SDL_CODE_PROCESS_QT_OVERLAY_EVENTS 109
 #endif
 
@@ -2634,6 +2639,21 @@ void Session::showStreamingToast(const QString& message, int durationMs)
                        message, durationMs);
 }
 
+void Session::processQtOverlayEvents()
+{
+#ifdef Q_OS_DARWIN
+    if (m_MacQtEventPumpInputGuard) {
+        m_MacQtEventPumpInputGuard->beginEventProcessing();
+    }
+#endif
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+#ifdef Q_OS_DARWIN
+    if (m_MacQtEventPumpInputGuard) {
+        m_MacQtEventPumpInputGuard->finishEventProcessing();
+    }
+#endif
+}
+
 void Session::updateFileMappingMenuState()
 {
     if (m_MenuPanel) {
@@ -3257,11 +3277,12 @@ void Session::handleSdlUserEvent(const SDL_UserEvent& event)
         }
         break;
     }
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
     case SDL_CODE_PROCESS_QT_OVERLAY_EVENTS:
         // The actual Qt processing happens after SDL dispatch below.
         // Keeping this event side-effect free also coalesces bursts of
-        // native button messages without re-entering Qt from Win32.
+        // native button messages without re-entering Qt from platform code.
         break;
 #endif
     default:
@@ -3363,7 +3384,7 @@ bool Session::tryReconnect()
         if (m_Toast) {
             m_Toast->beginEventProcessing();
         }
-        QCoreApplication::processEvents();
+        processQtOverlayEvents();
     };
 
     while (!cancelled && SDL_GetTicks() - startTicks < graceMs) {
@@ -4411,8 +4432,13 @@ void Session::exec()
 
     // Keep a hidden button ready so placement can switch during a stream
     // without creating a window from inside an input callback.
+#ifdef Q_OS_DARWIN
+    m_MacQtEventPumpInputGuard =
+            std::make_unique<MacQtEventPumpInputGuard>(m_Window);
+#endif
     m_MenuButton = new OverlayMenuButton();
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
     m_MenuButton->setEventWakeCallback([]() {
         SDL_Event wakeEvent = {};
         wakeEvent.type = SDL_USEREVENT;
@@ -4475,7 +4501,10 @@ void Session::exec()
         if (m_Toast) {
             m_Toast->beginEventProcessing();
         }
-        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        processQtOverlayEvents();
+        if (m_MenuButton) {
+            m_MenuButton->finishEventProcessing();
+        }
     };
 
     auto processClipboardHelperMessages = [this]() {
@@ -4871,8 +4900,13 @@ void Session::exec()
 
                 // SDL_CreateRenderer() may recreate the platform window while
                 // retaining the SDL_Window object. Refresh native input hooks
-                // after renderer creation so they follow the replacement HWND.
+                // after renderer creation so they follow the replacement window.
                 m_InputHandler->setWindow(m_Window);
+#ifdef Q_OS_DARWIN
+                if (m_MacQtEventPumpInputGuard) {
+                    m_MacQtEventPumpInputGuard->setStreamingWindow(m_Window);
+                }
+#endif
 
                 // As of SDL 2.0.12, SDL_RecreateWindow() doesn't carry over mouse capture
                 // or mouse hiding state to the new window. By capturing after the decoder
@@ -5120,10 +5154,11 @@ DispatchDeferredCleanup:
 
     // Destroy the Qt overlay menu button
     if (m_MenuButton) {
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+        m_MenuButton->hideButton();
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
         m_MenuButton->setEventWakeCallback({});
 #endif
-        m_MenuButton->hideButton();
         delete m_MenuButton;
         m_MenuButton = nullptr;
     }
@@ -5134,6 +5169,9 @@ DispatchDeferredCleanup:
         delete m_Toast;
         m_Toast = nullptr;
     }
+#ifdef Q_OS_DARWIN
+    m_MacQtEventPumpInputGuard.reset();
+#endif
 
     // Uncapture the mouse and hide the window immediately,
     // so we can return to the Qt GUI ASAP.

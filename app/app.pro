@@ -87,6 +87,16 @@ unix:if(!macx|disable-prebuilts) {
         PKGCONFIG += opus
     }
 
+    # Desktop overlay event monitors are independent of the video decoder.
+    # Keep these checks outside !disable-ffmpeg so software-only builds can
+    # still avoid polling Qt while the floating button is idle.
+    linux:!config_SL {
+        !disable-x11:packagesExist(xcb) {
+            DEFINES += HAVE_XCB_DISPLAY_MONITOR
+            PKGCONFIG += xcb
+        }
+    }
+
     !disable-ffmpeg {
         packagesExist(libavcodec) {
             PKGCONFIG += libavcodec libavutil libswscale
@@ -352,10 +362,18 @@ HEADERS += \
 macx {
     HEADERS += \
         gui/macwindowchrome.h \
+        streaming/video/macqteventpumpinputguard.h \
         streaming/video/overlayeventmonitor_mac.h
     SOURCES += \
         gui/macwindowchrome.mm \
+        streaming/video/macqteventpumpinputguard.mm \
         streaming/video/overlayeventmonitor_mac.mm
+}
+
+linux:!config_SL {
+    DEFINES += HAVE_LINUX_DISPLAY_EVENT_MONITOR
+    HEADERS += streaming/video/overlayeventmonitor_linux.h
+    SOURCES += streaming/video/overlayeventmonitor_linux.cpp
 }
 
 # Platform-specific renderers and decoders

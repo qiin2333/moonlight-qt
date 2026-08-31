@@ -12,6 +12,10 @@
 #include "overlayeventmonitor_mac.h"
 #endif
 
+#ifdef HAVE_LINUX_DISPLAY_EVENT_MONITOR
+#include "overlayeventmonitor_linux.h"
+#endif
+
 #ifdef Q_OS_WIN32
 #include <windows.h>
 #include <commctrl.h>
@@ -185,18 +189,26 @@ OverlayMenuButton::OverlayMenuButton(QWindow* parent)
 
 OverlayMenuButton::~OverlayMenuButton()
 {
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
     m_NativeEventMonitor.reset();
 #endif
 }
 
+void OverlayMenuButton::setEventWakeCallback(EventWakeCallback cb)
+{
+    std::lock_guard<std::mutex> lock(m_EventWakeCallbackMutex);
+    m_EventWakeCallback = std::move(cb);
+}
+
 bool OverlayMenuButton::needsEventProcessing() const
 {
-    if (!m_ButtonVisible) {
+    if (!m_ButtonVisible.load(std::memory_order_acquire)) {
         return false;
     }
 
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
     // If native monitoring is unavailable, retain the old continuous-pump
     // behavior so the button never becomes unusable on an unusual system.
     return !m_NativeEventMonitor || !m_NativeEventMonitor->isAttached() ||
@@ -211,14 +223,26 @@ void OverlayMenuButton::beginEventProcessing()
     m_EventWakeState.take();
 }
 
+void OverlayMenuButton::finishEventProcessing()
+{
+#ifdef HAVE_LINUX_DISPLAY_EVENT_MONITOR
+    if (m_NativeEventMonitor) {
+        m_NativeEventMonitor->finishEventProcessing();
+    }
+#endif
+}
+
 void OverlayMenuButton::requestEventProcessing()
 {
-    if (!m_ButtonVisible) {
+    if (!m_ButtonVisible.load(std::memory_order_acquire)) {
         return;
     }
 
-    if (m_EventWakeState.request() && m_EventWakeCallback) {
-        m_EventWakeCallback();
+    if (m_EventWakeState.request()) {
+        std::lock_guard<std::mutex> lock(m_EventWakeCallbackMutex);
+        if (m_ButtonVisible.load(std::memory_order_acquire) && m_EventWakeCallback) {
+            m_EventWakeCallback();
+        }
     }
 }
 
@@ -228,14 +252,19 @@ void OverlayMenuButton::requestButtonUpdate()
     requestUpdate();
 }
 
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
 void OverlayMenuButton::ensureNativeEventMonitor()
 {
     if (!m_NativeEventMonitor) {
-#ifdef Q_OS_WIN32
+#if defined(Q_OS_WIN32)
         m_NativeEventMonitor = std::make_unique<NativeEventMonitor>(this);
-#else
+#elif defined(Q_OS_DARWIN)
         m_NativeEventMonitor = std::make_unique<MacOverlayEventMonitor>([this]() {
+            requestEventProcessing();
+        });
+#elif defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
+        m_NativeEventMonitor = std::make_unique<LinuxDisplayEventMonitor>([this]() {
             requestEventProcessing();
         });
 #endif
@@ -243,11 +272,20 @@ void OverlayMenuButton::ensureNativeEventMonitor()
 
 #ifdef Q_OS_WIN32
     const auto nativeWindow = reinterpret_cast<HWND>(winId());
-#else
+#elif defined(Q_OS_DARWIN)
     void* nativeWindow = reinterpret_cast<void*>(winId());
+#elif defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
+    const auto nativeWindow = static_cast<std::uintptr_t>(winId());
 #endif
     if (!m_NativeEventMonitor->attach(nativeWindow)) {
         qWarning("Failed to monitor native overlay button events; using continuous Qt event processing");
+    }
+}
+
+void OverlayMenuButton::detachNativeEventMonitor()
+{
+    if (m_NativeEventMonitor) {
+        m_NativeEventMonitor->detach();
     }
 }
 #endif
@@ -286,7 +324,7 @@ void OverlayMenuButton::repositionTo(int parentX, int parentY, int parentW, int 
     }
 
     setGeometry(QRect(clampToParent(newPosition), QSize(kButtonSize, kButtonSize)));
-    if (m_ButtonVisible) {
+    if (m_ButtonVisible.load(std::memory_order_acquire)) {
         requestEventProcessing();
     }
 }
@@ -294,9 +332,10 @@ void OverlayMenuButton::repositionTo(int parentX, int parentY, int parentW, int 
 void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int parentH)
 {
     repositionTo(parentX, parentY, parentW, parentH);
-    m_ButtonVisible = true;
+    m_ButtonVisible.store(true, std::memory_order_release);
     show();
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
     ensureNativeEventMonitor();
 #endif
     raise();
@@ -306,7 +345,11 @@ void OverlayMenuButton::showButton(int parentX, int parentY, int parentW, int pa
 void OverlayMenuButton::hideButton()
 {
     cancelInteraction();
-    m_ButtonVisible = false;
+    m_ButtonVisible.store(false, std::memory_order_release);
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
+        defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
+    detachNativeEventMonitor();
+#endif
     m_EventWakeState.clear();
     unsetCursor();
     hide();

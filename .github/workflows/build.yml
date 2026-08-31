@@ -309,10 +309,11 @@ jobs:
 
     - name: Test macOS overlay event wakeups
       run: |
+        python3 setup-deps.py
         pushd tests/overlay_button_native_wake
         qmake overlay_button_native_wake.pro
         make -j"$(sysctl -n hw.ncpu)"
-        ./overlay_button_native_wake
+        DYLD_LIBRARY_PATH="$PWD/../../libs/mac/lib" ./overlay_button_native_wake
         popd
 
     - name: Build and generate DMG
@@ -406,9 +407,9 @@ jobs:
           libdbus-1-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev \
           libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev \
           libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev \
-          libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev libwayland-dev wayland-protocols \
+          libxv-dev libxxf86vm-dev libxcb1-dev libxcb-dri3-dev libx11-xcb-dev libwayland-dev wayland-protocols \
           libxfixes-dev libxtst-dev libpipewire-0.3-dev \
-          libopus-dev libvdpau-dev cmake
+          libopus-dev libvdpau-dev cmake xvfb xauth
 
         if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
           sudo apt install -y vulkan-sdk
@@ -439,6 +440,20 @@ jobs:
           # Needed for AppImage
           sudo apt install libfuse2
         fi
+
+    - name: Test Linux display event wakeups
+      run: |
+        pushd tests/linux_display_event_monitor
+        qmake linux_display_event_monitor.pro
+        make -j"$(nproc)"
+        ./linux_display_event_monitor
+        popd
+
+        pushd tests/overlay_button_native_wake
+        qmake overlay_button_native_wake.pro
+        make -j"$(nproc)"
+        QT_QPA_PLATFORM=xcb xvfb-run -a ./overlay_button_native_wake
+        popd
 
     # arm64 上没有 LunarG 源，Vulkan 那套要手工补：noble 自带的 loader 是 1.3.275，
     # 而 FFmpeg configure 卡的是 `vulkan >= 1.3.277`（pkg-config 版本号），差这么一点
