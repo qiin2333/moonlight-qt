@@ -1,4 +1,5 @@
 #include "streaming/video/overlaymenubutton.h"
+#include "streaming/video/macqteventpumpinputguard.h"
 
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -36,6 +37,25 @@ void sendPointerEvent(NSInteger windowNumber)
                                       clickCount:0
                                         pressure:0];
     [NSApp sendEvent:event];
+}
+
+void postKeyEvent(NSEventType type,
+                  NSInteger windowNumber,
+                  NSString* characters,
+                  NSEventModifierFlags modifiers,
+                  unsigned short keyCode)
+{
+    NSEvent* event = [NSEvent keyEventWithType:type
+                                      location:NSZeroPoint
+                                 modifierFlags:modifiers
+                                     timestamp:NSProcessInfo.processInfo.systemUptime
+                                  windowNumber:windowNumber
+                                       context:nil
+                                    characters:characters
+                   charactersIgnoringModifiers:characters
+                                      isARepeat:NO
+                                        keyCode:keyCode];
+    [NSApp postEvent:event atStart:NO];
 }
 }
 
@@ -99,6 +119,63 @@ int main(int argc, char* argv[])
             "re-shown button must reattach its macOS event monitor");
     require(wakeCount == reattachedWakeCount + 1,
             "reattached monitor must wake for native pointer input");
+
+    MacQtEventPumpInputGuard inputGuard;
+    postKeyEvent(NSEventTypeKeyDown, nativeView.window.windowNumber, @"a", 0, 0);
+    postKeyEvent(NSEventTypeKeyUp, nativeView.window.windowNumber, @"a", 0, 0);
+    postKeyEvent(NSEventTypeFlagsChanged,
+                 nativeView.window.windowNumber,
+                 @"",
+                 NSEventModifierFlagShift,
+                 56);
+    inputGuard.beginEventProcessing();
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+    inputGuard.finishEventProcessing();
+
+    const NSEventMask keyboardMask = NSEventMaskKeyDown |
+            NSEventMaskKeyUp |
+            NSEventMaskFlagsChanged;
+    NSEvent* firstKeyEvent = [NSApp nextEventMatchingMask:keyboardMask
+                                                 untilDate:[NSDate distantPast]
+                                                    inMode:NSDefaultRunLoopMode
+                                                   dequeue:YES];
+    NSEvent* secondKeyEvent = [NSApp nextEventMatchingMask:keyboardMask
+                                                  untilDate:[NSDate distantPast]
+                                                     inMode:NSDefaultRunLoopMode
+                                                    dequeue:YES];
+    NSEvent* modifierEvent = [NSApp nextEventMatchingMask:keyboardMask
+                                                untilDate:[NSDate distantPast]
+                                                   inMode:NSDefaultRunLoopMode
+                                                  dequeue:YES];
+    require(firstKeyEvent.type == NSEventTypeKeyDown &&
+                    [firstKeyEvent.characters isEqualToString:@"a"],
+            "Qt event processing must return key-down events for SDL");
+    require(secondKeyEvent.type == NSEventTypeKeyUp &&
+                    [secondKeyEvent.characters isEqualToString:@"a"],
+            "Qt event processing must preserve key release order");
+    require(modifierEvent.type == NSEventTypeFlagsChanged &&
+                    (modifierEvent.modifierFlags & NSEventModifierFlagShift),
+            "Qt event processing must preserve modifier changes");
+
+    NSEvent* normallyDispatchedEvent = [NSEvent keyEventWithType:NSEventTypeKeyDown
+                                                        location:NSZeroPoint
+                                                   modifierFlags:0
+                                                       timestamp:NSProcessInfo.processInfo.systemUptime
+                                                    windowNumber:nativeView.window.windowNumber
+                                                         context:nil
+                                                      characters:@"c"
+                                     charactersIgnoringModifiers:@"c"
+                                                        isARepeat:NO
+                                                          keyCode:8];
+    inputGuard.beginEventProcessing();
+    [NSApp sendEvent:normallyDispatchedEvent];
+    inputGuard.finishEventProcessing();
+    NSEvent* duplicateEvent = [NSApp nextEventMatchingMask:keyboardMask
+                                                 untilDate:[NSDate distantPast]
+                                                    inMode:NSDefaultRunLoopMode
+                                                   dequeue:YES];
+    require(duplicateEvent == nil,
+            "normal AppKit dispatch must not requeue an SDL-processed key");
 
     qunsetenv("MOONLIGHT_DEVICE_LOCAL_SETTINGS_DIR");
     return 0;

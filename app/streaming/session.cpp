@@ -25,6 +25,10 @@
 #include "video/ffmpeg.h"
 #endif
 
+#ifdef Q_OS_DARWIN
+#include "streaming/video/macqteventpumpinputguard.h"
+#endif
+
 #ifdef HAVE_SLVIDEO
 #include "video/slvid.h"
 #endif
@@ -2635,6 +2639,21 @@ void Session::showStreamingToast(const QString& message, int durationMs)
                        message, durationMs);
 }
 
+void Session::processQtOverlayEvents()
+{
+#ifdef Q_OS_DARWIN
+    if (m_MacQtEventPumpInputGuard) {
+        m_MacQtEventPumpInputGuard->beginEventProcessing();
+    }
+#endif
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+#ifdef Q_OS_DARWIN
+    if (m_MacQtEventPumpInputGuard) {
+        m_MacQtEventPumpInputGuard->finishEventProcessing();
+    }
+#endif
+}
+
 void Session::updateFileMappingMenuState()
 {
     if (m_MenuPanel) {
@@ -3365,7 +3384,7 @@ bool Session::tryReconnect()
         if (m_Toast) {
             m_Toast->beginEventProcessing();
         }
-        QCoreApplication::processEvents();
+        processQtOverlayEvents();
     };
 
     while (!cancelled && SDL_GetTicks() - startTicks < graceMs) {
@@ -4413,6 +4432,9 @@ void Session::exec()
 
     // Keep a hidden button ready so placement can switch during a stream
     // without creating a window from inside an input callback.
+#ifdef Q_OS_DARWIN
+    m_MacQtEventPumpInputGuard = std::make_unique<MacQtEventPumpInputGuard>();
+#endif
     m_MenuButton = new OverlayMenuButton();
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
         defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
@@ -4478,7 +4500,7 @@ void Session::exec()
         if (m_Toast) {
             m_Toast->beginEventProcessing();
         }
-        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        processQtOverlayEvents();
         if (m_MenuButton) {
             m_MenuButton->finishEventProcessing();
         }
@@ -5141,6 +5163,9 @@ DispatchDeferredCleanup:
         delete m_Toast;
         m_Toast = nullptr;
     }
+#ifdef Q_OS_DARWIN
+    m_MacQtEventPumpInputGuard.reset();
+#endif
 
     // Uncapture the mouse and hide the window immediately,
     // so we can return to the Qt GUI ASAP.

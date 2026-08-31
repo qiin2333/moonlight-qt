@@ -357,9 +357,11 @@ HEADERS += \
 macx {
     HEADERS += \
         gui/macwindowchrome.h \
+        streaming/video/macqteventpumpinputguard.h \
         streaming/video/overlayeventmonitor_mac.h
     SOURCES += \
         gui/macwindowchrome.mm \
+        streaming/video/macqteventpumpinputguard.mm \
         streaming/video/overlayeventmonitor_mac.mm
 }
 

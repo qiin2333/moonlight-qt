@@ -14,6 +14,7 @@ SOURCES += \
 macx {
     SOURCES += \
         main_mac.mm \
+        ../../app/streaming/video/macqteventpumpinputguard.mm \
         ../../app/streaming/video/overlayeventmonitor_mac.mm
 } else:linux {
     CONFIG += link_pkgconfig
@@ -33,4 +34,5 @@ HEADERS += \
     ../../app/streaming/video/overlaymenubutton.h
 
 macx: HEADERS += ../../app/streaming/video/overlayeventmonitor_mac.h
+macx: HEADERS += ../../app/streaming/video/macqteventpumpinputguard.h
 linux: HEADERS += ../../app/streaming/video/overlayeventmonitor_linux.h
