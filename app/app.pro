@@ -153,6 +153,7 @@ unix:if(!macx|disable-prebuilts) {
         !disable-wayland {
             packagesExist(wayland-client) {
                 CONFIG += wayland
+                DEFINES += HAVE_WAYLAND_DISPLAY_MONITOR
                 PKGCONFIG += wayland-client
             }
         }
@@ -161,6 +162,10 @@ unix:if(!macx|disable-prebuilts) {
             packagesExist(x11) {
                 DEFINES += HAS_X11
                 PKGCONFIG += x11
+                packagesExist(xcb) {
+                    DEFINES += HAVE_XCB_DISPLAY_MONITOR
+                    PKGCONFIG += xcb
+                }
             }
         }
     }
@@ -356,6 +361,12 @@ macx {
     SOURCES += \
         gui/macwindowchrome.mm \
         streaming/video/overlayeventmonitor_mac.mm
+}
+
+linux:!config_SL {
+    DEFINES += HAVE_LINUX_DISPLAY_EVENT_MONITOR
+    HEADERS += streaming/video/overlayeventmonitor_linux.h
+    SOURCES += streaming/video/overlayeventmonitor_linux.cpp
 }
 
 # Platform-specific renderers and decoders

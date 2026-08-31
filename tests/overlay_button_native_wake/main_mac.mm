@@ -85,6 +85,20 @@ int main(int argc, char* argv[])
     sendPointerEvent(windowNumber);
     require(!button.needsEventProcessing(),
             "hidden button must ignore native macOS pointer events");
+    require(wakeCount == settledWakeCount + 1,
+            "hidden button must detach its native event monitor");
+
+    button.showButton(100, 100, 800, 600);
+    settleQtEvents(button);
+    nativeView = static_cast<NSView*>(reinterpret_cast<void*>(button.winId()));
+    require(nativeView.window != nil,
+            "re-shown overlay button must have a native macOS window");
+    const int reattachedWakeCount = wakeCount;
+    sendPointerEvent(nativeView.window.windowNumber);
+    require(button.needsEventProcessing(),
+            "re-shown button must reattach its macOS event monitor");
+    require(wakeCount == reattachedWakeCount + 1,
+            "reattached monitor must wake for native pointer input");
 
     qunsetenv("MOONLIGHT_DEVICE_LOCAL_SETTINGS_DIR");
     return 0;

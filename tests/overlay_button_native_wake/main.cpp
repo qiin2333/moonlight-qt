@@ -93,6 +93,21 @@ int main(int argc, char* argv[])
     require(!button.needsEventProcessing(),
             "hidden button must not keep the Qt event pump active");
 
+    button.showButton(100, 100, 800, 600);
+    settleQtEvents(button);
+    hwnd = reinterpret_cast<HWND>(button.winId());
+    const int reattachedWakeCount = wakeCount;
+    require(PostMessageW(hwnd, WM_MOUSEMOVE, 0, MAKELPARAM(2, 2)) != FALSE,
+            "re-shown button must accept native pointer messages");
+    while (PeekMessageW(&finalMessage, hwnd, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&finalMessage);
+        DispatchMessageW(&finalMessage);
+    }
+    require(button.needsEventProcessing(),
+            "re-shown button must reattach its native event monitor");
+    require(wakeCount == reattachedWakeCount + 1,
+            "reattached native monitor must wake the owner loop");
+
     qunsetenv("MOONLIGHT_DEVICE_LOCAL_SETTINGS_DIR");
     return 0;
 #endif

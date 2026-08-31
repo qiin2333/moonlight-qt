@@ -15,6 +15,13 @@ macx {
     SOURCES += \
         main_mac.mm \
         ../../app/streaming/video/overlayeventmonitor_mac.mm
+} else:linux {
+    CONFIG += link_pkgconfig
+    DEFINES += HAVE_LINUX_DISPLAY_EVENT_MONITOR HAVE_XCB_DISPLAY_MONITOR
+    PKGCONFIG += xcb
+    SOURCES += \
+        main_linux.cpp \
+        ../../app/streaming/video/overlayeventmonitor_linux.cpp
 } else {
     SOURCES += main.cpp
 }
@@ -26,3 +33,4 @@ HEADERS += \
     ../../app/streaming/video/overlaymenubutton.h
 
 macx: HEADERS += ../../app/streaming/video/overlayeventmonitor_mac.h
+linux: HEADERS += ../../app/streaming/video/overlayeventmonitor_linux.h
