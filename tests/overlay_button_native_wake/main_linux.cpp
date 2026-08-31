@@ -54,7 +54,7 @@ void sendPointerMotion(Display* display, const QPoint& globalPosition)
                                  globalPosition.y(),
                                  CurrentTime),
             "XTest pointer motion must be accepted");
-    XFlush(display);
+    XSync(display, False);
 }
 
 void sendClick(Display* display, int count = 1)
@@ -65,7 +65,7 @@ void sendClick(Display* display, int count = 1)
         require(XTestFakeButtonEvent(display, Button1, False, CurrentTime),
                 "XTest button release must be accepted");
     }
-    XFlush(display);
+    XSync(display, False);
 }
 }
 
@@ -83,6 +83,7 @@ int main(int argc, char* argv[])
 
     Display* display = XOpenDisplay(nullptr);
     require(display != nullptr, "X11 test display must be available");
+    sendPointerMotion(display, QPoint(0, 0));
 
     OverlayMenuButton button;
     std::atomic_int wakeCount{0};
@@ -140,6 +141,7 @@ int main(int argc, char* argv[])
     QThread::msleep(20);
     require(wakeCount.load(std::memory_order_acquire) == hiddenWakeCount,
             "hidden button must detach its X11 event monitor");
+    sendPointerMotion(display, QPoint(0, 0));
 
     button.showButton(100, 100, 800, 600);
     settleQtEvents(button);
