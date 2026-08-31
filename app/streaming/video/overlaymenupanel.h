@@ -12,6 +12,7 @@
 #include <QVariantAnimation>
 #include <functional>
 #include <optional>
+#include <utility>
 #include <vector>
 
 /**
@@ -46,6 +47,8 @@ public:
         PasteText,
         TogglePointerRegionLock,
         ShowHostFiles,
+        SelectRemoteUsbDevice,
+        ReleaseRemoteUsbDevice,
         // Microphone
         ToggleMicrophone,
         // Gamepad mouse emulation
@@ -80,6 +83,23 @@ public:
         Error
     };
 
+    enum class RemoteUsbState {
+        Unavailable,
+        Discovering,
+        Available,
+        Opening,
+        Open,
+        Stopping,
+        Error
+    };
+
+    struct RemoteUsbDevice {
+        QString id;
+        QString label;
+        QString detail;
+        bool supported = true;
+    };
+
     enum class MenuItemType {
         Action,     // dispatch action + close menu
         SubMenu,    // navigate to sub-level
@@ -89,12 +109,20 @@ public:
 
     using ActionCallback = std::function<void(MenuAction)>;
     using CloseCallback  = std::function<void()>;
+    using RemoteUsbDeviceCallback = std::function<void(const QString&)>;
+    using RemoteUsbReleaseCallback = std::function<void()>;
 
     explicit OverlayMenuPanel(QWindow* parent = nullptr);
     ~OverlayMenuPanel() override;
 
     void setActionCallback(ActionCallback cb) { m_ActionCallback = cb; }
     void setCloseCallback(CloseCallback cb)   { m_CloseCallback = cb; }
+    void setRemoteUsbDeviceCallback(RemoteUsbDeviceCallback cb) {
+        m_RemoteUsbDeviceCallback = std::move(cb);
+    }
+    void setRemoteUsbReleaseCallback(RemoteUsbReleaseCallback cb) {
+        m_RemoteUsbReleaseCallback = std::move(cb);
+    }
 
     // Position the panel at the right edge of the given Qt logical parent rect.
     void showAtRightEdge(int parentX, int parentY, int parentW, int parentH,
@@ -126,6 +154,11 @@ public:
     void updateMenuPositionState(MenuAction activePlacementAction);
     void updateGamepadMouseState(bool enabled);
     void updateFileMappingState(FileMappingState state, const QString& detail);
+    void updateRemoteUsbState(bool available,
+                              RemoteUsbState state,
+                              std::vector<RemoteUsbDevice> devices,
+                              const QString& activeDeviceId,
+                              const QString& detail);
     void setHasGamepads(bool has) {
         if (m_HasGamepads != has) {
             m_HasGamepads = has;
@@ -155,6 +188,28 @@ private:
         bool         enabled;
         bool         toggleState;  // for Toggle: current on/off state
         bool         separatorAfter; // draw group separator after this item
+        QString      payload;      // opaque action payload; never rendered
+
+        MenuItem(QString label,
+                 QString detail,
+                 MenuItemType type,
+                 MenuAction action,
+                 int targetLevel,
+                 bool enabled,
+                 bool toggleState,
+                 bool separatorAfter,
+                 QString payload = {})
+            : label(std::move(label)),
+              detail(std::move(detail)),
+              type(type),
+              action(action),
+              targetLevel(targetLevel),
+              enabled(enabled),
+              toggleState(toggleState),
+              separatorAfter(separatorAfter),
+              payload(std::move(payload))
+        {
+        }
     };
 
     struct MenuLevel {
@@ -171,6 +226,7 @@ private:
     void schedulePointerOutsideCheck();
     void forceRepaint();     // synchronous repaint (requestUpdate is async on Windows)
     int  itemAtPos(const QPoint& pos) const;
+    void dispatchActionItem(const MenuItem& item);
 
     std::vector<MenuLevel> m_MenuLevels;
     int  m_CurrentLevel;
@@ -179,9 +235,16 @@ private:
     bool m_HasGamepads;
     FileMappingState m_FileMappingState;
     QString m_FileMappingDetail;
+    bool m_RemoteUsbAvailable;
+    RemoteUsbState m_RemoteUsbState;
+    std::vector<RemoteUsbDevice> m_RemoteUsbDevices;
+    QString m_RemoteUsbActiveDeviceId;
+    QString m_RemoteUsbDetail;
 
     ActionCallback m_ActionCallback;
     CloseCallback  m_CloseCallback;
+    RemoteUsbDeviceCallback m_RemoteUsbDeviceCallback;
+    RemoteUsbReleaseCallback m_RemoteUsbReleaseCallback;
 
     // Parent window rect in Qt global logical coordinates for level changes
     int m_ParentX, m_ParentY, m_ParentW, m_ParentH;

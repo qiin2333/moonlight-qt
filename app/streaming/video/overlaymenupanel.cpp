@@ -23,6 +23,9 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
       m_HasGamepads(false),
       m_FileMappingState(FileMappingState::Unknown),
       m_FileMappingDetail(tr("Checking")),
+      m_RemoteUsbAvailable(false),
+      m_RemoteUsbState(RemoteUsbState::Unavailable),
+      m_RemoteUsbDetail(tr("Unavailable")),
       m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
       m_CloseWhenPointerOutside(false),
       m_ContentOffset(0),
@@ -166,17 +169,27 @@ void OverlayMenuPanel::buildMenuLevels()
                          MenuAction::MenuActionMax, 3, true, false, false});
     top.items.push_back({tr("Bitrate"),       QString(),  MenuItemType::SubMenu,
                          MenuAction::MenuActionMax, 2, true, false, false});
-    constexpr bool separatorAfterHostFiles =
+    const bool separatorAfterHostFiles =
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
             false;
 #else
-            true;
+            !m_RemoteUsbAvailable;
 #endif
     top.items.push_back({tr("Host Files"),    m_FileMappingDetail, MenuItemType::Action,
                          MenuAction::ShowHostFiles, 0, true,
                          m_FileMappingState == FileMappingState::Available ||
                          m_FileMappingState == FileMappingState::Open,
                          separatorAfterHostFiles});
+    if (m_RemoteUsbAvailable) {
+        top.items.push_back({tr("USB Devices"), m_RemoteUsbDetail,
+                             MenuItemType::SubMenu,
+                             MenuAction::MenuActionMax, 4, true, false,
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+                             false});
+#else
+                             true});
+#endif
+    }
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
     top.items.push_back({tr("Function Tests"),
                          tr("Developer"),
@@ -252,6 +265,64 @@ void OverlayMenuPanel::buildMenuLevels()
     placement.items.push_back({tr("Disabled"), QString(), MenuItemType::Action,
                                MenuAction::SetMenuPlacementDisabled, 0, true, false, false});
     m_MenuLevels.push_back(placement);
+
+    // === Level 4: Remote USB devices ===
+    if (m_RemoteUsbAvailable) {
+        MenuLevel usb;
+        usb.title = tr("USB Devices");
+        if (m_RemoteUsbDevices.empty()) {
+            const QString emptyDetail =
+                m_RemoteUsbState == RemoteUsbState::Discovering
+                    ? tr("Scanning") : tr("No devices found");
+            usb.items.push_back({tr("USB Devices"), emptyDetail,
+                                 MenuItemType::Action,
+                                 MenuAction::MenuActionMax, 0, false, false,
+                                 false});
+        }
+        else {
+            for (const RemoteUsbDevice& device : m_RemoteUsbDevices) {
+                const bool active = !m_RemoteUsbActiveDeviceId.isEmpty() &&
+                                    device.id == m_RemoteUsbActiveDeviceId;
+                QString detail = device.detail;
+                if (active) {
+                    switch (m_RemoteUsbState) {
+                    case RemoteUsbState::Opening:
+                        detail = tr("Connecting");
+                        break;
+                    case RemoteUsbState::Open:
+                        detail = tr("Connected");
+                        break;
+                    case RemoteUsbState::Stopping:
+                        detail = tr("Releasing");
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                const bool busy = m_RemoteUsbState == RemoteUsbState::Opening ||
+                                  m_RemoteUsbState == RemoteUsbState::Stopping;
+                const bool hasOpenDevice =
+                    m_RemoteUsbState == RemoteUsbState::Open &&
+                    !m_RemoteUsbActiveDeviceId.isEmpty();
+                usb.items.push_back({device.label, detail,
+                                     MenuItemType::Action,
+                                     active && m_RemoteUsbState == RemoteUsbState::Open
+                                         ? MenuAction::ReleaseRemoteUsbDevice
+                                         : MenuAction::SelectRemoteUsbDevice,
+                                     0,
+                                     device.supported && !busy &&
+                                         (!hasOpenDevice || active),
+                                     active,
+                                     false,
+                                     device.id});
+            }
+        }
+        m_MenuLevels.push_back(std::move(usb));
+    }
+
+    if (m_CurrentLevel >= static_cast<int>(m_MenuLevels.size())) {
+        m_CurrentLevel = 0;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +431,47 @@ void OverlayMenuPanel::updateFileMappingState(FileMappingState state, const QStr
             forceRepaint();
             break;
         }
+    }
+}
+
+void OverlayMenuPanel::updateRemoteUsbState(
+    bool available,
+    RemoteUsbState state,
+    std::vector<RemoteUsbDevice> devices,
+    const QString& activeDeviceId,
+    const QString& detail)
+{
+    m_RemoteUsbAvailable = available;
+    m_RemoteUsbState = state;
+    m_RemoteUsbDevices = std::move(devices);
+    m_RemoteUsbActiveDeviceId = activeDeviceId;
+    m_RemoteUsbDetail = detail;
+    const int previousLevel = m_CurrentLevel;
+    buildMenuLevels();
+    if (m_Visible && previousLevel == 4 && m_MenuLevels.size() > 4) {
+        m_CurrentLevel = 4;
+        repositionWindow();
+    }
+    forceRepaint();
+}
+
+void OverlayMenuPanel::dispatchActionItem(const MenuItem& item)
+{
+    closeMenu();
+    if (item.action == MenuAction::SelectRemoteUsbDevice) {
+        if (m_RemoteUsbDeviceCallback) {
+            m_RemoteUsbDeviceCallback(item.payload);
+        }
+        return;
+    }
+    if (item.action == MenuAction::ReleaseRemoteUsbDevice) {
+        if (m_RemoteUsbReleaseCallback) {
+            m_RemoteUsbReleaseCallback();
+        }
+        return;
+    }
+    if (m_ActionCallback) {
+        m_ActionCallback(item.action);
     }
 }
 
@@ -777,10 +889,13 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             if (item.targetLevel == 1) return QChar(0xE713); // Settings gear
             if (item.targetLevel == 2) return QChar(0xE7F4); // DataSense (data/speed)
             if (item.targetLevel == 3) return QChar(0xE707); // Map pin
+            if (item.targetLevel == 4) return QChar(0xE88E); // USB
         }
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE740); // FullScreen
         case MenuAction::ShowHostFiles:     return QChar(0xE8B7); // Folder
+        case MenuAction::SelectRemoteUsbDevice:
+        case MenuAction::ReleaseRemoteUsbDevice: return QChar(0xE88E); // USB
         case MenuAction::ToggleMicrophone:  return QChar(0xE720); // Microphone
         case MenuAction::ToggleGamepadMouse:  return QChar(0xE7FC); // Gamepad
         case MenuAction::Quit:              return QChar(0xE711); // Close/X
@@ -803,10 +918,13 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             if (item.targetLevel == 1) return QChar(0xE8B8); // settings
             if (item.targetLevel == 2) return QChar(0xE1B2); // speed (bitrate)
             if (item.targetLevel == 3) return QChar(0xE55F); // place
+            if (item.targetLevel == 4) return QChar(0xE1E0); // usb
         }
         switch (item.action) {
         case MenuAction::ToggleFullScreen:  return QChar(0xE5D0); // fullscreen
         case MenuAction::ShowHostFiles:     return QChar(0xE2C7); // folder
+        case MenuAction::SelectRemoteUsbDevice:
+        case MenuAction::ReleaseRemoteUsbDevice: return QChar(0xE1E0); // usb
         case MenuAction::ToggleMicrophone:  return QChar(0xE029); // mic
         case MenuAction::ToggleGamepadMouse:  return QChar(0xE30F); // games (gamepad)
         case MenuAction::Quit:              return QChar(0xE5CD); // close
@@ -1029,14 +1147,8 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
         break;
 
     case MenuItemType::Action:
-    {
-        MenuAction action = item.action;
-        closeMenu();
-        if (m_ActionCallback) {
-            m_ActionCallback(action);
-        }
+        dispatchActionItem(item);
         break;
-    }
 
     case MenuItemType::Toggle:
     {
@@ -1132,14 +1244,8 @@ void OverlayMenuPanel::gamepadSelect()
         navigateToLevel(item.targetLevel);
         break;
     case MenuItemType::Action:
-    {
-        MenuAction action = item.action;
-        closeMenu();
-        if (m_ActionCallback) {
-            m_ActionCallback(action);
-        }
+        dispatchActionItem(item);
         break;
-    }
     case MenuItemType::Toggle:
     {
         auto& mutableItem = m_MenuLevels[m_CurrentLevel].items[m_HoveredIndex];

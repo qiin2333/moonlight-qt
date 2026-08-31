@@ -13,6 +13,12 @@
 #include "backend/nvhttp.h"
 #include "backend/identitymanager.h"
 #include "gui/windowsdisplaygeometry.h"
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+#include "remoteusb/remote_usb_session_coordinator.h"
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+#include "remoteusb/remote_usb_agent_client.h"
+#endif
 
 #include <Limelight.h>
 #include "SDL_compat.h"
@@ -65,6 +71,9 @@
 #include <QGuiApplication>
 #include <QCursor>
 #include <QProcess>
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+#include <QRandomGenerator>
+#endif
 #include <QScreen>
 #include <QtGlobal>
 #include <QMutexLocker>
@@ -75,6 +84,41 @@
 #include <utility>
 
 namespace {
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+QString findRemoteUsbAgentProgram()
+{
+    const QString overrideProgram = qEnvironmentVariable(
+        "MOONLIGHT_REMOTE_USB_AGENT_PROGRAM").trimmed();
+    if (!overrideProgram.isEmpty()) {
+        return overrideProgram;
+    }
+
+#ifdef Q_OS_WIN32
+    const QString executableName = QStringLiteral("moonlight-usb-agent.exe");
+#else
+    const QString executableName = QStringLiteral("moonlight-usb-agent");
+#endif
+    const QDir appDir(QCoreApplication::applicationDirPath());
+    QStringList candidates = {
+        appDir.absoluteFilePath(executableName),
+        appDir.absoluteFilePath(QStringLiteral("../libexec/") + executableName),
+        appDir.absoluteFilePath(QStringLiteral("../libexec/moonlight/") + executableName),
+    };
+#ifdef Q_OS_DARWIN
+    candidates.prepend(appDir.absoluteFilePath(
+        QStringLiteral("../Helpers/") + executableName));
+#endif
+
+    for (const QString& candidate : candidates) {
+        const QFileInfo info(QDir::cleanPath(candidate));
+        if (info.isFile() && info.isExecutable()) {
+            return info.absoluteFilePath();
+        }
+    }
+    return {};
+}
+#endif
+
 QRect qtWindowCreationGeometryForSdl(QWindow* window)
 {
     if (!window) {
@@ -371,6 +415,59 @@ QString fileMappingStateName(OverlayMenuPanel::FileMappingState state)
 {
     return FileMappingUx::stateName(state);
 }
+
+#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
+    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
+QString remoteUsbClassLabel(int deviceClass)
+{
+    switch (deviceClass) {
+    case 0x00: return Session::tr("Composite");
+    case 0x01: return Session::tr("Audio");
+    case 0x02: return Session::tr("Communications");
+    case 0x03: return Session::tr("Input");
+    case 0x07: return Session::tr("Printer");
+    case 0x08: return Session::tr("Storage");
+    case 0x09: return Session::tr("Hub");
+    case 0x0E: return Session::tr("Video");
+    case 0xE0: return Session::tr("Wireless");
+    case 0xEF: return Session::tr("Composite");
+    case 0xFF: return Session::tr("Vendor specific");
+    default: return Session::tr("USB device");
+    }
+}
+
+QString remoteUsbDeviceLabel(const QJsonObject& device)
+{
+    const QString displayName =
+        device.value(QStringLiteral("displayName")).toString().trimmed();
+    if (!displayName.isEmpty()) {
+        return displayName;
+    }
+    return Session::tr("USB %1:%2")
+        .arg(device.value(QStringLiteral("vendorId")).toInt(), 4, 16,
+             QLatin1Char('0'))
+        .arg(device.value(QStringLiteral("productId")).toInt(), 4, 16,
+             QLatin1Char('0'));
+}
+
+QString remoteUsbDeviceDetail(const QJsonObject& device)
+{
+    const QString category = remoteUsbClassLabel(
+        device.value(QStringLiteral("deviceClass")).toInt());
+    const QString ids = QStringLiteral("%1:%2")
+        .arg(device.value(QStringLiteral("vendorId")).toInt(), 4, 16,
+             QLatin1Char('0'))
+        .arg(device.value(QStringLiteral("productId")).toInt(), 4, 16,
+             QLatin1Char('0'));
+    if (device.value(QStringLiteral("isochronous")).toBool()) {
+        return Session::tr("%1 | Isochronous unsupported").arg(category);
+    }
+    if (device.value(QStringLiteral("deviceClass")).toInt() == 0x09) {
+        return Session::tr("Hub | Forward devices individually");
+    }
+    return QStringLiteral("%1 | %2").arg(category, ids);
+}
+#endif
 
 QString appendFileMappingDiagnostic(const QString& event,
                                     const QString& detail = QString(),
@@ -1187,6 +1284,42 @@ Session::Session(NvComputer* computer,
 {
     memset(&m_LastAbrVideoStats, 0, sizeof(m_LastAbrVideoStats));
     m_ClipboardHelper = nullptr;
+#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
+    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    m_RemoteUsbAgentProgram = findRemoteUsbAgentProgram();
+    if (!m_RemoteUsbAgentProgram.isEmpty()) {
+        ensureRemoteUsbAgent();
+        connect(this, &Session::connectionStarted, this, [this] {
+            m_RemoteUsbStreamStarted = true;
+            if (m_RemoteUsbAgent != nullptr && m_RemoteUsbAgent->isReady()) {
+                m_RemoteUsbAgent->enumerate();
+            }
+        }, Qt::QueuedConnection);
+    }
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    if (
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+        m_RemoteUsbAgent == nullptr &&
+#endif
+        qEnvironmentVariableIntValue("MOONLIGHT_REMOTE_USB_ENABLE") == 1) {
+        ensureRemoteUsbCoordinator();
+        connect(this, &Session::connectionStarted, this, [this] {
+            if (m_RemoteUsbCoordinator == nullptr) {
+                return;
+            }
+            const QByteArray requested = qEnvironmentVariable(
+                "MOONLIGHT_REMOTE_USB_DEVICE_ID").toUtf8();
+            if (requested.isEmpty()) {
+                m_RemoteUsbCoordinator->enumerate();
+            } else {
+                m_RemoteUsbCoordinator->start(requested);
+            }
+        }, Qt::QueuedConnection);
+    }
+#endif
+#endif
 }
 
 Session::~Session()
@@ -1200,11 +1333,337 @@ Session::~Session()
         m_ClipboardHelper = nullptr;
     }
 
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    if (m_RemoteUsbCoordinator != nullptr) {
+        m_RemoteUsbCoordinator->stopAndWait();
+        delete m_RemoteUsbCoordinator;
+        m_RemoteUsbCoordinator = nullptr;
+    }
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    if (m_RemoteUsbAgent != nullptr) {
+        m_RemoteUsbAgent->shutdown();
+        delete m_RemoteUsbAgent;
+        m_RemoteUsbAgent = nullptr;
+    }
+#endif
+
     delete m_DualSenseHapticsRenderer;
     m_DualSenseHapticsRenderer = nullptr;
 
     SDL_DestroyMutex(m_DecoderLock);
 }
+
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+void Session::ensureRemoteUsbCoordinator()
+{
+    if (m_RemoteUsbCoordinator == nullptr && m_Computer != nullptr) {
+        m_RemoteUsbCoordinator =
+            new RemoteUsb::RemoteUsbSessionCoordinator(m_Computer, this);
+        connect(m_RemoteUsbCoordinator,
+                &RemoteUsb::RemoteUsbSessionCoordinator::failed,
+                this,
+                [](const QString &message) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                                "Remote USB session failed: %s",
+                                message.toUtf8().constData());
+                });
+    }
+}
+#endif
+
+#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
+    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
+QString Session::remoteUsbState() const
+{
+    switch (m_RemoteUsbState) {
+    case OverlayMenuPanel::RemoteUsbState::Unavailable:
+        return QStringLiteral("unavailable");
+    case OverlayMenuPanel::RemoteUsbState::Discovering:
+        return QStringLiteral("discovering");
+    case OverlayMenuPanel::RemoteUsbState::Available:
+        return QStringLiteral("available");
+    case OverlayMenuPanel::RemoteUsbState::Opening:
+        return QStringLiteral("opening");
+    case OverlayMenuPanel::RemoteUsbState::Open:
+        return QStringLiteral("open");
+    case OverlayMenuPanel::RemoteUsbState::Stopping:
+        return QStringLiteral("stopping");
+    case OverlayMenuPanel::RemoteUsbState::Error:
+        return QStringLiteral("error");
+    }
+    return QStringLiteral("unavailable");
+}
+
+void Session::updateRemoteUsbMenuState()
+{
+    if (m_MenuPanel == nullptr) {
+        return;
+    }
+
+    std::vector<OverlayMenuPanel::RemoteUsbDevice> devices;
+    devices.reserve(static_cast<std::size_t>(m_RemoteUsbDevices.size()));
+    for (const QJsonValue& value : m_RemoteUsbDevices) {
+        if (!value.isObject()) {
+            continue;
+        }
+        const QJsonObject object = value.toObject();
+        OverlayMenuPanel::RemoteUsbDevice device;
+        device.id = object.value(QStringLiteral("deviceId")).toString();
+        device.label = remoteUsbDeviceLabel(object);
+        device.detail = remoteUsbDeviceDetail(object);
+        device.supported = !device.id.isEmpty() &&
+                           !object.value(QStringLiteral("isochronous")).toBool() &&
+                           object.value(QStringLiteral("deviceClass")).toInt() != 0x09;
+        if (!device.id.isEmpty()) {
+            devices.push_back(std::move(device));
+        }
+    }
+
+    const bool available =
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+        m_RemoteUsbAgent != nullptr;
+#else
+        m_RemoteUsbCoordinator != nullptr;
+#endif
+    m_MenuPanel->updateRemoteUsbState(
+        available, m_RemoteUsbState, std::move(devices),
+        m_RemoteUsbActiveDeviceId, m_RemoteUsbDetail);
+}
+
+void Session::enumerateRemoteUsb()
+{
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    if (!m_RemoteUsbAgentProgram.isEmpty()) {
+        ensureRemoteUsbAgent();
+        if (m_RemoteUsbAgent != nullptr && m_RemoteUsbAgent->isReady()) {
+            m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Discovering;
+            m_RemoteUsbDetail = tr("Scanning");
+            emit remoteUsbStateChanged();
+            updateRemoteUsbMenuState();
+            m_RemoteUsbAgent->enumerate();
+        }
+        return;
+    }
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    ensureRemoteUsbCoordinator();
+    if (m_RemoteUsbCoordinator != nullptr) {
+        m_RemoteUsbCoordinator->enumerate();
+    }
+#endif
+}
+
+void Session::startRemoteUsb(const QString &deviceId)
+{
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    if (!m_RemoteUsbAgentProgram.isEmpty()) {
+        ensureRemoteUsbAgent();
+        if (m_RemoteUsbAgent != nullptr && m_RemoteUsbAgent->isReady()) {
+            bool supported = m_RemoteUsbDevices.isEmpty();
+            for (const QJsonValue& value : m_RemoteUsbDevices) {
+                const QJsonObject object = value.toObject();
+                if (object.value(QStringLiteral("deviceId")).toString() == deviceId ||
+                    object.value(QStringLiteral("busId")).toString() == deviceId) {
+                    supported = !object.value(QStringLiteral("isochronous")).toBool() &&
+                                object.value(QStringLiteral("deviceClass")).toInt() != 0x09;
+                    break;
+                }
+            }
+            if (!supported) {
+                showStreamingToast(tr("This USB device cannot be forwarded."), 3000);
+                return;
+            }
+            m_RemoteUsbActiveDeviceId = deviceId;
+            m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Opening;
+            m_RemoteUsbDetail = tr("Connecting");
+            emit remoteUsbStateChanged();
+            updateRemoteUsbMenuState();
+            m_RemoteUsbAgent->start(deviceId.toUtf8());
+        }
+        return;
+    }
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    ensureRemoteUsbCoordinator();
+    if (m_RemoteUsbCoordinator != nullptr) {
+        m_RemoteUsbCoordinator->start(deviceId.toUtf8());
+    }
+#endif
+}
+
+void Session::stopRemoteUsb()
+{
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    if (m_RemoteUsbAgent != nullptr) {
+        if (!m_RemoteUsbActiveDeviceId.isEmpty() ||
+            m_RemoteUsbState == OverlayMenuPanel::RemoteUsbState::Opening ||
+            m_RemoteUsbState == OverlayMenuPanel::RemoteUsbState::Open ||
+            m_RemoteUsbState == OverlayMenuPanel::RemoteUsbState::Stopping) {
+            m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Stopping;
+            m_RemoteUsbDetail = tr("Releasing");
+            emit remoteUsbStateChanged();
+            updateRemoteUsbMenuState();
+        }
+        m_RemoteUsbAgent->stop();
+    }
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    if (m_RemoteUsbCoordinator != nullptr) {
+        m_RemoteUsbCoordinator->stop();
+    }
+#endif
+}
+#endif
+
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+void Session::ensureRemoteUsbAgent()
+{
+    if (m_RemoteUsbAgent != nullptr) {
+        return;
+    }
+    m_RemoteUsbAgent = new RemoteUsb::RemoteUsbAgentClient(this);
+
+    IdentityManager *identity = IdentityManager::get();
+    if (identity == nullptr || m_Computer == nullptr) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Remote USB agent host identity is unavailable");
+        delete m_RemoteUsbAgent;
+        m_RemoteUsbAgent = nullptr;
+        return;
+    }
+    RemoteUsb::RemoteUsbAgentHostConfig hostConfig;
+    QString hostUuid;
+    bool useTrueUid = true;
+    {
+        QReadLocker locker(&m_Computer->lock);
+        hostConfig.host = m_Computer->activeAddress.address();
+        hostConfig.httpsPort = m_Computer->activeHttpsPort;
+        hostConfig.serverCertificate = m_Computer->serverCert;
+        hostUuid = m_Computer->uuid;
+        useTrueUid = !m_Computer->isNvidiaServerSoftware;
+    }
+    hostConfig.clientIdentity = useTrueUid
+        ? identity->getUniqueId() : QStringLiteral("0123456789ABCDEF");
+    hostConfig.clientName = NvComputer::getPairname(hostUuid);
+    if (hostConfig.clientName.trimmed().isEmpty()) {
+        hostConfig.clientName = QHostInfo::localHostName();
+    }
+    hostConfig.sslConfiguration = identity->getSslConfig();
+    QString hostError;
+    if (!m_RemoteUsbAgent->configureHost(std::move(hostConfig), &hostError)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Remote USB agent host configuration failed: %s",
+                    hostError.toUtf8().constData());
+        delete m_RemoteUsbAgent;
+        m_RemoteUsbAgent = nullptr;
+        return;
+    }
+    m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Discovering;
+    m_RemoteUsbDetail = tr("Scanning");
+    connect(m_RemoteUsbAgent,
+            &RemoteUsb::RemoteUsbAgentClient::failed,
+            this,
+            [this](const QString &message) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "Remote USB agent failed: %s",
+                            message.toUtf8().constData());
+                m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Error;
+                m_RemoteUsbDetail = tr("Unavailable");
+                emit remoteUsbStateChanged();
+                updateRemoteUsbMenuState();
+                if (m_RemoteUsbStreamStarted) {
+                    showStreamingToast(tr("USB forwarding failed: %1").arg(message),
+                                       4500);
+                }
+            });
+    connect(m_RemoteUsbAgent,
+            &RemoteUsb::RemoteUsbAgentClient::devicesChanged,
+            this,
+            [this](const QJsonArray& devices) {
+                m_RemoteUsbDevices = devices;
+                if (m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Open &&
+                    m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Opening &&
+                    m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Stopping) {
+                    m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Available;
+                    m_RemoteUsbDetail = devices.isEmpty()
+                        ? tr("No devices")
+                        : tr("%1 available").arg(devices.size());
+                }
+                emit remoteUsbDevicesChanged();
+                emit remoteUsbStateChanged();
+                updateRemoteUsbMenuState();
+            });
+    connect(m_RemoteUsbAgent,
+            &RemoteUsb::RemoteUsbAgentClient::opened,
+            this,
+            [this](const QByteArray& deviceId) {
+                m_RemoteUsbActiveDeviceId = QString::fromUtf8(deviceId);
+                m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Open;
+                m_RemoteUsbDetail = tr("Connected");
+                QString label = tr("USB device");
+                for (const QJsonValue& value : m_RemoteUsbDevices) {
+                    const QJsonObject object = value.toObject();
+                    if (object.value(QStringLiteral("deviceId")).toString() ==
+                        m_RemoteUsbActiveDeviceId) {
+                        label = remoteUsbDeviceLabel(object);
+                        break;
+                    }
+                }
+                emit remoteUsbStateChanged();
+                updateRemoteUsbMenuState();
+                showStreamingToast(tr("%1 connected to the host").arg(label), 3000);
+            });
+    connect(m_RemoteUsbAgent,
+            &RemoteUsb::RemoteUsbAgentClient::stopped,
+            this,
+            [this] {
+                const auto previousState = m_RemoteUsbState;
+                const bool wasActive = !m_RemoteUsbActiveDeviceId.isEmpty();
+                m_RemoteUsbActiveDeviceId.clear();
+                if (previousState != OverlayMenuPanel::RemoteUsbState::Error) {
+                    m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Available;
+                    m_RemoteUsbDetail = m_RemoteUsbDevices.isEmpty()
+                        ? tr("No devices")
+                        : tr("%1 available").arg(m_RemoteUsbDevices.size());
+                }
+                emit remoteUsbStateChanged();
+                updateRemoteUsbMenuState();
+                if (wasActive && m_RemoteUsbStreamStarted &&
+                    previousState != OverlayMenuPanel::RemoteUsbState::Error) {
+                    showStreamingToast(tr("USB device released"), 2500);
+                }
+            });
+    connect(m_RemoteUsbAgent,
+            &RemoteUsb::RemoteUsbAgentClient::ready,
+            this,
+            [this](quint32) {
+                m_RemoteUsbAgent->enumerate();
+            },
+            Qt::QueuedConnection);
+
+    const quint64 random = QRandomGenerator::system()->generate64();
+    const QString socketName = QDir::temp().filePath(
+        QStringLiteral("moonlight-usb-agent-%1-%2.sock")
+            .arg(QCoreApplication::applicationPid())
+            .arg(random, 0, 16));
+    const QByteArray token = QByteArray::number(
+        QRandomGenerator::system()->generate64(), 16) +
+        QByteArray::number(QRandomGenerator::system()->generate64(), 16);
+    QString error;
+    if (!m_RemoteUsbAgent->launch(
+            m_RemoteUsbAgentProgram,
+            socketName, token, &error)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Remote USB agent launch failed: %s",
+                    error.toUtf8().constData());
+        m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Error;
+        m_RemoteUsbDetail = tr("Unavailable");
+        emit remoteUsbStateChanged();
+        updateRemoteUsbMenuState();
+    }
+}
+#endif
 
 bool Session::initialize(QQuickWindow* qtWindow)
 {
@@ -2234,6 +2693,15 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
     // Rebuild for the current gamepad set before applying dynamic menu state.
     m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
 
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    if (m_RemoteUsbAgent != nullptr && m_RemoteUsbAgent->isReady() &&
+        m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Opening &&
+        m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Open &&
+        m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Stopping) {
+        enumerateRemoteUsb();
+    }
+#endif
+
     // Update dynamic state before showing
     m_MenuPanel->updateMicrophoneState(m_MicStream != nullptr);
     m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
@@ -2241,6 +2709,10 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
     m_MenuPanel->updateMenuPositionState(
             menuPlacementActionForPreference(m_Preferences->overlayMenuPosition));
     updateFileMappingMenuState();
+#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
+    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
+    updateRemoteUsbMenuState();
+#endif
 
     // Show menu based on user preference
     switch (m_Preferences->overlayMenuPosition) {
@@ -3150,6 +3622,17 @@ public:
 
 bool Session::tryReconnect()
 {
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    if (m_RemoteUsbCoordinator != nullptr) {
+        m_RemoteUsbCoordinator->stopAndWait();
+    }
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    if (m_RemoteUsbAgent != nullptr) {
+        m_RemoteUsbAgent->stop();
+    }
+#endif
+
     // Release any locally tracked pressed keys before tearing down the dead connection.
     // If the old control stream is still partly alive, this gives the host one last
     // chance to clear stuck key state before reconnecting.
@@ -3760,6 +4243,17 @@ static const Uint32 k_FullScreenEntryTimeoutMs = 1200;
 
 void Session::exec()
 {
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    if (m_RemoteUsbCoordinator != nullptr && !m_AsyncConnectionSuccess) {
+        m_RemoteUsbCoordinator->stopAndWait();
+    }
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    if (m_RemoteUsbAgent != nullptr && !m_AsyncConnectionSuccess) {
+        m_RemoteUsbAgent->stop();
+    }
+#endif
+
     // If the connection failed, clean up and abort the connection.
     if (!m_AsyncConnectionSuccess) {
         if (m_ClipboardHelper != nullptr) {
@@ -4044,6 +4538,16 @@ void Session::exec()
     m_MenuPanel->setActionCallback([this](OverlayMenuPanel::MenuAction action) {
         dispatchQtMenuAction(action);
     });
+#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
+    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
+    m_MenuPanel->setRemoteUsbDeviceCallback([this](const QString& deviceId) {
+        startRemoteUsb(deviceId);
+    });
+    m_MenuPanel->setRemoteUsbReleaseCallback([this] {
+        stopRemoteUsb();
+    });
+    updateRemoteUsbMenuState();
+#endif
     m_MenuPanel->setCloseCallback([this]() {
         // Record close timestamp for edge-trigger debounce
         m_MenuCloseTicks = SDL_GetTicks();
@@ -4092,8 +4596,9 @@ void Session::exec()
     constexpr Uint32 QT_UI_EVENT_PUMP_INTERVAL_MS = 10;
     Uint32 lastQtEventPumpTicks = 0;
     auto qtUiNeedsEventProcessing = [this]() {
+        // A visible floating button is idle UI and must not force a 10 ms
+        // Qt event pump for the entire streaming session.
         return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
-               (m_MenuButton && m_MenuButton->isButtonVisible()) ||
                (m_Toast && m_Toast->isVisible()) ||
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
                (m_StylusReplayTest && m_StylusReplayTest->isPanelVisible());
@@ -4833,6 +5338,17 @@ DispatchDeferredCleanup:
     }
 
     SDL_QuitSubSystem(SDL_INIT_VIDEO);
+
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    if (m_RemoteUsbCoordinator != nullptr) {
+        m_RemoteUsbCoordinator->stopAndWait();
+    }
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
+    if (m_RemoteUsbAgent != nullptr) {
+        m_RemoteUsbAgent->stop();
+    }
+#endif
 
     // Cleanup can take a while, so dispatch it to a worker thread.
     // When it is complete, it will release our s_ActiveSessionSemaphore
