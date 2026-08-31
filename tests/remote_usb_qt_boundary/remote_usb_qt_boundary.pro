@@ -9,51 +9,28 @@ INCLUDEPATH += \
     $$PWD/../../app \
     $$PWD/../../moonlight-common-c/moonlight-common-c/src
 
-isEmpty(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR): \
-    MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR = $$(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR)
-isEmpty(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR) {
-    error("Set MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR to the shared-core remoteusb source directory")
-}
-MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR = \
-    $$clean_path($$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR)
-!exists($$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR) {
-    error("Remote USB shared core source directory is missing: $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR")
-}
-REMOTE_USB_CORE_DIR = $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR
-INCLUDEPATH += $$REMOTE_USB_CORE_DIR
-
-for(core_source, \
-    remote_usb_wire.c \
-    remote_usb_broker.c \
-    remote_usb_pdu.c \
-    remote_usb_usbip.c \
-    remote_usb_executor.c \
-    remote_usb_transport.c \
-    remote_usb_session.c) {
-    !exists($$REMOTE_USB_CORE_DIR/$$core_source) {
-        error("Remote USB shared core source is missing: $$REMOTE_USB_CORE_DIR/$$core_source")
-    }
-}
+REMOTE_USB_CORE_DIR = $$clean_path($$PWD/../../moonlight-remote-usb-core)
+INCLUDEPATH += $$REMOTE_USB_CORE_DIR/include
+macx: REMOTE_USB_CORE_LIBRARY = $$REMOTE_USB_CORE_DIR/target/debug/libmoonlight_remote_usb_core.a
+unix:!macx: REMOTE_USB_CORE_LIBRARY = $$REMOTE_USB_CORE_DIR/target/debug/libmoonlight_remote_usb_core.a
+win32: REMOTE_USB_CORE_LIBRARY = $$REMOTE_USB_CORE_DIR/target/debug/moonlight_remote_usb_core.lib
+remote_usb_rust_core.target = remote_usb_rust_core_build
+remote_usb_rust_core.commands = cargo build --locked --manifest-path $$REMOTE_USB_CORE_DIR/Cargo.toml
+remote_usb_rust_core.CONFIG += phony
+QMAKE_EXTRA_TARGETS += remote_usb_rust_core
+PRE_TARGETDEPS += remote_usb_rust_core_build
+LIBS += $$REMOTE_USB_CORE_LIBRARY
+unix:!macx: LIBS += -ldl -lpthread -lm
+win32: LIBS += -ladvapi32 -lbcrypt -lntdll -luserenv -lws2_32
 
 SOURCES += \
     main.cpp \
     ../../app/remoteusb/remote_usb_broker_client.cpp \
     ../../app/remoteusb/remote_usb_session_binding.cpp \
-    ../../app/remoteusb/remote_usb_tls_channel.cpp \
-    $$REMOTE_USB_CORE_DIR/remote_usb_wire.c \
-    $$REMOTE_USB_CORE_DIR/remote_usb_broker.c \
-    $$REMOTE_USB_CORE_DIR/remote_usb_pdu.c \
-    $$REMOTE_USB_CORE_DIR/remote_usb_usbip.c \
-    $$REMOTE_USB_CORE_DIR/remote_usb_executor.c \
-    $$REMOTE_USB_CORE_DIR/remote_usb_transport.c \
-    $$REMOTE_USB_CORE_DIR/remote_usb_session.c
+    ../../app/remoteusb/remote_usb_tls_channel.cpp
 
 HEADERS += \
     ../../app/remoteusb/remote_usb_platform_adapter.h \
     ../../app/remoteusb/remote_usb_broker_client.h \
     ../../app/remoteusb/remote_usb_session_binding.h \
     ../../app/remoteusb/remote_usb_tls_channel.h
-
-QMAKE_CFLAGS += -std=gnu11
-unix:!macx: QMAKE_CFLAGS += -pthread
-unix:!macx: QMAKE_LFLAGS += -pthread

@@ -87,109 +87,54 @@ contains(CONFIG, remote_usb) {
         }
     }
 
-    # A source checkout can be compiled directly.  The directory must contain
-    # the platform-neutral C files from remoteusb/shared-core's source list.
-    # An installed static library can be selected instead below.
-    isEmpty(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR): \
-        MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR = $$(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR)
+    # Build the pinned Rust core by default. Packagers may provide a prebuilt
+    # static library and matching public header through the two overrides.
+    isEmpty(MOONLIGHT_REMOTE_USB_CORE_DIR): \
+        MOONLIGHT_REMOTE_USB_CORE_DIR = $$clean_path($$PWD/../../moonlight-remote-usb-core)
     isEmpty(MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR): \
         MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR = $$(MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR)
     isEmpty(MOONLIGHT_REMOTE_USB_CORE_LIBRARY): \
         MOONLIGHT_REMOTE_USB_CORE_LIBRARY = $$(MOONLIGHT_REMOTE_USB_CORE_LIBRARY)
-
-    # Normalize user/environment supplied paths before testing or handing them
-    # to qmake.  A source checkout and an installed library are alternatives;
-    # accepting both would make duplicate symbols and selection order depend on
-    # the linker.
-    !isEmpty(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR): \
-        MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR = $$clean_path($$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR)
     !isEmpty(MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR): \
         MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR = $$clean_path($$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR)
     !isEmpty(MOONLIGHT_REMOTE_USB_CORE_LIBRARY): \
         MOONLIGHT_REMOTE_USB_CORE_LIBRARY = $$clean_path($$MOONLIGHT_REMOTE_USB_CORE_LIBRARY)
 
-    !isEmpty(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR):!isEmpty(MOONLIGHT_REMOTE_USB_CORE_LIBRARY) {
-        error("Choose either MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR or " \
-              "MOONLIGHT_REMOTE_USB_CORE_LIBRARY, not both")
-    }
-    !isEmpty(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR):!exists($$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR) {
-        error("Remote USB shared core source directory is missing: " \
-              "$$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR")
-    }
-    !isEmpty(MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR):!exists($$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR) {
-        error("Remote USB shared core include directory is missing: " \
-              "$$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR")
-    }
-    !isEmpty(MOONLIGHT_REMOTE_USB_CORE_LIBRARY):!exists($$MOONLIGHT_REMOTE_USB_CORE_LIBRARY) {
-        error("Remote USB shared core library is missing: " \
-              "$$MOONLIGHT_REMOTE_USB_CORE_LIBRARY")
-    }
+    isEmpty(MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR): \
+        MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR = $$MOONLIGHT_REMOTE_USB_CORE_DIR/include
+    !exists($$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR/remoteusb.h): \
+        error("Remote USB Rust C header is missing: $$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR/remoteusb.h")
 
-    !isEmpty(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR) {
-        isEmpty(MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR): \
-            MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR = $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR
-
-        INCLUDEPATH += $$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR
-        DEPENDPATH += $$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR
-        MOONLIGHT_REMOTE_USB_CORE_SOURCES = \
-            $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR/remote_usb_wire.c \
-            $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR/remote_usb_broker.c \
-            $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR/remote_usb_pdu.c \
-            $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR/remote_usb_usbip.c \
-            $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR/remote_usb_executor.c \
-            $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR/remote_usb_transport.c \
-            $$MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR/remote_usb_session.c
-        for(core_source, MOONLIGHT_REMOTE_USB_CORE_SOURCES) {
-            !exists($$core_source): error("Remote USB shared core source is missing: $$core_source")
-        }
-        SOURCES += $$MOONLIGHT_REMOTE_USB_CORE_SOURCES
-        HEADERS += $$PWD/remote_usb_session_binding.h \
-                   $$PWD/remote_usb_core_binding.h
-        SOURCES += $$PWD/remote_usb_session_binding.cpp
-        DEFINES += MOONLIGHT_REMOTE_USB_CORE_SOURCE
-
-        # The shared core is C11.  Use the GNU dialect here because the Qt app
-        # already has optional C units that rely on compiler extensions (for
-        # example masterhook.c); keep the default qmake build untouched and
-        # request this only when source mode is explicitly enabled.
-        unix {
-            QMAKE_CFLAGS += -std=gnu11
-        }
-        unix:!macx {
-            QMAKE_CFLAGS += -pthread
-            QMAKE_LFLAGS += -pthread
-        }
-    } else {
-        !isEmpty(MOONLIGHT_REMOTE_USB_CORE_LIBRARY) {
-            HEADERS += $$PWD/remote_usb_session_binding.h \
-                       $$PWD/remote_usb_core_binding.h
-            SOURCES += $$PWD/remote_usb_session_binding.cpp
-            !isEmpty(MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR) {
-                INCLUDEPATH += $$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR
-                DEPENDPATH += $$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR
-            }
-            LIBS += $$MOONLIGHT_REMOTE_USB_CORE_LIBRARY
-            DEFINES += MOONLIGHT_REMOTE_USB_CORE_LIBRARY
-
-            # The static core uses pthread mutexes on POSIX.  CMake exports
-            # this transitively, while a raw library path supplied to qmake
-            # does not, so carry the link requirement here.
-            unix:!macx: QMAKE_LFLAGS += -pthread
+    isEmpty(MOONLIGHT_REMOTE_USB_CORE_LIBRARY) {
+        !exists($$MOONLIGHT_REMOTE_USB_CORE_DIR/Cargo.toml): \
+            error("Initialize the moonlight-remote-usb-core submodule")
+        CONFIG(debug, debug|release) {
+            MOONLIGHT_REMOTE_USB_RUST_PROFILE = debug
+            MOONLIGHT_REMOTE_USB_CARGO_FLAGS =
         } else {
-            warning("CONFIG+=remote_usb requested without a shared core source or library; " \
-                    "only the adapter interface is enabled")
+            MOONLIGHT_REMOTE_USB_RUST_PROFILE = release
+            MOONLIGHT_REMOTE_USB_CARGO_FLAGS = --release
         }
+        win32: MOONLIGHT_REMOTE_USB_CORE_LIBRARY = $$MOONLIGHT_REMOTE_USB_CORE_DIR/target/$$MOONLIGHT_REMOTE_USB_RUST_PROFILE/moonlight_remote_usb_core.lib
+        else: MOONLIGHT_REMOTE_USB_CORE_LIBRARY = $$MOONLIGHT_REMOTE_USB_CORE_DIR/target/$$MOONLIGHT_REMOTE_USB_RUST_PROFILE/libmoonlight_remote_usb_core.a
+        remote_usb_rust_core.target = remote_usb_rust_core_build
+        remote_usb_rust_core.commands = cargo build --locked $$MOONLIGHT_REMOTE_USB_CARGO_FLAGS --manifest-path $$MOONLIGHT_REMOTE_USB_CORE_DIR/Cargo.toml
+        remote_usb_rust_core.CONFIG += phony
+        QMAKE_EXTRA_TARGETS += remote_usb_rust_core
+        PRE_TARGETDEPS += remote_usb_rust_core_build
     }
 
-    # The high-level lifecycle requires both the shared C session and a native
-    # USB adapter. Keep it out of partial/stub builds so the default app can
-    # still compile without either dependency.
-    !isEmpty(MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR):equals(MOONLIGHT_REMOTE_USB_LIBUSB_ENABLED, 1) {
-        HEADERS += $$PWD/remote_usb_session_coordinator.h
-        SOURCES += $$PWD/remote_usb_session_coordinator.cpp
-        DEFINES += MOONLIGHT_REMOTE_USB_SESSION_ENABLED
-    }
-    !isEmpty(MOONLIGHT_REMOTE_USB_CORE_LIBRARY):equals(MOONLIGHT_REMOTE_USB_LIBUSB_ENABLED, 1) {
+    INCLUDEPATH += $$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR
+    DEPENDPATH += $$MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR
+    LIBS += $$MOONLIGHT_REMOTE_USB_CORE_LIBRARY
+    HEADERS += $$PWD/remote_usb_session_binding.h \
+               $$PWD/remote_usb_core_binding.h
+    SOURCES += $$PWD/remote_usb_session_binding.cpp
+    DEFINES += MOONLIGHT_REMOTE_USB_RUST_CORE
+    unix:!macx: LIBS += -ldl -lpthread -lm
+    win32: LIBS += -ladvapi32 -lbcrypt -lntdll -luserenv -lws2_32
+
+    equals(MOONLIGHT_REMOTE_USB_LIBUSB_ENABLED, 1) {
         HEADERS += $$PWD/remote_usb_session_coordinator.h
         SOURCES += $$PWD/remote_usb_session_coordinator.cpp
         DEFINES += MOONLIGHT_REMOTE_USB_SESSION_ENABLED

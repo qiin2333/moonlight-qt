@@ -15,15 +15,8 @@
 #include <QSslSocket>
 
 #include <algorithm>
-#include <cstring>
 #include <limits>
 #include <utility>
-
-#ifdef MOONLIGHT_USB_AGENT_RUNTIME
-extern "C" {
-#include "remote_usb_broker.h"
-}
-#endif
 
 namespace RemoteUsbAgent {
 
@@ -267,18 +260,18 @@ bool LibusbBackend::start(const QJsonObject &request, QString *error)
         return false;
     }
 
-    ml_remote_usb_broker_hello hello {};
-    hello.size = sizeof(hello);
-    hello.version = ML_REMOTE_USB_BROKER_VERSION;
-    std::memcpy(hello.client_uuid, wireIdentity.constData(), 16);
-    hello.stream_generation = lease.streamGeneration;
-    hello.session_token = lease.sessionToken;
-    hello.attachment_token = lease.attachmentToken;
-    hello.lease_token = lease.leaseToken;
-    std::memcpy(hello.capability_nonce, capability->nonce.constData(), 16);
-    hello.max_urb = capability->maxUrb;
-    hello.max_inflight = capability->maxInflight;
-    hello.isochronous = 0;
+    RemoteUsb::RemoteUsbBrokerHello hello;
+    std::copy_n(reinterpret_cast<const std::uint8_t *>(wireIdentity.constData()),
+                hello.clientUuid.size(), hello.clientUuid.begin());
+    hello.streamGeneration = lease.streamGeneration;
+    hello.sessionToken = lease.sessionToken;
+    hello.attachmentToken = lease.attachmentToken;
+    hello.leaseToken = lease.leaseToken;
+    std::copy_n(reinterpret_cast<const std::uint8_t *>(capability->nonce.constData()),
+                hello.capabilityNonce.size(), hello.capabilityNonce.begin());
+    hello.maxPdu = capability->maxUrb;
+    hello.maxInflight = capability->maxInflight;
+    hello.isochronous = false;
 
     RemoteUsb::RemoteUsbTlsChannelConfig channelConfig;
     channelConfig.host = capability->host;
@@ -403,6 +396,8 @@ bool LibusbBackend::start(const QJsonObject &request, QString *error)
             *error = startError.isEmpty()
                 ? QStringLiteral("USB lease tunnel failed to start") : startError;
         }
+        m_impl->stopping = true;
+        m_impl->binding->stop();
         return false;
     }
     return true;

@@ -1,33 +1,42 @@
 #pragma once
 
 /*
- * Qt owner-loop binding for the platform-neutral Remote USB C session.
+ * Qt owner-loop binding for the Rust Remote USB core.
  *
- * This class deliberately owns no socket or USB handle.  The caller supplies
- * a platform adapter and an already-authenticated byte channel.  All C core
- * calls are made on the QObject's thread; callbacks arriving from an I/O or
- * USB worker are queued back to that thread before entering the C core.
+ * The Rust core owns protocol state only. This class owns the adaptation to
+ * Qt byte channels and platform USB callbacks; no QObject, socket, USB handle,
+ * or platform callback crosses the C ABI.
  */
 
 #include "remote_usb_platform_adapter.h"
 
 #include <QObject>
+#include <QHash>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 
 extern "C" {
-#include "remote_usb_broker.h"
-#include "remote_usb_executor.h"
-#include "remote_usb_session.h"
-#include "remote_usb_wire.h"
+#include "remoteusb.h"
 }
 
 namespace RemoteUsb {
 
+struct RemoteUsbBrokerHello {
+    std::array<std::uint8_t, 16> clientUuid {};
+    quint64 streamGeneration = 0;
+    quint64 sessionToken = 0;
+    quint64 attachmentToken = 0;
+    quint64 leaseToken = 0;
+    std::array<std::uint8_t, 16> capabilityNonce {};
+    quint32 maxPdu = 0;
+    quint32 maxInflight = 0;
+    bool isochronous = false;
+};
+
 struct RemoteUsbSessionBindingOptions {
-    ml_remote_usb_broker_hello brokerHello {};
+    RemoteUsbBrokerHello brokerHello;
     quint64 txWindowBytes = 0;
     quint32 txWindowPdus = 0;
     quint64 rxWindowBytes = 0;
@@ -38,15 +47,6 @@ struct RemoteUsbSessionBindingOptions {
     quint32 maxTransferSize = 0;
 };
 
-/*
- * A minimal vertical slice around ml_remote_usb_session.  The object is
- * owner-thread affine: public methods, including stop(), must be called from
- * the thread where the object was constructed.  The supplied adapter and
- * channel are borrowed and must outlive this object (and all callbacks).
- * A binding is single-use: after the first start attempt, create a new
- * binding/channel pair for reconnect so delayed callbacks cannot cross
- * session generations.
- */
 class RemoteUsbSessionBinding final : public QObject
 {
     Q_OBJECT
@@ -58,25 +58,18 @@ public:
                             QObject *parent = nullptr);
     ~RemoteUsbSessionBinding() override;
 
-    RemoteUsbSessionBinding(const RemoteUsbSessionBinding &) = delete;
-    RemoteUsbSessionBinding &operator=(const RemoteUsbSessionBinding &) = delete;
+    Q_DISABLE_COPY(RemoteUsbSessionBinding)
 
-    /* Starts the authenticated channel, then emits the broker HELLO. */
     bool start(QString *error = nullptr);
-
-    /* Idempotent owner-loop shutdown.  Completion is observable via stopped(). */
     void stop() noexcept;
 
     bool isStarted() const noexcept { return m_started; }
     bool isStopping() const noexcept { return m_stopping; }
     bool isStopped() const noexcept { return m_stopped; }
-    ml_remote_usb_session_state state() const noexcept;
+    quint32 state() const noexcept;
     QString lastError() const { return m_lastError; }
 
-    /* Feed arbitrary byte-stream data.  This is public for deterministic
-     * loopback tests; production callers normally use the channel callback. */
     bool feedBytes(const QByteArray &bytes, QString *error = nullptr);
-
     bool sendCapability(const DeviceSnapshot &device, QString *error = nullptr);
     bool sendOpen(quint64 leaseToken, quint64 attachmentToken,
                   QString *error = nullptr);
@@ -85,13 +78,9 @@ public:
     bool sendClose(QString *error = nullptr);
     bool sendPdu(quint64 pduId, const QByteArray &pdu,
                  QString *error = nullptr);
-    bool ackTx(quint64 pduId, QString *error = nullptr);
 
 signals:
-    /* All signals are emitted on the binding's owner Qt thread.  Payloads are
-     * copied before emission because the C callback views are ephemeral. */
     void capabilityReceived(RemoteUsb::DeviceSnapshot capability);
-    /* Emitted after the peer's exact 84-byte HELLO has been accepted. */
     void helloAccepted();
     void openRequested(quint64 leaseToken, quint64 attachmentToken);
     void openAccepted();
@@ -115,11 +104,11 @@ private:
     bool setError(const QString &message, QString *error = nullptr);
     void notifyError(const QString &message) noexcept;
     bool checkSession(QString *error = nullptr) const;
-    bool checkStatus(ml_remote_usb_session_status status,
-                     const char *operation,
+    bool checkStatus(quint32 status, const char *operation,
                      QString *error = nullptr);
     void failProtocol(const QString &message);
 
+    bool createSession(QString *error);
     void installChannelCallbacks();
     void enqueueBytes(QByteArray bytes);
     void enqueueError(QString message);
@@ -128,91 +117,42 @@ private:
     void processChannelError(const QString &message);
     void processChannelClosed();
     void finishStop();
-    void scheduleStopRetry();
 
-    bool createSession(QString *error);
-    void destroySessionBestEffort() noexcept;
-
+    bool drainEvents(QString *error = nullptr);
+    bool handleEvent(const rusb_event &event, QString *error);
     bool sendWire(const std::uint8_t *wire, std::size_t wireSize,
-                  const char *kind);
+                  const char *kind, QString *error = nullptr);
+    bool dispatchSubmit(const rusb_event &event, QString *error);
+    bool dispatchCancel(const rusb_event &event, QString *error);
 
-    static RemoteUsbSessionBinding *fromContext(void *context) noexcept;
+    void queueCompletion(quint64 requestToken, const TransferRequest &request,
+                         TransferCompletion completion);
+    void queueCancelCompletion(quint64 requestToken, qint32 status);
 
-    static ml_remote_usb_executor_submit_result submitControl(
-        void *context,
-        ml_remote_usb_executor *executor,
-        const ml_remote_usb_executor_transfer *transfer,
-        ml_remote_usb_executor_completion *completionOut) noexcept;
-    static ml_remote_usb_executor_submit_result submitData(
-        void *context,
-        ml_remote_usb_executor *executor,
-        const ml_remote_usb_executor_transfer *transfer,
-        ml_remote_usb_executor_completion *completionOut) noexcept;
-    static ml_remote_usb_executor_cancel_result cancel(
-        void *context,
-        ml_remote_usb_executor *executor,
-        const ml_remote_usb_executor_transfer *transfer,
-        std::int32_t *statusOut) noexcept;
-    static ml_remote_usb_executor_endpoint_result resolveEndpoint(
-        void *context,
-        const ml_remote_usb_pdu_request *request,
-        ml_remote_usb_executor_endpoint *endpointOut) noexcept;
-
-    static int sendHello(void *context, const std::uint8_t *wire,
-                         std::size_t wireSize) noexcept;
-    static int sendFrame(void *context, const std::uint8_t *wire,
-                         std::size_t wireSize) noexcept;
-    static int onCapability(void *context,
-                            const ml_remote_usb_wire_capability *capability) noexcept;
-    static int onOpen(void *context,
-                      const ml_remote_usb_wire_open *open) noexcept;
-    static int onOpenOk(void *context) noexcept;
-    static int onOpenReject(void *context, std::uint32_t status) noexcept;
-    static int onPdu(void *context, std::uint64_t pduId,
-                     const std::uint8_t *pdu, std::size_t pduSize) noexcept;
-    static int onClose(void *context, std::uint64_t leaseToken) noexcept;
-    static void onCoreError(void *context,
-                            ml_remote_usb_transport_status status) noexcept;
-    static void onCoreStopped(void *context) noexcept;
-
-    static bool copyTransfer(const ml_remote_usb_executor_transfer *source,
-                             TransferRequest *destination,
-                             QString *error = nullptr);
-    static bool copyPduRequest(const ml_remote_usb_pdu_request *source,
-                               TransferRequest *destination,
-                               QString *error = nullptr);
-    static bool copyCompletion(const TransferRequest &request,
-                               const TransferCompletion &source,
-                               ml_remote_usb_executor_completion *destination,
-                               QByteArray *stableData,
-                               QString *error = nullptr);
     static bool validateTransfer(const TransferRequest &request,
                                  QString *error = nullptr);
     static bool validateEndpoint(const TransferRequest &request,
                                  const Endpoint &endpoint,
                                  QString *error = nullptr);
-
-    ml_remote_usb_executor_submit_result submitImpl(
-        const ml_remote_usb_executor_transfer *transfer,
-        ml_remote_usb_executor_completion *completionOut,
-        bool control);
-    ml_remote_usb_executor_cancel_result cancelImpl(
-        const ml_remote_usb_executor_transfer *transfer,
-        std::int32_t *statusOut);
-
-    void queueCompletion(std::uint64_t requestToken,
-                         TransferCompletion completion);
-    void queueCancelCompletion(std::uint64_t requestToken, std::int32_t status);
+    static bool validateCompletion(const TransferRequest &request,
+                                   const TransferCompletion &completion,
+                                   QString *error = nullptr);
+    static bool decodeCapability(const std::uint8_t *payload,
+                                 std::size_t payloadSize,
+                                 DeviceSnapshot *snapshot,
+                                 QString *error = nullptr);
+    static QByteArray encodeCapability(const DeviceSnapshot &device,
+                                       quint64 leaseToken,
+                                       quint64 attachmentToken,
+                                       QString *error = nullptr);
 
     RemoteUsbPlatformAdapter *m_platform = nullptr;
     RemoteUsbByteChannel *m_channel = nullptr;
     RemoteUsbSessionBindingOptions m_options;
-    ml_remote_usb_session *m_session = nullptr;
+    rusb_session *m_session = nullptr;
+    QHash<quint64, TransferRequest> m_requests;
 
     bool m_started = false;
-    /* A binding owns one C session and one callback generation.  Reconnects
-     * create a fresh binding so queued completions from the old generation
-     * can never be delivered to a new session with a reused request token. */
     bool m_startAttempted = false;
     bool m_stopping = false;
     bool m_stopped = false;
@@ -220,9 +160,7 @@ private:
     bool m_channelClosed = true;
     bool m_channelCloseRequested = false;
     bool m_channelCallbacksInstalled = false;
-    bool m_coreStopDone = false;
     bool m_releaseCalled = false;
-    bool m_stopRetryScheduled = false;
     bool m_stoppedSignalEmitted = false;
     bool m_helloAccepted = false;
     bool m_failed = false;

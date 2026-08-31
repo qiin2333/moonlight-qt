@@ -18,12 +18,7 @@
 
 #include <algorithm>
 #include <array>
-#include <cstring>
 #include <memory>
-
-extern "C" {
-#include "remote_usb_broker.h"
-}
 
 namespace RemoteUsb {
 
@@ -289,22 +284,22 @@ public:
             return;
         }
 
-        ml_remote_usb_broker_hello hello {};
-        hello.size = sizeof(hello);
-        hello.version = ML_REMOTE_USB_BROKER_VERSION;
-        std::memcpy(hello.client_uuid, wireIdentity.constData(), 16);
-        hello.stream_generation = request.streamGeneration;
-        hello.session_token = request.sessionToken;
-        hello.attachment_token = request.attachmentToken;
-        hello.lease_token = request.leaseToken;
+        RemoteUsbBrokerHello hello;
+        std::copy_n(reinterpret_cast<const std::uint8_t *>(wireIdentity.constData()),
+                    hello.clientUuid.size(), hello.clientUuid.begin());
+        hello.streamGeneration = request.streamGeneration;
+        hello.sessionToken = request.sessionToken;
+        hello.attachmentToken = request.attachmentToken;
+        hello.leaseToken = request.leaseToken;
         if (capability->nonce.size() != 16) {
             fail(operation, QStringLiteral("Remote USB capability nonce is invalid"));
             return;
         }
-        std::memcpy(hello.capability_nonce, capability->nonce.constData(), 16);
-        hello.max_urb = capability->maxUrb;
-        hello.max_inflight = capability->maxInflight;
-        hello.isochronous = 0;
+        std::copy_n(reinterpret_cast<const std::uint8_t *>(capability->nonce.constData()),
+                    hello.capabilityNonce.size(), hello.capabilityNonce.begin());
+        hello.maxPdu = capability->maxUrb;
+        hello.maxInflight = capability->maxInflight;
+        hello.isochronous = false;
 
         RemoteUsbTlsChannelConfig channelConfig;
         channelConfig.host = capability->host;

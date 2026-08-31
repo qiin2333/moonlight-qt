@@ -1,7 +1,7 @@
 # Qt Remote USB Adapter Boundary
 
 The Qt client carries an opt-in adapter boundary and session coordinator for
-the shared Remote USB C core. The coordinator is connected to `Session` but is
+the shared Rust Remote USB core. The coordinator is connected to `Session` but is
 disabled by default at runtime; a normal qmake build does not compile or link
 any Remote USB code. When enabled, it uses a dedicated worker thread and a
 separate broker/TLS channel, never the normal streaming/control channel.
@@ -13,21 +13,18 @@ protocol.
 
 ## Enable the boundary
 
-The feature is enabled explicitly with `CONFIG+=remote_usb` and either a
-shared-core source directory or an installed static library:
+The feature is enabled explicitly with `CONFIG+=remote_usb`. By default qmake
+builds the Rust core at the commit pinned by the submodule:
 
 ```sh
-qmake6 moonlight-qt.pro CONFIG+=remote_usb \
-  MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR=/path/to/remoteusb
+git submodule update --init moonlight-remote-usb-core
+qmake6 moonlight-qt.pro CONFIG+=remote_usb
 ```
 
-The boundary smoke can be built independently of the full application.  Point
-it at the same shared-core checkout (or export the variable once for a CI
-job):
+The boundary smoke can be built independently of the full application:
 
 ```sh
 qmake6 tests/remote_usb_qt_boundary/remote_usb_qt_boundary.pro \
-  MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR=/path/to/remoteusb \
   -o "$TMPDIR/remote-usb-qt-smoke/Makefile"
 make -C "$TMPDIR/remote-usb-qt-smoke" -j2
 "$TMPDIR/remote-usb-qt-smoke/remote_usb_qt_boundary"
@@ -37,17 +34,7 @@ Expected output is `remote_usb_qt_boundary=passed`.  The smoke deliberately
 uses an in-process byte channel and platform adapter, so it does not require a
 USB device, a broker, or a network connection.
 
-`MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR` must contain the platform-neutral C
-sources listed by `remoteusb/shared-core/CMakeLists.txt`. The qmake include path
-is taken from that directory unless `MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR` is
-also supplied.
-
-Source and library mode are mutually exclusive. Source mode requires a C11
-compiler; on Unix the qmake fragment adds the pthread compile/link flags. A
-prebuilt static library must include the shared core's `Threads` dependency in
-its deployment toolchain (the qmake fragment adds `-pthread` on non-macOS Unix).
-
-For an installed build, pass the include directory and the complete library
+For a packaged build, pass the include directory and complete prebuilt library
 path instead:
 
 ```sh
@@ -56,9 +43,16 @@ qmake6 moonlight-qt.pro CONFIG+=remote_usb \
   MOONLIGHT_REMOTE_USB_CORE_LIBRARY=/opt/moonlight/lib/libmoonlight-remote-usb-core.a
 ```
 
-The same values may be provided as environment variables. Requesting the
-feature without either source or library intentionally enables only the header
-and emits a qmake warning; it does not silently substitute another transport.
+The same values may be provided as environment variables. The public header
+and static library must come from the same core revision. The binding checks
+both `RUSB_CORE_ABI_VERSION` and the independent RUSB protocol version before
+starting a session.
+
+The wire contract is normative in
+`moonlight-remote-usb-core/contract/protocol-v1.md`. Cross-language
+implementations must also pass the byte-exact vectors in
+`moonlight-remote-usb-core/contract/vectors-v1.json`; native Rust structure
+layout and Qt value objects are never wire formats.
 
 ## Boundary rules
 
@@ -85,7 +79,7 @@ rejection.
 `TransferRequest.deviceId` is the 32-bit USB/IP wire `devid`, not the opaque
 `DeviceSnapshot.deviceId`. `endpoint` is a number in the low four bits;
 resolved `Endpoint.address` carries the USB direction bit. Before invoking the
-C core, the binding must validate non-negative lengths/frame/interval values,
+Rust core, the binding must validate non-negative lengths/frame/interval values,
 `numberOfPackets == 0`, control setup direction and little-endian `wLength`,
 zero setup bytes for non-control requests, and exact OUT payload length. For an
 IN completion, `data.size()` must equal `actualLength` (and be empty at zero);
@@ -96,17 +90,18 @@ OUT completions must not return data. `actualLength`, `startFrame`, and
 cancel callback may only use the original request token and still fires once
 when completion and cancellation race.
 
-The future binding copies these values into the C executor/transport structs.
-The channel's protocol version refers to the Remote USB wire protocol; it is
-independent from the C adapter ABI version. `start()` authenticates the
-underlying byte channel, while the shared core still performs the broker HELLO
-exchange.
+The binding copies these values into the versioned `remoteusb.h` C ABI. The
+channel's protocol version refers to the Remote USB wire protocol; it is
+independent from the core ABI version. `start()` authenticates the underlying
+byte channel, while the Rust core still performs the broker HELLO exchange.
+The broker's negotiated reassembly size, fragment count, transfer size, and
+byte/PDU windows are also passed into the session config and enforced inside
+the core before allocation or USB dispatch.
 Callbacks may run on an I/O thread, and a `Pending` operation must issue exactly
-one terminal callback. The `SubmitDisposition` numeric values deliberately
-match the C executor (`Pending=0`, `Completed=1`, `Rejected=2`), but the binding
-should still use an explicit switch rather than rely on enum casts. A rejected
-submit currently carries human-readable detail through `QString`; the binding
-must map it to a deterministic USB/IP error status.
+one terminal callback. The binding maps each `SubmitDisposition` explicitly
+instead of passing a C++ enum through the ABI. A rejected submit carries
+human-readable detail through `QString`; the binding maps it to a deterministic
+USB/IP error status.
 
 `BytesCallback` receives arbitrary TCP stream chunks, not complete RUSB frames;
 a chunk can split a header or contain multiple frames. The binding must consume
@@ -125,8 +120,8 @@ returning; `false` means the owner must tear down the session. `start()`,
 `send()`, and `close()` are serialized on the owner loop and must not race one
 another. Closing the channel must unblock both directions, and the caller must
 wait for `closedCallback` and callback quiescence (or an equivalent drain
-guarantee) before destroying the C transport or channel. Adapter callbacks
-must catch C++ exceptions; none may cross into the C core.
+guarantee) before destroying the Rust session or channel. Adapter callbacks
+must catch C++ exceptions; none may cross the C ABI.
 
 All calls into the session, transport, and executor, including asynchronous
 completion and cancel delivery, are serialized on one owner event loop. An I/O
@@ -156,9 +151,9 @@ and independence; there is no fallback to the ordinary Moonlight stream.
 
 ## Current implementation slice
 
-1. The Qt broker-capability/client, TLS channel, C binding, and libusb backend
-   are implemented behind `CONFIG+=remote_usb remote_usb_libusb` and a shared
-   core source/library.
+1. The Qt broker-capability/client, TLS channel, Rust C-ABI binding, and libusb
+   backend are implemented behind `CONFIG+=remote_usb remote_usb_libusb`; the
+   core is pinned as a repository submodule.
 2. `Session` exposes asynchronous enumerate/start/stop calls, performs cleanup
    on reconnect and teardown, and presents per-session consent in the streaming
    overlay. The legacy in-process coordinator remains opt-in with

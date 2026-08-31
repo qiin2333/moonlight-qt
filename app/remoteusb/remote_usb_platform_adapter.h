@@ -162,9 +162,9 @@ enum class SubmitDisposition : quint8 {
     Rejected = 2u,
 };
 
-/* Values intentionally match ml_remote_usb_executor_submit_result.  The
- * names differ only because a platform adapter reports a rejected operation
- * while the C ABI calls it a failed submit. */
+/* Values are part of the Qt platform-adapter contract. The Rust core is
+ * reached through explicit switches in the owner-loop binding, so these
+ * values never cross the C ABI as native enum objects. */
 static_assert(static_cast<quint8>(SubmitDisposition::Pending) == 0u,
               "SubmitDisposition::Pending ABI value changed");
 static_assert(static_cast<quint8>(SubmitDisposition::Completed) == 1u,
@@ -213,7 +213,7 @@ using CancelCompletionCallback =
  * Implementations may use libusb, native OS APIs, or a platform service, but
  * expose no native handle through this interface.
  *
- * Callback rules are deliberately strict so the C executor can safely retain
+ * Callback rules are deliberately strict so the Rust executor can safely retain
  * an in-flight request: Pending means exactly one later completion, while
  * Completed means a synchronous completion before the method returns.
  * The TransferRequest reference is borrowed for the duration of the method
@@ -231,9 +231,8 @@ using CancelCompletionCallback =
  * Calls into the shared session/executor must be serialized by one owner event
  * loop. Callbacks may arrive on any thread, must not directly touch Qt UI
  * state, and should enqueue completion work onto that owner loop before
- * calling the C core. Implementations and callbacks must catch C++ exceptions;
- * no exception may cross this interface or the C shared-core callback
- * boundary.
+ * calling the Rust core. Implementations and callbacks must catch C++
+ * exceptions; no exception may cross this interface or the C ABI boundary.
  */
 class RemoteUsbPlatformAdapter
 {
@@ -299,7 +298,7 @@ struct ChannelCapabilities {
  * point may parser storage exceed kWireMaxFrameSize plus fixed parser state.
  * An oversized/unacceptable chunk is a protocol failure or is back-pressured,
  * never an unbounded allocation. All callbacks must be posted to the same
- * owner event loop used for C transport calls.
+ * owner event loop used for Rust C-ABI calls.
  */
 class RemoteUsbByteChannel
 {

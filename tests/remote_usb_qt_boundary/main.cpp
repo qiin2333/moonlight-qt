@@ -5,11 +5,6 @@
 #include "backend/nvaddress.h"
 #include "backend/nvcomputer.h"
 
-extern "C" {
-#include "remote_usb_broker.h"
-#include "remote_usb_wire.h"
-}
-
 #include <QCoreApplication>
 #include <QEventLoop>
 #include <QSslConfiguration>
@@ -19,7 +14,6 @@ extern "C" {
 #include <array>
 #include <cstdint>
 #include <cstring>
-#include <vector>
 
 /* The parser-only smoke does not call the network fetch path.  Keep the
  * executable independent of the full application backend by supplying the
@@ -198,68 +192,75 @@ bool require(bool condition, const QString &message, QTextStream &err)
     return condition;
 }
 
-ml_remote_usb_broker_hello testHello()
+void putLe16(std::uint8_t *bytes, quint16 value)
 {
-    ml_remote_usb_broker_hello hello {};
-    hello.size = sizeof(hello);
-    hello.version = ML_REMOTE_USB_BROKER_VERSION;
-    for (std::size_t index = 0; index < sizeof(hello.client_uuid); ++index) {
-        hello.client_uuid[index] = static_cast<std::uint8_t>('A' + index);
-        hello.capability_nonce[index] = static_cast<std::uint8_t>(index + 1);
+    bytes[0] = static_cast<std::uint8_t>(value);
+    bytes[1] = static_cast<std::uint8_t>(value >> 8u);
+}
+
+void putLe32(std::uint8_t *bytes, quint32 value)
+{
+    for (unsigned int index = 0; index < 4u; ++index) {
+        bytes[index] = static_cast<std::uint8_t>(value >> (index * 8u));
     }
-    hello.stream_generation = 7;
-    hello.session_token = 0x1111222233334444ULL;
-    hello.attachment_token = 0x5555666677778888ULL;
-    hello.lease_token = 0x9999aaaabbbbccccULL;
-    hello.max_urb = 64 * 1024;
-    hello.max_inflight = 8;
-    hello.isochronous = 0;
+}
+
+void putLe64(std::uint8_t *bytes, quint64 value)
+{
+    for (unsigned int index = 0; index < 8u; ++index) {
+        bytes[index] = static_cast<std::uint8_t>(value >> (index * 8u));
+    }
+}
+
+RemoteUsbBrokerHello testHello()
+{
+    RemoteUsbBrokerHello hello;
+    for (std::size_t index = 0; index < hello.clientUuid.size(); ++index) {
+        hello.clientUuid[index] = static_cast<std::uint8_t>('A' + index);
+        hello.capabilityNonce[index] = static_cast<std::uint8_t>(index + 1);
+    }
+    hello.streamGeneration = 7;
+    hello.sessionToken = 0x1111222233334444ULL;
+    hello.attachmentToken = 0x5555666677778888ULL;
+    hello.leaseToken = 0x9999aaaabbbbccccULL;
+    hello.maxPdu = 64 * 1024;
+    hello.maxInflight = 8;
     return hello;
 }
 
-QByteArray makePeerCapabilityFrame(const ml_remote_usb_broker_hello &hello)
+QByteArray makeHello(const RemoteUsbBrokerHello &hello)
 {
-    std::vector<std::uint8_t> payload(kWireMaxPayload);
-    const QByteArray busId = QByteArrayLiteral("1-2");
-    const QByteArray descriptors = QByteArrayLiteral("\x12\x01");
-    ml_remote_usb_wire_endpoint endpoint {};
-    endpoint.address = 0x81;
-    endpoint.attributes = 2;
-    endpoint.max_packet_size = 64;
-    endpoint.interval = 1;
+    QByteArray wire(static_cast<qsizetype>(kBrokerHelloSize), 0);
+    auto *bytes = reinterpret_cast<std::uint8_t *>(wire.data());
+    putLe32(bytes, 0x42535552u);
+    putLe16(bytes + 4u, 1u);
+    putLe16(bytes + 6u, static_cast<quint16>(kBrokerHelloSize));
+    std::copy(hello.clientUuid.cbegin(), hello.clientUuid.cend(), bytes + 8u);
+    putLe64(bytes + 24u, hello.streamGeneration);
+    putLe64(bytes + 32u, hello.sessionToken);
+    putLe64(bytes + 40u, hello.attachmentToken);
+    putLe64(bytes + 48u, hello.leaseToken);
+    std::copy(hello.capabilityNonce.cbegin(), hello.capabilityNonce.cend(),
+              bytes + 56u);
+    putLe32(bytes + 72u, hello.maxPdu);
+    putLe32(bytes + 76u, hello.maxInflight);
+    return wire;
+}
 
-    ml_remote_usb_wire_capability capability {};
-    capability.size = sizeof(capability);
-    capability.version = ML_REMOTE_USB_WIRE_VERSION;
-    capability.lease_token = hello.lease_token;
-    capability.attachment_token = hello.attachment_token;
-    capability.vendor_id = 0x1234;
-    capability.product_id = 0x5678;
-    capability.device_bcd = 0x0100;
-    capability.bus_id = reinterpret_cast<const std::uint8_t *>(busId.constData());
-    capability.bus_id_length = static_cast<std::size_t>(busId.size());
-    capability.raw_descriptors = reinterpret_cast<const std::uint8_t *>(
-        descriptors.constData());
-    capability.raw_descriptor_size = static_cast<std::size_t>(descriptors.size());
-    capability.endpoints = &endpoint;
-    capability.endpoint_count = 1;
-
-    std::size_t payloadSize = 0;
-    if (ml_remote_usb_wire_encode_capability(&capability, payload.data(),
-                                             payload.size(), &payloadSize) !=
-        ML_REMOTE_USB_WIRE_OK) {
-        return {};
-    }
-    std::vector<std::uint8_t> frame(kWireHeaderSize + payloadSize);
-    std::size_t frameSize = 0;
-    if (ml_remote_usb_wire_encode_frame(
-            frame.data(), frame.size(), ML_REMOTE_USB_WIRE_MESSAGE_CAPABILITY,
-            0, payload.data(), payloadSize, hello.session_token, 1,
-            &frameSize) != ML_REMOTE_USB_WIRE_OK) {
-        return {};
-    }
-    return QByteArray(reinterpret_cast<const char *>(frame.data()),
-                      static_cast<qsizetype>(frameSize));
+QByteArray makePeerOpenFrame(const RemoteUsbBrokerHello &hello)
+{
+    QByteArray wire(static_cast<qsizetype>(kWireHeaderSize + 16u), 0);
+    auto *bytes = reinterpret_cast<std::uint8_t *>(wire.data());
+    putLe32(bytes, 0x42535552u);
+    bytes[4] = 1u;
+    bytes[5] = 2u;
+    putLe16(bytes + 6u, static_cast<quint16>(kWireHeaderSize));
+    putLe32(bytes + 12u, 16u);
+    putLe64(bytes + 16u, hello.sessionToken);
+    putLe64(bytes + 24u, 1u);
+    putLe64(bytes + 32u, hello.leaseToken);
+    putLe64(bytes + 40u, hello.attachmentToken);
+    return wire;
 }
 
 bool testCapabilityParser(QTextStream &err)
@@ -305,16 +306,21 @@ bool testSessionBinding(QCoreApplication &app, QTextStream &err)
     FakeChannel channel;
     RemoteUsbSessionBindingOptions options;
     options.brokerHello = testHello();
+    options.maxReassemblySize = options.brokerHello.maxPdu;
+    options.maxFragments = 4096;
+    options.maxInflight = options.brokerHello.maxInflight;
+    options.maxTransferSize = options.brokerHello.maxPdu - kPduHeaderSize;
     RemoteUsbSessionBinding binding(&platform, &channel, options);
-    int capabilities = 0;
+    int helloAccepted = 0;
+    int openRequests = 0;
+    int openAccepted = 0;
     int stopped = 0;
-    QObject::connect(&binding, &RemoteUsbSessionBinding::capabilityReceived,
-                     &binding, [&capabilities](DeviceSnapshot snapshot) {
-                         if (snapshot.busId == QByteArrayLiteral("1-2") &&
-                             snapshot.endpoints.size() == 1) {
-                             ++capabilities;
-                         }
-                     });
+    QObject::connect(&binding, &RemoteUsbSessionBinding::helloAccepted,
+                     &binding, [&helloAccepted]() { ++helloAccepted; });
+    QObject::connect(&binding, &RemoteUsbSessionBinding::openRequested,
+                     &binding, [&openRequests](quint64, quint64) { ++openRequests; });
+    QObject::connect(&binding, &RemoteUsbSessionBinding::openAccepted,
+                     &binding, [&openAccepted]() { ++openAccepted; });
     QObject::connect(&binding, &RemoteUsbSessionBinding::stopped,
                      &binding, [&stopped]() { ++stopped; });
 
@@ -325,28 +331,38 @@ bool testSessionBinding(QCoreApplication &app, QTextStream &err)
                       channel.sent.first().size() == static_cast<qsizetype>(kBrokerHelloSize),
                   QStringLiteral("HELLO was not emitted as the first 84 bytes"), err);
 
-    std::array<std::uint8_t, ML_REMOTE_USB_BROKER_HELLO_SIZE> helloWire {};
-    ok &= require(ml_remote_usb_broker_encode_hello(&options.brokerHello,
-                                                     helloWire.data()) ==
-                      ML_REMOTE_USB_BROKER_OK,
-                  QStringLiteral("could not encode peer HELLO"), err);
-    const QByteArray hello(reinterpret_cast<const char *>(helloWire.data()),
-                           static_cast<qsizetype>(helloWire.size()));
+    const QByteArray hello = makeHello(options.brokerHello);
     channel.feed(hello.left(3));
     channel.feed(hello.mid(3));
     ok &= require(binding.feedBytes({}, &error),
                   QStringLiteral("empty deterministic feed failed: %1").arg(error), err);
 
-    const QByteArray capability = makePeerCapabilityFrame(options.brokerHello);
-    ok &= require(!capability.isEmpty(), QStringLiteral("could not build capability frame"), err);
-    for (qsizetype offset = 0; offset < capability.size();) {
-        const qsizetype size = std::min<qsizetype>(5, capability.size() - offset);
-        channel.feed(capability.mid(offset, size));
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+    ok &= require(helloAccepted == 1,
+                  QStringLiteral("fragmented HELLO was not accepted"), err);
+
+    DeviceSnapshot device;
+    device.busId = QByteArrayLiteral("1-2");
+    device.rawDescriptors = QByteArrayLiteral("\x12\x01");
+    device.endpoints.append(Endpoint { 0, 0, 0x81, 2, 64, 1, 0 });
+    ok &= require(binding.sendCapability(device, &error),
+                  QStringLiteral("capability was not emitted: %1").arg(error), err);
+    ok &= require(channel.sent.size() == 2,
+                  QStringLiteral("capability frame was not sent"), err);
+
+    const QByteArray open = makePeerOpenFrame(options.brokerHello);
+    for (qsizetype offset = 0; offset < open.size();) {
+        const qsizetype size = std::min<qsizetype>(5, open.size() - offset);
+        channel.feed(open.mid(offset, size));
         offset += size;
     }
     QCoreApplication::processEvents(QEventLoop::AllEvents);
-    ok &= require(capabilities == 1,
-                  QStringLiteral("fragmented capability was not delivered"), err);
+    ok &= require(openRequests == 1,
+                  QStringLiteral("fragmented OPEN was not delivered"), err);
+    ok &= require(binding.sendOpenOk(&error),
+                  QStringLiteral("OPEN_OK was not emitted: %1").arg(error), err);
+    ok &= require(openAccepted == 1 && channel.sent.size() == 3,
+                  QStringLiteral("OPEN_OK did not transition to open"), err);
 
     binding.stop();
     QCoreApplication::processEvents(QEventLoop::AllEvents);

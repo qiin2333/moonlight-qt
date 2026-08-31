@@ -10,11 +10,10 @@ MOONLIGHT_USB_AGENT_TOKEN=<random> \
 ```
 
 The first line from Moonlight must be a `hello` request carrying the token.
-After the `ready` event, commands are line-delimited JSON objects. A build with
-`MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR` (or the installed core library/include
-pair) runs the shared Remote USB session, TLS channel, broker capability flow,
-and libusb adapter inside the agent. A build without the shared core remains a
-discovery-only binary and rejects `start` explicitly.
+After the `ready` event, commands are line-delimited JSON objects. The build
+uses the pinned `moonlight-remote-usb-core` Rust submodule by default and runs
+the shared Remote USB session, TLS channel, broker capability flow, and libusb
+adapter inside the agent.
 
 The production `start` request carries the selected device, paired host and
 TLS identity, plus fresh stream/session/attachment/lease identifiers. All
@@ -38,7 +37,12 @@ variable so the token does not appear in process listings.
 Example runtime build:
 
 ```sh
-qmake6 usb-agent/usb_agent.pro \
-  MOONLIGHT_REMOTE_USB_CORE_SOURCE_DIR=/path/to/remoteusb/shared-core
+git submodule update --init moonlight-remote-usb-core
+qmake6 usb-agent/usb_agent.pro
 make -j4
 ```
+
+Packagers may set `MOONLIGHT_REMOTE_USB_CORE_INCLUDE_DIR` and
+`MOONLIGHT_REMOTE_USB_CORE_LIBRARY` to use a prebuilt Rust static library. The
+header and library must come from the same core revision; startup also rejects
+ABI or protocol versions that do not match the pinned v1 integration.
