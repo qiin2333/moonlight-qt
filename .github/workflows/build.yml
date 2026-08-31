@@ -409,7 +409,7 @@ jobs:
           libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev \
           libxv-dev libxxf86vm-dev libxcb1-dev libxcb-dri3-dev libx11-xcb-dev libwayland-dev wayland-protocols \
           libxfixes-dev libxtst-dev libpipewire-0.3-dev \
-          libopus-dev libvdpau-dev cmake weston xvfb xauth
+          libopus-dev libvdpau-dev cmake xvfb xauth
 
         if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
           sudo apt install -y vulkan-sdk
@@ -453,28 +453,6 @@ jobs:
         qmake overlay_button_native_wake.pro
         make -j"$(nproc)"
         QT_QPA_PLATFORM=xcb xvfb-run -a ./overlay_button_native_wake
-        make distclean
-
-        qmake overlay_button_native_wake.pro "CONFIG+=wayland_test"
-        make -j"$(nproc)"
-        export XDG_RUNTIME_DIR="$RUNNER_TEMP/moonlight-weston-${{ matrix.arch }}"
-        mkdir -p "$XDG_RUNTIME_DIR"
-        chmod 700 "$XDG_RUNTIME_DIR"
-        weston --backend=headless-backend.so --socket=moonlight-wayland-test \
-          --idle-time=0 --log="$XDG_RUNTIME_DIR/weston.log" &
-        WESTON_PID=$!
-        for attempt in $(seq 1 50); do
-          [[ -S "$XDG_RUNTIME_DIR/moonlight-wayland-test" ]] && break
-          sleep 0.1
-        done
-        if [[ ! -S "$XDG_RUNTIME_DIR/moonlight-wayland-test" ]]; then
-          cat "$XDG_RUNTIME_DIR/weston.log"
-          exit 1
-        fi
-        WAYLAND_DISPLAY=moonlight-wayland-test QT_QPA_PLATFORM=wayland \
-          ./overlay_button_native_wake
-        kill "$WESTON_PID"
-        wait "$WESTON_PID" || true
         popd
 
     # arm64 上没有 LunarG 源，Vulkan 那套要手工补：noble 自带的 loader 是 1.3.275，

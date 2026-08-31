@@ -91,10 +91,6 @@ unix:if(!macx|disable-prebuilts) {
     # Keep these checks outside !disable-ffmpeg so software-only builds can
     # still avoid polling Qt while the floating button is idle.
     linux:!config_SL {
-        !disable-wayland:packagesExist(wayland-client) {
-            DEFINES += HAVE_WAYLAND_DISPLAY_MONITOR
-            PKGCONFIG += wayland-client
-        }
         !disable-x11:packagesExist(xcb) {
             DEFINES += HAVE_XCB_DISPLAY_MONITOR
             PKGCONFIG += xcb

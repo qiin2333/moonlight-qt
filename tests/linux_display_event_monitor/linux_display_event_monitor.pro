@@ -9,11 +9,6 @@ packagesExist(xcb) {
     PKGCONFIG += xcb
 }
 
-packagesExist(wayland-client) {
-    DEFINES += HAVE_WAYLAND_DISPLAY_MONITOR
-    PKGCONFIG += wayland-client
-}
-
 SOURCES += \
     main.cpp \
     ../../app/streaming/video/overlayeventmonitor_linux.cpp

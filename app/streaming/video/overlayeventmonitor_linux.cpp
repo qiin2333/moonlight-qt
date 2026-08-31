@@ -20,22 +20,8 @@
 #define USE_XCB_DISPLAY_MONITOR
 #endif
 
-#if defined(HAVE_WAYLAND_DISPLAY_MONITOR)
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-#if QT_CONFIG(wayland)
-#define USE_WAYLAND_DISPLAY_MONITOR
-#endif
-#else
-#define USE_WAYLAND_DISPLAY_MONITOR
-#endif
-#endif
-
 #ifdef USE_XCB_DISPLAY_MONITOR
 #include <xcb/xcb.h>
-#endif
-
-#ifdef USE_WAYLAND_DISPLAY_MONITOR
-#include <wayland-client.h>
 #endif
 
 namespace {
@@ -63,31 +49,12 @@ DisplaySource qtDisplaySource()
 #endif
 #endif
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-#if defined(USE_WAYLAND_DISPLAY_MONITOR) && \
-        QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    if (auto* wayland = guiApp->nativeInterface<QNativeInterface::QWaylandApplication>()) {
-        if (wl_display* display = wayland->display()) {
-            return { wl_display_get_fd(display) };
-        }
-    }
-#endif
-#else
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     QPlatformNativeInterface* nativeInterface =
             QGuiApplication::platformNativeInterface();
     if (!nativeInterface) {
         return {};
     }
-
-#ifdef USE_WAYLAND_DISPLAY_MONITOR
-    if (QGuiApplication::platformName().startsWith(QStringLiteral("wayland"))) {
-        auto* display = static_cast<wl_display*>(
-                nativeInterface->nativeResourceForIntegration("display"));
-        if (display) {
-            return { wl_display_get_fd(display) };
-        }
-    }
-#endif
 
 #ifdef USE_XCB_DISPLAY_MONITOR
     if (QGuiApplication::platformName() == QStringLiteral("xcb")) {
