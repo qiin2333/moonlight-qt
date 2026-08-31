@@ -4900,8 +4900,13 @@ void Session::exec()
 
                 // SDL_CreateRenderer() may recreate the platform window while
                 // retaining the SDL_Window object. Refresh native input hooks
-                // after renderer creation so they follow the replacement HWND.
+                // after renderer creation so they follow the replacement window.
                 m_InputHandler->setWindow(m_Window);
+#ifdef Q_OS_DARWIN
+                if (m_MacQtEventPumpInputGuard) {
+                    m_MacQtEventPumpInputGuard->setStreamingWindow(m_Window);
+                }
+#endif
 
                 // As of SDL 2.0.12, SDL_RecreateWindow() doesn't carry over mouse capture
                 // or mouse hiding state to the new window. By capturing after the decoder

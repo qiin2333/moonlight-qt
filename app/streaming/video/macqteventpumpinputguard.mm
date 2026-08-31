@@ -54,13 +54,7 @@ bool isMouseEventHandledBySdl(NSEventType type)
 
 MacQtEventPumpInputGuard::MacQtEventPumpInputGuard(SDL_Window* streamingWindow)
 {
-    NSWindow* nativeWindow = nativeWindowForSdlWindow(streamingWindow);
-    if (nativeWindow) {
-        m_StreamingNativeWindow = [nativeWindow retain];
-    }
-    else {
-        qWarning("Unable to identify the macOS SDL streaming window; pointer input protection is unavailable");
-    }
+    setStreamingWindow(streamingWindow);
 
     if (QCoreApplication* app = QCoreApplication::instance()) {
         app->installNativeEventFilter(this);
@@ -82,6 +76,24 @@ MacQtEventPumpInputGuard::~MacQtEventPumpInputGuard()
     if (m_StreamingNativeWindow) {
         [static_cast<NSWindow*>(m_StreamingNativeWindow) release];
         m_StreamingNativeWindow = nullptr;
+    }
+}
+
+void MacQtEventPumpInputGuard::setStreamingWindow(SDL_Window* streamingWindow)
+{
+    NSWindow* nativeWindow = nativeWindowForSdlWindow(streamingWindow);
+    if (nativeWindow == static_cast<NSWindow*>(m_StreamingNativeWindow)) {
+        return;
+    }
+
+    [nativeWindow retain];
+    if (m_StreamingNativeWindow) {
+        [static_cast<NSWindow*>(m_StreamingNativeWindow) release];
+    }
+    m_StreamingNativeWindow = nativeWindow;
+
+    if (!nativeWindow) {
+        qWarning("Unable to identify the macOS SDL streaming window; pointer input protection is unavailable");
     }
 }
 

@@ -25,6 +25,7 @@ public:
     MacQtEventPumpInputGuard(const MacQtEventPumpInputGuard&) = delete;
     MacQtEventPumpInputGuard& operator=(const MacQtEventPumpInputGuard&) = delete;
 
+    void setStreamingWindow(SDL_Window* streamingWindow);
     void beginEventProcessing();
     void finishEventProcessing();
 

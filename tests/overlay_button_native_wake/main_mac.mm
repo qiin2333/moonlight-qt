@@ -254,6 +254,35 @@ int main(int argc, char* argv[])
                 dequeue:YES];
         require(requeuedOverlayEvent == nil,
                 "Qt overlay pointer input must not be requeued for SDL");
+
+        SDL_Window* replacementStreamingWindow = SDL_CreateWindow(
+                "replacement overlay input ownership test",
+                SDL_WINDOWPOS_CENTERED,
+                SDL_WINDOWPOS_CENTERED,
+                320,
+                240,
+                SDL_WINDOW_SHOWN);
+        require(replacementStreamingWindow != nullptr, SDL_GetError());
+        NSWindow* replacementNativeWindow =
+                nativeWindowForSdlWindow(replacementStreamingWindow);
+        require(replacementNativeWindow != nil,
+                "replacement SDL window must have a native Cocoa window");
+        inputGuard.setStreamingWindow(replacementStreamingWindow);
+        postMouseEvent(NSEventTypeMouseMoved,
+                       replacementNativeWindow.windowNumber);
+        inputGuard.beginEventProcessing();
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        inputGuard.finishEventProcessing();
+        NSEvent* replacementWindowEvent = [NSApp
+                nextEventMatchingMask:NSEventMaskMouseMoved
+                untilDate:[NSDate distantPast]
+                inMode:NSDefaultRunLoopMode
+                dequeue:YES];
+        require(replacementWindowEvent != nil &&
+                        replacementWindowEvent.window == replacementNativeWindow,
+                "input guard must follow a recreated SDL native window");
+        inputGuard.setStreamingWindow(streamingWindow);
+        SDL_DestroyWindow(replacementStreamingWindow);
     }
 
     SDL_DestroyWindow(streamingWindow);

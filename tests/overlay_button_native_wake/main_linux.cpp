@@ -200,9 +200,9 @@ int main(int argc, char* argv[])
     sendClick(display);
     require(wakeSemaphore.tryAcquire(1, 1000),
             "re-shown button must reattach its X11 event monitor");
+    require(wakeCount.load(std::memory_order_acquire) == reattachedWakeCount + 1,
+            "one reattached X11 click batch must produce one wake edge");
     settleQtEvents(button);
-    require(wakeCount.load(std::memory_order_acquire) >= reattachedWakeCount + 1,
-            "reattached X11 monitor must produce a new wake edge");
     require(clickCount.load(std::memory_order_acquire) == reattachedClickCount + 1,
             "reattached X11 button must handle a real click");
 
