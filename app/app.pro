@@ -236,7 +236,10 @@ macx {
         CONFIG += discord-rpc libplacebo
     }
 
-    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework UniformTypeIdentifiers -framework Metal -framework MetalFx -framework QuartzCore
+    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework UniformTypeIdentifiers -framework Metal -framework MetalFx -framework QuartzCore -framework GameController -framework CoreHaptics
+
+    SOURCES += streaming/audio/dualsensehapticsmac.mm
+    HEADERS += streaming/audio/dualsensehapticsmac.h
 
     # For libsoundio
     LIBS += -framework CoreAudio -framework AudioUnit
@@ -342,6 +345,7 @@ HEADERS += \
     streaming/audio/renderers/renderer.h \
     streaming/audio/dualsensehaptics.h \
     streaming/audio/dualsensehapticscalibration.h \
+    streaming/audio/dualsensehapticsrouting.h \
     streaming/audio/dualsensehapticsstream.h \
     streaming/audio/renderers/sdl.h \
     gui/computermodel.h \
@@ -361,7 +365,9 @@ HEADERS += \
     streaming/video/overlaymanager.h \
     streaming/video/overlaymenupanel.h \
     streaming/video/overlaybuttonposition.h \
+    streaming/video/overlayeventwakestate.h \
     streaming/video/overlaymenubutton.h \
+    streaming/video/overlaytoasteventstate.h \
     streaming/video/overlaytoast.h \
     backend/systemproperties.h \
     imageutils.h \
@@ -376,8 +382,12 @@ HEADERS += \
 
 # 把红绿灯沉到我们自己那条 bar 的中线上，顺带让 AppKit 的标题栏拖动区覆盖整条 bar
 macx {
-    HEADERS += gui/macwindowchrome.h
-    SOURCES += gui/macwindowchrome.mm
+    HEADERS += \
+        gui/macwindowchrome.h \
+        streaming/video/overlayeventmonitor_mac.h
+    SOURCES += \
+        gui/macwindowchrome.mm \
+        streaming/video/overlayeventmonitor_mac.mm
 }
 
 # Platform-specific renderers and decoders

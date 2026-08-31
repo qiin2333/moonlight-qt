@@ -205,6 +205,10 @@ private:
     // unexpected network interruption. Returns true if streaming resumed.
     bool tryReconnect();
 
+    void handleSdlUserEvent(const SDL_UserEvent& event);
+
+    void updateDualSenseHapticsControllerTarget();
+
     // Emit the appropriate error dialog for a connection termination code.
     void displayTerminationError(int errorCode);
 
@@ -247,7 +251,10 @@ private:
     void restoreCaptureAfterStylusReplayPanel();
 #endif
 #ifdef Q_OS_WIN32
-    void queryDisplayHdrBrightness(float& maxNits, float& minNits, float& maxFullNits);
+    void queryDisplayHdrBrightness(const QString& preferredDisplayName,
+                                   float& maxNits, float& minNits,
+                                   float& maxFullNits, float& sdrWhiteNits);
+    float queryDisplaySdrWhiteNits(const QString& displayName, bool logFailures = true);
 #endif
 
     void notifyMouseEmulationMode(bool enabled);
@@ -372,6 +379,7 @@ private:
     NvComputer* m_Computer;
     NvApp m_App;
     QString m_LaunchDisplayName;
+    QString m_ClientDisplayName;
     std::optional<bool> m_LaunchUseVdd;
     SDL_Window* m_Window;
     IVideoDecoder* m_VideoDecoder;
@@ -394,6 +402,7 @@ private:
     int m_LastTerminationErrorCode;      // stored to show final error if reconnect gives up
 
     bool m_AsyncConnectionSuccess;
+    float m_LastClientSdrWhiteNits;
     int m_PortTestResults;
 
     int m_ActiveVideoFormat;
