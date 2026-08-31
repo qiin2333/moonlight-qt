@@ -4433,7 +4433,8 @@ void Session::exec()
     // Keep a hidden button ready so placement can switch during a stream
     // without creating a window from inside an input callback.
 #ifdef Q_OS_DARWIN
-    m_MacQtEventPumpInputGuard = std::make_unique<MacQtEventPumpInputGuard>();
+    m_MacQtEventPumpInputGuard =
+            std::make_unique<MacQtEventPumpInputGuard>(m_Window);
 #endif
     m_MenuButton = new OverlayMenuButton();
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \

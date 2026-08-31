@@ -12,6 +12,8 @@ SOURCES += \
     ../../app/streaming/video/overlaymenubutton.cpp
 
 macx {
+    INCLUDEPATH += ../../libs/mac/include ../../libs/mac/include/SDL2
+    LIBS += -L../../libs/mac/lib -lSDL2
     SOURCES += \
         main_mac.mm \
         ../../app/streaming/video/macqteventpumpinputguard.mm \
@@ -19,10 +21,17 @@ macx {
 } else:linux {
     QT += gui-private
     CONFIG += link_pkgconfig
-    DEFINES += HAVE_LINUX_DISPLAY_EVENT_MONITOR HAVE_XCB_DISPLAY_MONITOR
-    PKGCONFIG += xcb
+    DEFINES += HAVE_LINUX_DISPLAY_EVENT_MONITOR
+    contains(CONFIG, wayland_test) {
+        DEFINES += HAVE_WAYLAND_DISPLAY_MONITOR
+        PKGCONFIG += wayland-client
+        SOURCES += main_wayland.cpp
+    } else {
+        DEFINES += HAVE_XCB_DISPLAY_MONITOR
+        PKGCONFIG += x11 xtst xcb
+        SOURCES += main_linux.cpp
+    }
     SOURCES += \
-        main_linux.cpp \
         ../../app/streaming/video/overlayeventmonitor_linux.cpp
 } else {
     SOURCES += main.cpp

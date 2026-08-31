@@ -4,10 +4,12 @@
 
 #include <vector>
 
-// Streaming overlays do not accept focus, so SDL remains the keyboard owner
-// while Qt is pumped only for transient overlay UI. On macOS both frameworks
-// read the same AppKit queue, so this guard preserves keyboard events that
-// arrive during a Qt pass and returns them for SDL to process afterwards.
+struct SDL_Window;
+
+// Qt and SDL read the same process-wide AppKit event queue. During a Qt overlay
+// pass, this guard preserves keyboard input and pointer input targeting the SDL
+// streaming window, then returns those events for SDL to process afterwards.
+// Pointer input for Qt overlay windows remains owned by Qt.
 class MacQtEventPumpInputGuard : public QAbstractNativeEventFilter
 {
 public:
@@ -17,7 +19,7 @@ public:
     using NativeEventResult = long;
 #endif
 
-    MacQtEventPumpInputGuard();
+    explicit MacQtEventPumpInputGuard(SDL_Window* streamingWindow);
     ~MacQtEventPumpInputGuard() override;
 
     MacQtEventPumpInputGuard(const MacQtEventPumpInputGuard&) = delete;
@@ -31,7 +33,8 @@ public:
                            NativeEventResult* result) override;
 
 private:
-    std::vector<void*> m_DeferredKeyboardEvents;
-    bool m_InterceptingKeyboardEvents = false;
+    std::vector<void*> m_DeferredInputEvents;
+    void* m_StreamingNativeWindow = nullptr;
+    bool m_InterceptingInputEvents = false;
     bool m_Installed = false;
 };

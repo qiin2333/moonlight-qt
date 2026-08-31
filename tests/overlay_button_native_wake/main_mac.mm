@@ -7,6 +7,9 @@
 
 #import <AppKit/AppKit.h>
 
+#include <SDL.h>
+#include <SDL_syswm.h>
+
 namespace {
 void require(bool condition, const char* message)
 {
@@ -57,6 +60,37 @@ void postKeyEvent(NSEventType type,
                                         keyCode:keyCode];
     [NSApp postEvent:event atStart:NO];
 }
+
+void postMouseEvent(NSEventType type, NSInteger windowNumber)
+{
+    NSEvent* event = [NSEvent mouseEventWithType:type
+                                        location:NSMakePoint(20, 20)
+                                   modifierFlags:0
+                                       timestamp:NSProcessInfo.processInfo.systemUptime
+                                    windowNumber:windowNumber
+                                         context:nil
+                                     eventNumber:1
+                                      clickCount:1
+                                        pressure:type == NSEventTypeLeftMouseDown ? 1.0 : 0.0];
+    [NSApp postEvent:event atStart:NO];
+}
+
+NSWindow* nativeWindowForSdlWindow(SDL_Window* window)
+{
+    SDL_SysWMinfo windowInfo;
+    SDL_VERSION(&windowInfo.version);
+    require(SDL_GetWindowWMInfo(window, &windowInfo),
+            "SDL streaming window must expose native information");
+    require(windowInfo.subsystem == SDL_SYSWM_COCOA,
+            "SDL streaming window must use Cocoa");
+    return windowInfo.info.cocoa.window;
+}
+
+void flushSdlEvents()
+{
+    SDL_PumpEvents();
+    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
+}
 }
 
 int main(int argc, char* argv[])
@@ -67,6 +101,20 @@ int main(int argc, char* argv[])
             settingsDirectory.path().toLocal8Bit());
 
     QGuiApplication app(argc, argv);
+    require(SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == 0,
+            SDL_GetError());
+    SDL_Window* streamingWindow = SDL_CreateWindow(
+            "overlay input ownership test",
+            SDL_WINDOWPOS_CENTERED,
+            SDL_WINDOWPOS_CENTERED,
+            320,
+            240,
+            SDL_WINDOW_SHOWN);
+    require(streamingWindow != nullptr, SDL_GetError());
+    NSWindow* streamingNativeWindow = nativeWindowForSdlWindow(streamingWindow);
+    require(streamingNativeWindow != nil,
+            "SDL streaming window must have a native Cocoa window");
+
     OverlayMenuButton button;
     int wakeCount = 0;
     button.setEventWakeCallback([&wakeCount]() { wakeCount++; });
@@ -120,62 +168,98 @@ int main(int argc, char* argv[])
     require(wakeCount == reattachedWakeCount + 1,
             "reattached monitor must wake for native pointer input");
 
-    MacQtEventPumpInputGuard inputGuard;
-    postKeyEvent(NSEventTypeKeyDown, nativeView.window.windowNumber, @"a", 0, 0);
-    postKeyEvent(NSEventTypeKeyUp, nativeView.window.windowNumber, @"a", 0, 0);
-    postKeyEvent(NSEventTypeFlagsChanged,
-                 nativeView.window.windowNumber,
-                 @"",
-                 NSEventModifierFlagShift,
-                 56);
-    inputGuard.beginEventProcessing();
-    QCoreApplication::processEvents(QEventLoop::AllEvents);
-    inputGuard.finishEventProcessing();
+    {
+        MacQtEventPumpInputGuard inputGuard(streamingWindow);
+        flushSdlEvents();
 
-    const NSEventMask keyboardMask = NSEventMaskKeyDown |
-            NSEventMaskKeyUp |
-            NSEventMaskFlagsChanged;
-    NSEvent* firstKeyEvent = [NSApp nextEventMatchingMask:keyboardMask
-                                                 untilDate:[NSDate distantPast]
-                                                    inMode:NSDefaultRunLoopMode
-                                                   dequeue:YES];
-    NSEvent* secondKeyEvent = [NSApp nextEventMatchingMask:keyboardMask
-                                                  untilDate:[NSDate distantPast]
-                                                     inMode:NSDefaultRunLoopMode
-                                                    dequeue:YES];
-    NSEvent* modifierEvent = [NSApp nextEventMatchingMask:keyboardMask
-                                                untilDate:[NSDate distantPast]
-                                                   inMode:NSDefaultRunLoopMode
-                                                  dequeue:YES];
-    require(firstKeyEvent.type == NSEventTypeKeyDown &&
-                    [firstKeyEvent.characters isEqualToString:@"a"],
-            "Qt event processing must return key-down events for SDL");
-    require(secondKeyEvent.type == NSEventTypeKeyUp &&
-                    [secondKeyEvent.characters isEqualToString:@"a"],
-            "Qt event processing must preserve key release order");
-    require(modifierEvent.type == NSEventTypeFlagsChanged &&
-                    (modifierEvent.modifierFlags & NSEventModifierFlagShift),
-            "Qt event processing must preserve modifier changes");
+        postKeyEvent(NSEventTypeKeyDown,
+                     streamingNativeWindow.windowNumber,
+                     @"a", 0, 0);
+        postKeyEvent(NSEventTypeKeyUp,
+                     streamingNativeWindow.windowNumber,
+                     @"a", 0, 0);
+        postKeyEvent(NSEventTypeFlagsChanged,
+                     streamingNativeWindow.windowNumber,
+                     @"",
+                     NSEventModifierFlagShift,
+                     56);
+        inputGuard.beginEventProcessing();
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        inputGuard.finishEventProcessing();
 
-    NSEvent* normallyDispatchedEvent = [NSEvent keyEventWithType:NSEventTypeKeyDown
-                                                        location:NSZeroPoint
-                                                   modifierFlags:0
-                                                       timestamp:NSProcessInfo.processInfo.systemUptime
-                                                    windowNumber:nativeView.window.windowNumber
-                                                         context:nil
-                                                      characters:@"c"
-                                     charactersIgnoringModifiers:@"c"
-                                                        isARepeat:NO
-                                                          keyCode:8];
-    inputGuard.beginEventProcessing();
-    [NSApp sendEvent:normallyDispatchedEvent];
-    inputGuard.finishEventProcessing();
-    NSEvent* duplicateEvent = [NSApp nextEventMatchingMask:keyboardMask
-                                                 untilDate:[NSDate distantPast]
-                                                    inMode:NSDefaultRunLoopMode
-                                                   dequeue:YES];
-    require(duplicateEvent == nil,
-            "normal AppKit dispatch must not requeue an SDL-processed key");
+        SDL_PumpEvents();
+        int aKeyDownCount = 0;
+        int aKeyUpCount = 0;
+        int shiftDownCount = 0;
+        SDL_Event sdlEvent;
+        while (SDL_PollEvent(&sdlEvent)) {
+            if (sdlEvent.type == SDL_KEYDOWN &&
+                    sdlEvent.key.keysym.scancode == SDL_SCANCODE_A) {
+                aKeyDownCount++;
+            }
+            else if (sdlEvent.type == SDL_KEYUP &&
+                     sdlEvent.key.keysym.scancode == SDL_SCANCODE_A) {
+                aKeyUpCount++;
+            }
+            else if (sdlEvent.type == SDL_KEYDOWN &&
+                     sdlEvent.key.keysym.scancode == SDL_SCANCODE_LSHIFT) {
+                shiftDownCount++;
+            }
+        }
+        require(aKeyDownCount == 1 && aKeyUpCount == 1,
+                "Qt event processing must preserve one ordered SDL key press");
+        require(shiftDownCount == 1,
+                "Qt event processing must preserve SDL modifier changes");
+
+        postMouseEvent(NSEventTypeMouseMoved,
+                       streamingNativeWindow.windowNumber);
+        postMouseEvent(NSEventTypeLeftMouseDown,
+                       streamingNativeWindow.windowNumber);
+        postMouseEvent(NSEventTypeLeftMouseUp,
+                       streamingNativeWindow.windowNumber);
+        inputGuard.beginEventProcessing();
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        inputGuard.finishEventProcessing();
+
+        SDL_PumpEvents();
+        int motionCount = 0;
+        int buttonDownCount = 0;
+        int buttonUpCount = 0;
+        while (SDL_PollEvent(&sdlEvent)) {
+            if (sdlEvent.type == SDL_MOUSEMOTION) {
+                motionCount++;
+            }
+            else if (sdlEvent.type == SDL_MOUSEBUTTONDOWN &&
+                     sdlEvent.button.button == SDL_BUTTON_LEFT) {
+                buttonDownCount++;
+            }
+            else if (sdlEvent.type == SDL_MOUSEBUTTONUP &&
+                     sdlEvent.button.button == SDL_BUTTON_LEFT) {
+                buttonUpCount++;
+            }
+        }
+        require(motionCount == 1 && buttonDownCount == 1 && buttonUpCount == 1,
+                "Qt event processing must preserve SDL window mouse input");
+
+        // Pointer events for the Qt overlay are not owned by SDL and must not
+        // be requeued into its event pump.
+        postMouseEvent(NSEventTypeMouseMoved, nativeView.window.windowNumber);
+        inputGuard.beginEventProcessing();
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        inputGuard.finishEventProcessing();
+        SDL_PumpEvents();
+        int unrelatedMotionCount = 0;
+        while (SDL_PollEvent(&sdlEvent)) {
+            if (sdlEvent.type == SDL_MOUSEMOTION) {
+                unrelatedMotionCount++;
+            }
+        }
+        require(unrelatedMotionCount == 0,
+                "Qt overlay pointer input must not be duplicated into SDL");
+    }
+
+    SDL_DestroyWindow(streamingWindow);
+    SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 
     qunsetenv("MOONLIGHT_DEVICE_LOCAL_SETTINGS_DIR");
     return 0;
