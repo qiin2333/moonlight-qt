@@ -313,6 +313,14 @@ void LinuxDisplayEventMonitor::finishEventProcessing()
         return;
     }
 
+    // A display disconnect or poll failure wakes the owner once so it can
+    // switch to continuous Qt processing. Release the stopped monitor here
+    // instead of retaining its display connection until the button is hidden.
+    if (!m_State->attached.load(std::memory_order_acquire)) {
+        detach();
+        return;
+    }
+
     if (m_State->wakeOutstanding.exchange(false, std::memory_order_acq_rel)) {
         signalControlFileDescriptor(m_State->controlFd);
     }

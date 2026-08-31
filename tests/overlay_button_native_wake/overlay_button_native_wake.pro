@@ -17,6 +17,7 @@ macx {
         ../../app/streaming/video/macqteventpumpinputguard.mm \
         ../../app/streaming/video/overlayeventmonitor_mac.mm
 } else:linux {
+    QT += gui-private
     CONFIG += link_pkgconfig
     DEFINES += HAVE_LINUX_DISPLAY_EVENT_MONITOR HAVE_XCB_DISPLAY_MONITOR
     PKGCONFIG += xcb

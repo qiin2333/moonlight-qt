@@ -1,4 +1,4 @@
-QT += core gui
+QT += core gui gui-private
 CONFIG += console c++17 link_pkgconfig
 CONFIG -= app_bundle
 
