@@ -247,15 +247,13 @@ int main(int argc, char* argv[])
         inputGuard.beginEventProcessing();
         QCoreApplication::processEvents(QEventLoop::AllEvents);
         inputGuard.finishEventProcessing();
-        SDL_PumpEvents();
-        int unrelatedMotionCount = 0;
-        while (SDL_PollEvent(&sdlEvent)) {
-            if (sdlEvent.type == SDL_MOUSEMOTION) {
-                unrelatedMotionCount++;
-            }
-        }
-        require(unrelatedMotionCount == 0,
-                "Qt overlay pointer input must not be duplicated into SDL");
+        NSEvent* requeuedOverlayEvent = [NSApp
+                nextEventMatchingMask:NSEventMaskMouseMoved
+                untilDate:[NSDate distantPast]
+                inMode:NSDefaultRunLoopMode
+                dequeue:YES];
+        require(requeuedOverlayEvent == nil,
+                "Qt overlay pointer input must not be requeued for SDL");
     }
 
     SDL_DestroyWindow(streamingWindow);
