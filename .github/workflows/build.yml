@@ -313,7 +313,7 @@ jobs:
         pushd tests/overlay_button_native_wake
         qmake overlay_button_native_wake.pro
         make -j"$(sysctl -n hw.ncpu)"
-        ./overlay_button_native_wake
+        DYLD_LIBRARY_PATH="$PWD/../../libs/mac/lib" ./overlay_button_native_wake
         popd
 
     - name: Build and generate DMG
