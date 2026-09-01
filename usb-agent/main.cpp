@@ -21,17 +21,11 @@ int main(int argc, char **argv)
     QCommandLineOption socketOption({ QStringLiteral("s"), QStringLiteral("socket") },
                                      QStringLiteral("local IPC socket name"),
                                      QStringLiteral("name"));
-    QCommandLineOption tokenOption({ QStringLiteral("t"), QStringLiteral("token") },
-                                    QStringLiteral("one-session IPC bearer token"),
-                                    QStringLiteral("token"));
     parser.addOption(socketOption);
-    parser.addOption(tokenOption);
     parser.process(app);
 
-    QByteArray token = parser.value(tokenOption).toUtf8();
-    if (token.isEmpty()) {
-        token = qEnvironmentVariable("MOONLIGHT_USB_AGENT_TOKEN").toUtf8();
-    }
+    const QByteArray token = qEnvironmentVariable(
+        "MOONLIGHT_USB_AGENT_TOKEN").toUtf8();
     LibusbBackend backend;
     Server server(parser.value(socketOption), std::move(token), &backend);
     QString error;

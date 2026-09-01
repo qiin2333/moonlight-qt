@@ -118,7 +118,7 @@ contains(CONFIG, remote_usb) {
         win32: MOONLIGHT_REMOTE_USB_CORE_LIBRARY = $$MOONLIGHT_REMOTE_USB_CORE_DIR/target/$$MOONLIGHT_REMOTE_USB_RUST_PROFILE/moonlight_remote_usb_core.lib
         else: MOONLIGHT_REMOTE_USB_CORE_LIBRARY = $$MOONLIGHT_REMOTE_USB_CORE_DIR/target/$$MOONLIGHT_REMOTE_USB_RUST_PROFILE/libmoonlight_remote_usb_core.a
         remote_usb_rust_core.target = remote_usb_rust_core_build
-        remote_usb_rust_core.commands = cargo build --locked $$MOONLIGHT_REMOTE_USB_CARGO_FLAGS --manifest-path $$MOONLIGHT_REMOTE_USB_CORE_DIR/Cargo.toml
+        remote_usb_rust_core.commands = cargo build --locked $$MOONLIGHT_REMOTE_USB_CARGO_FLAGS --manifest-path $$shell_quote($$MOONLIGHT_REMOTE_USB_CORE_DIR/Cargo.toml)
         remote_usb_rust_core.CONFIG += phony
         QMAKE_EXTRA_TARGETS += remote_usb_rust_core
         PRE_TARGETDEPS += remote_usb_rust_core_build

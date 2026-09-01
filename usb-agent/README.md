@@ -30,9 +30,8 @@ identity handle where the platform supports non-exportable keys.
 
 The socket is owner-readable/writable on Unix. Moonlight must still treat the
 token as a secret, rotate it whenever the agent is restarted, and close the
-connection on any authentication or protocol error. The `--token` option is
-kept only for manual testing; production callers should use the environment
-variable so the token does not appear in process listings.
+connection on any authentication or protocol error. The agent reads the token
+only from `MOONLIGHT_USB_AGENT_TOKEN`, so it never appears in process listings.
 
 Example runtime build:
 

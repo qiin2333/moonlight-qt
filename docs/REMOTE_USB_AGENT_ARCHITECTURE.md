@@ -25,8 +25,9 @@ client is accepted at a time.
 Requests are `enumerate`, `start` (with a stable device id and host/session
 parameters), and `stop`. Events are `ready`, `devices`, `opening`, `opened`,
 `stopped`, and `error`. The client carries a monotonically increasing decimal
-generation on every request and accepts only matching events, so a late event
-cannot reopen a newer lease.
+generation on every request and accepts only matching events, with the active
+lease generation tracked separately for asynchronous `opened` events. Auth
+errors may omit generation so their actual reason is preserved.
 
 Moonlight snapshots the paired host address, HTTPS port, pinned Sunshine
 certificate, client certificate/key, client identity, and display name into

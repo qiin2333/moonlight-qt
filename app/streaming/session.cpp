@@ -1473,11 +1473,12 @@ void Session::updateRemoteUsbMenuState()
         }
     }
 
-    const bool available =
+    bool available = false;
 #ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
-        m_RemoteUsbAgent != nullptr;
-#else
-        m_RemoteUsbCoordinator != nullptr;
+    available = available || m_RemoteUsbAgent != nullptr;
+#endif
+#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
+    available = available || m_RemoteUsbCoordinator != nullptr;
 #endif
     m_MenuPanel->updateRemoteUsbState(
         available, m_RemoteUsbState, std::move(devices),

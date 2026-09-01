@@ -35,6 +35,26 @@ struct LibusbBackend::Impl
     RemoteUsb::DeviceSnapshot selected;
     RemoteUsb::BrokerCapabilityRequest lease;
 #endif
+
+    ~Impl() noexcept
+    {
+#ifdef MOONLIGHT_USB_AGENT_RUNTIME
+        /* The normal path deletes these objects from the binding's stopped
+         * callback. Backend destruction can bypass that callback, so perform
+         * the same owner-thread cleanup synchronously while the adapter is
+         * still alive. Binding destruction releases any claimed device. */
+        if (binding != nullptr) {
+            binding->stop();
+            delete binding;
+            binding = nullptr;
+        }
+        delete channel;
+        channel = nullptr;
+        delete brokerClient;
+        brokerClient = nullptr;
+#endif
+        adapter.release();
+    }
 };
 
 namespace {

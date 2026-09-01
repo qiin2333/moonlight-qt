@@ -450,6 +450,8 @@ void OverlayMenuPanel::updateRemoteUsbState(
     buildMenuLevels();
     if (m_Visible && previousLevel == 4 && m_MenuLevels.size() > 4) {
         m_CurrentLevel = 4;
+    }
+    if (m_Visible) {
         repositionWindow();
     }
     forceRepaint();

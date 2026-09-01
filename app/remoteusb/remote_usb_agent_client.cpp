@@ -54,7 +54,19 @@ RemoteUsbAgentClient::RemoteUsbAgentClient(QObject *parent)
 
 RemoteUsbAgentClient::~RemoteUsbAgentClient()
 {
-    shutdown();
+    /* Destruction must not enter a nested event loop: queued socket/process
+     * callbacks can otherwise run against an object whose owner is tearing it
+     * down. Explicit shutdown() remains the graceful path for live owners. */
+    m_shuttingDown = true;
+    m_connectTimer.stop();
+    closeSocket();
+    if (m_process != nullptr && m_process->state() != QProcess::NotRunning) {
+        m_process->terminate();
+        if (!m_process->waitForFinished(1000)) {
+            m_process->kill();
+            m_process->waitForFinished(1000);
+        }
+    }
 }
 
 bool RemoteUsbAgentClient::launch(const QString &program,
@@ -174,36 +186,39 @@ void RemoteUsbAgentClient::start(const QByteArray &deviceId)
     const QSslCertificate clientCertificate =
         m_hostConfig.sslConfiguration.localCertificate();
     const QSslKey clientKey = m_hostConfig.sslConfiguration.privateKey();
-    sendRequest(QStringLiteral("start"),
-                QJsonObject {{ QStringLiteral("deviceId"),
-                               QString::fromUtf8(deviceId) },
-                             { QStringLiteral("host"), m_hostConfig.host },
-                             { QStringLiteral("httpsPort"),
-                               static_cast<int>(m_hostConfig.httpsPort) },
-                             { QStringLiteral("serverCertificate"),
-                               QString::fromLatin1(
-                                   m_hostConfig.serverCertificate.toDer().toBase64()) },
-                             { QStringLiteral("clientCertificate"),
-                               QString::fromLatin1(
-                                   clientCertificate.toDer().toBase64()) },
-                             { QStringLiteral("clientPrivateKey"),
-                               QString::fromLatin1(clientKey.toPem().toBase64()) },
-                             { QStringLiteral("clientIdentity"),
-                               m_hostConfig.clientIdentity },
-                             { QStringLiteral("clientName"),
-                               m_hostConfig.clientName },
-                             { QStringLiteral("streamGeneration"),
-                               QString::number(m_streamGeneration) },
-                             { QStringLiteral("sessionToken"),
-                               QString::number(randomToken()) },
-                             { QStringLiteral("attachmentToken"),
-                               QString::number(randomToken()) },
-                             { QStringLiteral("leaseToken"),
-                               QString::number(randomToken()) }});
+    const quint64 leaseGeneration = sendRequest(
+        QStringLiteral("start"),
+        QJsonObject {{ QStringLiteral("deviceId"),
+                       QString::fromUtf8(deviceId) },
+                     { QStringLiteral("host"), m_hostConfig.host },
+                     { QStringLiteral("httpsPort"),
+                       static_cast<int>(m_hostConfig.httpsPort) },
+                     { QStringLiteral("serverCertificate"),
+                       QString::fromLatin1(
+                           m_hostConfig.serverCertificate.toDer().toBase64()) },
+                     { QStringLiteral("clientCertificate"),
+                       QString::fromLatin1(
+                           clientCertificate.toDer().toBase64()) },
+                     { QStringLiteral("clientPrivateKey"),
+                       QString::fromLatin1(clientKey.toPem().toBase64()) },
+                     { QStringLiteral("clientIdentity"),
+                       m_hostConfig.clientIdentity },
+                     { QStringLiteral("clientName"),
+                       m_hostConfig.clientName },
+                     { QStringLiteral("streamGeneration"),
+                       QString::number(m_streamGeneration) },
+                     { QStringLiteral("sessionToken"),
+                       QString::number(randomToken()) },
+                     { QStringLiteral("attachmentToken"),
+                       QString::number(randomToken()) },
+                     { QStringLiteral("leaseToken"),
+                       QString::number(randomToken()) }});
+    m_activeLeaseGeneration = leaseGeneration;
 }
 
 void RemoteUsbAgentClient::stop()
 {
+    m_activeLeaseGeneration = 0;
     sendRequest(QStringLiteral("stop"));
 }
 
@@ -237,6 +252,7 @@ void RemoteUsbAgentClient::shutdown() noexcept
         m_token.clear();
         m_readBuffer.clear();
         m_ready = false;
+        m_activeLeaseGeneration = 0;
     } catch (...) {
         m_shuttingDown = true;
         closeSocket();
@@ -247,23 +263,29 @@ void RemoteUsbAgentClient::shutdown() noexcept
     }
 }
 
-void RemoteUsbAgentClient::sendRequest(const QString &operation,
-                                       const QJsonObject &extra)
+quint64 RemoteUsbAgentClient::sendRequest(const QString &operation,
+                                          const QJsonObject &extra)
 {
     if (m_socket == nullptr || (!m_ready && operation != QStringLiteral("hello")) ||
         m_socket->state() != QLocalSocket::ConnectedState) {
-        return;
+        return 0;
     }
     QJsonObject request = extra;
     request.insert(QStringLiteral("op"), operation);
+    quint64 generation = ++m_generation;
+    if (generation == 0) {
+        generation = ++m_generation;
+    }
     request.insert(QStringLiteral("generation"),
-                   QString::number(++m_generation));
+                   QString::number(generation));
     QByteArray payload = QJsonDocument(request).toJson(QJsonDocument::Compact);
     payload.append('\n');
     if (payload.size() > RemoteUsbAgent::kMaxMessageBytes ||
         m_socket->write(payload) != payload.size()) {
         fail(QStringLiteral("Remote USB agent request was not queued"));
+        return 0;
     }
+    return generation;
 }
 
 void RemoteUsbAgentClient::readSocket()
@@ -272,13 +294,16 @@ void RemoteUsbAgentClient::readSocket()
         return;
     }
     m_readBuffer.append(m_socket->readAll());
-    if (m_readBuffer.size() > RemoteUsbAgent::kMaxMessageBytes) {
-        fail(QStringLiteral("Remote USB agent message is too large"));
-        return;
-    }
     for (;;) {
         const qsizetype newline = m_readBuffer.indexOf('\n');
         if (newline < 0) {
+            if (m_readBuffer.size() > RemoteUsbAgent::kMaxMessageBytes) {
+                fail(QStringLiteral("Remote USB agent message is too large"));
+            }
+            return;
+        }
+        if (newline >= RemoteUsbAgent::kMaxMessageBytes) {
+            fail(QStringLiteral("Remote USB agent message is too large"));
             return;
         }
         const QByteArray line = m_readBuffer.left(newline).trimmed();
@@ -313,6 +338,25 @@ void RemoteUsbAgentClient::handleMessage(const QJsonObject &message)
         return;
     }
 
+    if (event == QStringLiteral("error")) {
+        const QJsonValue generationValue =
+            message.value(QStringLiteral("generation"));
+        if (!generationValue.isUndefined()) {
+            bool generationOk = false;
+            const quint64 generation = generationValue.toString().toULongLong(
+                &generationOk);
+            if (!generationValue.isString() || !generationOk || generation == 0 ||
+                (generation != m_generation &&
+                 generation != m_activeLeaseGeneration)) {
+                return;
+            }
+        }
+        const QString detail = message.value(QStringLiteral("message")).toString();
+        fail(detail.isEmpty() ? QStringLiteral("Remote USB agent request failed")
+                             : detail);
+        return;
+    }
+
     const QJsonValue generationValue =
         message.value(QStringLiteral("generation"));
     if (!generationValue.isString()) {
@@ -326,7 +370,9 @@ void RemoteUsbAgentClient::handleMessage(const QJsonObject &message)
         fail(QStringLiteral("Remote USB agent event generation is invalid"));
         return;
     }
-    if (generation != m_generation) {
+    const quint64 expectedGeneration = event == QStringLiteral("opened")
+        ? m_activeLeaseGeneration : m_generation;
+    if (expectedGeneration == 0 || generation != expectedGeneration) {
         return;
     }
 
@@ -343,10 +389,6 @@ void RemoteUsbAgentClient::handleMessage(const QJsonObject &message)
         emit stopped();
     } else if (event == QStringLiteral("opening")) {
         return;
-    } else if (event == QStringLiteral("error")) {
-        const QString detail = message.value(QStringLiteral("message")).toString();
-        fail(detail.isEmpty() ? QStringLiteral("Remote USB agent request failed")
-                             : detail);
     }
 }
 

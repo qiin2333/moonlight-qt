@@ -70,7 +70,7 @@ private slots:
 
 private:
     void sendHello();
-    void sendRequest(const QString &operation, const QJsonObject &extra = {});
+    quint64 sendRequest(const QString &operation, const QJsonObject &extra = {});
     void handleMessage(const QJsonObject &message);
     void fail(const QString &message);
     void closeSocket() noexcept;
@@ -87,6 +87,7 @@ private:
     bool m_shuttingDown = false;
     RemoteUsbAgentHostConfig m_hostConfig;
     quint64 m_streamGeneration = 0;
+    quint64 m_activeLeaseGeneration = 0;
 };
 
 } // namespace RemoteUsb

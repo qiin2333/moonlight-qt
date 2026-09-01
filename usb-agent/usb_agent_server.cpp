@@ -2,7 +2,6 @@
 #include "usb_agent_backend.h"
 
 #include <QCryptographicHash>
-#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -65,6 +64,7 @@ bool Server::listen(QString *error)
         }
         return false;
     }
+    m_server->setSocketOptions(QLocalServer::UserAccessOption);
     if (!m_server->listen(m_socketName)) {
         /* A stale endpoint is safe to remove only after listen failed. */
         QLocalServer::removeServer(m_socketName);
@@ -75,12 +75,6 @@ bool Server::listen(QString *error)
             return false;
         }
     }
-#if defined(Q_OS_UNIX)
-    /* The endpoint carries the bearer token, so do not leave it readable by
-     * other local users. The parent directory remains the OS IPC boundary. */
-    QFile::setPermissions(m_socketName,
-                           QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-#endif
     return true;
 }
 
@@ -197,6 +191,10 @@ void Server::send(QJsonObject object)
     QByteArray payload = QJsonDocument(std::move(object)).toJson(QJsonDocument::Compact);
     payload.append('\n');
     if (payload.size() > kMaxMessageBytes) {
+        /* Keep the fallback below the framing limit so an oversized device
+         * snapshot cannot leave the client waiting for a response. */
+        sendError(QStringLiteral("response_too_large"),
+                  QStringLiteral("agent response exceeds 64 KiB"));
         return;
     }
     m_client->write(payload);

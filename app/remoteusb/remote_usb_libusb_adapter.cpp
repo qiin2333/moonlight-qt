@@ -434,14 +434,19 @@ bool snapshotForDevice(libusb_device *device,
     return true;
 }
 
+/* USB/IP uses Linux URB flag values on the wire. They intentionally do not
+ * match libusb's transfer flag values. */
+constexpr quint32 kUsbIpUrbShortNotOk = 0x0001u;
+[[maybe_unused]] constexpr quint32 kUsbIpUrbZeroPacket = 0x0040u;
+
 unsigned char transferFlags(quint32 flags)
 {
     unsigned char mapped = 0;
-    if ((flags & LIBUSB_TRANSFER_SHORT_NOT_OK) != 0u) {
+    if ((flags & kUsbIpUrbShortNotOk) != 0u) {
         mapped |= LIBUSB_TRANSFER_SHORT_NOT_OK;
     }
 #ifdef LIBUSB_TRANSFER_ADD_ZERO_PACKET
-    if ((flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) != 0u) {
+    if ((flags & kUsbIpUrbZeroPacket) != 0u) {
         mapped |= LIBUSB_TRANSFER_ADD_ZERO_PACKET;
     }
 #endif
@@ -945,6 +950,12 @@ struct RemoteUsbLibusbAdapter::Impl {
 };
 
 #endif // REMOTE_USB_HAS_LIBUSB
+
+#if !REMOTE_USB_HAS_LIBUSB
+struct RemoteUsbLibusbAdapter::Impl {
+    explicit Impl(const RemoteUsbLibusbAdapterConfig &) {}
+};
+#endif
 
 RemoteUsbLibusbAdapter::RemoteUsbLibusbAdapter(
     const RemoteUsbLibusbAdapterConfig &config)
@@ -1643,10 +1654,6 @@ CancelDisposition RemoteUsbLibusbAdapter::cancel(
 }
 
 #else // REMOTE_USB_HAS_LIBUSB
-
-struct RemoteUsbLibusbAdapter::Impl {
-    explicit Impl(const RemoteUsbLibusbAdapterConfig &) {}
-};
 
 QVector<DeviceSnapshot> RemoteUsbLibusbAdapter::enumerate(QString *error)
 {
