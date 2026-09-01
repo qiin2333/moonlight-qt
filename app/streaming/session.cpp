@@ -84,6 +84,7 @@
 #include <QElapsedTimer>
 #include <QUrl>
 
+#include <atomic>
 #include <utility>
 #include <vector>
 
@@ -800,6 +801,11 @@ void Session::clDs5HapticsPcm(const LI_DS5_HAPTICS_PCM_FRAME* frame)
     }
 }
 
+// Minimum spacing between rumble reports synthesized from the IR feed. Only
+// applies to the fallback path below; the native renderer does not go through
+// the shared DS5 HID output queue.
+static constexpr uint32_t k_Ds5IrRumbleMinIntervalMs = 16;
+
 void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
 {
     if (frame == nullptr) {
@@ -816,10 +822,34 @@ void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
         return;
     }
 
+    // Only the rumble fallback needs this. The IR feed is an analysis stream
+    // that arrives far faster than a motor can physically respond - measured at
+    // ~200 frames/s against a Sunshine Foundation host. Every frame forwarded
+    // from here becomes one HID output report, and SDL serialises DS5 output
+    // reports through a single thread that the LED and adaptive trigger reports
+    // share, so forwarding all of them starves both: the pad kept replaying a
+    // backlog of stale LED and trigger updates for tens of seconds after the
+    // game had already exited. Each controller gets its own budget, because a
+    // shared one would halve the update rate with two pads streaming. Stop
+    // frames are never held back - dropping one would leave the pad buzzing at
+    // the last forwarded amplitude until the host happened to send something.
+    static std::atomic<uint32_t> lastForwardTicks[MAX_GAMEPADS]{};
+    if (frame->controllerNumber < MAX_GAMEPADS) {
+        std::atomic<uint32_t>& lastForward = lastForwardTicks[frame->controllerNumber];
+        const uint32_t now = SDL_GetTicks();
+        if (!dualsense_haptics::isIrStopFrame(*frame) &&
+            !SDL_TICKS_PASSED(now, lastForward.load(std::memory_order_relaxed) +
+                                       k_Ds5IrRumbleMinIntervalMs)) {
+            return;
+        }
+        lastForward.store(now, std::memory_order_relaxed);
+    }
+
     // IR lanes preserve authored left/right intent, while SDL exposes the
     // common low/high-frequency motor model. Fold both lanes into spectral
     // energy here; device-specific renderers can replace this calibration.
     const auto output = dualsense_haptics::renderIrV2(*frame);
+
     clRumble(frame->controllerNumber, output.lowFrequency, output.highFrequency);
 }
 
@@ -4207,7 +4237,8 @@ void Session::start()
             emitLaunchWarning(tr("Physical DualSense haptics was selected, but no active USB DualSense four-channel audio endpoint was found yet. Moonlight will keep checking during this stream."));
         }
 #else
-        emitLaunchWarning(tr("Physical DualSense haptics is only available on Windows and macOS in this build."));
+        emitLaunchWarning(
+            tr("Physical DualSense haptics is only available on Windows and macOS in this build."));
 #endif
     }
     else {
