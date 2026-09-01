@@ -40,6 +40,38 @@ isEmpty(MOONLIGHT_NUMERIC_VERSION): MOONLIGHT_NUMERIC_VERSION = $$cat(version.tx
 TEMPLATE = app
 
 include(../file-mapping/file-mapping.pri)
+include(remoteusb/remote_usb_platform_adapter.pri)
+
+# Keep the standalone Agent beside the application in developer and packaged
+# builds. Session discovers these locations without requiring user setup.
+contains(CONFIG, remote_usb_agent) {
+    macx {
+        CONFIG(debug, debug|release) {
+            REMOTE_USB_AGENT_SOURCE = $$clean_path($$OUT_PWD/../usb-agent/debug/moonlight-usb-agent)
+        } else {
+            REMOTE_USB_AGENT_SOURCE = $$clean_path($$OUT_PWD/../usb-agent/release/moonlight-usb-agent)
+        }
+        REMOTE_USB_AGENT_DEST_DIR = $$clean_path($$OUT_PWD/$${TARGET}.app/Contents/Helpers)
+    } else:win32 {
+        CONFIG(debug, debug|release) {
+            REMOTE_USB_AGENT_SOURCE = $$clean_path($$OUT_PWD/../usb-agent/debug/moonlight-usb-agent.exe)
+            REMOTE_USB_AGENT_DEST_DIR = $$clean_path($$OUT_PWD/debug)
+        } else {
+            REMOTE_USB_AGENT_SOURCE = $$clean_path($$OUT_PWD/../usb-agent/release/moonlight-usb-agent.exe)
+            REMOTE_USB_AGENT_DEST_DIR = $$clean_path($$OUT_PWD/release)
+        }
+    } else {
+        CONFIG(debug, debug|release) {
+            REMOTE_USB_AGENT_SOURCE = $$clean_path($$OUT_PWD/../usb-agent/debug/moonlight-usb-agent)
+        } else {
+            REMOTE_USB_AGENT_SOURCE = $$clean_path($$OUT_PWD/../usb-agent/release/moonlight-usb-agent)
+        }
+        REMOTE_USB_AGENT_DEST_DIR = $$clean_path($$OUT_PWD)
+    }
+    REMOTE_USB_AGENT_DEST = $$REMOTE_USB_AGENT_DEST_DIR/$$basename(REMOTE_USB_AGENT_SOURCE)
+    QMAKE_POST_LINK += $(MKDIR) $$shell_quote($$REMOTE_USB_AGENT_DEST_DIR) $$escape_expand(\n\t)
+    QMAKE_POST_LINK += $(COPY) $$shell_quote($$REMOTE_USB_AGENT_SOURCE) $$shell_quote($$REMOTE_USB_AGENT_DEST)
+}
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which has been marked as deprecated (the exact warnings
