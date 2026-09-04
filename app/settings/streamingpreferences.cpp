@@ -79,6 +79,7 @@
 #define SER_HDRMINBRIGHTNESS "hdrminbrightness"
 #define SER_HDRMAXAVERAGEBRIGHTNESS "hdrmaxaveragebrightness"
 #define SER_AUTOUPDATECHECK "autoupdatecheck"
+#define SER_USBFORWARDING "usbforwarding"
 #define SER_RENDERER "renderer"
 #define SER_BACKGROUNDSOURCE "backgroundsource"
 #define SER_BACKGROUNDIMAGEAPI "backgroundimageapi"
@@ -265,6 +266,7 @@ void StreamingPreferences::reload()
     enableMicrophone = settings.value(SER_MICROPHONE, false).toBool();
     overlayMenuPosition = loadOverlayMenuPlacement(settings);
     autoUpdateCheck = settings.value(SER_AUTOUPDATECHECK, true).toBool();
+    usbForwardingEnabled = settings.value(SER_USBFORWARDING, false).toBool();
 
     streamResolutionScale = settings.value(SER_STREAMRESOLUTIONSCALE, false).toBool();
     streamResolutionScaleRatio = settings.value(SER_STREAMRESOLUTIONSCALERATIO, 100).toInt();
@@ -722,6 +724,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_MICROPHONE, enableMicrophone);
     settings.setValue(SER_OVERLAYMENUPLACEMENT, static_cast<int>(overlayMenuPosition));
     settings.setValue(SER_AUTOUPDATECHECK, autoUpdateCheck);
+    settings.setValue(SER_USBFORWARDING, usbForwardingEnabled);
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moonlight V+ · USB 设备转发 · 原型稿 v0.2 · cend</title>
+<style>
+  :root {
+    --ink: #0F1115;
+    --surface: #171A20;
+    --surface2: #1F232B;
+    --line: #2B3038;
+    --line-strong: #3C434E;
+    --text: #EEF0EC;
+    --text-dim: #AEB3AB;
+    --text-faint: #7E858E;
+    --accent: #39C5BB;
+    --accent-strong: #5DD9D0;
+    --accent-dim: #2BA39A;
+    --accent-wash: rgba(57, 197, 187, 0.15);
+    --acid: #C8FF4D;
+    --acid-wash: rgba(200, 255, 77, 0.12);
+    --danger: #FF876F;
+    --danger-wash: rgba(255, 135, 111, 0.12);
+    --warn: #FFC24B;
+    --warn-wash: rgba(255, 194, 75, 0.1);
+    --shadow: 4px 4px 0 rgba(0, 0, 0, 0.55);
+    --shadow-lift: 6px 6px 0 rgba(0, 0, 0, 0.55);
+    --shadow-press: 2px 2px 0 rgba(0, 0, 0, 0.55);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; }
+  html { color-scheme: dark; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: "Manrope", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    font-size: 13.5px;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  ::selection { background: var(--acid); color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
+
+  /* ===== 原型外壳 ===== */
+  .shell { display: flex; min-height: 100vh; }
+  .proto-nav {
+    width: 236px; flex-shrink: 0;
+    background: var(--ink);
+    border-right: 1px solid var(--line);
+    padding: 28px 18px;
+    position: sticky; top: 0; height: 100vh;
+    overflow-y: auto;
+  }
+  .proto-nav h1 {
+    font-size: 16px; font-weight: 800; letter-spacing: 0.3px;
+    padding-left: 11px; position: relative;
+  }
+  .proto-nav h1::before {
+    content: ""; position: absolute; left: 0; top: 3px; bottom: 3px;
+    width: 4px; background: var(--acid);
+  }
+  .proto-nav .ver {
+    color: var(--text-faint); font-size: 11px; margin-top: 6px; padding-left: 11px;
+    letter-spacing: 0.6px;
+  }
+  .proto-nav nav { margin-top: 30px; display: flex; flex-direction: column; gap: 2px; }
+  .proto-nav button {
+    all: unset; cursor: pointer;
+    padding: 9px 12px;
+    color: var(--text-dim); font-size: 13px;
+    display: flex; gap: 10px; align-items: baseline;
+    border: 1px solid transparent;
+    transition: color 0.12s, background 0.12s, border-color 0.12s;
+  }
+  .proto-nav button:hover { color: var(--text); background: var(--surface); border-color: var(--line); }
+  .proto-nav button.on {
+    background: var(--surface2); color: var(--acid);
+    border-color: var(--line); font-weight: 700;
+    box-shadow: var(--shadow);
+  }
+  .proto-nav button .no {
+    font-size: 10.5px; color: var(--text-faint); width: 14px; flex-shrink: 0;
+    letter-spacing: 0.5px;
+  }
+  .proto-nav button.on .no { color: var(--acid); }
+  .proto-note-intro {
+    margin-top: 30px; padding: 14px 12px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--text-faint); font-size: 11.5px; line-height: 1.75;
+  }
+  .proto-note-intro b { color: var(--text-dim); }
+
+  .stage { flex: 1; padding: 36px 42px 70px; min-width: 0; }
+  .screen { display: none; }
+  .screen.on { display: block; }
+  .screen-head { margin-bottom: 20px; max-width: 900px; }
+  .screen-head h2 {
+    font-size: 20px; font-weight: 800; letter-spacing: 0.2px;
+    padding-left: 13px; position: relative;
+  }
+  .screen-head h2::before {
+    content: ""; position: absolute; left: 0; top: 4px; bottom: 4px;
+    width: 4px; background: var(--accent);
+  }
+  .screen-head p { color: var(--text-dim); margin-top: 6px; font-size: 12.5px; }
+
+  .anno {
+    margin-top: 18px; max-width: 900px;
+    border: 1px solid var(--line); background: var(--surface);
+    padding: 14px 18px;
+  }
+  .anno-t {
+    color: var(--text-faint); font-size: 10.5px; letter-spacing: 2px;
+    margin-bottom: 8px; font-weight: 700;
+  }
+  .anno .a {
+    display: flex; gap: 10px; align-items: baseline;
+    color: var(--text-dim); font-size: 12.5px; padding: 3px 0;
+  }
+  .anno .a::before { content: "■"; color: var(--acid); flex-shrink: 0; font-size: 8px; }
+  .anno .a b { color: var(--text); font-weight: 700; }
+
+  /* ===== 应用窗口拟真 ===== */
+  .win {
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow-lift);
+    max-width: 960px;
+  }
+  .win-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px;
+    background: var(--ink);
+    border-bottom: 1px solid var(--line);
+    color: var(--text-faint); font-size: 12px; letter-spacing: 0.5px;
+  }
+  .win-bar .dots { display: flex; gap: 0; }
+  .win-bar .dots i { width: 12px; height: 12px; background: var(--surface2); border: 1px solid var(--line); border-left: none; }
+  .win-bar .dots i:first-child { border-left: 1px solid var(--line); }
+  .win-bar .app { color: var(--text-dim); margin-left: 10px; }
+
+  /* ===== 设置页（屏 1）===== */
+  .settings-body { display: flex; min-height: 540px; }
+  .rail {
+    width: 200px; flex-shrink: 0;
+    background: var(--ink);
+    border-right: 1px solid var(--line);
+    padding: 18px 0;
+    display: flex; flex-direction: column; gap: 1px;
+    font-size: 13px;
+  }
+  .rail .grp {
+    color: var(--text-faint); font-size: 10px; padding: 14px 18px 5px;
+    letter-spacing: 2.5px; font-weight: 700;
+  }
+  .rail span {
+    padding: 8px 18px; color: var(--text-dim);
+    border-left: 3px solid transparent;
+    transition: color 0.12s, background 0.12s;
+  }
+  .rail span:hover { color: var(--text); background: var(--surface); }
+  .rail span.on {
+    background: var(--surface2); color: var(--acid); font-weight: 700;
+    border-left: 3px solid var(--acid);
+  }
+  .settings-main { flex: 1; padding: 26px 30px; overflow: hidden; }
+  .settings-main > h3 {
+    font-size: 18px; font-weight: 800; margin-bottom: 18px;
+    padding-left: 12px; position: relative;
+  }
+  .settings-main > h3::before {
+    content: ""; position: absolute; left: 0; top: 4px; bottom: 4px;
+    width: 4px; background: var(--accent);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow);
+    padding: 20px 22px;
+    transition: box-shadow 0.12s, transform 0.12s;
+  }
+  .card + .card { margin-top: 18px; }
+  .card .c-title { font-size: 15px; font-weight: 800; letter-spacing: 0.2px; }
+  .card .c-desc { color: var(--text-dim); font-size: 12.5px; margin-top: 5px; }
+
+  .togglerow {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; margin-top: 8px;
+    border-top: 1px solid var(--line);
+    cursor: pointer; user-select: none;
+  }
+  .togglerow .t-name { font-weight: 700; font-size: 13.5px; }
+  .togglerow .t-hint { color: var(--text-faint); font-size: 11.5px; margin-top: 2px; }
+  .switch {
+    width: 44px; height: 24px; flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--line-strong);
+    position: relative;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px;
+    background: var(--text-dim);
+    transition: transform 0.12s, background 0.12s;
+  }
+  .switch.on { background: var(--accent); border-color: var(--accent); }
+  .switch.on::after { transform: translateX(20px); background: var(--ink); }
+  .togglerow.off-zone { opacity: 0.4; pointer-events: none; }
+
+  .env { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .env-t {
+    color: var(--text-faint); font-size: 10px; letter-spacing: 2.5px;
+    font-weight: 700; margin-bottom: 10px;
+  }
+  .env-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
+  .env-row .k { color: var(--text-dim); width: 118px; }
+  .sq { width: 9px; height: 9px; flex-shrink: 0; }
+  .sq.ok { background: var(--acid); }
+  .sq.warn { background: var(--warn); }
+  .sq.off { background: var(--line-strong); }
+
+  .btnrow { display: flex; gap: 12px; margin-top: 18px; }
+  .btn {
+    all: unset; cursor: pointer;
+    padding: 9px 18px;
+    font-size: 13px; font-weight: 700;
+    border: 1px solid var(--line-strong);
+    background: var(--surface2);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.12s, transform 0.12s, background 0.12s;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-lift); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: var(--shadow-press); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+  .btn.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+  .btn.acid { background: var(--acid); border-color: var(--acid); color: var(--ink); }
+  .btn.acid:hover { filter: brightness(1.06); }
+  .btn.disabled { opacity: 0.35; pointer-events: none; box-shadow: none; }
+
+  /* ===== 模态（屏 2 / 3）===== */
+  .modal-stage {
+    background:
+      repeating-linear-gradient(45deg, transparent 0 14px, rgba(255,255,255,0.012) 14px 15px),
+      var(--ink);
+    padding: 28px 0 44px;
+    border: 1px solid var(--line);
+  }
+  .modal {
+    max-width: 580px; margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.55);
+  }
+  .modal .m-head {
+    padding: 20px 26px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--ink);
+  }
+  .modal .m-head h3 {
+    font-size: 16px; font-weight: 800;
+    padding-left: 12px; position: relative;
+  }
+  .modal .m-head h3::before {
+    content: ""; position: absolute; left: 0; top: 3px; bottom: 3px;
+    width: 4px; background: var(--acid);
+  }
+  .modal .m-body { padding: 18px 26px 24px; }
+
+  .steps { display: flex; flex-direction: column; margin: 6px 0 8px; }
+  .step { display: flex; gap: 14px; position: relative; padding-bottom: 22px; }
+  .step:last-child { padding-bottom: 8px; }
+  .step::before {
+    content: ""; position: absolute; left: 10px; top: 24px; bottom: 0;
+    width: 2px; background: var(--line);
+  }
+  .step.done::before, .step.now::before { background: var(--accent-dim); }
+  .step:last-child::before { display: none; }
+  .step .st-dot {
+    width: 22px; height: 22px; flex-shrink: 0;
+    background: var(--surface2); border: 1px solid var(--line-strong);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: var(--text-faint);
+    z-index: 1;
+  }
+  .step.done .st-dot { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--ink); }
+  .step.now .st-dot {
+    border-color: var(--acid); color: var(--acid);
+    box-shadow: 3px 3px 0 rgba(200, 255, 77, 0.25);
+  }
+  .step .st-name { font-weight: 700; font-size: 13.5px; padding-top: 1px; }
+  .step .st-sub { color: var(--text-faint); font-size: 12px; margin-top: 2px; }
+  .step.now .st-name { color: var(--acid); }
+
+  .notice {
+    display: flex; gap: 12px;
+    background: var(--warn-wash);
+    border: 1px solid var(--warn);
+    box-shadow: var(--shadow);
+    padding: 13px 15px;
+    font-size: 12.5px; color: var(--text);
+    margin: 14px 0 16px;
+  }
+  .notice .ico { flex-shrink: 0; color: var(--warn); font-weight: 800; }
+  .notice .sub { color: var(--text-dim); font-size: 12px; margin-top: 3px; }
+
+  .dev-list { border: 1px solid var(--line); }
+  .dev {
+    display: flex; align-items: center; gap: 13px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .dev:nth-child(even) { background: var(--surface2); }
+  .dev:last-child { border-bottom: none; }
+  .dev .d-name { font-weight: 700; font-size: 13.5px; }
+  .dev .d-sub { color: var(--text-faint); font-size: 11.5px; margin-top: 1px; }
+  .dev .d-state { margin-left: auto; flex-shrink: 0; }
+  .chip {
+    font-size: 11px; padding: 3px 10px;
+    border: 1px solid currentColor;
+    font-weight: 700; letter-spacing: 0.5px;
+  }
+  .chip.ok { color: var(--acid); background: var(--acid-wash); }
+  .chip.neutral { color: var(--text-faint); background: var(--surface); }
+  .chip.muted { color: var(--warn); background: var(--warn-wash); }
+  .dev.disabled { opacity: 0.45; }
+
+  .cb {
+    width: 19px; height: 19px; flex-shrink: 0;
+    border: 1px solid var(--line-strong); background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: transparent;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .cb.on { background: var(--acid); border-color: var(--acid); color: var(--ink); box-shadow: 2px 2px 0 rgba(0,0,0,0.4); }
+  .dev.clickable { cursor: pointer; user-select: none; }
+  .dev.clickable:hover { outline: 1px solid var(--line-strong); outline-offset: -1px; }
+
+  .foot-note {
+    color: var(--text-faint); font-size: 11.5px; margin-top: 14px;
+    border-left: 3px solid var(--line-strong); padding-left: 10px; line-height: 1.65;
+  }
+  .m-actions { display: flex; justify-content: flex-end; gap: 14px; margin-top: 22px; }
+
+  /* ===== Overlay（屏 4）===== */
+  .game {
+    position: relative;
+    max-width: 960px; aspect-ratio: 16/8.4;
+    background:
+      radial-gradient(900px 380px at 78% 18%, rgba(57, 197, 187, 0.14), transparent 55%),
+      radial-gradient(700px 420px at 12% 88%, rgba(255, 135, 111, 0.1), transparent 55%),
+      linear-gradient(160deg, #161a22 0%, #101319 55%, #0C0E12 100%);
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow-lift);
+    overflow: hidden;
+  }
+  .game .scene {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(239, 240, 236, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(239, 240, 236, 0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(75% 75% at 50% 45%, #000 25%, transparent 100%);
+  }
+  .game .osd {
+    position: absolute; top: 14px; left: 16px;
+    font-size: 11px; color: var(--text-faint);
+    letter-spacing: 1.5px; font-weight: 700;
+  }
+  .game .floating-btn {
+    position: absolute; right: 24px; bottom: 22px;
+    width: 42px; height: 42px;
+    background: var(--surface2);
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--acid); font-size: 16px; font-weight: 800;
+  }
+  .game .float-hint {
+    position: absolute; right: 80px; bottom: 33px;
+    color: var(--text-faint); font-size: 11px; letter-spacing: 1px;
+  }
+  .overlay-panel {
+    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+    width: 440px; max-width: 92%;
+    background: rgba(23, 26, 32, 0.92);
+    border: 1px solid var(--line-strong);
+    backdrop-filter: blur(10px);
+    box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.5);
+  }
+  .overlay-panel .op-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 13px 18px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(15, 17, 21, 0.6);
+  }
+  .overlay-panel .op-head .t { font-weight: 800; font-size: 15px; }
+  .overlay-panel .op-head .n { font-size: 11px; color: var(--acid); letter-spacing: 0.5px; font-weight: 700; }
+  .odev {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer; user-select: none;
+    transition: background 0.1s;
+  }
+  .odev:hover { background: rgba(57, 197, 187, 0.07); }
+  .odev .od-dot { width: 10px; height: 10px; flex-shrink: 0; }
+  .odev.fwd .od-dot { background: var(--acid); box-shadow: 2px 2px 0 rgba(200, 255, 77, 0.3); }
+  .odev.idle .od-dot { background: transparent; border: 1px solid var(--line-strong); }
+  .odev.na .od-dot { background: var(--surface2); border: 1px solid var(--line); height: 4px; }
+  .odev .od-name { font-weight: 700; font-size: 13.5px; }
+  .odev .od-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 1px; }
+  .odev.fwd .od-sub { color: var(--acid); }
+  .odev .od-act { margin-left: auto; font-size: 11px; color: var(--text-faint); flex-shrink: 0; letter-spacing: 0.5px; }
+  .odev.fwd .od-act { color: var(--danger); font-weight: 700; }
+  .odev.na { cursor: default; opacity: 0.55; }
+  .odev.refresh { color: var(--text-dim); font-size: 13px; }
+  .op-esc {
+    text-align: center; padding: 8px 0 10px;
+    color: var(--text-faint); font-size: 10px; letter-spacing: 2px;
+  }
+
+  /* ===== Toast（屏 5）===== */
+  .toast-wrap { display: flex; flex-direction: column; gap: 14px; max-width: 540px; }
+  .toast {
+    display: flex; align-items: flex-start; gap: 13px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow);
+    padding: 13px 16px;
+    font-size: 13px;
+  }
+  .toast .t-ico {
+    flex-shrink: 0; width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800;
+  }
+  .toast.ok .t-ico { background: var(--acid); color: var(--ink); }
+  .toast.err .t-ico { background: var(--danger); color: var(--ink); }
+  .toast.info .t-ico { background: var(--accent); color: var(--ink); }
+  .toast .t-msg b { font-weight: 700; }
+  .toast .t-sub { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+  .toast .t-life {
+    margin-left: auto; flex-shrink: 0; align-self: center;
+    color: var(--text-faint); font-size: 10px; letter-spacing: 1px;
+  }
+  .hintrow {
+    margin-top: 4px; padding: 11px 16px;
+    border: 1px dashed var(--line-strong);
+    color: var(--text-faint); font-size: 12.5px;
+    display: flex; gap: 10px; align-items: center;
+  }
+
+  @media (max-width: 900px) {
+    .shell { flex-direction: column; }
+    .proto-nav { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--line); }
+    .stage { padding: 20px 16px 50px; }
+    .settings-body { flex-direction: column; }
+    .rail { width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; padding: 10px; }
+    .rail .grp { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="proto-nav">
+    <h1>USB 设备转发</h1>
+    <div class="ver">CEND 设计系统 · 原型 V0.2</div>
+    <nav aria-label="原型画面">
+      <button class="on" data-s="s1"><span class="no">01</span>设置页卡片</button>
+      <button data-s="s2"><span class="no">02</span>首用向导 · 环境体检</button>
+      <button data-s="s3"><span class="no">03</span>绑定管理（唯一 UAC）</button>
+      <button data-s="s4"><span class="no">04</span>串流中 Overlay 菜单</button>
+      <button data-s="s5"><span class="no">05</span>Toast 与引导</button>
+    </nav>
+    <div class="proto-note-intro">
+      按 <b>cend</b> 设计系统（Theme.qml 真实 token）重制：<b>零圆角</b> · 1px 描边 · <b>4px 硬投影</b>（hover 6px / 按下 2px）· 薄荷青 #39C5BB 主色 · <b>酸性绿 #C8FF4D</b> 强调 · 珊瑚 #FF876F 警示。绑定与转发两层分离。
+    </div>
+  </aside>
+
+  <main class="stage">
+
+    <!-- ========== 屏 1：设置页 ========== -->
+    <section class="screen on" id="s1">
+      <div class="screen-head">
+        <h2>设置页 · USB 设备转发卡片</h2>
+        <p>挂在生态扩展页。总开关默认关闭；关闭时运行时不拉起 agent、不显示 overlay 菜单。</p>
+      </div>
+      <div class="win">
+        <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span class="app">MOONLIGHT V+ — 设置</span></div>
+        <div class="settings-body">
+          <div class="rail" aria-hidden="true">
+            <div class="grp">常规</div>
+            <span>基础设置</span>
+            <span>显示</span>
+            <span>音频</span>
+            <div class="grp">串流</div>
+            <span>输入设备</span>
+            <span>网络</span>
+            <div class="grp">扩展</div>
+            <span class="on">生态扩展</span>
+            <span>后台服务</span>
+            <div class="grp">其他</div>
+            <span>关于</span>
+          </div>
+          <div class="settings-main">
+            <h3>生态扩展</h3>
+            <div class="card">
+              <div class="c-title">USB 设备转发</div>
+              <div class="c-desc">把本机的手柄等外设，交给串流主机直接使用。转发由你逐台确认，随时可以停止。</div>
+              <div class="togglerow" id="masterToggle" role="switch" aria-checked="true" tabindex="0">
+                <div>
+                  <div class="t-name">启用 USB 设备转发</div>
+                  <div class="t-hint">关闭后串流时不会发现或启动任何 USB 服务</div>
+                </div>
+                <div class="switch on" aria-hidden="true"></div>
+              </div>
+              <div class="env">
+                <div class="env-t">环境状态</div>
+                <div class="env-row"><span class="sq ok"></span><span class="k">USBIPD-WIN</span><span>v4.2.0 · 已安装</span></div>
+                <div class="env-row"><span class="sq ok"></span><span class="k">后台服务</span><span>运行中</span></div>
+                <div class="env-row"><span class="sq ok"></span><span class="k">已绑定设备</span><span>1 台（DualSense 无线手柄）</span></div>
+              </div>
+              <div class="btnrow">
+                <button class="btn">管理绑定的设备…</button>
+                <button class="btn">安装 / 修复环境…</button>
+              </div>
+            </div>
+            <div class="card" style="opacity:0.55">
+              <div class="c-title">语音输入</div>
+              <div class="c-desc">麦克风的语音不经过 USB 转发。串流时开启「使用我的麦克风」，语音会通过低延迟音频通道直达主机。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="anno">
+        <div class="anno-t">DESIGN NOTES</div>
+        <div class="a"><b>总开关默认关</b> —— 补上运行时可选这最后一层：编译进来了也必须用户显式打开</div>
+        <div class="a"><b>环境体检前置</b> —— usbipd 依赖问题在设置页就暴露，不让用户到串流中才发现</div>
+        <div class="a"><b>语音输入卡</b> —— 在第一次找麦克风之前就把期望掰正，避免"转发了却没声音"的客诉</div>
+      </div>
+    </section>
+
+    <!-- ========== 屏 2：向导 ========== -->
+    <section class="screen" id="s2">
+      <div class="screen-head">
+        <h2>首用向导 · 环境体检</h2>
+        <p>四态状态机，每一步只有一个主按钮。UAC 全程只出现一次（绑定步骤）。</p>
+      </div>
+      <div class="modal-stage">
+        <div class="modal">
+          <div class="m-head"><h3>设置 USB 设备转发</h3></div>
+          <div class="m-body">
+            <div class="steps">
+              <div class="step done">
+                <div class="st-dot">✓</div>
+                <div><div class="st-name">安装 usbipd-win</div><div class="st-sub">v4.2.0 · 已安装</div></div>
+              </div>
+              <div class="step done">
+                <div class="st-dot">✓</div>
+                <div><div class="st-name">启动后台服务</div><div class="st-sub">正在运行</div></div>
+              </div>
+              <div class="step now">
+                <div class="st-dot">3</div>
+                <div><div class="st-name">选择要共享的设备</div><div class="st-sub">需要管理员权限，仅此一次</div></div>
+              </div>
+              <div class="step">
+                <div class="st-dot">4</div>
+                <div><div class="st-name">完成</div><div class="st-sub">串流时在悬浮菜单里选择转发</div></div>
+              </div>
+            </div>
+            <div class="m-actions">
+              <button class="btn">上一步</button>
+              <button class="btn acid">选择设备…</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="anno">
+        <div class="anno-t">DESIGN NOTES</div>
+        <div class="a"><b>每态一个主按钮</b> —— 未安装→安装 / 未运行→启动 / 未绑定→绑定，用户不需要理解依赖关系</div>
+        <div class="a"><b>第 3 步才提权</b> —— 安装 usbipd 本身要管理员，bind 也要；向导把它们收拢到一次流程里</div>
+        <div class="a"><b>完成态指向 overlay</b> —— 教会用户"转发发生在串流里"，而不是停留在设置页</div>
+      </div>
+    </section>
+
+    <!-- ========== 屏 3：绑定管理 ========== -->
+    <section class="screen" id="s3">
+      <div class="screen-head">
+        <h2>绑定管理对话框</h2>
+        <p>唯一需要管理员权限的界面。批量勾选 → 一次 UAC 完成，运行时零提权。</p>
+      </div>
+      <div class="modal-stage">
+        <div class="modal">
+          <div class="m-head"><h3>选择要共享的 USB 设备</h3></div>
+          <div class="m-body">
+            <div class="notice">
+              <span class="ico">⚠</span>
+              <div>
+                绑定后，设备将由转发服务接管，<b>本机暂时无法使用</b>。
+                <div class="sub">取消勾选即可还原，重启后依然生效；串流中是否真正转发，仍由你在悬浮菜单里逐台确认。</div>
+              </div>
+            </div>
+            <div class="dev-list">
+              <div class="dev clickable" data-cb>
+                <div class="cb on">✓</div>
+                <div><div class="d-name">DualSense 无线手柄</div><div class="d-sub">蓝牙/USB · 已连接</div></div>
+                <div class="d-state"><span class="chip ok">已绑定</span></div>
+              </div>
+              <div class="dev clickable" data-cb>
+                <div class="cb">✓</div>
+                <div><div class="d-name">Xbox 无线接收器</div><div class="d-sub">新接入的设备</div></div>
+                <div class="d-state"><span class="chip neutral">未绑定</span></div>
+              </div>
+              <div class="dev clickable" data-cb>
+                <div class="cb">✓</div>
+                <div><div class="d-name">USB 网络摄像头</div><div class="d-sub">画面和声音暂不支持转发</div></div>
+                <div class="d-state"><span class="chip muted">仅控制接口</span></div>
+              </div>
+              <div class="dev disabled">
+                <div class="cb"></div>
+                <div><div class="d-name">USB Root Hub</div><div class="d-sub">集线器设备无法共享</div></div>
+                <div class="d-state"><span class="chip neutral">不支持</span></div>
+              </div>
+            </div>
+            <div class="foot-note">带 * 的设备只能转发按键、旋钮等控制部分；摄像头画面与麦克风语音不走 USB 转发。</div>
+            <div class="m-actions">
+              <button class="btn">取消</button>
+              <button class="btn acid">继续（弹出管理员确认）</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="anno">
+        <div class="anno-t">DESIGN NOTES</div>
+        <div class="a"><b>接管语义写在勾选之前</b> —— "本机暂时无法使用"是 bind 与 libusb claim 最大的差异，必须第一次就讲透</div>
+        <div class="a"><b>不支持也显示</b> —— 灰字+原因，跟 overlay 里 hub/isochronous 的既有处理一致</div>
+        <div class="a"><b>按钮文案预告 UAC</b> —— "弹出管理员确认"写进按钮本身，不搞突袭</div>
+      </div>
+    </section>
+
+    <!-- ========== 屏 4：Overlay ========== -->
+    <section class="screen" id="s4">
+      <div class="screen-head">
+        <h2>串流中 · Overlay 菜单（四级页）</h2>
+        <p>现有「USB 设备」子菜单升级为三态列表。点选 = 本次转发，再点一次 = 释放，与现有交互一致。</p>
+      </div>
+      <div class="game">
+        <div class="scene" aria-hidden="true"></div>
+        <div class="osd">7840 · 1080P60 · 12.4 MS</div>
+        <div class="float-hint">USB 设备</div>
+        <div class="floating-btn" aria-hidden="true">⇅</div>
+        <div class="overlay-panel" role="menu" aria-label="USB 设备">
+          <div class="op-head"><span class="t">USB 设备</span><span class="n">1/8 可转发 · 目标 7840</span></div>
+          <div class="odev fwd" role="menuitem">
+            <span class="od-dot"></span>
+            <div><div class="od-name">DualSense 无线手柄</div><div class="od-sub">转发中 · 7840</div></div>
+            <span class="od-act">点按释放</span>
+          </div>
+          <div class="odev idle" role="menuitem">
+            <span class="od-dot"></span>
+            <div><div class="od-name">Xbox 无线手柄</div><div class="od-sub">未转发</div></div>
+            <span class="od-act">点按转发</span>
+          </div>
+          <div class="odev idle" role="menuitem">
+            <span class="od-dot"></span>
+            <div><div class="od-name">8BitDo 无线接收器</div><div class="od-sub">未转发</div></div>
+            <span class="od-act">点按转发</span>
+          </div>
+          <div class="odev na" role="menuitem" aria-disabled="true">
+            <span class="od-dot"></span>
+            <div><div class="od-name">USB 网络摄像头</div><div class="od-sub">画面与声音暂不支持转发</div></div>
+          </div>
+          <div class="odev refresh" role="menuitem">↻ 刷新设备列表</div>
+          <div class="op-esc">ESC 返回上级菜单</div>
+        </div>
+      </div>
+      <div class="anno">
+        <div class="anno-t">DESIGN NOTES</div>
+        <div class="a"><b>一行双信息</b> —— 状态方块 + 真实设备名（usbipd list 自带名字），右侧常驻下一步动作词</div>
+        <div class="a"><b>酸性绿 = 转发中</b> —— cend 里 acid 是最强强调色，只给"正在生效"的状态，讯号不稀释</div>
+        <div class="a"><b>未绑定的设备不出现</b> —— overlay 只展示已绑定（可转发）的设备，绑定引导留在设置页</div>
+      </div>
+    </section>
+
+    <!-- ========== 屏 5：Toast ========== -->
+    <section class="screen" id="s5">
+      <div class="screen-head">
+        <h2>状态反馈 · Toast 与引导</h2>
+        <p>三秒级 toast，出现在视频顶部。正向提示让用户在主机屏幕上确认"成功没有"。</p>
+      </div>
+      <div class="toast-wrap">
+        <div class="toast ok">
+          <span class="t-ico">✓</span>
+          <div class="t-msg"><b>转发已就绪：DualSense 无线手柄</b><div class="t-sub">现在可以在主机上直接使用</div></div>
+          <span class="t-life">3S</span>
+        </div>
+        <div class="toast err">
+          <span class="t-ico">!</span>
+          <div class="t-msg"><b>接入失败：设备被其他程序占用</b><div class="t-sub">关闭占用它的程序后再试</div></div>
+          <span class="t-life">4S</span>
+        </div>
+        <div class="toast info">
+          <span class="t-ico">i</span>
+          <div class="t-msg"><b>手柄已在本机拔出，转发已结束</b><div class="t-sub">重新插入后会在列表中出现</div></div>
+          <span class="t-life">3S</span>
+        </div>
+        <div class="hintrow">ℹ 在设置的「USB 设备转发」中绑定后，这里会显示更多设备</div>
+      </div>
+      <div class="anno">
+        <div class="anno-t">DESIGN NOTES</div>
+        <div class="a"><b>图标用色块</b> —— 酸性绿/珊瑚/青三色方块图标，粗野主义的直接表达，状态一眼可辨</div>
+        <div class="a"><b>错误说明原因 + 下一步</b> —— "被其他程序占用"配"关闭后再试"，不做无解释的红色报错</div>
+        <div class="a"><b>拔出是 info 不是 error</b> —— 物理拔线是用户的正常操作，语气按正常事件处理</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('.proto-nav button');
+  tabs.forEach(b => b.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+    document.getElementById(b.dataset.s).classList.add('on');
+    window.scrollTo({ top: 0 });
+  }));
+
+  const master = document.getElementById('masterToggle');
+  master.addEventListener('click', () => {
+    const sw = master.querySelector('.switch');
+    const on = sw.classList.toggle('on');
+    master.setAttribute('aria-checked', on);
+  });
+  master.addEventListener('keydown', e => {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); master.click(); }
+  });
+
+  document.querySelectorAll('[data-cb]').forEach(row => {
+    row.addEventListener('click', () => {
+      row.querySelector('.cb').classList.toggle('on');
+      const chip = row.querySelector('.chip');
+      if (chip && chip.classList.contains('neutral'))
+        chip.textContent = row.querySelector('.cb').classList.contains('on') ? '将绑定' : '未绑定';
+    });
+  });
+</script>
+</body>
+</html>
