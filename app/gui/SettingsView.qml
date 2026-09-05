@@ -38,6 +38,7 @@ FocusScope {
         { key: "host",     icon: "qrc:/res/fluent/cat-host.svg",     title: qsTr("Host Settings") },
         { key: "input",    icon: "qrc:/res/fluent/cat-input.svg",    title: qsTr("Input Settings") },
         { key: "gamepad",  icon: "qrc:/res/fluent/cat-gamepad.svg",  title: qsTr("Gamepad Settings") },
+        { key: "peripherals", icon: "qrc:/res/fluent/cat-peripherals.svg", title: qsTr("Peripherals Settings") },
         { key: "advanced", icon: "qrc:/res/fluent/cat-advanced.svg", title: qsTr("Advanced Settings") },
         { key: "ui",       icon: "qrc:/res/fluent/cat-ui.svg",       title: qsTr("Software Settings") },
         { key: "ecosystem",icon: "qrc:/res/fluent/cat-ecosystem.svg",title: qsTr("AlkaidLab Ecosystem") },
@@ -242,6 +243,15 @@ FocusScope {
                 visible: settingsPage.category === "about"
                 height: visible ? implicitHeight : 0
                 onScrollToEndRequested: scrollArea.scrollToEnd()
+            }
+
+            PeripheralsSettingsPage {
+                id: peripheralsPage
+                y: basicPage.height + displayPage.height + legacyPage.height
+                   + ecosystemPage.height + aboutPage.height
+                width: parent.width
+                visible: settingsPage.category === "peripherals"
+                height: visible ? implicitHeight : 0
             }
         }
     }

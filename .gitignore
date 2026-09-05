@@ -8,3 +8,7 @@ soundio/libsoundio/
 libs/
 config.tests/*/.qmake.stash
 config.tests/*/Makefile
+
+.claude/
+.codex-build/
+.codex-remote-attachments/

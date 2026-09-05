@@ -87,6 +87,8 @@ static QString getStartupApplicationDir(const char* argv0)
 #include "backend/autoupdatechecker.h"
 #include "backend/computermanager.h"
 #include "backend/systemproperties.h"
+#include "backend/usbforwardingenvironment.h"
+#include "backend/usbforwardingbackend.h"
 #include "streaming/session.h"
 #include "settings/streamingpreferences.h"
 #include "gui/sdlgamepadkeynavigation.h"
@@ -1293,6 +1295,23 @@ int main(int argc, char *argv[])
                                                [](QQmlEngine*, QJSEngine*) -> QObject* {
                                                    return new SystemProperties();
                                                });
+    qmlRegisterSingletonType<UsbForwardingEnvironment>("UsbForwardingEnvironment", 1, 0,
+                                                       "UsbForwardingEnvironment",
+                                                       [](QQmlEngine*, QJSEngine*) -> QObject* {
+                                                           /* C++-owned singleton: Session also uses it off the QML thread. */
+                                                           QQmlEngine::setObjectOwnership(
+                                                               UsbForwardingEnvironment::get(),
+                                                               QQmlEngine::CppOwnership);
+                                                           return UsbForwardingEnvironment::get();
+                                                       });
+    qmlRegisterSingletonType<UsbForwardingBackend>("UsbForwardingBackend", 1, 0,
+                                                   "UsbForwardingBackend",
+                                                   [](QQmlEngine*, QJSEngine*) -> QObject* {
+                                                       QQmlEngine::setObjectOwnership(
+                                                           UsbForwardingBackend::get(),
+                                                           QQmlEngine::CppOwnership);
+                                                       return UsbForwardingBackend::get();
+                                                   });
     qmlRegisterSingletonType<SdlGamepadKeyNavigation>("SdlGamepadKeyNavigation", 1, 0,
                                                       "SdlGamepadKeyNavigation",
                                                       [](QQmlEngine* qmlEngine, QJSEngine*) -> QObject* {

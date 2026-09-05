@@ -19,12 +19,7 @@
 #include "video/overlaymanager.h"
 #include "video/overlaymenupanel.h"
 #include "video/overlaymenubutton.h"
-#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
-#include "remoteusb/remote_usb_session_coordinator.h"
-#endif
-#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
-#include "remoteusb/remote_usb_agent_client.h"
-#endif
+#include "backend/usbforwardingtunnel.h"
 #include "video/overlaytoast.h"
 #ifndef STEAM_LINK
 #include "micstream.h"
@@ -140,8 +135,6 @@ public:
     Q_INVOKABLE bool initialize(QQuickWindow* qtWindow);
     Q_INVOKABLE void start();
     Q_INVOKABLE void interrupt();
-#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
-    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
     Q_PROPERTY(QJsonArray remoteUsbDevices READ remoteUsbDevices
                NOTIFY remoteUsbDevicesChanged)
     Q_PROPERTY(QString remoteUsbState READ remoteUsbState
@@ -154,7 +147,6 @@ public:
     QJsonArray remoteUsbDevices() const { return m_RemoteUsbDevices; }
     QString remoteUsbState() const;
     QString remoteUsbActiveDeviceId() const { return m_RemoteUsbActiveDeviceId; }
-#endif
     Q_PROPERTY(QStringList launchWarnings MEMBER m_LaunchWarnings NOTIFY launchWarningsChanged);
 
     static
@@ -193,11 +185,8 @@ signals:
     void readyForDeletion();
 
     void launchWarningsChanged();
-#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
-    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
     void remoteUsbDevicesChanged();
     void remoteUsbStateChanged();
-#endif
 
 private:
     void exec();
@@ -246,10 +235,7 @@ private:
     void showStreamingToast(const QString& message, int durationMs = 2000);
     void processQtOverlayEvents();
     void updateFileMappingMenuState();
-#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
-    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
     void updateRemoteUsbMenuState();
-#endif
     bool openFileMappingMountPath();
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
     void restoreCaptureAfterStylusReplayPanel();
@@ -364,12 +350,8 @@ private:
     void processFileMappingMountResult();
     void cleanupFileMappingMount();
     void startFileMappingSmokeProbe();
-#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
-    void ensureRemoteUsbCoordinator();
-#endif
-#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
-    void ensureRemoteUsbAgent();
-#endif
+    void refreshRemoteUsbDevices();
+    void teardownUsbTunnel();
 
     static
     int drSubmitDecodeUnit(PDECODE_UNIT du);
@@ -456,22 +438,15 @@ private:
     std::mutex m_CursorUpdateMutex;
     std::shared_ptr<RemoteCursorUpdate> m_PendingCursorUpdate;
     bool m_CursorUpdateEventQueued = false;
-#ifdef MOONLIGHT_REMOTE_USB_SESSION_ENABLED
-    RemoteUsb::RemoteUsbSessionCoordinator *m_RemoteUsbCoordinator = nullptr;
-#endif
-#ifdef MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED
-    RemoteUsb::RemoteUsbAgentClient *m_RemoteUsbAgent = nullptr;
-    QString m_RemoteUsbAgentProgram;
-    bool m_RemoteUsbStreamStarted = false;
-#endif
-#if defined(MOONLIGHT_REMOTE_USB_SESSION_ENABLED) || \
-    defined(MOONLIGHT_REMOTE_USB_AGENT_CLIENT_ENABLED)
+    /* USB forwarding: one reverse tunnel per forwarded device, owned by this
+     * session. m_RemoteUsbDevices mirrors the bound-device list from
+     * UsbForwardingBackend and feeds the overlay menu. */
+    UsbForwarding::Tunnel *m_UsbTunnel = nullptr;
     QJsonArray m_RemoteUsbDevices;
     OverlayMenuPanel::RemoteUsbState m_RemoteUsbState =
         OverlayMenuPanel::RemoteUsbState::Unavailable;
     QString m_RemoteUsbActiveDeviceId;
     QString m_RemoteUsbDetail;
-#endif
 
     static CONNECTION_LISTENER_CALLBACKS k_ConnCallbacks;
     static Session* s_ActiveSession;
