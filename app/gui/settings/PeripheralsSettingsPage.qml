@@ -21,7 +21,7 @@ Column {
         id: usbForwardingCard
         title: qsTr("USB Device Forwarding")
         subtitle: qsTr("Share local gamepads and other peripherals with the streaming host. Forwarding is confirmed per device during a stream and can be stopped at any time.")
-        visible: SystemProperties.remoteUsbAvailable
+        visible: SystemProperties.usbForwardingAvailable
 
         readonly property string usbipdUrl: "https://github.com/dorssel/usbipd-win/releases/latest"
 

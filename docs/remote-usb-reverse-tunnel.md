@@ -40,8 +40,8 @@ ready 之前的拒绝用一行 `{"op":"error","reason":"..."}` 返回。ready �
 
 ## 生命周期与资源限制
 
-- 每个 busid 一条活动隧道；重复请求被拒绝。
-- 客户端启动超时 10 秒，Sunshine 启动超时 12 秒；主机 attach 仍受 controller 超时约束。
+- Sunshine 端每个 busid 一条活动隧道，重复请求被拒绝；Moonlight 客户端当前限制为全局一条活动隧道。
+- 客户端启动超时 15 秒（须覆盖主机侧完整窗口），Sunshine 启动超时 12 秒；主机 attach 仍受 controller 超时约束。
 - JSON 握手行限制 4 KiB；握手后的剩余字节必须继续转发。
 - 客户端采用 4 MiB 读取缓冲/写队列高水位，主机每方向按 64 KiB 异步读写，依赖 TCP 背压。
 - 用户释放、串流结束或任一 socket 断开会关闭本端两条连接；主机取消未完成 attach，并 detach 已接受的绑定。

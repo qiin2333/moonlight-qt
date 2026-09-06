@@ -63,9 +63,9 @@ SystemProperties::SystemProperties()
 
 #ifdef Q_OS_WIN32
     // Only Windows has a USB/IP server to attach today (usbipd-win). The Linux
-    // usbip-host backend and the Android service are future work; see
-    // docs/remote-usb-reverse-tunnel.md section 4.
-    remoteUsbAvailable = true;
+    // usbip-host backend and the Android service are future work; see the
+    // platform table in docs/remote-usb-reverse-tunnel.md.
+    usbForwardingAvailable = true;
 #endif
 
     QString nativeArch = QSysInfo::currentCpuArchitecture();

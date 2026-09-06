@@ -1387,7 +1387,7 @@ void Session::startRemoteUsb(const QString &deviceId)
                     "USB tunnel: env override missing (port=%d token=%d)",
                     !portOverride.isEmpty(), !tokenOverride.isEmpty());
         showStreamingToast(
-            tr("This host does not support USB forwarding yet."), 4000);
+            tr("USB forwarding is not configured on this client."), 4000);
         return;
     }
     config.port = static_cast<quint16>(portOverride.toUShort());
@@ -3512,7 +3512,7 @@ public:
 
 bool Session::tryReconnect()
 {
-    // Drop any forwarded USB device so the reconnect starts with a clean lease.
+    // Drop any forwarded USB device so the reconnect starts from a clean state.
     teardownUsbTunnel();
 
     // Release any locally tracked pressed keys before tearing down the dead connection.

@@ -10,20 +10,42 @@
 namespace UsbForwarding {
 
 namespace {
-/* Bound the handshake line so a hostile peer cannot grow the buffer. */
+/* Bound the handshake line so a hostile peer cannot grow the buffer. The
+ * limit covers content bytes before '\n', matching the server's buffer. */
 constexpr qsizetype kMaxHandshakeBytes = 4 * 1024;
 /* Stop reading from one side while the other side is this far behind. TCP
  * back-pressures the USB/IP peer instead of us buffering without limit. */
 constexpr qint64 kHighWaterMark = 4 * 1024 * 1024;
-/* Deadline covering TCP connect, TLS, and the JSON handshake. Without it a
- * reachable-but-stalled endpoint would pin the session in "Connecting". */
-constexpr int kStartupTimeoutMs = 10 * 1000;
+/* Deadline covering TCP connect, TLS, the JSON handshake, and the host-side
+ * usbip attach that must finish before the server sends its ready line
+ * (the server allows 12 s for the same window; the client must outlast it). */
+constexpr int kStartupTimeoutMs = 15 * 1000;
+/* Character set and length the server's valid_busid() accepts; validating
+ * here rejects a misconfigured request before the TLS connection. */
+constexpr qsizetype kMaxBusIdBytes = 31;
 } // namespace
 
 bool TunnelConfig::valid() const noexcept
 {
-    return !host.isEmpty() && port != 0 && !sessionToken.isEmpty() &&
-           !busId.isEmpty() && localPort != 0;
+    if (host.isEmpty() || port == 0 || sessionToken.isEmpty() ||
+        busId.isEmpty() || localPort == 0) {
+        return false;
+    }
+    /* Mirror the server's valid_busid(): printable busid characters only,
+     * at most 31 bytes. */
+    if (busId.size() > kMaxBusIdBytes) {
+        return false;
+    }
+    for (const char c : busId) {
+        const bool allowed = (c >= '0' && c <= '9') ||
+                             (c >= 'a' && c <= 'z') ||
+                             (c >= 'A' && c <= 'Z') ||
+                             c == '-' || c == '.';
+        if (!allowed) {
+            return false;
+        }
+    }
+    return true;
 }
 
 Tunnel::Tunnel(TunnelConfig config, QObject *parent)
@@ -92,7 +114,7 @@ bool Tunnel::start(QString *error)
         QJsonObject request {
             { QStringLiteral("op"), QStringLiteral("forward") },
             { QStringLiteral("token"),
-              QString::fromLatin1(m_Config.sessionToken) },
+              QString::fromUtf8(m_Config.sessionToken) },
             { QStringLiteral("busid"), QString::fromUtf8(m_Config.busId) },
         };
         QByteArray line =
@@ -202,6 +224,12 @@ void Tunnel::handleRemoteReadyRead()
             if (m_HandshakeBuffer.size() > kMaxHandshakeBytes) {
                 failWith(tr("The host sent an invalid USB tunnel response."));
             }
+            return;
+        }
+        if (newline > kMaxHandshakeBytes) {
+            /* Content alone exceeds the mirrored server limit; the server
+             * would have closed at the same boundary. */
+            failWith(tr("The host sent an invalid USB tunnel response."));
             return;
         }
         if (newline > kMaxHandshakeBytes) {
