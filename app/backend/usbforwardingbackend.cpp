@@ -1,12 +1,11 @@
 #include "usbforwardingbackend.h"
+#include "usbforwardingenvironment.h"
 
-#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
 #include <QRegularExpression>
-#include <QStandardPaths>
 #include <QTimer>
 
 #ifdef Q_OS_WIN32
@@ -51,19 +50,6 @@ UsbForwardingBackend* UsbForwardingBackend::get()
     return &backend;
 }
 
-QString UsbForwardingBackend::locateUsbipd() const
-{
-    QString exe = QStandardPaths::findExecutable(QStringLiteral("usbipd"));
-    if (exe.isEmpty()) {
-        const QString bundledPath =
-            QStringLiteral("C:/Program Files/usbipd-win/usbipd.exe");
-        if (QFileInfo::exists(bundledPath)) {
-            exe = bundledPath;
-        }
-    }
-    return exe;
-}
-
 void UsbForwardingBackend::setBusy(bool busy)
 {
     if (m_Busy == busy) {
@@ -87,7 +73,7 @@ void UsbForwardingBackend::refresh()
     if (m_Busy) {
         return;
     }
-    const QString exe = locateUsbipd();
+    const QString exe = UsbForwardingEnvironment::locateUsbipd();
     if (exe.isEmpty()) {
         m_Devices.clear();
         emit devicesChanged();
@@ -183,7 +169,7 @@ void UsbForwardingBackend::bind(const QString &busId)
     if (busId.isEmpty()) {
         return;
     }
-    const QString exe = locateUsbipd();
+    const QString exe = UsbForwardingEnvironment::locateUsbipd();
     if (exe.isEmpty()) {
         emit operationFinished(false, tr("usbipd-win is not installed."));
         return;
@@ -217,7 +203,7 @@ void UsbForwardingBackend::unbind(const QString &busId, const QString &persisted
     } else {
         return;
     }
-    const QString exe = locateUsbipd();
+    const QString exe = UsbForwardingEnvironment::locateUsbipd();
     if (exe.isEmpty()) {
         emit operationFinished(false, tr("usbipd-win is not installed."));
         return;

@@ -1298,7 +1298,7 @@ int main(int argc, char *argv[])
     qmlRegisterSingletonType<UsbForwardingEnvironment>("UsbForwardingEnvironment", 1, 0,
                                                        "UsbForwardingEnvironment",
                                                        [](QQmlEngine*, QJSEngine*) -> QObject* {
-                                                           /* C++-owned singleton: Session also uses it off the QML thread. */
+                                                           /* Static singleton; QML must not delete it. */
                                                            QQmlEngine::setObjectOwnership(
                                                                UsbForwardingEnvironment::get(),
                                                                QQmlEngine::CppOwnership);

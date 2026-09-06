@@ -46,7 +46,6 @@ signals:
 private:
     explicit UsbForwardingBackend(QObject *parent = nullptr);
 
-    QString locateUsbipd() const;
     void setBusy(bool busy);
     void setError(const QString &error);
 

@@ -5,12 +5,6 @@
 #include <QStandardPaths>
 #include <QTimer>
 
-namespace {
-
-const char* kServiceName = "usbipd";
-
-} // namespace
-
 UsbForwardingEnvironment::UsbForwardingEnvironment(QObject *parent)
     : QObject(parent)
 {
@@ -22,12 +16,8 @@ UsbForwardingEnvironment* UsbForwardingEnvironment::get()
     return &environment;
 }
 
-void UsbForwardingEnvironment::refresh()
+QString UsbForwardingEnvironment::locateUsbipd()
 {
-    if (m_Checking) {
-        return;
-    }
-#ifdef Q_OS_WIN32
     QString usbipdExe = QStandardPaths::findExecutable(QStringLiteral("usbipd"));
     if (usbipdExe.isEmpty()) {
         const QString bundledPath =
@@ -36,6 +26,16 @@ void UsbForwardingEnvironment::refresh()
             usbipdExe = bundledPath;
         }
     }
+    return usbipdExe;
+}
+
+void UsbForwardingEnvironment::refresh()
+{
+    if (m_Checking) {
+        return;
+    }
+#ifdef Q_OS_WIN32
+    const QString usbipdExe = locateUsbipd();
     if (usbipdExe.isEmpty()) {
         m_Version.clear();
         finish(NotInstalled);
@@ -54,7 +54,6 @@ void UsbForwardingEnvironment::refresh()
 
 void UsbForwardingEnvironment::startVersionProbe(const QString &usbipdExe)
 {
-    m_UsbipdExe = usbipdExe;
     QProcess *probe = new QProcess(this);
     /* FailedToStart emits errorOccurred but never finished; handle it so a
      * missing executable cannot wedge the probe. */
@@ -85,7 +84,7 @@ void UsbForwardingEnvironment::startVersionProbe(const QString &usbipdExe)
         startServiceProbe();
     });
     QTimer::singleShot(8000, probe, &QProcess::kill);
-    probe->start(m_UsbipdExe, {QStringLiteral("--version")});
+    probe->start(usbipdExe, {QStringLiteral("--version")});
 }
 
 void UsbForwardingEnvironment::startServiceProbe()
@@ -112,7 +111,7 @@ void UsbForwardingEnvironment::startServiceProbe()
     QTimer::singleShot(8000, probe, &QProcess::kill);
 #ifdef Q_OS_WIN32
     probe->start(QStringLiteral("sc.exe"),
-                 {QStringLiteral("query"), QString::fromLatin1(kServiceName)});
+                 {QStringLiteral("query"), QStringLiteral("usbipd")});
 #else
     probe->deleteLater();
     finish(ServiceStopped);

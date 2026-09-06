@@ -173,7 +173,6 @@ bool Tunnel::start(QString *error)
 void Tunnel::stop() noexcept
 {
     m_Finished = true;
-    m_Forwarding = false;
     m_StartupTimer->stop();
     if (m_Local != nullptr) {
         m_Local->disconnect(this);
@@ -225,7 +224,6 @@ void Tunnel::handleRemoteReadyRead()
             return;
         }
         m_HandshakeDone = true;
-        m_Forwarding = true;
         m_StartupTimer->stop();
         emit forwarding();
         if (m_Finished) return;
@@ -290,6 +288,10 @@ void Tunnel::failWith(const QString &message)
 void Tunnel::finishCleanly()
 {
     if (m_Finished) {
+        return;
+    }
+    if (!m_HandshakeDone) {
+        failWith(tr("The USB tunnel closed before the connection was ready."));
         return;
     }
     stop();

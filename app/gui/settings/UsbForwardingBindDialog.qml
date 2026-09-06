@@ -211,6 +211,7 @@ NavigableDialog {
                                 visible: row.modelData.isBound
                                          || (row.modelData.isConnected && row.modelData.isSupported)
                                 enabled: !UsbForwardingBackend.busy
+                                         && UsbForwardingBackend.error === ""
                                 primary: !row.modelData.isBound
                                 onClicked: {
                                     dialog.statusText = ""

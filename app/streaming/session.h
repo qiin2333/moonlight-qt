@@ -135,18 +135,6 @@ public:
     Q_INVOKABLE bool initialize(QQuickWindow* qtWindow);
     Q_INVOKABLE void start();
     Q_INVOKABLE void interrupt();
-    Q_PROPERTY(QJsonArray remoteUsbDevices READ remoteUsbDevices
-               NOTIFY remoteUsbDevicesChanged)
-    Q_PROPERTY(QString remoteUsbState READ remoteUsbState
-               NOTIFY remoteUsbStateChanged)
-    Q_PROPERTY(QString remoteUsbActiveDeviceId READ remoteUsbActiveDeviceId
-               NOTIFY remoteUsbStateChanged)
-    Q_INVOKABLE void enumerateRemoteUsb();
-    Q_INVOKABLE void startRemoteUsb(const QString &deviceId);
-    Q_INVOKABLE void stopRemoteUsb();
-    QJsonArray remoteUsbDevices() const { return m_RemoteUsbDevices; }
-    QString remoteUsbState() const;
-    QString remoteUsbActiveDeviceId() const { return m_RemoteUsbActiveDeviceId; }
     Q_PROPERTY(QStringList launchWarnings MEMBER m_LaunchWarnings NOTIFY launchWarningsChanged);
 
     static
@@ -185,8 +173,6 @@ signals:
     void readyForDeletion();
 
     void launchWarningsChanged();
-    void remoteUsbDevicesChanged();
-    void remoteUsbStateChanged();
 
 private:
     void exec();
@@ -351,6 +337,9 @@ private:
     void cleanupFileMappingMount();
     void startFileMappingSmokeProbe();
     void refreshRemoteUsbDevices();
+    void enumerateRemoteUsb();
+    void startRemoteUsb(const QString &deviceId);
+    void stopRemoteUsb();
     void teardownUsbTunnel();
 
     static
@@ -442,7 +431,7 @@ private:
      * session. m_RemoteUsbDevices mirrors the bound-device list from
      * UsbForwardingBackend and feeds the overlay menu. */
     UsbForwarding::Tunnel *m_UsbTunnel = nullptr;
-    QJsonArray m_RemoteUsbDevices;
+    std::vector<OverlayMenuPanel::RemoteUsbDevice> m_RemoteUsbDevices;
     OverlayMenuPanel::RemoteUsbState m_RemoteUsbState =
         OverlayMenuPanel::RemoteUsbState::Unavailable;
     QString m_RemoteUsbActiveDeviceId;

@@ -1273,64 +1273,20 @@ Session::~Session()
     SDL_DestroyMutex(m_DecoderLock);
 }
 
-QString Session::remoteUsbState() const
-{
-    switch (m_RemoteUsbState) {
-    case OverlayMenuPanel::RemoteUsbState::Unavailable:
-        return QStringLiteral("unavailable");
-    case OverlayMenuPanel::RemoteUsbState::Discovering:
-        return QStringLiteral("discovering");
-    case OverlayMenuPanel::RemoteUsbState::Available:
-        return QStringLiteral("available");
-    case OverlayMenuPanel::RemoteUsbState::Opening:
-        return QStringLiteral("opening");
-    case OverlayMenuPanel::RemoteUsbState::Open:
-        return QStringLiteral("open");
-    case OverlayMenuPanel::RemoteUsbState::Stopping:
-        return QStringLiteral("stopping");
-    case OverlayMenuPanel::RemoteUsbState::Error:
-        return QStringLiteral("error");
-    }
-    return QStringLiteral("unavailable");
-}
-
 void Session::updateRemoteUsbMenuState()
 {
     if (m_MenuPanel == nullptr) {
         return;
     }
 
-    std::vector<OverlayMenuPanel::RemoteUsbDevice> devices;
-    devices.reserve(static_cast<std::size_t>(m_RemoteUsbDevices.size()));
-    for (const QJsonValue& value : m_RemoteUsbDevices) {
-        if (!value.isObject()) {
-            continue;
-        }
-        const QJsonObject object = value.toObject();
-        OverlayMenuPanel::RemoteUsbDevice device;
-        /* The bus id is the only device identity that crosses to the host: the
-         * platform USB/IP server owns it and Sunshine forwards it verbatim. */
-        device.id = object.value(QStringLiteral("busId")).toString();
-        device.label = object.value(QStringLiteral("description")).toString();
-        if (device.label.isEmpty()) {
-            device.label = tr("USB device");
-        }
-        device.detail = object.value(QStringLiteral("vidPid")).toString().toUpper();
-        device.supported = !device.id.isEmpty() &&
-                           object.value(QStringLiteral("isSupported")).toBool();
-        if (!device.id.isEmpty()) {
-            devices.push_back(std::move(device));
-        }
-    }
-
     m_MenuPanel->updateRemoteUsbState(
         m_Preferences->usbForwardingEnabled, m_RemoteUsbState,
-        std::move(devices), m_RemoteUsbActiveDeviceId, m_RemoteUsbDetail);
+        m_RemoteUsbDevices, m_RemoteUsbActiveDeviceId, m_RemoteUsbDetail);
 }
 
 void Session::refreshRemoteUsbDevices()
 {
-    m_RemoteUsbDevices = QJsonArray();
+    m_RemoteUsbDevices.clear();
 
     if (m_Preferences->usbForwardingEnabled) {
         /* Only shared (bound) devices can be forwarded, so the overlay lists
@@ -1342,18 +1298,18 @@ void Session::refreshRemoteUsbDevices()
                 !device.value(QStringLiteral("isConnected")).toBool()) {
                 continue;
             }
-            m_RemoteUsbDevices.append(QJsonObject {
-                { QStringLiteral("busId"),
-                  device.value(QStringLiteral("busId")).toString() },
-                { QStringLiteral("description"),
-                  device.value(QStringLiteral("description")).toString() },
-                { QStringLiteral("vidPid"),
-                  device.value(QStringLiteral("vidPid")).toString() },
-                { QStringLiteral("isSupported"),
-                  device.value(QStringLiteral("isSupported")).toBool() },
-                { QStringLiteral("isAttached"),
-                  device.value(QStringLiteral("isAttached")).toBool() },
-            });
+            OverlayMenuPanel::RemoteUsbDevice menuDevice;
+            menuDevice.id = device.value(QStringLiteral("busId")).toString();
+            if (menuDevice.id.isEmpty()) {
+                continue;
+            }
+            menuDevice.label = device.value(QStringLiteral("description")).toString();
+            if (menuDevice.label.isEmpty()) {
+                menuDevice.label = tr("USB device");
+            }
+            menuDevice.detail = device.value(QStringLiteral("vidPid")).toString().toUpper();
+            menuDevice.supported = device.value(QStringLiteral("isSupported")).toBool();
+            m_RemoteUsbDevices.push_back(std::move(menuDevice));
         }
     }
 
@@ -1363,7 +1319,7 @@ void Session::refreshRemoteUsbDevices()
         if (!m_Preferences->usbForwardingEnabled) {
             m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Unavailable;
             m_RemoteUsbDetail = tr("Unavailable");
-        } else if (m_RemoteUsbDevices.isEmpty()) {
+        } else if (m_RemoteUsbDevices.empty()) {
             m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Available;
             m_RemoteUsbDetail = tr("No shared devices");
         } else {
@@ -1372,8 +1328,6 @@ void Session::refreshRemoteUsbDevices()
         }
     }
 
-    emit remoteUsbDevicesChanged();
-    emit remoteUsbStateChanged();
     updateRemoteUsbMenuState();
 }
 
@@ -1385,7 +1339,6 @@ void Session::enumerateRemoteUsb()
     }
     m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Discovering;
     m_RemoteUsbDetail = tr("Scanning");
-    emit remoteUsbStateChanged();
     updateRemoteUsbMenuState();
 
     UsbForwardingBackend* backend = UsbForwardingBackend::get();
@@ -1409,10 +1362,9 @@ void Session::startRemoteUsb(const QString &deviceId)
     }
 
     bool supported = false;
-    for (const QJsonValue& value : m_RemoteUsbDevices) {
-        const QJsonObject object = value.toObject();
-        if (object.value(QStringLiteral("busId")).toString() == deviceId) {
-            supported = object.value(QStringLiteral("isSupported")).toBool();
+    for (const auto& device : m_RemoteUsbDevices) {
+        if (device.id == deviceId) {
+            supported = device.supported;
             break;
         }
     }
@@ -1424,10 +1376,8 @@ void Session::startRemoteUsb(const QString &deviceId)
     UsbForwarding::TunnelConfig config;
     config.busId = deviceId.toUtf8();
 
-    /* Sunshine negotiates the USB stream endpoint and a one-shot session token
-     * for this stream, in the same way it negotiates the video and audio ports.
-     * Until that negotiation ships on the host, allow a developer override so
-     * the client half can be exercised against a manually started endpoint. */
+    /* Port/token negotiation is not implemented yet. Both processes currently
+     * use matching environment overrides to configure the USB endpoint. */
     const QString portOverride =
         qEnvironmentVariable("MOONLIGHT_USB_TUNNEL_PORT").trimmed();
     const QByteArray tokenOverride =
@@ -1459,14 +1409,12 @@ void Session::startRemoteUsb(const QString &deviceId)
     m_RemoteUsbActiveDeviceId = deviceId;
     m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Opening;
     m_RemoteUsbDetail = tr("Connecting");
-    emit remoteUsbStateChanged();
     updateRemoteUsbMenuState();
 
     m_UsbTunnel = new UsbForwarding::Tunnel(std::move(config), this);
     connect(m_UsbTunnel, &UsbForwarding::Tunnel::forwarding, this, [this] {
         m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Open;
         m_RemoteUsbDetail = tr("Connected");
-        emit remoteUsbStateChanged();
         updateRemoteUsbMenuState();
         showStreamingToast(tr("USB device forwarding is ready."), 3000);
     });
@@ -1494,7 +1442,6 @@ void Session::stopRemoteUsb()
     }
     m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Stopping;
     m_RemoteUsbDetail = tr("Releasing");
-    emit remoteUsbStateChanged();
     updateRemoteUsbMenuState();
     teardownUsbTunnel();
 }
@@ -1509,7 +1456,6 @@ void Session::teardownUsbTunnel()
     }
     m_RemoteUsbActiveDeviceId.clear();
     m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Available;
-    emit remoteUsbStateChanged();
     refreshRemoteUsbDevices();
 }
 

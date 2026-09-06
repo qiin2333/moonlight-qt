@@ -21,6 +21,7 @@ public:
     Q_ENUM(State)
 
     static UsbForwardingEnvironment* get();
+    static QString locateUsbipd();
 
     Q_INVOKABLE void refresh();
 
@@ -42,5 +43,4 @@ private:
     State m_State = Checking;
     QString m_Version;
     bool m_Checking = false;
-    QString m_UsbipdExe;
 };

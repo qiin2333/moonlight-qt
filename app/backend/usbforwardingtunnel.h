@@ -10,12 +10,11 @@
  *            (usbipd-win on Windows, usbip-host on Linux,
  *             USBIPServerForAndroid on Android)
  *   remote : TLS to Sunshine, authenticated with the paired client
- *            certificate, carrying the stream session token
+ *            certificate, carrying the configured shared token
  *
- * The tunnel is a fourth stream of the streaming session (video / audio /
- * control / usb): it inherits the session identity, the negotiated port and the
- * session lifetime, but keeps its own socket so USB traffic can never
- * head-of-line block input on the control stream.
+ * Session owns the tunnel and closes it when streaming ends. The tunnel uses
+ * a separate socket from video/audio/control; its port and token currently
+ * come from environment overrides, not RTSP negotiation.
  *
  * Only the handshake is Moonlight's own protocol: one line of JSON in each
  * direction. Everything after that is an opaque byte stream.
@@ -32,10 +31,10 @@ class QTimer;
 namespace UsbForwarding {
 
 struct TunnelConfig {
-    /* Sunshine endpoint negotiated for this session's USB stream. */
+    /* Configured Sunshine USB endpoint. */
     QString host;
     quint16 port = 0;
-    /* One-shot token bound to the current streaming session. */
+    /* Shared token configured on both ends; not yet a per-session credential. */
     QByteArray sessionToken;
     /* Paired client certificate/key plus the pinned server certificate. */
     QSslConfiguration sslConfiguration;
@@ -61,9 +60,6 @@ public:
 
     Q_DISABLE_COPY(Tunnel)
 
-    QByteArray busId() const noexcept { return m_Config.busId; }
-    bool isForwarding() const noexcept { return m_Forwarding; }
-
     bool start(QString *error = nullptr);
     void stop() noexcept;
 
@@ -86,7 +82,6 @@ private:
     QByteArray m_HandshakeBuffer;
     bool m_HandshakeDone = false;
     bool m_PeerVerified = false;
-    bool m_Forwarding = false;
     bool m_Finished = false;
 };
 
