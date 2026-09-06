@@ -27,3 +27,14 @@ MIT License, Copyright (c) 2020 Microsoft Corporation.
 | `tb-network.svg` | `Plug Connected/SVG/ic_fluent_plug_connected_24_regular.svg` |
 | `tb-display.svg` | `Desktop/SVG/ic_fluent_desktop_24_regular.svg` |
 | `tb-settings.svg` | `Settings/SVG/ic_fluent_settings_24_regular.svg` |
+
+串流菜单复用这套资源，新增以下上游 24px Regular 图标（同样仅将填色改为白色）：
+
+| 文件 | 上游资源 |
+| --- | --- |
+| `menu-position.svg` | `Pin/SVG/ic_fluent_pin_24_regular.svg` |
+| `menu-bitrate.svg` | `Data Usage/SVG/ic_fluent_data_usage_24_regular.svg` |
+| `menu-files.svg` | `Folder/SVG/ic_fluent_folder_24_regular.svg` |
+| `menu-microphone.svg` | `Mic/SVG/ic_fluent_mic_24_regular.svg` |
+| `menu-close.svg` | `Dismiss/SVG/ic_fluent_dismiss_24_regular.svg` |
+| `menu-next.svg` | `Chevron Right/SVG/ic_fluent_chevron_right_24_regular.svg` |

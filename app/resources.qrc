@@ -34,6 +34,7 @@
         <file>res/fluent/cat-advanced.svg</file>
         <file>res/fluent/cat-about.svg</file>
         <file>res/fluent/cat-ecosystem.svg</file>
+        <file>res/fluent/cat-peripherals.svg</file>
         <file>res/fluent/download.svg</file>
         <file>res/fluent/tb-back.svg</file>
         <file>res/fluent/tb-add-pc.svg</file>
@@ -43,6 +44,12 @@
         <file>res/fluent/tb-network.svg</file>
         <file>res/fluent/tb-display.svg</file>
         <file>res/fluent/tb-settings.svg</file>
+        <file>res/fluent/menu-position.svg</file>
+        <file>res/fluent/menu-bitrate.svg</file>
+        <file>res/fluent/menu-files.svg</file>
+        <file>res/fluent/menu-microphone.svg</file>
+        <file>res/fluent/menu-close.svg</file>
+        <file>res/fluent/menu-next.svg</file>
         <file>res/fonts/Manrope-Regular.ttf</file>
         <file>res/fonts/Manrope-SemiBold.ttf</file>
         <file>res/fonts/Manrope-ExtraBold.ttf</file>

@@ -10,6 +10,3 @@ url=https://github.com/qiin2333/moonlight-common-c.git
 [submodule "third-party/AMF"]
 	path = third-party/AMF
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git
-[submodule "moonlight-remote-usb-core"]
-	path = moonlight-remote-usb-core
-	url = https://github.com/qiin2333/moonlight-remote-usb-core.git
