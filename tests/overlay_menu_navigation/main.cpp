@@ -1,5 +1,6 @@
 #include "../../app/streaming/video/overlaymenupanel.h"
 #include <QGuiApplication>
+#include <QFontDatabase>
 #include <QCursor>
 #include <QKeyEvent>
 #include <QTest>
@@ -33,6 +34,9 @@ private:
 int main(int argc, char **argv)
 {
     QGuiApplication app(argc, argv);
+    QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Manrope-Regular.ttf"));
+    QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Manrope-SemiBold.ttf"));
+    QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/DMMono-Regular.ttf"));
     OverlayMenuPanel panel;
     QString selected;
     int releaseCount = 0;

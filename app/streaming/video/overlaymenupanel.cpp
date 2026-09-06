@@ -4,7 +4,6 @@
 #include <QScreen>
 #include <QGuiApplication>
 #include <QCoreApplication>
-#include <QPainterPath>
 #include <QCursor>
 #include <QFontDatabase>
 #include <QFontMetrics>
@@ -13,6 +12,15 @@
 namespace {
 constexpr qint64 PointerGracePeriodMs = 300;
 constexpr int PointerCheckIntervalMs = 150;
+// Raster counterpart of gui/theme/Theme.qml (same palette and hard edges).
+const QColor MenuSurface("#171A20");
+const QColor MenuHover("#1F232B");
+const QColor MenuLine("#3C434E");
+const QColor MenuText("#EEF0EC");
+const QColor MenuDim("#AEB3AB");
+const QColor MenuFaint("#7E858E");
+const QColor MenuAccent("#39C5BB");
+const QColor MenuDanger("#FF876F");
 }
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
@@ -42,35 +50,25 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     setFormat(fmt);
 
     // Logical (unscaled) values — Qt 6 handles DPI automatically
-    // Win11 dark context menu style
+    // Match the application's square industrial panels.
     m_ItemHeight   = 38;
     m_Padding      = 4;
-    m_MenuWidth    = 280;
-    m_BorderRadius = 8;
+    m_MenuWidth    = 320;
     m_ShadowMargin = 8;
     m_TitleHeight  = 32;
     m_IconAreaWidth = 24;
 
-    // Load ModeSeven.ttf (same font as performance stats overlay)
-    int fontId = QFontDatabase::addApplicationFont(QStringLiteral(":/data/ModeSeven.ttf"));
-    QString modeSeven;
-    if (fontId >= 0) {
-        QStringList families = QFontDatabase::applicationFontFamilies(fontId);
-        if (!families.isEmpty())
-            modeSeven = families.first();
-    }
+    m_LabelFont.setFamilies(UiFont::familyChain(QStringLiteral("Manrope")));
+    m_LabelFont.setPointSize(10);
+    m_LabelFont.setWeight(QFont::DemiBold);
 
-    m_LabelFont.setFamilies(UiFont::familyChain(modeSeven));
-    m_LabelFont.setPointSize(9);
-    m_LabelFont.setWeight(QFont::Normal);
-
-    m_DetailFont = QFont(m_LabelFont);
+    m_DetailFont.setFamilies(UiFont::familyChain(QStringLiteral("DM Mono")));
     m_DetailFont.setPointSize(8);
-    m_DetailFont.setWeight(QFont::Normal);
 
-    m_TitleFont = QFont(m_LabelFont);
-    m_TitleFont.setPointSize(8);
+    m_TitleFont = m_DetailFont;
+    m_TitleFont.setPointSize(9);
     m_TitleFont.setWeight(QFont::DemiBold);
+    m_TitleFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
 
     // Icon font: platform-specific
 #ifdef Q_OS_WIN
@@ -100,7 +98,7 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
 
     m_ContentSlideAnim = new QVariantAnimation(this);
     m_ContentSlideAnim->setDuration(150);
-    m_ContentSlideAnim->setEasingCurve(QEasingCurve::OutCubic);
+    m_ContentSlideAnim->setEasingCurve(QEasingCurve::OutQuad);
     connect(m_ContentSlideAnim, &QVariantAnimation::valueChanged, this, [this](const QVariant& val) {
         m_ContentOffset = val.toReal();
         forceRepaint();
@@ -565,7 +563,7 @@ void OverlayMenuPanel::showInternal()
     // Slide direction depends on anchor mode
     const bool verticalSlide = m_AnchorMode == AnchorMode::TopEdge;
     const int slideDirection = (m_AnchorMode == AnchorMode::LeftEdge || verticalSlide) ? -1 : 1;
-    const int slideDistance = 40;
+    const int slideDistance = 8;
     const int targetCoordinate = verticalSlide ? m_TargetPosition.y() : m_TargetPosition.x();
     const int startCoordinate = targetCoordinate + slideDistance * slideDirection;
     m_SlideAnim->setPropertyName(verticalSlide ? QByteArrayLiteral("y") : QByteArrayLiteral("x"));
@@ -581,16 +579,16 @@ void OverlayMenuPanel::showInternal()
     raise();
 
     // Animate slide
-    m_SlideAnim->setDuration(220);
+    m_SlideAnim->setDuration(120);
     m_SlideAnim->setStartValue(startCoordinate);
     m_SlideAnim->setEndValue(targetCoordinate);
-    m_SlideAnim->setEasingCurve(QEasingCurve::OutCubic);
+    m_SlideAnim->setEasingCurve(QEasingCurve::OutQuad);
 
-    // Animate opacity: 0 → 1
-    m_OpacityAnim->setDuration(220);
+    // Short, mechanical reveal.
+    m_OpacityAnim->setDuration(120);
     m_OpacityAnim->setStartValue(0.0);
     m_OpacityAnim->setEndValue(1.0);
-    m_OpacityAnim->setEasingCurve(QEasingCurve::OutCubic);
+    m_OpacityAnim->setEasingCurve(QEasingCurve::OutQuad);
 
     m_SlideAnim->start();
     m_OpacityAnim->start();
@@ -704,7 +702,7 @@ void OverlayMenuPanel::navigateToLevel(int level)
 
     if (goingForward) {
         // Forward: content slides in from right
-        m_ContentSlideAnim->setStartValue(30.0);
+        m_ContentSlideAnim->setStartValue(8.0);
         m_ContentSlideAnim->setEndValue(0.0);
         m_ContentSlideAnim->start();
     } else {
@@ -745,19 +743,19 @@ void OverlayMenuPanel::closeMenu()
     // Animate away from the edge that opened the menu.
     const bool verticalSlide = m_AnchorMode == AnchorMode::TopEdge;
     const int slideDirection = (m_AnchorMode == AnchorMode::LeftEdge || verticalSlide) ? -1 : 1;
-    const int slideDistance = 30;
+    const int slideDistance = 8;
     const int startCoordinate = verticalSlide ? y() : x();
     m_SlideAnim->setPropertyName(verticalSlide ? QByteArrayLiteral("y") : QByteArrayLiteral("x"));
-    m_SlideAnim->setDuration(160);
+    m_SlideAnim->setDuration(120);
     m_SlideAnim->setStartValue(startCoordinate);
     m_SlideAnim->setEndValue(startCoordinate + slideDistance * slideDirection);
-    m_SlideAnim->setEasingCurve(QEasingCurve::InCubic);
+    m_SlideAnim->setEasingCurve(QEasingCurve::OutQuad);
 
     // Animate opacity: current → 0
-    m_OpacityAnim->setDuration(160);
+    m_OpacityAnim->setDuration(120);
     m_OpacityAnim->setStartValue(opacity());
     m_OpacityAnim->setEndValue(0.0);
-    m_OpacityAnim->setEasingCurve(QEasingCurve::InCubic);
+    m_OpacityAnim->setEasingCurve(QEasingCurve::OutQuad);
 
     // When fade-out completes, finalize (use disconnect to emulate single-shot for Qt 5 compat)
     auto conn = std::make_shared<QMetaObject::Connection>();
@@ -809,7 +807,7 @@ int OverlayMenuPanel::itemAtPos(const QPoint& pos) const
 void OverlayMenuPanel::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::Antialiasing, false);
     p.setRenderHint(QPainter::TextAntialiasing);
 
     int w = width();
@@ -823,63 +821,45 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
     p.fillRect(0, 0, w, h, Qt::transparent);
     p.setCompositionMode(QPainter::CompositionMode_SourceOver);
 
-    // === Soft drop shadow ===
-    for (int i = sm; i >= 1; i--) {
-        qreal t = 1.0 - (qreal)i / sm;
-        int alpha = qRound(28.0 * t * t);
-        QPainterPath sp;
-        sp.addRoundedRect(QRectF(sm - i, sm - i + 1, cw + 2 * i, ch + 2 * i),
-                          m_BorderRadius + i, m_BorderRadius + i);
-        p.fillPath(sp, QColor(0, 0, 0, alpha));
-    }
-
-    // Move to content area
+    // The same 6px, zero-blur offset shadow used by Panel.qml.
+    p.fillRect(QRect(sm + 6, sm + 6, cw, ch), QColor(0, 0, 0, 140));
     p.save();
     p.translate(sm, sm);
-
-    // === Win11 dark background ===
-    QPainterPath bgPath;
-    bgPath.addRoundedRect(QRectF(0, 0, cw, ch), m_BorderRadius, m_BorderRadius);
-    p.fillPath(bgPath, QColor(44, 44, 44, 242));
-
-    // Subtle border (Win11 style: thin light outline)
-    p.setPen(QPen(QColor(255, 255, 255, 20), 1.0));
-    p.drawPath(bgPath);
-
-    // Clip content
-    p.setClipPath(bgPath);
+    p.fillRect(QRect(0, 0, cw, ch), MenuSurface);
+    p.setPen(QPen(MenuLine, 1));
+    p.drawRect(QRect(0, 0, cw - 1, ch - 1));
+    p.setClipRect(QRect(1, 1, cw - 2, ch - 2));
+    p.fillRect(QRect(1, 1, 4, m_TitleHeight - 1), MenuAccent);
+    p.fillRect(QRect(1, m_TitleHeight - 1, cw - 2, 1), MenuLine);
 
     // --- Title bar: back navigation on sub-levels and close on every level ---
     const auto& level = m_MenuLevels[m_CurrentLevel];
-    int textPad = (m_CurrentLevel == 0) ? 16 : 8;
+    int textPad = 16;
     int titleH = m_TitleHeight;
     const bool backHovered = m_CurrentLevel > 0 && m_HoveredIndex == -2;
     const bool closeHovered = m_HoveredIndex == -3;
 
     if (backHovered) {
-        QPainterPath hlPath;
-        hlPath.addRoundedRect(QRectF(4, 2, cw - m_TitleHeight - 4,
-                                     m_TitleHeight - 4), 4, 4);
-        p.fillPath(hlPath, QColor(255, 255, 255, 15));
+        p.fillRect(QRect(6, 1, cw - m_TitleHeight - 6, m_TitleHeight - 2), MenuHover);
     }
 
     const QRect closeRect(cw - m_TitleHeight, 0, m_TitleHeight, m_TitleHeight);
     if (closeHovered) {
-        p.fillRect(closeRect, QColor(196, 43, 28, 220));
+        p.fillRect(closeRect, MenuDanger);
     }
 
     p.setFont(m_TitleFont);
-    p.setPen(backHovered ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 160));
+    p.setPen(backHovered ? MenuAccent : MenuDim);
     QRect titleRect(textPad, 0, cw - textPad - m_TitleHeight, m_TitleHeight);
     const QString titleText = m_CurrentLevel > 0
             ? QString::fromUtf8("\xe2\x97\x82 ") + level.title
             : level.title;
-    p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter, titleText);
+    p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter, titleText.toUpper());
 
     QFont closeFont = m_LabelFont;
     closeFont.setPointSize(11);
     p.setFont(closeFont);
-    p.setPen(QColor(255, 255, 255, closeHovered ? 255 : 170));
+    p.setPen(closeHovered ? MenuSurface : MenuDim);
     p.drawText(closeRect, Qt::AlignCenter, QString::fromUtf8("\xc3\x97"));
 
     // Apply content offset for level navigation animation
@@ -968,11 +948,13 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         int itemY = contentTop + i * m_ItemHeight;
         const auto& item = items[i];
 
-        // Hover highlight — Win11 style: subtle rounded rect
+        // Square focus/hover outline and the shared 4px accent marker.
         if (i == m_HoveredIndex && item.enabled) {
-            QPainterPath hlPath;
-            hlPath.addRoundedRect(QRectF(4, itemY + 1, cw - 8, m_ItemHeight - 2), 4, 4);
-            p.fillPath(hlPath, QColor(255, 255, 255, 20));
+            const QRect row(4, itemY + 1, cw - 8, m_ItemHeight - 2);
+            p.fillRect(row, MenuHover);
+            p.setPen(QPen(MenuAccent, 1));
+            p.drawRect(row.adjusted(0, 0, -1, -1));
+            p.fillRect(QRect(4, itemY + 1, 4, m_ItemHeight - 2), MenuAccent);
         }
 
         // Icon (drawn in left area if this level has icons)
@@ -980,7 +962,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             QChar icon = iconForItem(item);
             if (!icon.isNull()) {
                 p.setFont(m_IconFont);
-                p.setPen(item.enabled ? QColor(255, 255, 255, 180) : QColor(255, 255, 255, 60));
+                p.setPen(item.enabled ? MenuDim : MenuFaint);
                 QRect iconRect(textPad, itemY, m_IconAreaWidth, m_ItemHeight);
                 p.drawText(iconRect, Qt::AlignCenter, QString(icon));
             }
@@ -989,65 +971,46 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         // --- SubMenu item ---
         if (item.type == MenuItemType::SubMenu) {
             p.setFont(m_LabelFont);
-            p.setPen(item.enabled ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 80));
+            p.setPen(item.enabled ? MenuText : MenuFaint);
             QRect lr(labelX, itemY, cw - labelX - 36, m_ItemHeight);
             p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
 
             // Detail text (e.g., "20 Mbps")
             if (!item.detail.isEmpty()) {
                 p.setFont(m_DetailFont);
-                p.setPen(QColor(255, 255, 255, 100));
+                p.setPen(MenuDim);
                 QRect dr(cw / 2, itemY, cw / 2 - textPad - 20, m_ItemHeight);
                 p.drawText(dr, Qt::AlignRight | Qt::AlignVCenter, item.detail);
             }
 
             // Chevron ›
             p.setFont(m_LabelFont);
-            p.setPen(QColor(255, 255, 255, 100));
+            p.setPen(MenuDim);
             QRect ar(cw - textPad - 10, itemY, 10, m_ItemHeight);
             p.drawText(ar, Qt::AlignCenter, QString::fromUtf8("\xe2\x80\xba"));
         }
         // --- Toggle item ---
         else if (item.type == MenuItemType::Toggle) {
             p.setFont(m_LabelFont);
-            p.setPen(item.enabled ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 80));
+            p.setPen(item.enabled ? MenuText : MenuFaint);
             QRect lr(labelX, itemY, cw - labelX - 52, m_ItemHeight);
             p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
 
-            // Win11-style toggle switch
-            int trackW = 40, trackH = 20;
-            int trackX = cw - textPad - trackW;
-            int trackY = itemY + (m_ItemHeight - trackH) / 2;
-
-            QPainterPath trackPath;
-            trackPath.addRoundedRect(QRectF(trackX, trackY, trackW, trackH),
-                                     trackH / 2, trackH / 2);
-
-            int knobR = 6;
-            if (item.toggleState) {
-                // On: accent fill (Win11 system accent blue)
-                p.fillPath(trackPath, QColor(110, 192, 232));
-                p.setPen(QPen(QColor(110, 192, 232), 1));
-                p.drawPath(trackPath);
-                p.setBrush(Qt::white);
-                p.setPen(Qt::NoPen);
-                p.drawEllipse(QPoint(trackX + trackW - trackH / 2,
-                                     trackY + trackH / 2), knobR, knobR);
-            } else {
-                // Off: transparent with white border
-                p.fillPath(trackPath, QColor(255, 255, 255, 0));
-                p.setPen(QPen(QColor(255, 255, 255, 120), 1.5));
-                p.drawPath(trackPath);
-                p.setBrush(QColor(255, 255, 255, 160));
-                p.setPen(Qt::NoPen);
-                p.drawEllipse(QPoint(trackX + trackH / 2,
-                                     trackY + trackH / 2), knobR - 1, knobR - 1);
-            }
+            // Square track and square thumb, matching HardSwitch.qml.
+            const int trackW = 40, trackH = 20;
+            const int trackX = cw - textPad - trackW;
+            const int trackY = itemY + (m_ItemHeight - trackH) / 2;
+            const QRect track(trackX, trackY, trackW, trackH);
+            p.fillRect(track, item.toggleState ? MenuAccent : MenuHover);
+            p.setPen(QPen(item.toggleState ? MenuAccent : MenuLine, 1));
+            p.drawRect(track.adjusted(0, 0, -1, -1));
+            p.fillRect(QRect(trackX + (item.toggleState ? trackW - 16 : 4),
+                             trackY + 4, 12, 12), item.toggleState ? MenuSurface : MenuDim);
         }
         // --- Action item ---
         else if (item.type == MenuItemType::Action) {
             p.setFont(m_LabelFont);
-            p.setPen(item.enabled ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 80));
+            p.setPen(item.enabled ? MenuText : MenuFaint);
 
             bool hasLongDetail = !item.detail.isEmpty() && item.detail.length() > 3;
             bool hasShortDetail = !item.detail.isEmpty() && item.detail.length() <= 3;
@@ -1058,7 +1021,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
                 p.drawText(lb, Qt::AlignLeft | Qt::AlignBottom, item.label);
 
                 p.setFont(m_DetailFont);
-                p.setPen(QColor(255, 255, 255, 90));
+                p.setPen(MenuDim);
                 QRect sr(labelX, itemY + topH, cw - labelX - textPad, m_ItemHeight - topH);
                 p.drawText(sr, Qt::AlignLeft | Qt::AlignTop, item.detail);
             } else {
@@ -1075,9 +1038,9 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
                 p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
 
                 if (hasShortDetail) {
-                    // Short status text or checkmark — Win11 accent color
+                    // Short status text or checkmark in the shared brand accent.
                     p.setFont(m_DetailFont);
-                    p.setPen(QColor(110, 192, 232));
+                    p.setPen(MenuAccent);
                     QRect cr(cw - textPad - detailWidth, itemY,
                              detailWidth, m_ItemHeight);
                     p.drawText(cr, Qt::AlignRight | Qt::AlignVCenter, item.detail);
@@ -1087,14 +1050,14 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         // --- Back item (fallback, normally handled by title bar) ---
         else if (item.type == MenuItemType::Back) {
             p.setFont(m_DetailFont);
-            p.setPen(QColor(255, 255, 255, 120));
+            p.setPen(MenuDim);
             QRect lr(labelX, itemY, cw - labelX - textPad, m_ItemHeight);
             p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
         }
 
         // Group separator — only where explicitly flagged
         if (item.separatorAfter && i < (int)items.size() - 1) {
-            p.setPen(QPen(QColor(255, 255, 255, 18), 1));
+            p.setPen(QPen(MenuLine, 1));
             int sepY = itemY + m_ItemHeight - 1;
             p.drawLine(labelX, sepY, cw - textPad, sepY);
         }

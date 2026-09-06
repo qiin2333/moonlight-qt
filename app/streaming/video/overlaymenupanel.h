@@ -29,7 +29,7 @@
  *   Developer builds may append a function-test panel entry.
  *
  * Sub-level navigation uses a title bar with back button (◂ Title).
- * Win11 dark theme with Segoe MDL2 Assets icons, drop shadow, and slide animations.
+ * Square industrial theme matching Theme.qml, with hard shadows and brand accents.
  */
 class OverlayMenuPanel : public QRasterWindow {
     Q_OBJECT
@@ -255,7 +255,6 @@ private:
     int m_ItemHeight;
     int m_Padding;
     int m_MenuWidth;
-    int m_BorderRadius;
     int m_ShadowMargin;
     int m_TitleHeight;
     int m_IconAreaWidth;

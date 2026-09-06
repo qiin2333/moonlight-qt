@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/fonts">
+    <file alias="Manrope-Regular.ttf">../../app/res/fonts/Manrope-Regular.ttf</file>
+    <file alias="Manrope-SemiBold.ttf">../../app/res/fonts/Manrope-SemiBold.ttf</file>
+    <file alias="DMMono-Regular.ttf">../../app/res/fonts/DMMono-Regular.ttf</file>
+  </qresource>
+</RCC>
