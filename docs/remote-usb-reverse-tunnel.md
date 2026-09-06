@@ -65,3 +65,11 @@ Windows 本机通过 usbipd-win 5.3.0 导出真实 Android 手机，正式 Qt `T
 - 两轮“导入 → 控制传输 → 释放”通过，第二轮可复用 hub port 1；每轮结束后导入端口为空，最终手机恢复本机 ADB 可用。
 - 初次测试与参数化脚本复跑均通过两轮。Sunshine 的 `tests/tools/run_usb_control_vm_e2e.py` 和 `usb_control_probe.cpp` 提供复现入口，详见其 `tests/tools/README-remote-usb.md`。
 - 此结果验证真实 USB 控制传输和断开重连。VM 中 ADB 仍需手机授权，未验证 ADB shell、持续 bulk/isochronous 吞吐、其他设备类别或完整视频串流/UI 生命周期。
+
+### 与实际视频串流联合验证
+
+随后使用完整 Moonlight 和虚拟机中的完整 Sunshine 连续完成两轮会话：1024×768 H.264 桌面画面可见，实际串流 USB 菜单导入手机，每轮校验序列号并执行 20 次 WinUSB `GET_STATUS`，然后直接退出串流。两次退出均自动清空导入端口，重开串流后可再次导入，最终手机恢复本机 ADB 可用。客户端退出统计的接收/解码/呈现帧率分别为 30.0/30.0/30.0 和 30.1/30.1/30.0 FPS；观察到的网络丢帧为 0%。这两轮未使用独立隧道 probe，USB 与视频直接连接同一 VM。
+
+通过配置为登录会话内 WGC 采集、Sunshine 软件编码与 Moonlight 软件解码。测试环境硬件解码报 hwframes context 初始化失败（-22）；VM 没有音频端点，因此硬件解码、音频、手柄和 USB bulk/isochronous 吞吐不计入此次通过范围。
+
+测试部署需使用与 VM 驱动匹配的 usbip-win2 0.9.7.8 工具及配套 DLL。初次 CLI 配对在主机登记成功但客户端 pin 为空，成功测试前通过已认证 SSH 取得主机证书并固定到该测试主机；全新配对的 pin 持久化仍待单独验证。具体步骤与证据说明见 Sunshine 的 `tests/tools/README-remote-usb.md`。
