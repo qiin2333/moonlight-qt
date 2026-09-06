@@ -5,7 +5,6 @@
 #include <QGuiApplication>
 #include <QCoreApplication>
 #include <QCursor>
-#include <QFontDatabase>
 #include <QFontMetrics>
 #include <memory>
 
@@ -56,7 +55,7 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     m_MenuWidth    = 320;
     m_ShadowMargin = 8;
     m_TitleHeight  = 32;
-    m_IconAreaWidth = 24;
+    m_IconAreaWidth = 28;
 
     m_LabelFont.setFamilies(UiFont::familyChain(QStringLiteral("Manrope")));
     m_LabelFont.setPointSize(10);
@@ -70,27 +69,16 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     m_TitleFont.setWeight(QFont::DemiBold);
     m_TitleFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
 
-    // Icon font: platform-specific
-#ifdef Q_OS_WIN
-    // Segoe MDL2 Assets — available on Windows 10/11
-    m_IconFont = QFont(QStringLiteral("Segoe MDL2 Assets"), 10);
-#else
-    // Material Icons (bundled, Apache 2.0) — cross-platform fallback
-    {
-        int iconFontId = QFontDatabase::addApplicationFont(QStringLiteral(":/data/MaterialIcons-Regular.ttf"));
-        QString materialFamily;
-        if (iconFontId >= 0) {
-            QStringList families = QFontDatabase::applicationFontFamilies(iconFontId);
-            if (!families.isEmpty())
-                materialFamily = families.first();
-        }
-        if (!materialFamily.isEmpty())
-            m_IconFont = QFont(materialFamily, 12);
-        else
-            m_IconFont = QFont(QStringLiteral("Material Icons"), 12);
+    // Reuse the same bundled Fluent 24 Regular assets as settings/toolbars.
+    // Keep QIcon instances alive so Qt can cache rasterizations for each DPI.
+    for (const QString &name : {QStringLiteral("tb-settings"), QStringLiteral("menu-position"),
+             QStringLiteral("menu-bitrate"), QStringLiteral("menu-files"),
+             QStringLiteral("cat-peripherals"), QStringLiteral("cat-display"),
+             QStringLiteral("menu-microphone"), QStringLiteral("cat-gamepad"),
+             QStringLiteral("menu-close"), QStringLiteral("menu-next"),
+             QStringLiteral("tb-back")}) {
+        m_MenuIcons.insert(name, QIcon(QStringLiteral(":/res/fluent/%1.svg").arg(name)));
     }
-#endif
-    m_IconFont.setWeight(QFont::Normal);
 
     // --- Animations ---
     m_OpacityAnim = new QPropertyAnimation(this, "opacity", this);
@@ -832,6 +820,15 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
     p.fillRect(QRect(1, 1, 4, m_TitleHeight - 1), MenuAccent);
     p.fillRect(QRect(1, m_TitleHeight - 1, cw - 2, 1), MenuLine);
 
+    const auto drawIcon = [&](const QString &name, const QRect &rect, qreal opacity = 1.0) {
+        const auto icon = m_MenuIcons.constFind(name);
+        if (icon == m_MenuIcons.cend()) return;
+        p.save();
+        p.setOpacity(opacity);
+        icon.value().paint(&p, rect, Qt::AlignCenter, QIcon::Normal, QIcon::Off);
+        p.restore();
+    };
+
     // --- Title bar: back navigation on sub-levels and close on every level ---
     const auto& level = m_MenuLevels[m_CurrentLevel];
     int textPad = 16;
@@ -850,17 +847,14 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
 
     p.setFont(m_TitleFont);
     p.setPen(backHovered ? MenuAccent : MenuDim);
-    QRect titleRect(textPad, 0, cw - textPad - m_TitleHeight, m_TitleHeight);
-    const QString titleText = m_CurrentLevel > 0
-            ? QString::fromUtf8("\xe2\x97\x82 ") + level.title
-            : level.title;
-    p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter, titleText.toUpper());
-
-    QFont closeFont = m_LabelFont;
-    closeFont.setPointSize(11);
-    p.setFont(closeFont);
-    p.setPen(closeHovered ? MenuSurface : MenuDim);
-    p.drawText(closeRect, Qt::AlignCenter, QString::fromUtf8("\xc3\x97"));
+    const int backWidth = m_CurrentLevel > 0 ? 28 : 0;
+    if (backWidth) {
+        drawIcon(QStringLiteral("tb-back"), QRect(textPad, (titleH - 20) / 2, 20, 20));
+    }
+    QRect titleRect(textPad + backWidth, 0, cw - textPad - backWidth - m_TitleHeight, titleH);
+    p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter, level.title.toUpper());
+    drawIcon(QStringLiteral("menu-close"),
+             QRect(closeRect.center().x() - 9, closeRect.center().y() - 9, 18, 18));
 
     // Apply content offset for level navigation animation
     if (m_ContentSlideAnim->state() != QAbstractAnimation::Running) {
@@ -874,69 +868,27 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
     const auto& items = level.items;
     int contentTop = titleH + m_Padding;
 
-    // Icon mapping for menu items
-    // Windows: Segoe MDL2 Assets code points
-    // Other platforms: Material Icons code points (bundled font)
-    auto iconForItem = [](const MenuItem& item) -> QChar {
-#ifdef Q_OS_WIN
-        // Segoe MDL2 Assets code points
+    auto iconForItem = [](const MenuItem& item) -> QString {
         if (item.type == MenuItemType::SubMenu) {
-            if (item.targetLevel == 1) return QChar(0xE713); // Settings gear
-            if (item.targetLevel == 2) return QChar(0xE7F4); // DataSense (data/speed)
-            if (item.targetLevel == 3) return QChar(0xE707); // Map pin
-            if (item.targetLevel == 4) return QChar(0xE88E); // USB
+            switch (item.targetLevel) {
+            case 1: return QStringLiteral("tb-settings");
+            case 2: return QStringLiteral("menu-bitrate");
+            case 3: return QStringLiteral("menu-position");
+            case 4: return QStringLiteral("cat-peripherals");
+            }
         }
         switch (item.action) {
-        case MenuAction::ToggleFullScreen:  return QChar(0xE740); // FullScreen
-        case MenuAction::ShowHostFiles:     return QChar(0xE8B7); // Folder
-        case MenuAction::SelectRemoteUsbDevice:
-        case MenuAction::ReleaseRemoteUsbDevice: return QChar(0xE88E); // USB
-        case MenuAction::ToggleMicrophone:  return QChar(0xE720); // Microphone
-        case MenuAction::ToggleGamepadMouse:  return QChar(0xE7FC); // Gamepad
-        case MenuAction::Quit:              return QChar(0xE711); // Close/X
-        case MenuAction::QuitAndExit:       return QChar(0xE711); // Close/X
-        case MenuAction::ToggleStatsOverlay:return QChar(0xE7F4); // DataSense
-        case MenuAction::ToggleMouseMode:   return QChar(0xE962); // Handwriting/pointer
-        case MenuAction::ToggleCursorHide:  return QChar(0xE76C); // PointerHand
-        case MenuAction::ToggleMinimize:    return QChar(0xE921); // Minimize
-        case MenuAction::UngrabInput:       return QChar(0xE785); // Mouse back
-        case MenuAction::PasteText:         return QChar(0xE77F); // Paste
-        case MenuAction::TogglePointerRegionLock: return QChar(0xE72E); // Lock
+        case MenuAction::ToggleFullScreen: return QStringLiteral("cat-display");
+        case MenuAction::ShowHostFiles: return QStringLiteral("menu-files");
+        case MenuAction::ToggleMicrophone: return QStringLiteral("menu-microphone");
+        case MenuAction::ToggleGamepadMouse: return QStringLiteral("cat-gamepad");
+        case MenuAction::Quit:
+        case MenuAction::QuitAndExit: return QStringLiteral("menu-close");
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
-        case MenuAction::OpenStylusReplayPanel: return QChar(0xE943); // Developer tools
+        case MenuAction::OpenStylusReplayPanel: return QStringLiteral("tb-settings");
 #endif
-        default: return QChar();
+        default: return {};
         }
-#else
-        // Material Icons code points
-        if (item.type == MenuItemType::SubMenu) {
-            if (item.targetLevel == 1) return QChar(0xE8B8); // settings
-            if (item.targetLevel == 2) return QChar(0xE1B2); // speed (bitrate)
-            if (item.targetLevel == 3) return QChar(0xE55F); // place
-            if (item.targetLevel == 4) return QChar(0xE1E0); // usb
-        }
-        switch (item.action) {
-        case MenuAction::ToggleFullScreen:  return QChar(0xE5D0); // fullscreen
-        case MenuAction::ShowHostFiles:     return QChar(0xE2C7); // folder
-        case MenuAction::SelectRemoteUsbDevice:
-        case MenuAction::ReleaseRemoteUsbDevice: return QChar(0xE1E0); // usb
-        case MenuAction::ToggleMicrophone:  return QChar(0xE029); // mic
-        case MenuAction::ToggleGamepadMouse:  return QChar(0xE30F); // games (gamepad)
-        case MenuAction::Quit:              return QChar(0xE5CD); // close
-        case MenuAction::QuitAndExit:       return QChar(0xE5CD); // close
-        case MenuAction::ToggleStatsOverlay:return QChar(0xE1B2); // speed
-        case MenuAction::ToggleMouseMode:   return QChar(0xE323); // mouse (Material)
-        case MenuAction::ToggleCursorHide:  return QChar(0xE31A); // near_me (cursor arrow)
-        case MenuAction::ToggleMinimize:    return QChar(0xE15B); // remove (minimize bar)
-        case MenuAction::UngrabInput:       return QChar(0xE5C4); // arrow_back
-        case MenuAction::PasteText:         return QChar(0xE14F); // content_paste
-        case MenuAction::TogglePointerRegionLock: return QChar(0xE897); // lock
-#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
-        case MenuAction::OpenStylusReplayPanel: return QChar(0xE869); // build
-#endif
-        default: return QChar();
-        }
-#endif
     };
 
     // Icon column: only on top-level menu
@@ -957,15 +909,10 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             p.fillRect(QRect(4, itemY + 1, 4, m_ItemHeight - 2), MenuAccent);
         }
 
-        // Icon (drawn in left area if this level has icons)
         if (hasIcons) {
-            QChar icon = iconForItem(item);
-            if (!icon.isNull()) {
-                p.setFont(m_IconFont);
-                p.setPen(item.enabled ? MenuDim : MenuFaint);
-                QRect iconRect(textPad, itemY, m_IconAreaWidth, m_ItemHeight);
-                p.drawText(iconRect, Qt::AlignCenter, QString(icon));
-            }
+            drawIcon(iconForItem(item),
+                     QRect(textPad, itemY + (m_ItemHeight - 20) / 2, 20, 20),
+                     item.enabled ? (i == m_HoveredIndex ? 1.0 : 0.85) : 0.4);
         }
 
         // --- SubMenu item ---
@@ -983,11 +930,8 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
                 p.drawText(dr, Qt::AlignRight | Qt::AlignVCenter, item.detail);
             }
 
-            // Chevron ›
-            p.setFont(m_LabelFont);
-            p.setPen(MenuDim);
-            QRect ar(cw - textPad - 10, itemY, 10, m_ItemHeight);
-            p.drawText(ar, Qt::AlignCenter, QString::fromUtf8("\xe2\x80\xba"));
+            drawIcon(QStringLiteral("menu-next"),
+                     QRect(cw - textPad - 16, itemY + (m_ItemHeight - 16) / 2, 16, 16), 0.85);
         }
         // --- Toggle item ---
         else if (item.type == MenuItemType::Toggle) {

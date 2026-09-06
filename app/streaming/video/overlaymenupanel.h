@@ -5,6 +5,8 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <QFont>
+#include <QIcon>
+#include <QHash>
 #include <QSurfaceFormat>
 #include <QElapsedTimer>
 #include <QTimer>
@@ -263,7 +265,7 @@ private:
     QFont m_LabelFont;
     QFont m_DetailFont;
     QFont m_TitleFont;
-    QFont m_IconFont;
+    QHash<QString, QIcon> m_MenuIcons;
 
     // Anti-flicker: grace period after show
     QElapsedTimer m_ShowTimer;

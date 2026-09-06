@@ -4,4 +4,17 @@
     <file alias="Manrope-SemiBold.ttf">../../app/res/fonts/Manrope-SemiBold.ttf</file>
     <file alias="DMMono-Regular.ttf">../../app/res/fonts/DMMono-Regular.ttf</file>
   </qresource>
+  <qresource prefix="/res/fluent">
+    <file alias="menu-position.svg">../../app/res/fluent/menu-position.svg</file>
+    <file alias="menu-bitrate.svg">../../app/res/fluent/menu-bitrate.svg</file>
+    <file alias="menu-files.svg">../../app/res/fluent/menu-files.svg</file>
+    <file alias="menu-microphone.svg">../../app/res/fluent/menu-microphone.svg</file>
+    <file alias="menu-close.svg">../../app/res/fluent/menu-close.svg</file>
+    <file alias="menu-next.svg">../../app/res/fluent/menu-next.svg</file>
+    <file alias="tb-settings.svg">../../app/res/fluent/tb-settings.svg</file>
+    <file alias="cat-peripherals.svg">../../app/res/fluent/cat-peripherals.svg</file>
+    <file alias="cat-display.svg">../../app/res/fluent/cat-display.svg</file>
+    <file alias="cat-gamepad.svg">../../app/res/fluent/cat-gamepad.svg</file>
+    <file alias="tb-back.svg">../../app/res/fluent/tb-back.svg</file>
+  </qresource>
 </RCC>
