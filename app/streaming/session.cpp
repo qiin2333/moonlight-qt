@@ -5148,6 +5148,15 @@ void Session::exec()
         case SDL_KEYUP:
         case SDL_KEYDOWN:
             presence.runCallbacks();
+            // Escape follows the same back/close rule as the controller. Swallow
+            // both halves of the key press so it cannot reach the remote app.
+            if (m_MenuPanel && (m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) &&
+                event.key.keysym.sym == SDLK_ESCAPE) {
+                if (event.type == SDL_KEYUP && m_MenuPanel->isMenuVisible()) {
+                    m_MenuPanel->gamepadBack();
+                }
+                break;
+            }
             // Ctrl+Alt+Shift+O toggles the Qt overlay menu
             if (event.key.state == SDL_PRESSED &&
                 (event.key.keysym.mod & KMOD_CTRL) &&
@@ -5173,9 +5182,12 @@ void Session::exec()
             }
 #endif
 
-            // When Qt overlay menu is visible, consume all button events
-            // to prevent SDL from re-capturing the mouse
-            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+            // Dismiss on release so the entire outside click stays local;
+            // neither a press nor an unmatched release reaches the host.
+            if (m_MenuPanel && (m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing())) {
+                if (event.type == SDL_MOUSEBUTTONUP) {
+                    m_MenuPanel->dismissOnOutsideClick(QCursor::pos());
+                }
                 break;
             }
 

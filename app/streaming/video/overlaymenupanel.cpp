@@ -290,7 +290,7 @@ void OverlayMenuPanel::buildMenuLevels()
                         detail = tr("Connecting");
                         break;
                     case RemoteUsbState::Open:
-                        detail = tr("Connected");
+                        detail = tr("Connected — select to release");
                         break;
                     case RemoteUsbState::Stopping:
                         detail = tr("Releasing");
@@ -459,19 +459,24 @@ void OverlayMenuPanel::updateRemoteUsbState(
 
 void OverlayMenuPanel::dispatchActionItem(const MenuItem& item)
 {
-    closeMenu();
+    // USB callbacks can synchronously rebuild the device list. Own the payload
+    // before calling out so a refresh cannot invalidate the selected identity.
+    const QString payload = item.payload;
     if (item.action == MenuAction::SelectRemoteUsbDevice) {
+        beginInteraction();
         if (m_RemoteUsbDeviceCallback) {
-            m_RemoteUsbDeviceCallback(item.payload);
+            m_RemoteUsbDeviceCallback(payload);
         }
         return;
     }
     if (item.action == MenuAction::ReleaseRemoteUsbDevice) {
+        beginInteraction();
         if (m_RemoteUsbReleaseCallback) {
             m_RemoteUsbReleaseCallback();
         }
         return;
     }
+    closeMenu();
     if (m_ActionCallback) {
         m_ActionCallback(item.action);
     }
@@ -688,8 +693,7 @@ void OverlayMenuPanel::navigateToLevel(int level)
     // Explicit navigation commits to interacting with the menu. A shorter
     // submenu can resize out from under the pointer, so keep it open until
     // an action or explicit dismissal instead of racing a leave timeout.
-    m_CloseWhenPointerOutside = false;
-    m_LeaveTimer.stop();
+    beginInteraction();
     bool goingForward = level > m_CurrentLevel;
     m_ContentSlideAnim->stop();
     m_ContentOffset = 0;
@@ -706,6 +710,19 @@ void OverlayMenuPanel::navigateToLevel(int level)
     } else {
         // Back: instant switch, no animation (avoids jarring resize + slide combo)
         forceRepaint();
+    }
+}
+
+void OverlayMenuPanel::beginInteraction()
+{
+    m_CloseWhenPointerOutside = false;
+    m_LeaveTimer.stop();
+}
+
+void OverlayMenuPanel::dismissOnOutsideClick(const QPoint& globalPosition)
+{
+    if (m_Visible && !geometry().contains(globalPosition)) {
+        closeMenu();
     }
 }
 
@@ -1110,6 +1127,7 @@ void OverlayMenuPanel::mouseMoveEvent(QMouseEvent* event)
 void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() != Qt::LeftButton) return;
+    beginInteraction();
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     int idx = itemAtPos(event->position().toPoint());
@@ -1169,6 +1187,7 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
 void OverlayMenuPanel::gamepadMoveUp()
 {
     if (!m_Visible) return;
+    beginInteraction();
     const auto& items = m_MenuLevels[m_CurrentLevel].items;
     if (items.empty()) return;
 
@@ -1193,6 +1212,7 @@ void OverlayMenuPanel::gamepadMoveUp()
 void OverlayMenuPanel::gamepadMoveDown()
 {
     if (!m_Visible) return;
+    beginInteraction();
     const auto& items = m_MenuLevels[m_CurrentLevel].items;
     if (items.empty()) return;
 

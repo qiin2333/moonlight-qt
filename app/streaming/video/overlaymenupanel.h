@@ -144,6 +144,7 @@ public:
                       const QPoint& cursorPosition, bool pointerTriggered = true);
 
     void closeMenu();
+    void dismissOnOutsideClick(const QPoint& globalPosition);
     bool isMenuVisible() const { return m_Visible; }
     bool isClosing() const { return m_Closing; }
     bool needsEventProcessing() const { return m_Visible || m_Closing; }
@@ -224,6 +225,7 @@ private:
     void repositionWindow();
     void showInternal();     // shared show logic after geometry is set
     void schedulePointerOutsideCheck();
+    void beginInteraction();
     void forceRepaint();     // synchronous repaint (requestUpdate is async on Windows)
     int  itemAtPos(const QPoint& pos) const;
     void dispatchActionItem(const MenuItem& item);

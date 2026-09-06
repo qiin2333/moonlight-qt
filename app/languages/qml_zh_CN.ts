@@ -1995,8 +1995,8 @@
         <translation type="vanished">正在连接</translation>
     </message>
     <message>
-        <source>Connected</source>
-        <translation type="vanished">已连接</translation>
+        <source>Connected — select to release</source>
+        <translation>已连接 · 点击释放</translation>
     </message>
     <message>
         <source>Releasing</source>
