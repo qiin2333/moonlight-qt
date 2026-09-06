@@ -114,7 +114,8 @@ Item {
             readonly property Item __focusFrameTarget: null
 
             width: rail.compact ? Math.max(96, label.implicitWidth + Theme.spaceXl + Theme.spaceLg) : list.width
-            height: rail.compact ? list.height : 44
+            height: rail.compact ? list.height : Math.max(44, label.implicitHeight + topPadding + bottomPadding)
+            padding: Theme.spaceSm
 
             // 进焦点链。设置页的手柄上下键 = Tab / Shift+Tab，所以这一行就等于
             // 「上下能走到分类栏」。ItemDelegate 默认是 NoFocus，改成 StrongFocus
@@ -197,12 +198,14 @@ Item {
                 }
             }
 
-            contentItem: Row {
+            contentItem: Item {
                 id: label
-                spacing: Theme.spaceSm
-                leftPadding: Theme.spaceMd
+                implicitWidth: Theme.spaceMd + categoryIcon.width + Theme.spaceSm + categoryText.implicitWidth
+                implicitHeight: Math.max(categoryIcon.height, categoryText.implicitHeight)
 
                 Image {
+                    id: categoryIcon
+                    x: Theme.spaceMd
                     anchors.verticalCenter: parent.verticalCenter
                     source: modelData.icon
                     // 按 2x 栅格化，Retina 上才不会糊
@@ -219,6 +222,9 @@ Item {
                 }
 
                 Text {
+                    id: categoryText
+                    x: categoryIcon.x + categoryIcon.width + Theme.spaceSm
+                    width: Math.max(0, parent.width - x)
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.title
                     color: item.current ? Theme.text : Theme.textDim
@@ -227,6 +233,7 @@ Item {
                     font.weight: item.current ? Font.ExtraBold : Font.Medium
                     font.capitalization: Font.AllUppercase
                     font.letterSpacing: Theme.tracking(Theme.fontRowTitle, 0.06)
+                    wrapMode: rail.compact ? Text.NoWrap : Text.Wrap
                     elide: Text.ElideRight
                 }
             }

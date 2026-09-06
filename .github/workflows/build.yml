@@ -7,6 +7,12 @@ on:
     branches: [ master, main ]
   release:
     types: [ published ]
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Rebuild a version tag and replace its existing release assets
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -222,6 +228,15 @@ jobs:
         release\overlay_toast_event_state.exe
         if errorlevel 1 exit /b %ERRORLEVEL%
         popd
+
+    - name: Test compiled Chinese translations and settings navigation layout
+      shell: cmd
+      run: |
+        lrelease app\languages\qml_zh_CN.ts
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        set QT_QPA_PLATFORM=offscreen
+        qmltestrunner -input tests\settings_localization -translation app\languages\qml_zh_CN.qm
+        if errorlevel 1 exit /b %ERRORLEVEL%
 
     - name: Test overlay submenu navigation
       shell: cmd
@@ -711,17 +726,25 @@ jobs:
         path: build/installer-release/Moonlight-VPlus-SteamLink-*.zip
 
   release:
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_release && github.ref_type == 'tag')
     needs: [qml-lint, version-tests, build-windows, build-macos, build-linux, build-steamlink]
     runs-on: ubuntu-latest
 
     steps:
+    - name: Verify existing release before replacing assets
+      if: github.event_name == 'workflow_dispatch'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RELEASE_TAG: ${{ github.ref_name }}
+      run: gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
+
     - name: Download all artifacts
       uses: actions/download-artifact@v4
 
     - name: Upload release assets
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: ${{ github.event.release.tag_name || github.ref_name }}
         files: |
           **/*.exe
           **/*.zip

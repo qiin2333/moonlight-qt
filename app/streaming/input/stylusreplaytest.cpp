@@ -102,6 +102,8 @@ bool deadlineReached(Uint32 now, Uint32 deadline)
 
 class StylusReplayTest::Impl
 {
+    // Keep Linguist extraction in the same context used at runtime.
+    Q_DECLARE_TR_FUNCTIONS(StylusReplayTest)
 public:
     Impl(SDL_Window* streamingWindow,
          ToastCallback toastCallback,
@@ -233,11 +235,6 @@ public:
     }
 
 private:
-    static QString tr(const char* text)
-    {
-        return QCoreApplication::translate("StylusReplayTest", text);
-    }
-
     void toast(const QString& message, int durationMs = 2000)
     {
         if (m_ToastCallback) {
