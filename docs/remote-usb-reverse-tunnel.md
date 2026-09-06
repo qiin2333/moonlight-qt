@@ -56,3 +56,12 @@ ready 之前的拒绝用一行 `{"op":"error","reason":"..."}` 返回。ready �
 - `tests/usb_forwarding_tunnel/usb_forwarding_tunnel.pro` 构建无视频会话的测试驱动，直接使用正式 `Tunnel` 类。
 - Sunshine 的 `reverse_tunnel_probe` 和 `tests/tools/test_reverse_tunnel.py` 覆盖 TLS/token 拒绝、先转发后完成 attach、断开重连以及双端隧道对拍。合成 helper 测试不等同于真实 USB 设备 E2E。
 - 主机原有 `loopback_usbip_bridge` 仍服务虚拟触摸屏 POC，不参与这条反向隧道。
+
+## Windows 实机验证（2026-09-06）
+
+Windows 本机通过 usbipd-win 5.3.0 导出真实 Android 手机，正式 Qt `Tunnel` 经 SSH 端口转发连接 Win10 Hyper-V 虚拟机中的正式 Sunshine `reverse_tunnel_service`，由 usbip-win2 0.9.7.8 导入设备。
+
+- 无需手机点击授权：使用 WinUSB 标准控制请求，读取并校验设备 VID/PID 与序列号，每轮完成 20 次 `GET_STATUS`。
+- 两轮“导入 → 控制传输 → 释放”通过，第二轮可复用 hub port 1；每轮结束后导入端口为空，最终手机恢复本机 ADB 可用。
+- 初次测试与参数化脚本复跑均通过两轮。Sunshine 的 `tests/tools/run_usb_control_vm_e2e.py` 和 `usb_control_probe.cpp` 提供复现入口，详见其 `tests/tools/README-remote-usb.md`。
+- 此结果验证真实 USB 控制传输和断开重连。VM 中 ADB 仍需手机授权，未验证 ADB shell、持续 bulk/isochronous 吞吐、其他设备类别或完整视频串流/UI 生命周期。
