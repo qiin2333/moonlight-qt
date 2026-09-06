@@ -685,6 +685,10 @@ void OverlayMenuPanel::navigateToLevel(int level)
 {
     if (level < 0 || level >= (int)m_MenuLevels.size()) return;
 
+    // Explicit navigation commits to interacting with the menu. A shorter
+    // submenu can resize out from under the pointer, so keep it open until
+    // an action or explicit dismissal instead of racing a leave timeout.
+    m_CloseWhenPointerOutside = false;
     m_LeaveTimer.stop();
     bool goingForward = level > m_CurrentLevel;
     m_ContentSlideAnim->stop();
@@ -693,14 +697,6 @@ void OverlayMenuPanel::navigateToLevel(int level)
     m_CurrentLevel = level;
     m_HoveredIndex = -1;
     repositionWindow();
-
-    // Reset grace period so Leave event won't close the menu immediately
-    // (the mouse may be outside the resized window after navigation)
-    m_ShowTimer.start();
-
-    if (m_CloseWhenPointerOutside) {
-        schedulePointerOutsideCheck();
-    }
 
     if (goingForward) {
         // Forward: content slides in from right
