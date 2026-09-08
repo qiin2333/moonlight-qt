@@ -47,6 +47,13 @@ struct ClipboardSyncHostContext
 // notifications for the same content are dropped, mirroring the Sunshine
 // GUI agent's logic so the two ends don't ping-pong.
 //
+// Text keys the cache on the payload bytes. Images key a second cache on
+// the decoded pixels: platforms re-encode clipboard image flavors after we
+// write them (macOS synthesizes new PNGf/TIFF data lazily and bumps the
+// pasteboard changeCount again), so the delayed echo hands back a
+// re-encoded copy whose bytes never match the wire payload. Pixels survive
+// those lossless re-encodes, making them the only stable identity.
+//
 // Threading:
 //   * Construct on the GUI thread.
 //   * start() / stop() must run on the GUI thread.
@@ -141,6 +148,11 @@ private:
 
     static uint64_t hashBytes(const QByteArray& bytes);
 
+    // Pixel-level echo bookkeeping for images (see class comment).
+    bool seenImageRecently(uint64_t pixelHash);
+    void recordImageHash(uint64_t pixelHash);
+    static uint64_t hashImagePixels(const QImage& image);
+
     bool encodeImageAsPng(const QImage& image,
                           QByteArray& outPng,
                           const char* sourceDescription) const;
@@ -173,7 +185,8 @@ private:
     QNetworkAccessManager* m_Nam = nullptr;
 
     bool m_Active = false;
-    QQueue<QPair<uint64_t, qint64>> m_EchoCache; // (hash, timestamp_ms)
+    QQueue<QPair<uint64_t, qint64>> m_EchoCache;       // (byte hash, timestamp_ms)
+    QQueue<QPair<uint64_t, qint64>> m_ImageEchoCache;  // (pixel hash, timestamp_ms)
 
 #ifdef Q_OS_MACOS
     QTimer* m_PasteboardPollTimer = nullptr;
