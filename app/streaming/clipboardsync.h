@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QByteArray>
+#include <QHash>
 #include <QMutex>
 #include <QPair>
 #include <QQueue>
@@ -10,6 +11,7 @@
 #include <QString>
 #include <QStringList>
 #include <cstdint>
+#include <functional>
 
 class QImage;
 class QMimeData;
@@ -39,6 +41,22 @@ struct ClipboardSyncHostContext
 // /api/v1/clipboard/blob endpoints) in both directions. Payloads above the
 // 65 KB single-packet cap are switched to KIND_REF transparently.
 // File / other payloads are accepted on the wire but ignored.
+//
+// Compound clipboard (v2, no wire-format change): a clipboard change that
+// carries BOTH text and an image is emitted as two consecutive frames
+// sharing a non-zero token, text frame first, image frame second. Peers
+// that don't aggregate simply apply the frames in order and end up with
+// the image — the exact v1 outcome — so no version negotiation is needed.
+// Aggregating peers apply each frame as it arrives (zero added latency vs
+// v1) and retain the text payload: when the image lands — inline or after
+// its REF blob fetch — the clipboard is upgraded with one compound write
+// carrying both flavors. Single-flavor changes keep the legacy token=0
+// single frame. token=0 is never aggregated (the Qt client historically
+// emitted it for every frame). Inside a burst the text frame is always
+// inline (a burst text payload larger than the wire cap is dropped rather
+// than deferred via REF, which would race the image frame onto the wire
+// and flip legacy peers' final state to text); the image frame may still
+// use KIND_REF.
 //
 // Echo suppression: when we either write a payload to the local clipboard
 // (because the host pushed it) or send a payload to the host (because we
@@ -89,6 +107,12 @@ public:
         return payloadBytes >= INLINE_THRESHOLD;
     }
 
+    // How long a burst's payloads are retained after their frames applied —
+    // purely a memory bound; application is immediate on arrival (see class
+    // comment).
+    static constexpr int BURST_RETENTION_MS = 5000;
+    static constexpr int MAX_PENDING_BURSTS = 32;
+
     // File copy/paste is not part of the clipboard sync protocol. Native file
     // clipboards often also expose a thumbnail or application icon as an image,
     // so callers must reject file references before considering image formats.
@@ -137,9 +161,22 @@ private slots:
     void onIncomingFrame(QByteArray frame);
 
 private:
-    bool encodeFrame(uint8_t kind, const QByteArray& payload, QByteArray& outFrame) const;
+    // Aggregation state for one inbound compound burst (frames sharing a
+    // non-zero token). Frames are applied as they arrive; the retained text
+    // lets the arriving image upgrade the clipboard to one compound write.
+    struct BurstState
+    {
+        QByteArray textPayload;
+        QByteArray pngPayload;
+        bool haveText = false;
+        bool havePng = false;
+        QTimer* timer = nullptr;
+    };
+
+    bool encodeFrame(uint8_t kind, quint32 token, const QByteArray& payload, QByteArray& outFrame) const;
     bool decodeFrame(const QByteArray& frame,
                      uint8_t& outKind,
+                     quint32& outToken,
                      QByteArray& outPayload) const;
 
     // Hash + TTL bookkeeping; not thread-safe, only touched from GUI thread.
@@ -157,7 +194,12 @@ private:
                           QByteArray& outPng,
                           const char* sourceDescription) const;
     void sendClipboardPng(const QByteArray& png,
-                          const QString& sourceDescription);
+                          const QString& sourceDescription,
+                          quint32 token = 0);
+    // Shared text outbound path for single-flavor changes (token 0) and the
+    // text frame of a compound burst. Applies the size cap, echo checks and
+    // inline-vs-REF choice, then emits.
+    void sendTextOutbound(const QByteArray& utf8, quint32 token);
     bool extractClipboardPng(const QMimeData* mime,
                              QByteArray& outPng,
                              QString* outSourceDescription = nullptr) const;
@@ -176,10 +218,20 @@ private:
     // QNetworkAccessManager event-loop callbacks land back on the GUI thread.
     bool buildBlobUrl(const QString& tail, QUrl& outUrl) const;
     QNetworkAccessManager* nam();
-    void uploadAndSendRef(const QByteArray& payload, const QString& mime);
+    void uploadAndSendRef(const QByteArray& payload, const QString& mime, quint32 token = 0);
     void fetchRefAndApply(const QString& id, const QString& mime, qint64 advertisedSize);
+    void fetchBlob(const QString& id,
+                   qint64 advertisedSize,
+                   const std::function<void(const QByteArray&, const QString&)>& onFetched);
     void applyInboundText(const QByteArray& payload);
     void applyInboundPng(const QByteArray& payload);
+
+    // Compound burst aggregation (see class comment).
+    quint32 nextToken();
+    void handleBurstFrame(uint8_t kind, quint32 token, const QByteArray& payload);
+    void burstFlavorResolved(quint32 token, uint8_t kind, const QByteArray& payload);
+    void removeBurst(quint32 token);
+    void applyCompound(const QByteArray& text, const QByteArray& png);
 
     ClipboardSyncHostContext m_HostContext;
     QNetworkAccessManager* m_Nam = nullptr;
@@ -187,6 +239,8 @@ private:
     bool m_Active = false;
     QQueue<QPair<uint64_t, qint64>> m_EchoCache;       // (byte hash, timestamp_ms)
     QQueue<QPair<uint64_t, qint64>> m_ImageEchoCache;  // (pixel hash, timestamp_ms)
+    QHash<quint32, BurstState> m_PendingBursts;
+    quint32 m_NextToken = 1;
 
 #ifdef Q_OS_MACOS
     QTimer* m_PasteboardPollTimer = nullptr;
