@@ -187,6 +187,7 @@ void ClipboardSync::stop()
     }
 
     m_EchoCache.clear();
+    m_ImageEchoCache.clear();
     m_PendingSelfWrites = 0;
 #ifdef Q_OS_MACOS
     if (m_PasteboardPollTimer != nullptr) {
@@ -344,10 +345,15 @@ void ClipboardSync::applyInboundPng(const QByteArray& payload)
         return;
     }
 
-    // Hash the wire bytes (not the decoded pixels) so the echo we suppress
-    // matches what we'd re-encode if QClipboard hands the image straight back.
+    // Record both identities *before* writing. The byte hash suppresses the
+    // immediate dataChanged echo when the platform returns our payload
+    // verbatim (Windows). macOS instead re-encodes the image flavors after
+    // the write and bumps the pasteboard changeCount a second time, handing
+    // us back bytes that never match the wire payload — the pixel hash
+    // covers that delayed echo because the re-encodes are lossless.
     uint64_t hash = hashBytes(payload);
     recordHash(hash);
+    recordImageHash(hashImagePixels(image));
     ++m_PendingSelfWrites;
 
     QMimeData* mime = new QMimeData();
@@ -406,24 +412,32 @@ void ClipboardSync::sendClipboardPng(const QByteArray& png,
         return;
     }
 
-    if (shouldTransferOutOfBand(png.size())) {
-        // Out-of-band path. Record the underlying PNG hash before
-        // upload so the echo we'll see when the host loops the REF
-        // back (and we fetch the same bytes) is suppressed.
-        uint64_t hash = hashBytes(png);
-        if (seenRecently(hash)) {
-            return;
-        }
-        recordHash(hash);
-        uploadAndSendRef(png, QStringLiteral("image/png"));
-        return;
-    }
-
     uint64_t hash = hashBytes(png);
     if (seenRecently(hash)) {
         return;
     }
+
+    // The outbound image may be the delayed echo of an image the host just
+    // pushed: the platform clipboard re-encoded it, so its bytes no longer
+    // match any recorded hash, but its pixels do. Check the pixel identity
+    // before dispatching to either the inline or the out-of-band path.
+    QImage decoded;
+    if (decoded.loadFromData(png, "PNG") && !decoded.isNull()) {
+        uint64_t pixelHash = hashImagePixels(decoded);
+        if (pixelHash != 0 && seenImageRecently(pixelHash)) {
+            return;
+        }
+        recordImageHash(pixelHash);
+    }
+
     recordHash(hash);
+
+    if (shouldTransferOutOfBand(png.size())) {
+        // Out-of-band path. The hashes recorded above suppress the echo
+        // we'll see when the host loops the REF back to us.
+        uploadAndSendRef(png, QStringLiteral("image/png"));
+        return;
+    }
 
     QByteArray frame;
     if (encodeFrame(KIND_PNG, png, frame)) {
@@ -847,6 +861,81 @@ uint64_t ClipboardSync::hashBytes(const QByteArray& bytes)
         h *= 0x100000001b3ULL;
     }
     return h;
+}
+
+uint64_t ClipboardSync::hashImagePixels(const QImage& image)
+{
+    if (image.isNull()) {
+        return 0;
+    }
+
+    // Normalize to one straight-alpha format so identical pixel content
+    // hashes identically no matter which flavor (PNG/TIFF/DIB) or Qt format
+    // it came back as. Opaque images (the overwhelmingly common clipboard
+    // case) survive every lossless conversion bit-exact; semi-transparent
+    // pixels may drift by rounding through a premultiplied intermediate,
+    // which at worst degrades back to byte-hash-only suppression.
+    const QImage canonical = image.convertToFormat(QImage::Format_RGBA8888);
+    if (canonical.isNull() || canonical.width() <= 0 || canonical.height() <= 0) {
+        return 0;
+    }
+
+    uint64_t h = 0xcbf29ce484222325ULL;
+    const auto mixBytes = [&h](const uchar* bytes, int count) {
+        for (int i = 0; i < count; ++i) {
+            h ^= bytes[i];
+            h *= 0x100000001b3ULL;
+        }
+    };
+
+    // Fold dimensions in so equal bytes under different geometry don't collide.
+    const quint32 dimensions[2] = {
+        static_cast<quint32>(canonical.width()),
+        static_cast<quint32>(canonical.height()),
+    };
+    mixBytes(reinterpret_cast<const uchar*>(dimensions), sizeof(dimensions));
+
+    // Scan row data only, skipping any per-row stride padding.
+    const int rowBytes = canonical.width() * 4;
+    for (int y = 0; y < canonical.height(); ++y) {
+        mixBytes(canonical.constScanLine(y), rowBytes);
+    }
+
+    return h;
+}
+
+bool ClipboardSync::seenImageRecently(uint64_t pixelHash)
+{
+    if (pixelHash == 0) {
+        return false;
+    }
+
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+
+    while (!m_ImageEchoCache.isEmpty()
+               && (now - m_ImageEchoCache.front().second) > ECHO_TTL_MS) {
+        m_ImageEchoCache.removeFirst();
+    }
+
+    for (const auto& e : m_ImageEchoCache) {
+        if (e.first == pixelHash) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ClipboardSync::recordImageHash(uint64_t pixelHash)
+{
+    if (pixelHash == 0) {
+        return;
+    }
+
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    m_ImageEchoCache.enqueue(qMakePair(pixelHash, now));
+    while (m_ImageEchoCache.size() > ECHO_MAX) {
+        m_ImageEchoCache.removeFirst();
+    }
 }
 
 QNetworkAccessManager* ClipboardSync::nam()
