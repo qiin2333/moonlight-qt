@@ -4,6 +4,7 @@
 #include "nvapp.h"
 #include "nvaddress.h"
 #include "remotecomputer.h"
+#include "usbforwardingcapability.h"
 
 #include <Limelight.h>
 
@@ -146,6 +147,8 @@ public:
                            int timeoutMs,
                            NvLogLevel logLevel = NvLogLevel::NVLL_VERBOSE);
 
+    UsbForwarding::Capability getUsbForwardingCapability();
+
     bool
     getAbrCapabilities(int* hostMaxBitrateKbps = nullptr);
 
@@ -224,7 +227,8 @@ private:
                    QString command,
                    QString arguments,
                    int timeoutMs,
-                   NvLogLevel logLevel);
+                   NvLogLevel logLevel,
+                   qint64 maxResponseBytes = 0);
 
     QNetworkReply*
     openJsonConnection(QUrl baseUrl,

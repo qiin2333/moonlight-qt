@@ -1398,6 +1398,10 @@
 <context>
     <name>OverlayMenuPanel</name>
     <message>
+        <source>Connecting — select to cancel</source>
+        <translation>正在連線 · 選擇此項取消</translation>
+    </message>
+    <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="159"/>
         <source>Overlay Menu</source>
         <translation>懸浮選單</translation>
@@ -2282,6 +2286,30 @@
 <context>
     <name>Session</name>
     <message>
+        <source>USB tunnel connected. Check device availability on the host.</source>
+        <translation>USB 通道已連線，請確認裝置在主機上是否可用。</translation>
+    </message>
+    <message>
+        <source>Checking host USB forwarding support</source>
+        <translation>正在檢查主機 USB 轉發支援</translation>
+    </message>
+    <message>
+        <source>Update Sunshine to use automatic USB forwarding setup.</source>
+        <translation>請更新 Sunshine 以自動設定 USB 轉發。</translation>
+    </message>
+    <message>
+        <source>Could not check host USB forwarding. Try again.</source>
+        <translation>無法檢查主機 USB 轉發，請重試。</translation>
+    </message>
+    <message>
+        <source>Enable USB forwarding in Sunshine settings and restart the host.</source>
+        <translation>請在 Sunshine 設定中啟用 USB 轉發並重新啟動主機。</translation>
+    </message>
+    <message>
+        <source>Host USB forwarding is unavailable. Check its driver and settings.</source>
+        <translation>主機 USB 轉發無法使用，請檢查驅動程式和設定。</translation>
+    </message>
+    <message>
         <location filename="../streaming/session.cpp" line="363"/>
         <source>No video received from host.</source>
         <translation>沒有接收到來自主機的視訊。</translation>
@@ -2811,6 +2839,43 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>UsbForwardingEnvironment</name>
+    <message>
+        <source>The USB forwarding driver is not running. Start VBoxUSBMon as administrator, or restart Windows.</source>
+        <translation>USB 轉發驅動未執行。請以系統管理員身分啟動 VBoxUSBMon，或重新啟動 Windows。</translation>
+    </message>
+    <message>
+        <source>The usbipd service is not running. Start the service and retry.</source>
+        <translation>usbipd 服務未執行。請啟動服務後重試。</translation>
+    </message>
+    <message>
+        <source>Could not verify the local USB service and driver. Check the usbipd-win installation.</source>
+        <translation>無法確認本機 USB 服務和驅動狀態。請檢查 usbipd-win 安裝。</translation>
+    </message>
+</context>
+<context>
+    <name>PeripheralsSettingsPage</name>
+    <message>
+        <source>USB driver not running. Start VBoxUSBMon as administrator, or restart Windows.</source>
+        <translation>USB 驅動未執行。請以系統管理員身分啟動 VBoxUSBMon，或重新啟動 Windows。</translation>
+    </message>
+    <message>
+        <source>Could not verify the USB service and driver. Check the usbipd-win installation.</source>
+        <translation>無法確認 USB 服務和驅動狀態。請檢查 usbipd-win 安裝。</translation>
+    </message>
+</context>
+<context>
+    <name>UsbForwarding::Tunnel</name>
+    <message>
+        <source>The host could not start USB forwarding.</source>
+        <translation>主機未能啟動 USB 轉發。</translation>
+    </message>
+    <message>
+        <source>The host could not start USB forwarding: %1</source>
+        <translation>主機未能啟動 USB 轉發：%1</translation>
     </message>
 </context>
 </TS>

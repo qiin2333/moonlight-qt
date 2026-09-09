@@ -30,6 +30,7 @@ Column {
                 UsbForwardingEnvironment.refresh()
             }
         }
+        onVisibleChanged: if (visible) UsbForwardingEnvironment.refresh()
 
         ToggleRow {
             title: qsTr("Enable USB device forwarding")
@@ -47,6 +48,12 @@ Column {
                     return qsTr("Checking environment…")
                 }
                 switch (UsbForwardingEnvironment.state) {
+                case UsbForwardingEnvironment.Checking:
+                    return qsTr("Checking environment…")
+                case UsbForwardingEnvironment.DriverStopped:
+                    return qsTr("USB driver not running. Start VBoxUSBMon as administrator, or restart Windows.")
+                case UsbForwardingEnvironment.CheckFailed:
+                    return qsTr("Could not verify the USB service and driver. Check the usbipd-win installation.")
                 case UsbForwardingEnvironment.Ready:
                     return qsTr("v%1 · Service running")
                         .arg(UsbForwardingEnvironment.usbipdVersion)

@@ -1,0 +1,9 @@
+QT += core
+QT -= gui
+CONFIG += c++17 console
+CONFIG -= app_bundle
+TEMPLATE = app
+TARGET = usb_forwarding_environment_test
+SOURCES += main.cpp ../../app/backend/usbforwardingenvironment.cpp
+HEADERS += ../../app/backend/usbforwardingenvironment.h
+win32:LIBS += -ladvapi32

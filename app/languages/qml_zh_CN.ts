@@ -1995,6 +1995,10 @@
         <translation>正在连接</translation>
     </message>
     <message>
+        <source>Connecting — select to cancel</source>
+        <translation>正在连接 · 选择此项取消</translation>
+    </message>
+    <message>
         <source>Connected — select to release</source>
         <translation>已连接 · 点击释放</translation>
     </message>
@@ -2234,6 +2238,14 @@
 </context>
 <context>
     <name>PeripheralsSettingsPage</name>
+    <message>
+        <source>USB driver not running. Start VBoxUSBMon as administrator, or restart Windows.</source>
+        <translation>USB 驱动未运行。请以管理员身份启动 VBoxUSBMon，或重启 Windows。</translation>
+    </message>
+    <message>
+        <source>Could not verify the USB service and driver. Check the usbipd-win installation.</source>
+        <translation>无法确认 USB 服务和驱动状态。请检查 usbipd-win 安装。</translation>
+    </message>
     <message>
         <source>USB Device Forwarding</source>
         <translation>USB 设备转发</translation>
@@ -2719,6 +2731,26 @@
 <context>
     <name>Session</name>
     <message>
+        <source>Checking host USB forwarding support</source>
+        <translation>正在检查主机 USB 转发支持</translation>
+    </message>
+    <message>
+        <source>Update Sunshine to use automatic USB forwarding setup.</source>
+        <translation>请更新 Sunshine 以自动配置 USB 转发。</translation>
+    </message>
+    <message>
+        <source>Could not check host USB forwarding. Try again.</source>
+        <translation>无法检查主机 USB 转发，请重试。</translation>
+    </message>
+    <message>
+        <source>Enable USB forwarding in Sunshine settings and restart the host.</source>
+        <translation>请在 Sunshine 设置中启用 USB 转发并重启主机。</translation>
+    </message>
+    <message>
+        <source>Host USB forwarding is unavailable. Check its driver and settings.</source>
+        <translation>主机 USB 转发不可用，请检查驱动和设置。</translation>
+    </message>
+    <message>
         <source>No video received from host.</source>
         <translation>没有从主机接收到视频画面。</translation>
     </message>
@@ -2863,8 +2895,8 @@
         <translation>已连接</translation>
     </message>
     <message>
-        <source>USB device forwarding is ready.</source>
-        <translation>USB 设备转发已就绪。</translation>
+        <source>USB tunnel connected. Check device availability on the host.</source>
+        <translation>USB 隧道已连接，请确认设备在主机上是否可用。</translation>
     </message>
     <message>
         <source>Releasing</source>
@@ -3392,12 +3424,12 @@
         <translation>主机发送了无效的 USB 隧道响应。</translation>
     </message>
     <message>
-        <source>The host refused to forward this device.</source>
-        <translation>主机拒绝转发此设备。</translation>
+        <source>The host could not start USB forwarding.</source>
+        <translation>主机未能启动 USB 转发。</translation>
     </message>
     <message>
-        <source>The host refused to forward this device: %1</source>
-        <translation>主机拒绝转发此设备：%1</translation>
+        <source>The host could not start USB forwarding: %1</source>
+        <translation>主机未能启动 USB 转发：%1</translation>
     </message>
     <message>
         <source>The USB tunnel closed before the connection was ready.</source>
@@ -3592,6 +3624,21 @@
     <message>
         <source>Learn more</source>
         <translation>了解一下</translation>
+    </message>
+</context>
+<context>
+    <name>UsbForwardingEnvironment</name>
+    <message>
+        <source>The USB forwarding driver is not running. Start VBoxUSBMon as administrator, or restart Windows.</source>
+        <translation>USB 转发驱动未运行。请以管理员身份启动 VBoxUSBMon，或重启 Windows。</translation>
+    </message>
+    <message>
+        <source>The usbipd service is not running. Start the service and retry.</source>
+        <translation>usbipd 服务未运行。请启动服务后重试。</translation>
+    </message>
+    <message>
+        <source>Could not verify the local USB service and driver. Check the usbipd-win installation.</source>
+        <translation>无法确认本地 USB 服务和驱动状态。请检查 usbipd-win 安装。</translation>
     </message>
 </context>
 </TS>

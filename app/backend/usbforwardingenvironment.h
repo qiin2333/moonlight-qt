@@ -17,11 +17,16 @@ public:
         NotInstalled,
         ServiceStopped,
         Ready,
+        DriverStopped,
+        CheckFailed,
     };
     Q_ENUM(State)
 
     static UsbForwardingEnvironment* get();
     static QString locateUsbipd();
+    // Read-only SCM queries; also used immediately before a tunnel attempt.
+    static State probeServices();
+    static QString readinessError(State state);
 
     Q_INVOKABLE void refresh();
 

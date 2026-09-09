@@ -15,6 +15,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <memory>
 
 #define FAST_FAIL_TIMEOUT_MS 2000
 #define REQUEST_TIMEOUT_MS 5000
@@ -602,6 +603,26 @@ NvHTTP::openConnectionToString(QUrl baseUrl,
     return ret;
 }
 
+UsbForwarding::Capability NvHTTP::getUsbForwardingCapability()
+{
+    if (m_ServerCert.isNull() || httpsPort() == 0) {
+        throw GfeHttpResponseException(401, "USB forwarding requires a paired host");
+    }
+    std::unique_ptr<QNetworkReply> reply(openConnection(m_BaseUrlHttps,
+        "api/v1/usb-forwarding", QString(), 5000, NVLL_NONE, 4096));
+    // A normally trusted certificate may not emit sslErrors at all. Require
+    // the paired leaf certificate even on that path before accepting credentials.
+    if (reply->sslConfiguration().peerCertificate() != m_ServerCert) {
+        throw GfeHttpResponseException(401, "USB forwarding host certificate mismatch");
+    }
+    if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() != 200) {
+        throw GfeHttpResponseException(400, "USB capability request failed");
+    }
+    const auto capability = UsbForwarding::Capability::parse(reply->readAll());
+    if (!capability) throw GfeHttpResponseException(400, "Invalid USB capability response");
+    return *capability;
+}
+
 bool
 NvHTTP::getAbrCapabilities(int* hostMaxBitrateKbps)
 {
@@ -669,7 +690,8 @@ NvHTTP::openConnection(QUrl baseUrl,
                        QString command,
                        QString arguments,
                        int timeoutMs,
-                       NvLogLevel logLevel)
+                       NvLogLevel logLevel,
+                       qint64 maxResponseBytes)
 {
     // Port must be set
     Q_ASSERT(baseUrl.port(0) != 0);
@@ -697,6 +719,11 @@ NvHTTP::openConnection(QUrl baseUrl,
 
     QNetworkRequest request(url);
 
+    if (maxResponseBytes > 0) {
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                             QNetworkRequest::ManualRedirectPolicy);
+    }
+
     // Add our client certificate
     request.setSslConfiguration(IdentityManager::get()->getSslConfig());
 
@@ -717,6 +744,16 @@ NvHTTP::openConnection(QUrl baseUrl,
 
     // Run the request with a timeout if requested
     QEventLoop loop;
+    bool oversized = false;
+    if (maxResponseBytes > 0) {
+        reply->setReadBufferSize(maxResponseBytes + 1);
+        connect(reply, &QNetworkReply::readyRead, &loop, [&] {
+            if (reply->bytesAvailable() > maxResponseBytes) {
+                oversized = true;
+                reply->abort();
+            }
+        });
+    }
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, &loop, &QEventLoop::quit);
     if (timeoutMs) {
@@ -743,6 +780,10 @@ NvHTTP::openConnection(QUrl baseUrl,
     disconnect(sslErrorsConnection);
 
     // Handle error
+    if (oversized) {
+        delete reply;
+        throw GfeHttpResponseException(400, "USB capability response too large");
+    }
     if (reply->error() != QNetworkReply::NoError)
     {
         if (logLevel >= NvLogLevel::NVLL_ERROR) {

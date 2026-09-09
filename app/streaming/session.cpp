@@ -13,6 +13,7 @@
 #include "backend/nvhttp.h"
 #include "backend/identitymanager.h"
 #include "backend/usbforwardingbackend.h"
+#include "backend/usbforwardingenvironment.h"
 #include "gui/windowsdisplaygeometry.h"
 
 #include <Limelight.h>
@@ -21,6 +22,7 @@
 #include "utils.h"
 #include <QCoreApplication>
 #include <QHostInfo>
+#include <QThread>
 
 #ifdef HAVE_FFMPEG
 #include "video/ffmpeg.h"
@@ -1337,8 +1339,13 @@ void Session::enumerateRemoteUsb()
         refreshRemoteUsbDevices();
         return;
     }
-    m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Discovering;
-    m_RemoteUsbDetail = tr("Scanning");
+    // Refreshing the list must not hide the active operation or its Stop action.
+    if (m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Open &&
+        m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Opening &&
+        m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Stopping) {
+        m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Discovering;
+        m_RemoteUsbDetail = tr("Scanning");
+    }
     updateRemoteUsbMenuState();
 
     UsbForwardingBackend* backend = UsbForwardingBackend::get();
@@ -1355,7 +1362,7 @@ void Session::startRemoteUsb(const QString &deviceId)
     if (!m_Preferences->usbForwardingEnabled || deviceId.isEmpty()) {
         return;
     }
-    if (m_UsbTunnel != nullptr) {
+    if (m_UsbTunnel != nullptr || m_UsbCapabilityPending) {
         showStreamingToast(tr("Another USB device is already being forwarded."),
                            3000);
         return;
@@ -1376,31 +1383,20 @@ void Session::startRemoteUsb(const QString &deviceId)
     UsbForwarding::TunnelConfig config;
     config.busId = deviceId.toUtf8();
 
-    /* Port/token negotiation is not implemented yet. Both processes currently
-     * use matching environment overrides to configure the USB endpoint. */
-    const QString portOverride =
-        qEnvironmentVariable("MOONLIGHT_USB_TUNNEL_PORT").trimmed();
-    const QByteArray tokenOverride =
-        qEnvironmentVariable("MOONLIGHT_USB_TUNNEL_TOKEN").trimmed().toUtf8();
-    if (portOverride.isEmpty() || tokenOverride.isEmpty()) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "USB tunnel: env override missing (port=%d token=%d)",
-                    !portOverride.isEmpty(), !tokenOverride.isEmpty());
-        showStreamingToast(
-            tr("USB forwarding is not configured on this client."), 4000);
-        return;
-    }
-    config.port = static_cast<quint16>(portOverride.toUShort());
-    config.sessionToken = tokenOverride;
-
     IdentityManager* identity = IdentityManager::get();
     if (identity == nullptr || m_Computer == nullptr) {
         showStreamingToast(tr("USB forwarding is unavailable for this host."),
                            3000);
         return;
     }
+    NvAddress address;
+    uint16_t httpsPort;
+    QString uuid;
     {
         QReadLocker locker(&m_Computer->lock);
+        address = m_Computer->activeAddress;
+        httpsPort = m_Computer->activeHttpsPort;
+        uuid = m_Computer->uuid;
         config.host = m_Computer->activeAddress.address();
         config.pinnedServerCertificate = m_Computer->serverCert;
     }
@@ -1408,15 +1404,71 @@ void Session::startRemoteUsb(const QString &deviceId)
 
     m_RemoteUsbActiveDeviceId = deviceId;
     m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Opening;
-    m_RemoteUsbDetail = tr("Connecting");
+    m_RemoteUsbDetail = tr("Checking host USB forwarding support");
+    m_UsbCapabilityPending = true;
+    const auto generation = ++m_UsbCapabilityGeneration;
     updateRemoteUsbMenuState();
 
+    struct Result {
+        std::optional<UsbForwarding::Capability> capability;
+        bool hostUpdateRequired = false;
+        QString localError;
+    };
+    auto result = std::make_shared<Result>();
+    // Capture a connection snapshot, never Session or NvComputer, on the worker.
+    auto worker = QThread::create([result, address, httpsPort, uuid,
+                                  certificate = config.pinnedServerCertificate] {
+        result->localError = UsbForwardingEnvironment::readinessError(
+            UsbForwardingEnvironment::probeServices());
+        if (!result->localError.isEmpty()) return;
+        try {
+            NvHTTP http(address, httpsPort, certificate, true, nullptr, uuid);
+            result->capability = http.getUsbForwardingCapability();
+        } catch (const QtNetworkReplyException& error) {
+            result->hostUpdateRequired = error.getError() == QNetworkReply::ContentNotFoundError;
+        } catch (const std::exception&) {
+            // Never surface/log a response body that could contain credentials.
+        }
+    });
+    connect(worker, &QThread::finished, this,
+            [this, result, generation, config = std::move(config)]() mutable {
+        if (generation != m_UsbCapabilityGeneration) return;
+        m_UsbCapabilityPending = false;
+        if (!m_Preferences->usbForwardingEnabled) {
+            teardownUsbTunnel();
+            return;
+        }
+        if (!result->localError.isEmpty() || !result->capability || !result->capability->available) {
+            const QString message = !result->localError.isEmpty() ? result->localError : result->hostUpdateRequired
+                ? tr("Update Sunshine to use automatic USB forwarding setup.")
+                : !result->capability ? tr("Could not check host USB forwarding. Try again.")
+                : result->capability->reason == QStringLiteral("disabled")
+                    ? tr("Enable USB forwarding in Sunshine settings and restart the host.")
+                    : tr("Host USB forwarding is unavailable. Check its driver and settings.");
+            teardownUsbTunnel();
+            m_RemoteUsbDetail = message;
+            updateRemoteUsbMenuState();
+            showStreamingToast(message, 5000);
+            return;
+        }
+        config.port = result->capability->port;
+        config.sessionToken = result->capability->token;
+        startConfiguredRemoteUsb(std::move(config));
+    });
+    connect(worker, &QThread::finished, worker, &QObject::deleteLater);
+    worker->start();
+}
+
+void Session::startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config)
+{
+    m_RemoteUsbDetail = tr("Connecting");
+    updateRemoteUsbMenuState();
     m_UsbTunnel = new UsbForwarding::Tunnel(std::move(config), this);
     connect(m_UsbTunnel, &UsbForwarding::Tunnel::forwarding, this, [this] {
         m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Open;
         m_RemoteUsbDetail = tr("Connected");
         updateRemoteUsbMenuState();
-        showStreamingToast(tr("USB device forwarding is ready."), 3000);
+        showStreamingToast(tr("USB tunnel connected. Check device availability on the host."), 4000);
     });
     connect(m_UsbTunnel, &UsbForwarding::Tunnel::finished,
             this, [this](const QString& message) {
@@ -1437,7 +1489,7 @@ void Session::startRemoteUsb(const QString &deviceId)
 
 void Session::stopRemoteUsb()
 {
-    if (m_UsbTunnel == nullptr) {
+    if (m_UsbTunnel == nullptr && !m_UsbCapabilityPending) {
         return;
     }
     m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Stopping;
@@ -1448,6 +1500,8 @@ void Session::stopRemoteUsb()
 
 void Session::teardownUsbTunnel()
 {
+    ++m_UsbCapabilityGeneration;
+    m_UsbCapabilityPending = false;
     if (m_UsbTunnel != nullptr) {
         m_UsbTunnel->disconnect(this);
         m_UsbTunnel->stop();

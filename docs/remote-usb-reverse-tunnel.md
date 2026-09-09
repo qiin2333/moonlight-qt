@@ -10,23 +10,53 @@ USB 设备 → usbipd-win → Moonlight Tunnel → TLS → Sunshine reverse_tunn
 
 - Windows 客户端：`UsbForwardingBackend` 管理 usbipd-win 的设备共享与枚举。
 - Windows 主机：`usbip_host_controller` 调用 usbip-win2。
-- Linux、Android 的 USB/IP 服务器可复用相同传输协议，但本 PR 没有实现相应客户端平台集成；不能据此宣称已支持。
+- Android 客户端在 moonlight-vplus 工程中集成独立的 USB/IP 导出后端，使用同一能力接口和隧道协议；本 Qt 工程不提供 Android 或 Linux 客户端 USB 后端。
 - Linux 主机 controller 当前返回 unsupported。macOS 没有本 PR 可用的 USB/IP 后端。
 
 ## 鉴权与配置
 
 Moonlight 使用配对时保存的客户端证书/私钥，并验证 Sunshine 的证书与配对 pin 完全一致。通过 IP 连接时不要求证书 CN 等于 IP；任何不同的证书仍被拒绝。Sunshine 要求客户端出示已配对证书，并校验 JSON 中的共享 token。
 
-目前端口和 token **尚未通过 RTSP 协商**，开发测试需要在启动对应进程前设置：
+Qt 和 Android 统一通过已配对、固定主机证书的 HTTPS 连接请求
+`GET /api/v1/usb-forwarding`，不再读取端口/token 环境变量。接口版本为 1，
+响应上限 4096 字节，包含 `enabled`、`available`、`reason`；只有可用时才返回
+`port`（1–65535 的整数）和 `token`（64 位十六进制字符串）。
+`available` 表示主机隧道服务可接入，不代表驱动已正常导入设备；设备可用性须在实际导入后验证。
+能力请求不跟随重定向，5 秒内结束；即使证书受系统 CA 信任，也必须与配对证书完全匹配。
 
-| Sunshine | Moonlight |
-|---|---|
-| `SUNSHINE_USB_TUNNEL_PORT`（默认 47996） | `MOONLIGHT_USB_TUNNEL_PORT` |
-| `SUNSHINE_USB_TUNNEL_TOKEN` | `MOONLIGHT_USB_TUNNEL_TOKEN` |
+Sunshine 默认关闭转发；在 Web 设置的输入页启用 `usb_forwarding_enabled`，
+保存并重启后生效。`usb_forwarding_port` 默认 0（自动使用主端口 +7，通常为 47996）；
+显式填写 1024–65535 可覆盖，客户端始终使用能力接口公布的实际端口。主机必须安装 usbip-win2
+及匹配驱动，跨网络使用还需允许/转发对应 TCP 端口，不自动配置路由器。
 
-两端值必须一致。不要把 token、私钥或用户配对状态提交到仓库。当前环境变量 token 不是自动生成的逐会话凭据；未来 RTSP 协商和主机会话生命周期绑定需要单独实现。
+Qt 用户先在设置中启用 USB 转发，并通过设备管理将要使用的外设共享（绑定）；
+开始串流后，在 USB 菜单中明确选择设备才获取凭据、启动隧道。
+关闭共享或结束串流会释放导入；取消期间未完成的凭据请求不能重新启动共享。
+主机重启后再次选择设备会重新获取凭据。
+
+token 仅保存在内存中，按主机进程生命周期生成和轮换，不是逐串流令牌。
+接口要求客户端仍在配对列表中，返回 `Cache-Control: no-store`；实际隧道再次校验
+配对证书和 token。不要把 token、私钥或用户配对状态写入日志或提交到仓库。
+本功能信任获准转发的已配对客户端，不承诺任意 USB 类别均可安全或可靠使用。
 
 ## 建立连接
+
+Windows 客户端在设置页以及每次连接前，通过只读 SCM 查询同时检查 `usbipd`
+服务和 `VBoxUSBMon` 驱动；查询失败或任一未运行时不启动隧道。该检查只是必要条件，
+不能证明实际 import 成功。服务运行、设备已共享、TLS ready、设备导入成功是不同状态。
+
+### 2026-09-09 本机复测（未完成验收）
+
+正常 PIN 配对、重启 Qt 后配对保留、运行时能力获取及 K380 导入均已实测；
+主机记录 hub port 1，11 个相关 PnP 节点正常。实际按键、停止回收、重连和退出清理
+尚未在这轮正式配置流程中完成验收；悬浮菜单还存在待定位的关闭/交互问题。
+
+测试环境曾缺少 `usbipd` 对 `VBoxUSBMon` 的服务依赖，导致驱动不启动及
+`CreateFile` 错误；随后出现原生 attach 超时、主机退出超时和服务启动文件占用。
+重启系统、补回依赖并启动驱动后导入成功。这些环境操作不由客户端自动执行，
+也不能据此宣称此前所有超时根因已解决。客户端只增加只读预检和准确的失败提示。
+
+### 连接步骤
 
 1. Moonlight 连接本机 USB/IP 服务器（默认 `127.0.0.1:3240`），并连接 Sunshine TLS 端口。
 2. 验证配对证书后发送一行 JSON：

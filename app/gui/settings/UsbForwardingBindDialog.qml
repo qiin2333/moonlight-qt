@@ -14,7 +14,7 @@ NavigableDialog {
 
     title: qsTr("Share USB devices")
     closePolicy: Popup.CloseOnEscape
-    width: Math.max(360, Math.min(600, Overlay.overlay.width - Theme.spaceLg * 2))
+    width: Math.max(360, Math.min(600, (Overlay.overlay ? Overlay.overlay.width : 600) - Theme.spaceLg * 2))
     standardButtons: Dialog.Close
 
     property string statusText: ""
