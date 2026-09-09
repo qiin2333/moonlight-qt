@@ -491,7 +491,7 @@ OverlayMenuPanel::SliderRowRects OverlayMenuPanel::sliderRowRects(int contentWid
     return r;
 }
 
-OverlayMenuPanel::SliderZone OverlayMenuPanel::sliderZoneAt(const QPoint& localPos, int rowIdx) const
+OverlayMenuPanel::SliderZone OverlayMenuPanel::sliderZoneAt(const QPoint& windowPos, int rowIdx) const
 {
     const auto& items = m_MenuLevels[m_CurrentLevel].items;
     if (rowIdx < 0 || rowIdx >= (int)items.size()
@@ -499,13 +499,15 @@ OverlayMenuPanel::SliderZone OverlayMenuPanel::sliderZoneAt(const QPoint& localP
         return SliderZone::None;
     }
 
+    // Row rects live in content coordinates; callers hand us window coords.
+    const QPoint contentPos = windowPos - QPoint(m_ShadowMargin, m_ShadowMargin);
     const int itemY = m_TitleHeight + m_Padding + rowIdx * m_ItemHeight;
     const SliderRowRects r = sliderRowRects(width() - 2 * m_ShadowMargin, itemY);
 
     // Buttons win over the track so their hit area feels solid.
-    if (r.minus.adjusted(-2, -2, 2, 2).contains(localPos)) return SliderZone::Minus;
-    if (r.plus.adjusted(-2, -2, 2, 2).contains(localPos)) return SliderZone::Plus;
-    if (QRect(r.track.x() - 4, itemY, r.track.width() + 8, m_ItemHeight).contains(localPos)) {
+    if (r.minus.adjusted(-2, -2, 2, 2).contains(contentPos)) return SliderZone::Minus;
+    if (r.plus.adjusted(-2, -2, 2, 2).contains(contentPos)) return SliderZone::Plus;
+    if (QRect(r.track.x() - 4, itemY, r.track.width() + 8, m_ItemHeight).contains(contentPos)) {
         return SliderZone::Track;
     }
     return SliderZone::None;
@@ -697,6 +699,9 @@ void OverlayMenuPanel::showInternal()
     m_CurrentLevel = 0;
     m_HoveredIndex = -1;
     m_ContentOffset = 0;
+    m_SliderDragging = false;
+    m_SliderPressedZone = SliderZone::None;
+    m_SliderHotZone = SliderZone::None;
 
     // If closing animation is in progress, cancel it
     if (m_Closing) {
@@ -885,6 +890,15 @@ void OverlayMenuPanel::closeMenu()
     m_Visible = false;
     m_Closing = true;
     m_HoveredIndex = -1;
+
+    // A close can land mid-drag (e.g. window focus loss). Drop the drag and
+    // the mouse grab so the next show doesn't treat motion as scrubbing.
+    if (m_SliderDragging) {
+        m_SliderDragging = false;
+        setMouseGrabEnabled(false);
+    }
+    m_SliderPressedZone = SliderZone::None;
+    m_SliderHotZone = SliderZone::None;
 
     // Stop any show/level animations
     m_SlideAnim->stop();
@@ -1241,7 +1255,8 @@ void OverlayMenuPanel::mouseMoveEvent(QMouseEvent* event)
             if (items[i].type != MenuItemType::Slider) continue;
             const int itemY = m_TitleHeight + m_Padding + i * m_ItemHeight;
             const SliderRowRects r = sliderRowRects(width() - 2 * m_ShadowMargin, itemY);
-            const double frac = (pos.x() - r.track.x()) / double(r.track.width());
+            const double frac = (pos.x() - m_ShadowMargin - r.track.x())
+                                    / double(r.track.width());
             setBitrateFromFraction(frac);
             break;
         }
@@ -1323,7 +1338,8 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
             const SliderRowRects r = sliderRowRects(width() - 2 * m_ShadowMargin, itemY);
             m_SliderDragging = true;
             setMouseGrabEnabled(true);
-            const double frac = (pos.x() - r.track.x()) / double(r.track.width());
+            const double frac = (pos.x() - m_ShadowMargin - r.track.x())
+                                    / double(r.track.width());
             setBitrateFromFraction(frac);
         }
         forceRepaint();
