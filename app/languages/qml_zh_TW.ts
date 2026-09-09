@@ -2303,7 +2303,7 @@
     </message>
     <message>
         <source>Enable USB forwarding in Sunshine settings and restart the host.</source>
-        <translation>請在 Sunshine 設定中啟用 USB 轉發並重新啟動 Sunshine。</translation>
+        <translation>請在 Sunshine 設定中啟用 USB 轉發並重新啟動主機。</translation>
     </message>
     <message>
         <source>Host USB forwarding is unavailable. Check its driver and settings.</source>

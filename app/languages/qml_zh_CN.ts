@@ -2744,7 +2744,7 @@
     </message>
     <message>
         <source>Enable USB forwarding in Sunshine settings and restart the host.</source>
-        <translation>请在 Sunshine 设置中启用 USB 转发并重启 Sunshine。</translation>
+        <translation>请在 Sunshine 设置中启用 USB 转发并重启主机。</translation>
     </message>
     <message>
         <source>Host USB forwarding is unavailable. Check its driver and settings.</source>
