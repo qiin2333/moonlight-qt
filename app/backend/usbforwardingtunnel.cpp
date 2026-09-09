@@ -246,8 +246,8 @@ void Tunnel::handleRemoteReadyRead()
             const QString reason =
                 reply.value(QStringLiteral("reason")).toString();
             failWith(reason.isEmpty()
-                         ? tr("The host refused to forward this device.")
-                         : tr("The host refused to forward this device: %1")
+                         ? tr("The host could not start USB forwarding.")
+                         : tr("The host could not start USB forwarding: %1")
                                .arg(reason));
             return;
         }

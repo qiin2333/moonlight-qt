@@ -339,6 +339,7 @@ private:
     void refreshRemoteUsbDevices();
     void enumerateRemoteUsb();
     void startRemoteUsb(const QString &deviceId);
+    void startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config);
     void stopRemoteUsb();
     void teardownUsbTunnel();
 
@@ -431,6 +432,8 @@ private:
      * session. m_RemoteUsbDevices mirrors the bound-device list from
      * UsbForwardingBackend and feeds the overlay menu. */
     UsbForwarding::Tunnel *m_UsbTunnel = nullptr;
+    quint64 m_UsbCapabilityGeneration = 0;
+    bool m_UsbCapabilityPending = false;
     std::vector<OverlayMenuPanel::RemoteUsbDevice> m_RemoteUsbDevices;
     OverlayMenuPanel::RemoteUsbState m_RemoteUsbState =
         OverlayMenuPanel::RemoteUsbState::Unavailable;

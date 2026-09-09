@@ -5,6 +5,10 @@
 #include <QStandardPaths>
 #include <QTimer>
 
+#ifdef Q_OS_WIN32
+#include <windows.h>
+#endif
+
 UsbForwardingEnvironment::UsbForwardingEnvironment(QObject *parent)
     : QObject(parent)
 {
@@ -89,33 +93,50 @@ void UsbForwardingEnvironment::startVersionProbe(const QString &usbipdExe)
 
 void UsbForwardingEnvironment::startServiceProbe()
 {
-    QProcess *probe = new QProcess(this);
-    /* FailedToStart emits errorOccurred but never finished; handle it so a
-     * missing sc.exe cannot wedge the probe. */
-    connect(probe, &QProcess::errorOccurred, this,
-            [this, probe](QProcess::ProcessError processError) {
-        if (processError != QProcess::FailedToStart) {
-            return;
-        }
-        probe->deleteLater();
-        finish(ServiceStopped);
-    });
-    connect(probe, &QProcess::finished, this, [this, probe](int exitCode) {
-        probe->deleteLater();
-        const bool running =
-            exitCode == 0 &&
-            QString::fromLocal8Bit(probe->readAllStandardOutput())
-                .contains(QLatin1String("RUNNING"));
-        finish(running ? Ready : ServiceStopped);
-    });
-    QTimer::singleShot(8000, probe, &QProcess::kill);
+    finish(probeServices());
+}
+
+UsbForwardingEnvironment::State UsbForwardingEnvironment::probeServices()
+{
 #ifdef Q_OS_WIN32
-    probe->start(QStringLiteral("sc.exe"),
-                 {QStringLiteral("query"), QStringLiteral("usbipd")});
+    const SC_HANDLE manager = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+    if (!manager) return CheckFailed;
+    State result = Ready;
+    const struct { const wchar_t* name; State stopped; } services[] = {
+        {L"usbipd", ServiceStopped}, {L"VBoxUSBMon", DriverStopped}
+    };
+    for (const auto& entry : services) {
+        const SC_HANDLE service = OpenServiceW(manager, entry.name, SERVICE_QUERY_STATUS);
+        if (!service) {
+            result = CheckFailed;
+            break;
+        }
+        SERVICE_STATUS status {};
+        const bool queried = QueryServiceStatus(service, &status) != FALSE;
+        CloseServiceHandle(service);
+        if (!queried || status.dwCurrentState != SERVICE_RUNNING) {
+            result = queried ? entry.stopped : CheckFailed;
+            break;
+        }
+    }
+    CloseServiceHandle(manager);
+    return result;
 #else
-    probe->deleteLater();
-    finish(ServiceStopped);
+    return NotInstalled;
 #endif
+}
+
+QString UsbForwardingEnvironment::readinessError(State state)
+{
+    switch (state) {
+    case Ready: return {};
+    case DriverStopped:
+        return tr("The USB forwarding driver is not running. Start VBoxUSBMon as administrator, or restart Windows.");
+    case ServiceStopped:
+        return tr("The usbipd service is not running. Start the service and retry.");
+    default:
+        return tr("Could not verify the local USB service and driver. Check the usbipd-win installation.");
+    }
 }
 
 void UsbForwardingEnvironment::finish(State state)

@@ -307,6 +307,7 @@ HEADERS += \
     backend/identitymanager.h \
     backend/nvcomputer.h \
     backend/nvhttp.h \
+    backend/usbforwardingcapability.h \
     backend/nvpairingmanager.h \
     backend/computermanager.h \
     backend/boxartmanager.h \
