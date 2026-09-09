@@ -1399,7 +1399,7 @@
     <name>OverlayMenuPanel</name>
     <message>
         <source>Connecting — select to cancel</source>
-        <translation>正在連線 · 點擊取消</translation>
+        <translation>正在連線 · 選擇此項取消</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="159"/>

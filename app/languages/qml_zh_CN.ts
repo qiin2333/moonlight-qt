@@ -1996,7 +1996,7 @@
     </message>
     <message>
         <source>Connecting — select to cancel</source>
-        <translation>正在连接 · 点击取消</translation>
+        <translation>正在连接 · 选择此项取消</translation>
     </message>
     <message>
         <source>Connected — select to release</source>
