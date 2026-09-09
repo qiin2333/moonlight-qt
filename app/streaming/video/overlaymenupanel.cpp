@@ -21,10 +21,11 @@ const QColor MenuFaint("#7E858E");
 const QColor MenuAccent("#39C5BB");
 const QColor MenuDanger("#FF876F");
 
-// Bitrate scrubber range and granularity — same log scale as the settings
-// page slider (HardSlider over log(500)..log(2000000)).
+// Bitrate scrubber range and granularity — log scale like the settings page
+// slider. The maximum matches Sunshine's /bitrate runtime endpoint cap
+// (800000 Kbps); higher values would be rejected by the host.
 constexpr int kBitrateMinKbps = 500;
-constexpr int kBitrateMaxKbps = 2000000;
+constexpr int kBitrateMaxKbps = 800000;
 constexpr int kBitrateLogSteps = 200;
 const double kBitrateLogSpan = qLn(kBitrateMaxKbps / double(kBitrateMinKbps));
 // Idle window after the last scrub tick before the change is committed.

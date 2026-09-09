@@ -162,6 +162,15 @@ int main(int argc, char **argv)
     panel.gamepadSelect();
     if (bitrateCommits != 3 || lastBitrate <= afterScrub) qFatal("wheel step not flushed");
     if (!panel.isMenuVisible()) qFatal("slider interaction closed the menu");
+    // Saturating the wheel must clamp at the Sunshine /bitrate cap (800 Mbps).
+    for (int i = 0; i < 250; i++) {
+        QWheelEvent wheelMax(QPointF(140, 8 + 32 + 4 + 19), QPointF(),
+                             QPoint(), QPoint(0, 120), Qt::NoButton, Qt::NoModifier,
+                             Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(&panel, &wheelMax);
+    }
+    panel.gamepadSelect();
+    if (lastBitrate != 800000) qFatal("scrubber did not clamp at 800000 Kbps");
     panel.dismissOnOutsideClick(QPoint(-100, -100));
     QTest::qWait(220);
     if (panel.isVisible()) qFatal("outside click after slider use failed to dismiss");
