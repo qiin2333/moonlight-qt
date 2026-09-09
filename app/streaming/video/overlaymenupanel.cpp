@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QCursor>
 #include <QFontMetrics>
+#include <QtMath>
 #include <memory>
 
 namespace {
@@ -1382,7 +1383,9 @@ void OverlayMenuPanel::wheelEvent(QWheelEvent* event)
         return;
     }
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    // QWheelEvent::pos() is unavailable on the SteamLink Qt 5.14 build;
+    // position() exists everywhere from 5.14 on.
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
     const QPoint pos = event->position().toPoint();
 #else
     const QPoint pos = event->pos();
