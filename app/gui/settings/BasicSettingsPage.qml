@@ -615,8 +615,9 @@ Column {
                     width: parent.width
 
                     // 使用对数刻度来实现非线性调整
+                    // 上限对齐 Sunshine /bitrate 接口的 800000 Kbps 拒绝线
                     property real logMin: Math.log(500)
-                    property real logMax: Math.log(2000000)
+                    property real logMax: Math.log(800000)
 
                     value: Math.log(StreamingPreferences.bitrateKbps)
                     stepSize: (logMax - logMin) / 200

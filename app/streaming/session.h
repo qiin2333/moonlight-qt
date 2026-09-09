@@ -218,6 +218,7 @@ private:
     void syncQtOverlayWindowsWithSdlWindowState();
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
+    void startRuntimeBitrateWorker();
     void showStreamingToast(const QString& message, int durationMs = 2000);
     void processQtOverlayEvents();
     void updateFileMappingMenuState();
@@ -409,6 +410,10 @@ private:
     RTP_VIDEO_STATS m_LastAbrVideoStats;
     std::shared_ptr<std::atomic_bool> m_AbrFeedbackInFlight;
     std::shared_ptr<std::atomic_int> m_AbrCurrentBitrateKbps;
+    // Runtime bitrate requests coalesce here; a single background worker
+    // applies the newest value so HTTP never blocks the stream loop.
+    std::atomic_int m_PendingRuntimeBitrateKbps { 0 };
+    std::atomic_bool m_RuntimeBitrateInFlight { false };
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
     OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification

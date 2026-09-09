@@ -2778,36 +2778,9 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
         return;
     }
 
-    // --- Bitrate presets ---
-    case OverlayMenuPanel::MenuAction::SetBitrate1000:
-    case OverlayMenuPanel::MenuAction::SetBitrate2000:
-    case OverlayMenuPanel::MenuAction::SetBitrate5000:
-    case OverlayMenuPanel::MenuAction::SetBitrate10000:
-    case OverlayMenuPanel::MenuAction::SetBitrate20000:
-    case OverlayMenuPanel::MenuAction::SetBitrate30000:
-    case OverlayMenuPanel::MenuAction::SetBitrate50000:
-    case OverlayMenuPanel::MenuAction::SetBitrate100000:
-    {
-        static const int kBitrateMap[] = {
-            1000, 2000, 5000, 10000, 20000, 30000, 50000, 100000
-        };
-        int idx = (int)action - (int)OverlayMenuPanel::MenuAction::SetBitrate1000;
-        if (idx >= 0 && idx < 8) {
-            int newBitrate = kBitrateMap[idx];
-            // Save preference for future sessions
-            m_Preferences->bitrateKbps = newBitrate;
-            m_Preferences->save();
-            // Try to change bitrate in the current session via Sunshine API
-            requestRuntimeBitrateChange(newBitrate);
-            // Show toast notification
-            if (newBitrate >= 1000) {
-                showStreamingToast(QString("Bitrate: %1 Mbps").arg(newBitrate / 1000));
-            } else {
-                showStreamingToast(QString("Bitrate: %1 Kbps").arg(newBitrate));
-            }
-        }
-        return;
-    }
+    // --- Bitrate ---
+    // Adjustments from the overlay menu (scrubber row + presets) arrive via
+    // the panel's bitrate change callback; nothing to dispatch here.
 
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
     case OverlayMenuPanel::MenuAction::OpenStylusReplayPanel:
@@ -3000,50 +2973,97 @@ void Session::requestRuntimeBitrateChange(int bitrateKbps)
         return;
     }
 
-    try {
-        NvHTTP http(m_Computer);
+    // Coalesce rapid slider commits. A worker applying earlier values picks
+    // up the newest pending one via startRuntimeBitrateWorker() on finish,
+    // so the synchronous HTTP request never runs on the stream loop.
+    m_PendingRuntimeBitrateKbps.store(bitrateKbps, std::memory_order_release);
+    if (m_RuntimeBitrateInFlight.exchange(true, std::memory_order_acq_rel)) {
+        return;
+    }
+    startRuntimeBitrateWorker();
+}
 
-        // Build clientname the same way as openConnection() does for /launch
-        QString clientname = QHostInfo::localHostName();
-        if (!m_Computer->uuid.isEmpty()) {
-            QString pairname = NvComputer::getPairname(m_Computer->uuid);
-            if (!pairname.isEmpty()) {
-                clientname = pairname;
-            }
+void Session::startRuntimeBitrateWorker()
+{
+    // Snapshot the connection under lock; the worker never touches Session
+    // or NvComputer (same pattern as startRemoteUsb()).
+    NvAddress address;
+    uint16_t httpsPort;
+    QString uuid;
+    QSslCertificate certificate;
+    {
+        QReadLocker locker(&m_Computer->lock);
+        address = m_Computer->activeAddress;
+        httpsPort = m_Computer->activeHttpsPort;
+        uuid = m_Computer->uuid;
+        certificate = m_Computer->serverCert;
+    }
+
+    // Build clientname the same way as openConnection() does for /launch
+    QString clientname = QHostInfo::localHostName();
+    if (!uuid.isEmpty()) {
+        QString pairname = NvComputer::getPairname(uuid);
+        if (!pairname.isEmpty()) {
+            clientname = pairname;
         }
-
-        QString args = QString("bitrate=%1&clientname=%2")
-                           .arg(bitrateKbps)
-                           .arg(clientname);
-
-        QString response = http.openConnectionToString(
-            http.m_BaseUrlHttps,
-            "bitrate",
-            args,
-            5000,
-            NvHTTP::NVLL_VERBOSE);
-
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Runtime bitrate change to %d kbps: %s",
-                    bitrateKbps,
-                    response.toUtf8().constData());
-
-        m_AbrCurrentBitrateKbps->store(bitrateKbps);
     }
-    catch (const GfeHttpResponseException& e) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Runtime bitrate change failed (HTTP): %s",
-                     e.toQString().toUtf8().constData());
-    }
-    catch (const QtNetworkReplyException& e) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Runtime bitrate change failed (Network): %s",
-                     e.toQString().toUtf8().constData());
-    }
-    catch (...) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Runtime bitrate change failed: unknown error");
-    }
+
+    auto bitrateToApply = std::make_shared<int>(
+        m_PendingRuntimeBitrateKbps.exchange(0, std::memory_order_acq_rel));
+    auto appliedBitrate = std::make_shared<std::atomic_int>(-1);
+
+    auto worker = QThread::create([bitrateToApply, appliedBitrate, address, httpsPort,
+                                   uuid, certificate, clientname] {
+        try {
+            NvHTTP http(address, httpsPort, certificate, true, nullptr, uuid);
+            QString args = QString("bitrate=%1&clientname=%2")
+                               .arg(*bitrateToApply)
+                               .arg(clientname);
+            QString response = http.openConnectionToString(
+                http.m_BaseUrlHttps,
+                "bitrate",
+                args,
+                5000,
+                NvHTTP::NVLL_VERBOSE);
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Runtime bitrate change to %d kbps: %s",
+                        *bitrateToApply,
+                        response.toUtf8().constData());
+            appliedBitrate->store(*bitrateToApply);
+        }
+        catch (const GfeHttpResponseException& e) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "Runtime bitrate change failed (HTTP): %s",
+                         e.toQString().toUtf8().constData());
+        }
+        catch (const QtNetworkReplyException& e) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "Runtime bitrate change failed (Network): %s",
+                         e.toQString().toUtf8().constData());
+        }
+        catch (...) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "Runtime bitrate change failed: unknown error");
+        }
+    });
+    connect(worker, &QThread::finished, this, [this, appliedBitrate]() {
+        const int applied = appliedBitrate->load();
+        if (applied > 0) {
+            m_AbrCurrentBitrateKbps->store(applied);
+            showStreamingToast(tr("Bitrate: %1").arg(
+                    OverlayMenuPanel::formatBitrateKbps(applied)));
+        }
+        // Commits that landed mid-flight are still pending; apply the
+        // newest one before going idle.
+        if (m_PendingRuntimeBitrateKbps.load(std::memory_order_acquire) != 0) {
+            startRuntimeBitrateWorker();
+        }
+        else {
+            m_RuntimeBitrateInFlight.store(false, std::memory_order_release);
+        }
+    });
+    connect(worker, &QThread::finished, worker, &QObject::deleteLater);
+    worker->start();
 }
 
 void Session::startSunshineAbr()
@@ -4676,6 +4696,15 @@ void Session::exec()
     m_MenuPanel->setRemoteUsbReleaseCallback([this] {
         stopRemoteUsb();
     });
+    m_MenuPanel->setBitrateChangeCallback([this](int bitrateKbps) {
+        // Manual adjustment takes over from the settings page auto-recompute.
+        m_Preferences->autoAdjustBitrate = false;
+        m_Preferences->bitrateKbps = bitrateKbps;
+        m_Preferences->save();
+        // Applied asynchronously; the toast confirms the value the host
+        // actually accepted (see startRuntimeBitrateWorker()).
+        requestRuntimeBitrateChange(bitrateKbps);
+    });
     updateRemoteUsbMenuState();
     m_MenuPanel->setCloseCallback([this]() {
         // Record close timestamp for edge-trigger debounce
@@ -5324,6 +5353,12 @@ void Session::exec()
                         break;
                     case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
                         m_MenuPanel->gamepadMoveDown();
+                        break;
+                    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+                        m_MenuPanel->gamepadAdjustSlider(-1);
+                        break;
+                    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+                        m_MenuPanel->gamepadAdjustSlider(1);
                         break;
                     case SDL_CONTROLLER_BUTTON_A:
                         m_MenuPanel->gamepadSelect();
