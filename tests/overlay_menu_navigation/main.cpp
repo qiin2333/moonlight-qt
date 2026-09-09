@@ -41,7 +41,8 @@ int main(int argc, char **argv)
     QString selected;
     int releaseCount = 0;
     const std::vector<OverlayMenuPanel::RemoteUsbDevice> devices {
-        {QStringLiteral("1-1"), QStringLiteral("Phone"), QStringLiteral("18D1:4EE7"), true}
+        {QStringLiteral("1-1"), QStringLiteral("Phone"), QStringLiteral("18D1:4EE7"), true},
+        {QStringLiteral("1-2"), QStringLiteral("Keyboard"), QStringLiteral("046D:B34D"), true}
     };
     panel.setRemoteUsbDeviceCallback([&](const QString &id) {
         selected = id;
@@ -98,12 +99,17 @@ int main(int argc, char **argv)
     if (selected != QStringLiteral("1-1")) qFatal("device selection was not dispatched");
     QTest::qWait(220);
     if (!panel.isVisible()) qFatal("connecting status dismissed menu");
+    QTest::mouseClick(&panel, Qt::LeftButton, Qt::NoModifier, QPoint(140, 101));
+    if (selected != QStringLiteral("1-1") || releaseCount != 0)
+        qFatal("connecting state allowed switching to another device");
     QTest::mouseClick(&panel, Qt::LeftButton, Qt::NoModifier, QPoint(140, 63));
-    if (releaseCount != 0) qFatal("busy device allowed release");
+    if (releaseCount != 1 || !panel.isVisible()) qFatal("connecting device cannot be cancelled");
+    QTest::mouseClick(&panel, Qt::LeftButton, Qt::NoModifier, QPoint(140, 63));
+    if (releaseCount != 1) qFatal("stopping device allowed duplicate release");
     panel.updateRemoteUsbState(true, OverlayMenuPanel::RemoteUsbState::Open,
                                devices, selected, QStringLiteral("Connected"));
     QTest::mouseClick(&panel, Qt::LeftButton, Qt::NoModifier, QPoint(140, 63));
-    if (releaseCount != 1 || !panel.isVisible()) qFatal("release did not keep status visible");
+    if (releaseCount != 2 || !panel.isVisible()) qFatal("release did not keep status visible");
     panel.updateRemoteUsbState(true, OverlayMenuPanel::RemoteUsbState::Available,
                                devices, {}, QStringLiteral("1 available"));
     panel.gamepadBack();

@@ -273,7 +273,7 @@ void OverlayMenuPanel::buildMenuLevels()
                 if (active) {
                     switch (m_RemoteUsbState) {
                     case RemoteUsbState::Opening:
-                        detail = tr("Connecting");
+                        detail = tr("Connecting — select to cancel");
                         break;
                     case RemoteUsbState::Open:
                         detail = tr("Connected — select to release");
@@ -290,14 +290,17 @@ void OverlayMenuPanel::buildMenuLevels()
                 const bool hasOpenDevice =
                     m_RemoteUsbState == RemoteUsbState::Open &&
                     !m_RemoteUsbActiveDeviceId.isEmpty();
+                const bool canRelease = active &&
+                    (m_RemoteUsbState == RemoteUsbState::Opening ||
+                     m_RemoteUsbState == RemoteUsbState::Open);
                 usb.items.push_back({device.label, detail,
                                      MenuItemType::Action,
-                                     active && m_RemoteUsbState == RemoteUsbState::Open
+                                     canRelease
                                          ? MenuAction::ReleaseRemoteUsbDevice
                                          : MenuAction::SelectRemoteUsbDevice,
                                      0,
-                                     device.supported && !busy &&
-                                         (!hasOpenDevice || active),
+                                     canRelease || (device.supported && !busy &&
+                                         (!hasOpenDevice || active)),
                                      active,
                                      false,
                                      device.id});

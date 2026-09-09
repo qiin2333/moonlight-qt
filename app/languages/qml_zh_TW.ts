@@ -1398,6 +1398,10 @@
 <context>
     <name>OverlayMenuPanel</name>
     <message>
+        <source>Connecting — select to cancel</source>
+        <translation>正在連線 · 點擊取消</translation>
+    </message>
+    <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="159"/>
         <source>Overlay Menu</source>
         <translation>懸浮選單</translation>

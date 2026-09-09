@@ -1995,6 +1995,10 @@
         <translation>正在连接</translation>
     </message>
     <message>
+        <source>Connecting — select to cancel</source>
+        <translation>正在连接 · 点击取消</translation>
+    </message>
+    <message>
         <source>Connected — select to release</source>
         <translation>已连接 · 点击释放</translation>
     </message>
