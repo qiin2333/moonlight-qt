@@ -700,6 +700,7 @@ void OverlayMenuPanel::showInternal()
     m_CurrentLevel = 0;
     m_HoveredIndex = -1;
     m_ContentOffset = 0;
+    m_WheelAccum = 0;
     m_SliderDragging = false;
     m_SliderPressedZone = SliderZone::None;
     m_SliderHotZone = SliderZone::None;
@@ -891,6 +892,7 @@ void OverlayMenuPanel::closeMenu()
     m_Visible = false;
     m_Closing = true;
     m_HoveredIndex = -1;
+    m_WheelAccum = 0;
 
     // A close can land mid-drag (e.g. window focus loss). Drop the drag and
     // the mouse grab so the next show doesn't treat motion as scrubbing.
@@ -1393,6 +1395,8 @@ void OverlayMenuPanel::wheelEvent(QWheelEvent* event)
     const int idx = itemAtPos(pos);
     if (idx < 0 || idx >= (int)m_MenuLevels[m_CurrentLevel].items.size()
             || m_MenuLevels[m_CurrentLevel].items[idx].type != MenuItemType::Slider) {
+        // Don't carry a partial notch into a later scrub session.
+        m_WheelAccum = 0;
         event->ignore();
         return;
     }
