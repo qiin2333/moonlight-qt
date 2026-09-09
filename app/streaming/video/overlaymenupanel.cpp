@@ -20,6 +20,15 @@ const QColor MenuDim("#AEB3AB");
 const QColor MenuFaint("#7E858E");
 const QColor MenuAccent("#39C5BB");
 const QColor MenuDanger("#FF876F");
+
+// Bitrate scrubber range and granularity — same log scale as the settings
+// page slider (HardSlider over log(500)..log(2000000)).
+constexpr int kBitrateMinKbps = 500;
+constexpr int kBitrateMaxKbps = 2000000;
+constexpr int kBitrateLogSteps = 200;
+const double kBitrateLogSpan = qLn(kBitrateMaxKbps / double(kBitrateMinKbps));
+// Idle window after the last scrub tick before the change is committed.
+constexpr int kBitrateCommitDelayMs = 450;
 }
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
@@ -111,6 +120,11 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
         else {
             schedulePointerOutsideCheck();
         }
+    });
+
+    m_BitrateCommitTimer.setSingleShot(true);
+    connect(&m_BitrateCommitTimer, &QTimer::timeout, this, [this]() {
+        commitBitrateNow();
     });
 
     buildMenuLevels();
@@ -216,25 +230,19 @@ void OverlayMenuPanel::buildMenuLevels()
                                MenuAction::TogglePointerRegionLock, 0, true, false, false});
     m_MenuLevels.push_back(shortcuts);
 
-    // === Level 2: Bitrate presets ===
+    // === Level 2: Bitrate (log-scale scrubber row + presets) ===
     MenuLevel bitrate;
     bitrate.title = tr("Bitrate");
-    bitrate.items.push_back({tr("1 Mbps"),    QString(), MenuItemType::Action,
-                             MenuAction::SetBitrate1000,   0, true, false, false});
-    bitrate.items.push_back({tr("2 Mbps"),    QString(), MenuItemType::Action,
-                             MenuAction::SetBitrate2000,   0, true, false, false});
-    bitrate.items.push_back({tr("5 Mbps"),    QString(), MenuItemType::Action,
-                             MenuAction::SetBitrate5000,   0, true, false, false});
-    bitrate.items.push_back({tr("10 Mbps"),   QString(), MenuItemType::Action,
-                             MenuAction::SetBitrate10000,  0, true, false, false});
-    bitrate.items.push_back({tr("20 Mbps"),   QString(), MenuItemType::Action,
-                             MenuAction::SetBitrate20000,  0, true, false, false});
-    bitrate.items.push_back({tr("30 Mbps"),   QString(), MenuItemType::Action,
-                             MenuAction::SetBitrate30000,  0, true, false, false});
-    bitrate.items.push_back({tr("50 Mbps"),   QString(), MenuItemType::Action,
-                             MenuAction::SetBitrate50000,  0, true, false, false});
-    bitrate.items.push_back({tr("100 Mbps"),  QString(), MenuItemType::Action,
-                             MenuAction::SetBitrate100000, 0, true, false, false});
+    bitrate.items.push_back({QString(), QString(), MenuItemType::Slider,
+                             MenuAction::MenuActionMax, 0, true, false, true});
+    static const int kBitratePresets[] = {
+        1000, 2000, 5000, 10000, 20000, 30000, 50000, 100000
+    };
+    for (int kbps : kBitratePresets) {
+        bitrate.items.push_back({formatBitrateKbps(kbps), QString(), MenuItemType::Action,
+                                 MenuAction::SetBitrate, 0, true, false, false,
+                                 QString::number(kbps)});
+    }
     m_MenuLevels.push_back(bitrate);
 
     // === Level 3: Overlay menu placement ===
@@ -312,6 +320,10 @@ void OverlayMenuPanel::buildMenuLevels()
     if (m_CurrentLevel >= static_cast<int>(m_MenuLevels.size())) {
         m_CurrentLevel = 0;
     }
+
+    // Rebuilds (gamepad set / USB refresh) wipe derived details; re-stamp
+    // the bitrate state so the scrubber row and preset checkmarks survive.
+    refreshBitrateDetails();
 }
 
 // ---------------------------------------------------------------------------
@@ -346,40 +358,188 @@ void OverlayMenuPanel::updateBitrateState(int bitrateKbps)
 {
     if (m_MenuLevels.empty()) return;
 
-    // Show current bitrate as detail text on the Bitrate category (level 0)
+    if (m_BitrateCommitTimer.isActive()) {
+        // A scrub is still pending commit; it will land shortly and update
+        // the preference. Don't clobber the slider with the stale value.
+        return;
+    }
+
+    m_BitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    m_CommittedBitrateKbps = m_BitrateKbps;
+    refreshBitrateDetails();
+    forceRepaint();
+}
+
+// ---------------------------------------------------------------------------
+// Bitrate slider row
+// ---------------------------------------------------------------------------
+
+QString OverlayMenuPanel::formatBitrateKbps(int kbps)
+{
+    if (kbps >= 1000000) {
+        const bool whole = kbps % 1000000 == 0;
+        return QStringLiteral("%1 Gbps").arg(kbps / 1000000.0, 0, 'f', whole ? 0 : 1);
+    }
+    if (kbps >= 1000) {
+        const bool whole = kbps % 1000 == 0;
+        return QStringLiteral("%1 Mbps").arg(kbps / 1000.0, 0, 'f', whole ? 0 : 1);
+    }
+    return QStringLiteral("%1 kbps").arg(kbps);
+}
+
+void OverlayMenuPanel::refreshBitrateDetails()
+{
+    if (m_MenuLevels.empty()) return;
+
+    // Current bitrate as detail text on the Bitrate category (level 0)
     for (auto& item : m_MenuLevels[0].items) {
         if (item.type == MenuItemType::SubMenu && item.targetLevel == 2) {
-            if (bitrateKbps >= 1000) {
-                item.detail = QString("%1 Mbps").arg(bitrateKbps / 1000);
-            } else {
-                item.detail = QString("%1 kbps").arg(bitrateKbps);
-            }
+            item.detail = formatBitrateKbps(m_BitrateKbps);
             break;
         }
     }
 
-    // Mark the active bitrate preset in level 2
+    // Mark the active preset (✓) in level 2; custom values stay unmarked
+    // since the scrubber row itself shows the exact value.
     if ((int)m_MenuLevels.size() > 2) {
-        auto actionToKbps = [](MenuAction a) -> int {
-            switch (a) {
-            case MenuAction::SetBitrate1000:   return 1000;
-            case MenuAction::SetBitrate2000:   return 2000;
-            case MenuAction::SetBitrate5000:   return 5000;
-            case MenuAction::SetBitrate10000:  return 10000;
-            case MenuAction::SetBitrate20000:  return 20000;
-            case MenuAction::SetBitrate30000:  return 30000;
-            case MenuAction::SetBitrate50000:  return 50000;
-            case MenuAction::SetBitrate100000: return 100000;
-            default: return -1;
-            }
-        };
         for (auto& item : m_MenuLevels[2].items) {
-            if (item.type == MenuItemType::Action) {
-                int kbps = actionToKbps(item.action);
-                item.detail = (kbps == bitrateKbps) ? QString::fromUtf8("\342\234\223") : QString();
+            if (item.action == MenuAction::SetBitrate) {
+                item.detail = (item.payload.toInt() == m_BitrateKbps)
+                                  ? QString::fromUtf8("\342\234\223") : QString();
             }
         }
     }
+}
+
+double OverlayMenuPanel::bitrateFraction() const
+{
+    return qBound(0.0, qLn(m_BitrateKbps / double(kBitrateMinKbps)) / kBitrateLogSpan, 1.0);
+}
+
+void OverlayMenuPanel::setBitrateKbps(int bitrateKbps)
+{
+    bitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    // Round to display-friendly granularity so the label doesn't flicker
+    // while scrubbing (also keeps committed values tidy).
+    if (bitrateKbps < 10000) {
+        bitrateKbps = qRound(bitrateKbps / 50.0) * 50;
+    } else if (bitrateKbps < 100000) {
+        bitrateKbps = qRound(bitrateKbps / 500.0) * 500;
+    } else {
+        bitrateKbps = qRound(bitrateKbps / 5000.0) * 5000;
+    }
+    bitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    if (bitrateKbps == m_BitrateKbps) return;
+
+    m_BitrateKbps = bitrateKbps;
+    refreshBitrateDetails();
+    m_BitrateCommitTimer.start(kBitrateCommitDelayMs);
+    forceRepaint();
+}
+
+void OverlayMenuPanel::setBitrateFromFraction(double fraction)
+{
+    fraction = qBound(0.0, fraction, 1.0);
+    setBitrateKbps(qRound(kBitrateMinKbps * qExp(fraction * kBitrateLogSpan)));
+}
+
+void OverlayMenuPanel::adjustBitrateStep(int direction, int multiplier)
+{
+    const double step = (kBitrateLogSpan / kBitrateLogSteps) * qMax(1, multiplier);
+    setBitrateFromFraction(bitrateFraction() + direction * step);
+}
+
+void OverlayMenuPanel::commitBitrateNow()
+{
+    m_BitrateCommitTimer.stop();
+    if (m_BitrateKbps == m_CommittedBitrateKbps) return;
+
+    m_CommittedBitrateKbps = m_BitrateKbps;
+    if (m_BitrateChangeCallback) {
+        m_BitrateChangeCallback(m_BitrateKbps);
+    }
+}
+
+void OverlayMenuPanel::selectBitratePreset(const MenuItem& item)
+{
+    // Presets snap the scrubber and commit immediately, but keep the menu
+    // open so the value can be fine-tuned right away.
+    beginInteraction();
+    m_BitrateKbps = qBound(kBitrateMinKbps, item.payload.toInt(), kBitrateMaxKbps);
+    refreshBitrateDetails();
+    commitBitrateNow();
+    forceRepaint();
+}
+
+OverlayMenuPanel::SliderRowRects OverlayMenuPanel::sliderRowRects(int contentWidth, int itemY) const
+{
+    const int textPad = 16;
+    const int buttonSize = 22;
+    const int buttonGap = 4;
+
+    SliderRowRects r;
+    r.value = QRect(textPad, itemY, 78, m_ItemHeight);
+    r.plus = QRect(contentWidth - textPad - buttonSize,
+                   itemY + (m_ItemHeight - buttonSize) / 2, buttonSize, buttonSize);
+    r.minus = QRect(r.plus.x() - buttonSize - buttonGap, r.plus.y(),
+                    buttonSize, buttonSize);
+    const int trackLeft = r.value.right() + 1 + 8;
+    const int trackRight = r.minus.x() - 6;
+    r.track = QRect(trackLeft, itemY + m_ItemHeight / 2 - 3,
+                    qMax(0, trackRight - trackLeft), 6);
+    return r;
+}
+
+OverlayMenuPanel::SliderZone OverlayMenuPanel::sliderZoneAt(const QPoint& localPos, int rowIdx) const
+{
+    const auto& items = m_MenuLevels[m_CurrentLevel].items;
+    if (rowIdx < 0 || rowIdx >= (int)items.size()
+            || items[rowIdx].type != MenuItemType::Slider) {
+        return SliderZone::None;
+    }
+
+    const int itemY = m_TitleHeight + m_Padding + rowIdx * m_ItemHeight;
+    const SliderRowRects r = sliderRowRects(width() - 2 * m_ShadowMargin, itemY);
+
+    // Buttons win over the track so their hit area feels solid.
+    if (r.minus.adjusted(-2, -2, 2, 2).contains(localPos)) return SliderZone::Minus;
+    if (r.plus.adjusted(-2, -2, 2, 2).contains(localPos)) return SliderZone::Plus;
+    if (QRect(r.track.x() - 4, itemY, r.track.width() + 8, m_ItemHeight).contains(localPos)) {
+        return SliderZone::Track;
+    }
+    return SliderZone::None;
+}
+
+void OverlayMenuPanel::gamepadAdjustSlider(int direction)
+{
+    if (!m_Visible) return;
+    const auto& items = m_MenuLevels[m_CurrentLevel].items;
+
+    // D-pad left/right anywhere in the scrubber's submenu drives the slider;
+    // focus follows so the highlight shows what is being adjusted.
+    int rowIdx = -1;
+    for (int i = 0; i < (int)items.size(); i++) {
+        if (items[i].type == MenuItemType::Slider) {
+            rowIdx = i;
+            break;
+        }
+    }
+    if (rowIdx < 0) return;
+
+    beginInteraction();
+    if (m_HoveredIndex != rowIdx) {
+        m_HoveredIndex = rowIdx;
+        m_SliderAdjustStreak = 0;
+        forceRepaint();
+    }
+    if (m_SliderAdjustClock.isValid() && m_SliderAdjustClock.elapsed() <= 350) {
+        m_SliderAdjustStreak++;
+    } else {
+        m_SliderAdjustStreak = 0;
+    }
+    m_SliderAdjustClock.start();
+    // 1x → 2x → 4x → 8x (capped) while the d-pad is held or rapidly tapped.
+    adjustBitrateStep(direction, 1 << qMin(m_SliderAdjustStreak / 2, 3));
 }
 
 void OverlayMenuPanel::updateMenuPositionState(MenuAction activePlacementAction)
@@ -954,6 +1114,53 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             p.fillRect(QRect(trackX + (item.toggleState ? trackW - 16 : 4),
                              trackY + 4, 12, 12), item.toggleState ? MenuSurface : MenuDim);
         }
+        // --- Slider item (bitrate scrubber) ---
+        else if (item.type == MenuItemType::Slider) {
+            const SliderRowRects r = sliderRowRects(cw, itemY);
+            const bool sliderFocused = i == m_HoveredIndex && item.enabled;
+
+            // Current value in the shared brand accent.
+            p.setFont(m_LabelFont);
+            p.setPen(sliderFocused ? MenuAccent : MenuText);
+            p.drawText(r.value, Qt::AlignLeft | Qt::AlignVCenter,
+                       formatBitrateKbps(m_BitrateKbps));
+
+            // Log-scale track: hover base, accent fill up to the square thumb.
+            p.fillRect(r.track, MenuHover);
+            p.setPen(QPen(MenuLine, 1));
+            p.drawRect(r.track);
+            const double frac = bitrateFraction();
+            const int fillW = qRound(r.track.width() * frac);
+            if (fillW > 0) {
+                p.fillRect(QRect(r.track.x(), r.track.y(), fillW, r.track.height()),
+                           MenuAccent);
+            }
+            const int thumbW = 10, thumbH = 16;
+            const int thumbX = qBound(r.track.x() - thumbW / 2,
+                                      r.track.x() + fillW - thumbW / 2,
+                                      r.track.x() + r.track.width() - thumbW / 2);
+            const QRect thumb(thumbX, itemY + (m_ItemHeight - thumbH) / 2, thumbW, thumbH);
+            p.fillRect(thumb, m_SliderDragging ? MenuAccent : MenuText);
+            p.setPen(QPen(MenuLine, 1));
+            p.drawRect(thumb);
+
+            // −/+ steppers with hover/pressed feedback
+            const QRect zones[] = { r.minus, r.plus };
+            const SliderZone zoneIds[] = { SliderZone::Minus, SliderZone::Plus };
+            const QString glyphs[] = { QStringLiteral("-"), QStringLiteral("+") };
+            for (int z = 0; z < 2; z++) {
+                const bool hot = sliderFocused && m_SliderHotZone == zoneIds[z];
+                const bool pressed = m_SliderPressedZone == zoneIds[z];
+                if (hot || pressed) {
+                    p.fillRect(zones[z], pressed ? MenuAccent : MenuHover);
+                }
+                p.setPen(QPen(pressed ? MenuAccent : MenuLine, 1));
+                p.drawRect(zones[z]);
+                p.setFont(m_LabelFont);
+                p.setPen(hot || pressed ? MenuText : MenuDim);
+                p.drawText(zones[z], Qt::AlignCenter, glyphs[z]);
+            }
+        }
         // --- Action item ---
         else if (item.type == MenuItemType::Action) {
             p.setFont(m_LabelFont);
@@ -1021,12 +1228,30 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
 void OverlayMenuPanel::mouseMoveEvent(QMouseEvent* event)
 {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    int newIdx = itemAtPos(event->position().toPoint());
+    const QPoint pos = event->position().toPoint();
 #else
-    int newIdx = itemAtPos(event->pos());
+    const QPoint pos = event->pos();
 #endif
-    if (newIdx != m_HoveredIndex) {
+
+    if (m_SliderDragging) {
+        // Keep scrubbing even when the pointer leaves the panel (mouse grab).
+        const auto& items = m_MenuLevels[m_CurrentLevel].items;
+        for (int i = 0; i < (int)items.size(); i++) {
+            if (items[i].type != MenuItemType::Slider) continue;
+            const int itemY = m_TitleHeight + m_Padding + i * m_ItemHeight;
+            const SliderRowRects r = sliderRowRects(width() - 2 * m_ShadowMargin, itemY);
+            const double frac = (pos.x() - r.track.x()) / double(r.track.width());
+            setBitrateFromFraction(frac);
+            break;
+        }
+        return;
+    }
+
+    const int newIdx = itemAtPos(pos);
+    const SliderZone hotZone = sliderZoneAt(pos, newIdx);
+    if (newIdx != m_HoveredIndex || hotZone != m_SliderHotZone) {
         m_HoveredIndex = newIdx;
+        m_SliderHotZone = hotZone;
         setCursor((m_HoveredIndex >= 0 || m_HoveredIndex == -2 || m_HoveredIndex == -3)
                           ? Qt::PointingHandCursor
                           : Qt::ArrowCursor);
@@ -1040,10 +1265,11 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
     beginInteraction();
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    int idx = itemAtPos(event->position().toPoint());
+    const QPoint pos = event->position().toPoint();
 #else
-    int idx = itemAtPos(event->pos());
+    const QPoint pos = event->pos();
 #endif
+    int idx = itemAtPos(pos);
 
     if (idx == -3) {
         closeMenu();
@@ -1073,8 +1299,35 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
         break;
 
     case MenuItemType::Action:
+        if (item.action == MenuAction::SetBitrate) {
+            selectBitratePreset(item);
+            break;
+        }
         dispatchActionItem(item);
         break;
+
+    case MenuItemType::Slider:
+    {
+        const SliderZone zone = sliderZoneAt(pos, idx);
+        m_SliderPressedZone = zone;
+        m_SliderHotZone = zone;
+        if (zone == SliderZone::Minus) {
+            adjustBitrateStep(-1, 1);
+        }
+        else if (zone == SliderZone::Plus) {
+            adjustBitrateStep(1, 1);
+        }
+        else if (zone == SliderZone::Track) {
+            const int itemY = m_TitleHeight + m_Padding + idx * m_ItemHeight;
+            const SliderRowRects r = sliderRowRects(width() - 2 * m_ShadowMargin, itemY);
+            m_SliderDragging = true;
+            setMouseGrabEnabled(true);
+            const double frac = (pos.x() - r.track.x()) / double(r.track.width());
+            setBitrateFromFraction(frac);
+        }
+        forceRepaint();
+        break;
+    }
 
     case MenuItemType::Toggle:
     {
@@ -1088,6 +1341,54 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
         break;
     }
     }
+}
+
+void OverlayMenuPanel::mouseReleaseEvent(QMouseEvent* event)
+{
+    Q_UNUSED(event);
+    if (!m_SliderDragging && m_SliderPressedZone == SliderZone::None) return;
+
+    if (m_SliderDragging) {
+        m_SliderDragging = false;
+        setMouseGrabEnabled(false);
+    }
+    m_SliderPressedZone = SliderZone::None;
+    m_SliderHotZone = SliderZone::None;
+    // The commit timer keeps running; the value lands once the pointer idles.
+    forceRepaint();
+}
+
+void OverlayMenuPanel::wheelEvent(QWheelEvent* event)
+{
+    if (!m_Visible) {
+        event->ignore();
+        return;
+    }
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    const QPoint pos = event->position().toPoint();
+#else
+    const QPoint pos = event->pos();
+#endif
+    const int idx = itemAtPos(pos);
+    if (idx < 0 || idx >= (int)m_MenuLevels[m_CurrentLevel].items.size()
+            || m_MenuLevels[m_CurrentLevel].items[idx].type != MenuItemType::Slider) {
+        event->ignore();
+        return;
+    }
+
+    // Wheeling the scrubber counts as interaction; don't race the leave timer.
+    beginInteraction();
+
+    // Accumulate high-resolution wheel deltas; one notch = one fine step.
+    m_WheelAccum += event->angleDelta().y() / 120.0;
+    int notches = 0;
+    while (m_WheelAccum >= 1.0) { notches++; m_WheelAccum -= 1.0; }
+    while (m_WheelAccum <= -1.0) { notches--; m_WheelAccum += 1.0; }
+    if (notches != 0) {
+        adjustBitrateStep(notches > 0 ? 1 : -1, qAbs(notches));
+    }
+    event->accept();
 }
 
 // ---------------------------------------------------------------------------
@@ -1172,7 +1473,15 @@ void OverlayMenuPanel::gamepadSelect()
         navigateToLevel(item.targetLevel);
         break;
     case MenuItemType::Action:
+        if (item.action == MenuAction::SetBitrate) {
+            selectBitratePreset(item);
+            break;
+        }
         dispatchActionItem(item);
+        break;
+    case MenuItemType::Slider:
+        // A confirms — flush a pending scrub immediately.
+        commitBitrateNow();
         break;
     case MenuItemType::Toggle:
     {

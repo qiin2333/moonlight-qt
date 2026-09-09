@@ -3,6 +3,7 @@
 #include <QRasterWindow>
 #include <QPainter>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QPoint>
 #include <QFont>
 #include <QIcon>
@@ -26,7 +27,7 @@
  * Menu structure:
  *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen, Microphone [toggle], Disconnect
  *   Level 1 (Actions):  Quit, Performance Stats, Mouse Mode, Cursor, Minimize, ...
- *   Level 2 (Bitrate):  1/2/5/10/20/30/50/100 Mbps
+ *   Level 2 (Bitrate):  log-scale scrubber row + 1/2/5/10/20/30/50/100 Mbps presets
  *   Level 3 (Position): Top, Right, Left, Floating button, Disabled
  *   Developer builds may append a function-test panel entry.
  *
@@ -55,15 +56,9 @@ public:
         ToggleMicrophone,
         // Gamepad mouse emulation
         ToggleGamepadMouse,
-        // Bitrate presets (kbps)
-        SetBitrate1000,
-        SetBitrate2000,
-        SetBitrate5000,
-        SetBitrate10000,
-        SetBitrate20000,
-        SetBitrate30000,
-        SetBitrate50000,
-        SetBitrate100000,
+        // Set bitrate to the kbps value carried in MenuItem::payload.
+        // Handled inside the panel (slider row + presets); never dispatched.
+        SetBitrate,
         SetMenuPlacementTop,
         SetMenuPlacementRight,
         SetMenuPlacementLeft,
@@ -107,12 +102,16 @@ public:
         SubMenu,    // navigate to sub-level
         Toggle,     // dispatch action, toggle visual state, keep menu open
         Back,       // navigate back to top level
+        Slider,     // in-row value scrubber (drag/wheel/gamepad); keeps menu open
     };
 
     using ActionCallback = std::function<void(MenuAction)>;
     using CloseCallback  = std::function<void()>;
     using RemoteUsbDeviceCallback = std::function<void(const QString&)>;
     using RemoteUsbReleaseCallback = std::function<void()>;
+    // Fired when a bitrate adjustment settles (debounced while scrubbing,
+    // immediate for preset taps). The value is in kbps.
+    using BitrateChangeCallback = std::function<void(int)>;
 
     explicit OverlayMenuPanel(QWindow* parent = nullptr);
     ~OverlayMenuPanel() override;
@@ -125,6 +124,12 @@ public:
     void setRemoteUsbReleaseCallback(RemoteUsbReleaseCallback cb) {
         m_RemoteUsbReleaseCallback = std::move(cb);
     }
+    void setBitrateChangeCallback(BitrateChangeCallback cb) {
+        m_BitrateChangeCallback = std::move(cb);
+    }
+
+    // Human-readable bitrate label shared with toast/log formatting.
+    static QString formatBitrateKbps(int kbps);
 
     // Position the panel at the right edge of the given Qt logical parent rect.
     void showAtRightEdge(int parentX, int parentY, int parentW, int parentH,
@@ -174,11 +179,16 @@ public:
     void gamepadMoveDown();
     void gamepadSelect();
     void gamepadBack();
+    // Step the focused slider row (DPAD left/right); direction is -1 or +1.
+    // Rapid consecutive presses accelerate the step size.
+    void gamepadAdjustSlider(int direction);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
     bool event(QEvent* event) override;
 
 private:
@@ -222,6 +232,16 @@ private:
 
     enum class AnchorMode { RightEdge, LeftEdge, TopEdge, AtCursor };
 
+    // Hit zones inside the slider row (local coordinates).
+    enum class SliderZone { None, Minus, Track, Plus };
+
+    struct SliderRowRects {
+        QRect value;
+        QRect track;
+        QRect minus;
+        QRect plus;
+    };
+
     void buildMenuLevels();
     void navigateToLevel(int level);
     void repositionWindow();
@@ -231,6 +251,17 @@ private:
     void forceRepaint();     // synchronous repaint (requestUpdate is async on Windows)
     int  itemAtPos(const QPoint& pos) const;
     void dispatchActionItem(const MenuItem& item);
+
+    // --- Bitrate slider row ---
+    SliderRowRects sliderRowRects(int contentWidth, int itemY) const;
+    SliderZone sliderZoneAt(const QPoint& localPos, int rowIdx) const;
+    double bitrateFraction() const;                 // m_BitrateKbps on the log scale, 0..1
+    void setBitrateFromFraction(double fraction);   // inverse of bitrateFraction()
+    void setBitrateKbps(int bitrateKbps);           // clamp + refresh + schedule commit
+    void adjustBitrateStep(int direction, int multiplier);
+    void selectBitratePreset(const MenuItem& item); // snap to preset + commit now
+    void commitBitrateNow();                        // flush pending change to callback
+    void refreshBitrateDetails();                   // level-0 detail + preset checkmarks
 
     std::vector<MenuLevel> m_MenuLevels;
     int  m_CurrentLevel;
@@ -249,6 +280,19 @@ private:
     CloseCallback  m_CloseCallback;
     RemoteUsbDeviceCallback m_RemoteUsbDeviceCallback;
     RemoteUsbReleaseCallback m_RemoteUsbReleaseCallback;
+    BitrateChangeCallback m_BitrateChangeCallback;
+
+    // Bitrate slider state. m_BitrateKbps is the on-screen value;
+    // m_CommittedBitrateKbps is the last value sent to the callback.
+    int m_BitrateKbps = 10000;
+    int m_CommittedBitrateKbps = 10000;
+    QTimer m_BitrateCommitTimer;      // debounces callback while scrubbing
+    bool m_SliderDragging = false;    // pointer is scrubbing the track
+    SliderZone m_SliderPressedZone = SliderZone::None;
+    SliderZone m_SliderHotZone = SliderZone::None;
+    qreal m_WheelAccum = 0.0;         // high-resolution wheel accumulation
+    QElapsedTimer m_SliderAdjustClock; // gamepad repeat acceleration window
+    int m_SliderAdjustStreak = 0;
 
     // Parent window rect in Qt global logical coordinates for level changes
     int m_ParentX, m_ParentY, m_ParentW, m_ParentH;

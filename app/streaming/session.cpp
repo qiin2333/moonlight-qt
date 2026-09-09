@@ -2778,36 +2778,9 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
         return;
     }
 
-    // --- Bitrate presets ---
-    case OverlayMenuPanel::MenuAction::SetBitrate1000:
-    case OverlayMenuPanel::MenuAction::SetBitrate2000:
-    case OverlayMenuPanel::MenuAction::SetBitrate5000:
-    case OverlayMenuPanel::MenuAction::SetBitrate10000:
-    case OverlayMenuPanel::MenuAction::SetBitrate20000:
-    case OverlayMenuPanel::MenuAction::SetBitrate30000:
-    case OverlayMenuPanel::MenuAction::SetBitrate50000:
-    case OverlayMenuPanel::MenuAction::SetBitrate100000:
-    {
-        static const int kBitrateMap[] = {
-            1000, 2000, 5000, 10000, 20000, 30000, 50000, 100000
-        };
-        int idx = (int)action - (int)OverlayMenuPanel::MenuAction::SetBitrate1000;
-        if (idx >= 0 && idx < 8) {
-            int newBitrate = kBitrateMap[idx];
-            // Save preference for future sessions
-            m_Preferences->bitrateKbps = newBitrate;
-            m_Preferences->save();
-            // Try to change bitrate in the current session via Sunshine API
-            requestRuntimeBitrateChange(newBitrate);
-            // Show toast notification
-            if (newBitrate >= 1000) {
-                showStreamingToast(QString("Bitrate: %1 Mbps").arg(newBitrate / 1000));
-            } else {
-                showStreamingToast(QString("Bitrate: %1 Kbps").arg(newBitrate));
-            }
-        }
-        return;
-    }
+    // --- Bitrate ---
+    // Adjustments from the overlay menu (scrubber row + presets) arrive via
+    // the panel's bitrate change callback; nothing to dispatch here.
 
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
     case OverlayMenuPanel::MenuAction::OpenStylusReplayPanel:
@@ -4676,6 +4649,16 @@ void Session::exec()
     m_MenuPanel->setRemoteUsbReleaseCallback([this] {
         stopRemoteUsb();
     });
+    m_MenuPanel->setBitrateChangeCallback([this](int bitrateKbps) {
+        // Manual adjustment takes over from the settings page auto-recompute.
+        m_Preferences->autoAdjustBitrate = false;
+        m_Preferences->bitrateKbps = bitrateKbps;
+        m_Preferences->save();
+        // Apply to the running session via the Sunshine API
+        requestRuntimeBitrateChange(bitrateKbps);
+        showStreamingToast(QString("Bitrate: %1").arg(
+                OverlayMenuPanel::formatBitrateKbps(bitrateKbps)));
+    });
     updateRemoteUsbMenuState();
     m_MenuPanel->setCloseCallback([this]() {
         // Record close timestamp for edge-trigger debounce
@@ -5324,6 +5307,12 @@ void Session::exec()
                         break;
                     case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
                         m_MenuPanel->gamepadMoveDown();
+                        break;
+                    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+                        m_MenuPanel->gamepadAdjustSlider(-1);
+                        break;
+                    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+                        m_MenuPanel->gamepadAdjustSlider(1);
                         break;
                     case SDL_CONTROLLER_BUTTON_A:
                         m_MenuPanel->gamepadSelect();
