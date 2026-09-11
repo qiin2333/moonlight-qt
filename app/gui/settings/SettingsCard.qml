@@ -1,4 +1,4 @@
-import QtQuick 2.9
+import QtQuick
 import "../theme"
 
 // 一张设置卡片：方角硬投影面板 + 左侧强调粗条 + 宽字距标题，内容走默认属性。
