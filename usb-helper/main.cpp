@@ -199,7 +199,9 @@ int runList()
         json += "{\"busId\":\"" + jsonEscape(busId) + "\"";
         json += ",\"vid\":" + std::to_string(descriptor.idVendor);
         json += ",\"pid\":" + std::to_string(descriptor.idProduct);
-        json += ",\"vidPid\":\"" + vidPid + "\"";
+        json += ",\"vidPid\":\"";
+        json += vidPid; // %04x:%04x 自产，无需转义
+        json += "\"";
         json += ",\"serial\":\"" + jsonEscape(serial) + "\"";
         json += ",\"manufacturer\":\"" + jsonEscape(manufacturer) + "\"";
         json += ",\"product\":\"" + jsonEscape(product) + "\"";

@@ -354,6 +354,13 @@ jobs:
       run: |
         HELPER="build/build-Release/app/Moonlight.app/Contents/MacOS/moonlight-usbd"
         test -x "$HELPER"
+        # helper 必须静态链 libusb/usbipdcpp：一旦解析到 Homebrew 的
+        # libusb dylib，CI 上能跑、用户机器上必挂。
+        if otool -L "$HELPER" | grep -q "libusb"; then
+          otool -L "$HELPER"
+          echo "helper dynamically links libusb!" >&2
+          exit 1
+        fi
         "$HELPER" --version
         "$HELPER" list --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d, list)'
 

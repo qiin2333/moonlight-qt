@@ -48,7 +48,10 @@ configure_file(cmake/libusb-1.0.h.in
 # Libs.private：pkg_check_modules 不带 --static，不会看 private。
 configure_file(cmake/libusb-1.0.pc.in
                "${CMAKE_BINARY_DIR}/pkgconfig/libusb-1.0.pc" @ONLY)
-set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${CMAKE_BINARY_DIR}/pkgconfig")
+# 自己的 .pc 必须排在 PKG_CONFIG_PATH 最前：GitHub runner 的 Homebrew 也有
+# libusb-1.0.pc（动态库），排后面会被抢先，helper 就动态链到 brew 的单架构
+# dylib 上——CI 能过、用户机器上必挂。
+set(ENV{PKG_CONFIG_PATH} "${CMAKE_BINARY_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 set(USBIPDCPP_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(USBIPDCPP_BUILD_VIRTUAL_DEVICE OFF CACHE BOOL "" FORCE)
