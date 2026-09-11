@@ -1270,6 +1270,12 @@ Session::~Session()
         m_UsbTunnel = nullptr;
     }
 
+    if (m_UsbLocalServer != nullptr) {
+        m_UsbLocalServer->stop();
+        delete m_UsbLocalServer;
+        m_UsbLocalServer = nullptr;
+    }
+
     delete m_DualSenseHapticsRenderer;
     m_DualSenseHapticsRenderer = nullptr;
 
