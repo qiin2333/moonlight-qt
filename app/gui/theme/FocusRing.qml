@@ -1,4 +1,4 @@
-import QtQuick 2.9
+import QtQuick
 import "."
 
 // 统一的焦点环：方角、2px、accent，套在目标外面 3px。
