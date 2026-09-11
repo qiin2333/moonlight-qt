@@ -9,5 +9,7 @@ source=@CMAKE_CURRENT_SOURCE_DIR@
 Name: libusb-1.0
 Description: libusb static, vendored by moonlight-usbd
 Version: 1.0.29
-Libs: -L${libdir} -lusb-1.0 -lobjc -framework IOKit -framework CoreFoundation -framework Security
+# 静态档案直接给绝对路径：-lusb-1.0 走搜索路径，任何目录里的
+# libusb-1.0.dylib（如 Homebrew）都会抢先解析成动态链接。
+Libs: ${libdir}/libusb-1.0.a -lobjc -framework IOKit -framework CoreFoundation -framework Security
 Cflags: -I${shim} -I${source}/third_party/libusb/libusb

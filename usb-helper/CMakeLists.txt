@@ -44,14 +44,15 @@ configure_file(cmake/libusb-1.0.h.in
                "${CMAKE_BINARY_DIR}/libusb-shim/libusb-1.0/libusb.h" @ONLY)
 
 # usbipdcpp 的 libusb 组件无条件走 pkg-config（pkg_check_modules libusb-1.0），
-# 给上面的静态构建生成一个 .pc 注入 PKG_CONFIG_PATH。框架/objc 放 Libs 而不是
-# Libs.private：pkg_check_modules 不带 --static，不会看 private。
+# 给上面的静态构建生成一个 .pc。解析必须完全确定性：PKG_CONFIG_LIBDIR 覆盖
+# pkg-config 的默认搜索路径，把 Homebrew 的同名 .pc 彻底隔离（只排
+# PKG_CONFIG_PATH 顺序不够——runner 的 brew libusb 恰好也是 1.0.29，第二轮
+# CI 实测仍被抢解析成动态链接）；.pc 的 Libs 再给静态档案绝对路径，杜绝
+# -lusb-1.0 被任何搜索路径上的 dylib 抢先。
 configure_file(cmake/libusb-1.0.pc.in
                "${CMAKE_BINARY_DIR}/pkgconfig/libusb-1.0.pc" @ONLY)
-# 自己的 .pc 必须排在 PKG_CONFIG_PATH 最前：GitHub runner 的 Homebrew 也有
-# libusb-1.0.pc（动态库），排后面会被抢先，helper 就动态链到 brew 的单架构
-# dylib 上——CI 能过、用户机器上必挂。
-set(ENV{PKG_CONFIG_PATH} "${CMAKE_BINARY_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+set(ENV{PKG_CONFIG_LIBDIR} "${CMAKE_BINARY_DIR}/pkgconfig")
+set(ENV{PKG_CONFIG_PATH} "${CMAKE_BINARY_DIR}/pkgconfig")
 
 set(USBIPDCPP_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(USBIPDCPP_BUILD_VIRTUAL_DEVICE OFF CACHE BOOL "" FORCE)
