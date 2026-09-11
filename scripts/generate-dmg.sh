@@ -67,6 +67,20 @@ pushd $BUILD_FOLDER
 make -j$(sysctl -n hw.logicalcpu) $(echo "$BUILD_CONFIG" | tr '[:upper:]' '[:lower:]') || fail "Make failed!"
 popd
 
+# USB 转发 helper（usbipdcpp + libusb 静态构建，见 usb-helper/README.md）。
+# 独立 build 目录按架构隔离（本脚本可能对不同架构各跑一次，BUILD_ROOT 是共
+# 享的），configure 前清掉防陈旧缓存；主工程的 LTO 环境变量不带给它。
+echo Building USB forwarding helper
+USB_HELPER_BUILD=$BUILD_ROOT/usb-helper-$MOONLIGHT_ARCH
+rm -rf $USB_HELPER_BUILD
+(
+  unset CFLAGS CXXFLAGS LDFLAGS
+  cmake -S $SOURCE_ROOT/usb-helper -B $USB_HELPER_BUILD \
+    -DCMAKE_BUILD_TYPE=$BUILD_CONFIG \
+    -DCMAKE_OSX_ARCHITECTURES=$MOONLIGHT_ARCH || exit 1
+  cmake --build $USB_HELPER_BUILD -j$(sysctl -n hw.logicalcpu) || exit 1
+) || fail "USB helper build failed!"
+
 echo Saving dSYM file
 pushd $BUILD_FOLDER
 dsymutil app/Moonlight.app/Contents/MacOS/Moonlight -o Moonlight-$VERSION.dsym || fail "dSYM creation failed!"
@@ -99,13 +113,16 @@ if [ ! -f "$HELPER_BINARY" ]; then
 fi
 cp "$HELPER_BINARY" $BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/ || fail "Clipboard helper copy failed!"
 
+echo Copying USB forwarding helper into app bundle
+cp $USB_HELPER_BUILD/moonlight-usbd $BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/ || fail "USB helper copy failed!"
+
 # macdeployqt only rewrites Qt references in the main executable and the
 # plugins it deploys, so the clipboard helper has to be named explicitly with
 # -executable. Otherwise it keeps the build machine's absolute Qt paths, which
 # either don't exist on the user's machine or pull a second copy of Qt into the
 # process alongside the bundled one. Either way the helper aborts at startup
 # and clipboard sync silently disables itself.
-macdeployqt $BUILD_FOLDER/app/Moonlight.app $EXTRA_ARGS -executable=$BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/moonlight-clipboard-helper -qmldir=$SOURCE_ROOT/app/gui -appstore-compliant || fail "macdeployqt failed!"
+macdeployqt $BUILD_FOLDER/app/Moonlight.app $EXTRA_ARGS -executable=$BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/moonlight-clipboard-helper -executable=$BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/moonlight-usbd -qmldir=$SOURCE_ROOT/app/gui -appstore-compliant || fail "macdeployqt failed!"
 
 echo Building File Provider extension into app bundle
 bash "$SOURCE_ROOT/scripts/build-macos-fileprovider-extension.sh" "$SOURCE_ROOT" "$BUILD_FOLDER" "$BUILD_FOLDER/app/Moonlight.app" "$MOONLIGHT_ARCH" || fail "File Provider extension build failed"

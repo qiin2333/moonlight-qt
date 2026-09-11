@@ -42,6 +42,7 @@ private:
     explicit UsbForwardingEnvironment(QObject *parent = nullptr);
 
     void startVersionProbe(const QString &usbipdExe);
+    void startHelperVersionProbe(const QString &helperPath);
     void startServiceProbe();
     void finish(State state);
 

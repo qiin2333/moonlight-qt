@@ -6,15 +6,15 @@
  * One tunnel carries one USB device. The client owns two sockets and copies
  * bytes between them without interpreting a single USB/IP byte:
  *
- *   local  : TCP to the platform USB/IP server on 127.0.0.1:3240
- *            (usbipd-win on Windows, usbip-host on Linux,
- *             USBIPServerForAndroid on Android)
+ *   local  : TCP to the platform USB/IP server (usbipd-win on 3240 on
+ *            Windows; the per-session moonlight-usbd helper on an
+ *            ephemeral loopback port on macOS)
  *   remote : TLS to Sunshine, authenticated with the paired client
  *            certificate, carrying the configured shared token
  *
  * Session owns the tunnel and closes it when streaming ends. The tunnel uses
- * a separate socket from video/audio/control; its port and token currently
- * come from environment overrides, not RTSP negotiation.
+ * a separate socket from video/audio/control; its port and token come from
+ * the GET /api/v1/usb-forwarding capability endpoint.
  *
  * Only the handshake is Moonlight's own protocol: one line of JSON in each
  * direction. Everything after that is an opaque byte stream.

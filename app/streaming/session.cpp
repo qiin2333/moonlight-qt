@@ -14,6 +14,7 @@
 #include "backend/identitymanager.h"
 #include "backend/usbforwardingbackend.h"
 #include "backend/usbforwardingenvironment.h"
+#include "backend/usbforwardinglocalserver.h"
 #include "gui/windowsdisplaygeometry.h"
 
 #include <Limelight.h>
@@ -1461,6 +1462,36 @@ void Session::startRemoteUsb(const QString &deviceId)
 
 void Session::startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config)
 {
+#ifdef Q_OS_DARWIN
+    /* macOS has no resident USB/IP service: spawn the bundled moonlight-usbd
+     * for this device and point the tunnel at its ephemeral loopback port.
+     * Spawned on the Session thread with blocking waits (like the clipboard
+     * helper), never on the capability worker above. */
+    m_UsbLocalServer = new UsbForwardingLocalServer();
+    quint16 helperPort = 0;
+    QString helperError;
+    if (!m_UsbLocalServer->start({QString::fromUtf8(config.busId)},
+                                 &helperPort, &helperError)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "USB helper failed to start: %s",
+                    helperError.toUtf8().constData());
+        const QString message = helperError.contains(QLatin1String("device_occupied"))
+                ? tr("This USB device is in use by macOS and cannot be forwarded.")
+                : helperError.contains(QLatin1String("device_not_found"))
+                      ? tr("The USB device was unplugged. Refresh the list and try again.")
+                      : tr("Could not start the local USB sharing service.");
+        delete m_UsbLocalServer;
+        m_UsbLocalServer = nullptr;
+        teardownUsbTunnel();
+        m_RemoteUsbDetail = message;
+        updateRemoteUsbMenuState();
+        showStreamingToast(message, 5000);
+        return;
+    }
+    config.localHost = QStringLiteral("127.0.0.1");
+    config.localPort = helperPort;
+#endif
+
     m_RemoteUsbDetail = tr("Connecting");
     updateRemoteUsbMenuState();
     m_UsbTunnel = new UsbForwarding::Tunnel(std::move(config), this);
@@ -1507,6 +1538,11 @@ void Session::teardownUsbTunnel()
         m_UsbTunnel->stop();
         m_UsbTunnel->deleteLater();
         m_UsbTunnel = nullptr;
+    }
+    if (m_UsbLocalServer != nullptr) {
+        m_UsbLocalServer->stop();
+        delete m_UsbLocalServer;
+        m_UsbLocalServer = nullptr;
     }
     m_RemoteUsbActiveDeviceId.clear();
     m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Available;

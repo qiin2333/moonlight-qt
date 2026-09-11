@@ -350,6 +350,13 @@ jobs:
       run: |
         scripts/generate-dmg.sh Release
 
+    - name: Smoke test USB forwarding helper
+      run: |
+        HELPER="build/build-Release/app/Moonlight.app/Contents/MacOS/moonlight-usbd"
+        test -x "$HELPER"
+        "$HELPER" --version
+        "$HELPER" list --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d, list)'
+
     - name: Upload DMG artifact
       uses: actions/upload-artifact@v4
       with:

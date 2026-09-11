@@ -1,0 +1,13 @@
+# 给 usbipdcpp 的 pkg_check_modules(libusb-1.0) 用的 vendored 静态 libusb。
+# 由 CMakeLists.txt configure 到 build/pkgconfig/。注意框架链接放 Libs：
+# pkg_check_modules 不带 --static，不读 Libs.private（来源 configure.ac
+# darwin 分支：-lobjc + IOKit + CoreFoundation + Security）。
+libdir=@CMAKE_BINARY_DIR@/lib
+shim=@CMAKE_BINARY_DIR@/libusb-shim
+source=@CMAKE_CURRENT_SOURCE_DIR@
+
+Name: libusb-1.0
+Description: libusb static, vendored by moonlight-usbd
+Version: 1.0.29
+Libs: -L${libdir} -lusb-1.0 -lobjc -framework IOKit -framework CoreFoundation -framework Security
+Cflags: -I${shim} -I${source}/third_party/libusb/libusb

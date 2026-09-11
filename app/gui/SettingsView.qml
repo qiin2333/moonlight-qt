@@ -31,7 +31,7 @@ FocusScope {
 
     // 图标取自 Microsoft Fluent UI System Icons（MIT），和 FluentWinUI3 是同一套设计语言。
     // 之前用 emoji，各平台字体不同，渲染出来大小、粗细、配色都对不齐。
-    readonly property var categories: [
+    readonly property var rawCategories: [
         { key: "basic",    icon: "qrc:/res/fluent/cat-basic.svg",    title: qsTr("Basic Settings") },
         { key: "display",  icon: "qrc:/res/fluent/cat-display.svg",  title: qsTr("Display Settings") },
         { key: "audio",    icon: "qrc:/res/fluent/cat-audio.svg",    title: qsTr("Audio Settings") },
@@ -44,6 +44,13 @@ FocusScope {
         { key: "ecosystem",icon: "qrc:/res/fluent/cat-ecosystem.svg",title: qsTr("AlkaidLab Ecosystem") },
         { key: "about",    icon: "qrc:/res/fluent/cat-about.svg",    title: qsTr("About") }
     ]
+
+    // USB 设备转发只在有本地 USB/IP 后端的平台提供（Windows/macOS）；
+    // 没有的平台连分类一起隐藏，避免出现空页。
+    readonly property var categories: rawCategories.filter(
+        function(c) {
+            return c.key !== "peripherals" || SystemProperties.usbForwardingAvailable
+        })
 
     StackView.onActivated: {
         // This enables Tab and BackTab based navigation rather than arrow keys.

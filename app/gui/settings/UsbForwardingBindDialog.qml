@@ -4,13 +4,20 @@ import QtQuick.Controls
 import QtQuick.Layouts 1.3
 import ".."
 import "../theme"
+import SystemProperties 1.0
 import UsbForwardingBackend 1.0
 
-// USB 设备共享管理对话框。共享/停止共享会触发一次 UAC（usbipd bind/unbind 写
-// HKLM 注册表，需要管理员；每个设备一次）。bind 是持久化的：重启后依然共享；
-// 串流中是否真正转发，仍由悬浮菜单逐台确认。
+// USB 设备共享管理对话框。平台语义不同：
+//  - Windows：共享/停止共享触发一次 UAC（usbipd bind/unbind 写 HKLM 注册表，
+//    需要管理员；每个设备一次）。bind 持久化在 usbipd 自己的注册表里。
+//  - macOS：共享只是记在 Moonlight 偏好里，无提权；转发用的 serve 进程由
+//    串流会话按需拉起。被 macOS 系统驱动占用（HID/存储/摄像头）的设备
+//    显示「In use by macOS」，不可共享。
+// 串流中是否真正转发，两平台都由悬浮菜单逐台确认。
 NavigableDialog {
     id: dialog
+
+    readonly property bool isMac: SystemProperties.isDarwin
 
     title: qsTr("Share USB devices")
     closePolicy: Popup.CloseOnEscape
@@ -34,6 +41,9 @@ NavigableDialog {
     }
 
     function deviceStatusText(d) {
+        if (d.isOccupied !== undefined && d.isOccupied) {
+            return qsTr("In use by macOS")
+        }
         if (!d.isConnected) {
             return d.isBound ? qsTr("Not connected") : ""
         }
@@ -47,6 +57,9 @@ NavigableDialog {
     }
 
     function deviceStatusColor(d) {
+        if (d.isOccupied !== undefined && d.isOccupied) {
+            return Theme.danger
+        }
         if (!d.isConnected || !d.isSupported) {
             return Theme.textFaint
         }
@@ -86,7 +99,9 @@ NavigableDialog {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: qsTr("Stop sharing to restore it. Sharing needs administrator confirmation, once per device.")
+                    text: dialog.isMac
+                          ? qsTr("Stop sharing to restore it. Sharing is remembered by Moonlight and needs no administrator confirmation.")
+                          : qsTr("Stop sharing to restore it. Sharing needs administrator confirmation, once per device.")
                     color: Theme.textDim
                     font.family: Theme.fontSans
                     font.pointSize: Theme.fontCaption
