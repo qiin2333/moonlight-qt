@@ -4813,9 +4813,16 @@ void Session::exec()
         // visibility as active Qt work forces this SDL loop to wake and drain
         // all Qt events every 10 ms even while the button is idle, which can
         // delay input and video processing.
+        // Remote USB 转发的 queued 工作全部投递在本线程（helper spawn 的
+        // worker-finished lambda、tunnel socket I/O、helper stderr 排水），
+        // 而本循环已取代 app.exec()、只在返回 true 时泵事件：转发存续期间
+        // 必须保持泵转，否则 helper 无法启动、日志会写满 stderr 管道把
+        // moonlight-usbd 卡死、转发数据也会停摆。
         return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
                (m_MenuButton && m_MenuButton->needsEventProcessing()) ||
                (m_Toast && m_Toast->needsEventProcessing()) ||
+               m_UsbCapabilityPending || m_UsbLocalServer != nullptr ||
+               m_UsbTunnel != nullptr ||
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
                (m_StylusReplayTest && m_StylusReplayTest->isPanelVisible());
 #else
