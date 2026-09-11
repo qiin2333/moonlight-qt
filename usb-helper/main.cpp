@@ -31,6 +31,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unistd.h>
 #include <vector>
 
 namespace {
@@ -130,8 +131,11 @@ bool interfacesClaimable(libusb_device* device, libusb_device_handle* handle)
 
     bool claimable = true;
     for (int i = 0; i < config->bNumInterfaces && claimable; i++) {
-        if (libusb_claim_interface(handle, i) == LIBUSB_SUCCESS) {
-            libusb_release_interface(handle, i);
+        // libusb wants bInterfaceNumber from the descriptor, not the array
+        // index: interfaces are not guaranteed to be numbered contiguously.
+        const uint8_t interfaceNumber = config->interface[i].altsetting->bInterfaceNumber;
+        if (libusb_claim_interface(handle, interfaceNumber) == LIBUSB_SUCCESS) {
+            libusb_release_interface(handle, interfaceNumber);
         } else {
             claimable = false;
         }
@@ -210,6 +214,7 @@ int runList()
     }
     libusb_free_device_list(devices, 1);
 
+    json += "]";
     std::cout << json << "\n" << std::flush;
     return 0;
 }
@@ -256,13 +261,15 @@ int runServe(const std::vector<std::string>& bindBusIds,
     std::cout << "READY " << server.get_server().endpoint().port() << std::endl;
 
     // 退出条件：stdin EOF（父进程关闭管道）或 SIGTERM/SIGINT。stdin 监视线
-    // 线程用 detach：EOF 时它 raise(SIGTERM) 唤醒 sigwait，进程退出时线程随
-    // 之消亡；反过来信号先到时它可能永远阻塞在 read 上，join 会卡死。
+    // 线程用 detach：EOF 时它 kill(getpid(), SIGTERM) 唤醒主线程的 sigwait，
+    // 进程退出时线程随之消亡；反过来信号先到时它可能永远阻塞在 read 上，
+    // join 会卡死。注意必须用 kill 而非 raise：raise 是线程定向信号
+    // （pthread_kill(self)），只会挂起到本监视线程，sigwait 根本收不到。
     std::thread stdinWatcher([] {
         std::string line;
         while (std::getline(std::cin, line)) {
         }
-        std::raise(SIGTERM);
+        kill(getpid(), SIGTERM);
     });
     stdinWatcher.detach();
 

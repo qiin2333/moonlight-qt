@@ -5,6 +5,11 @@
 #include <QDebug>
 #include <QVariantMap>
 
+// wm.cpp 拖入 SDL/X11 依赖，这里用桩替代（非 Wayland 平台真实现同样返回 false）。
+#include "../../app/utils.h"
+bool WMUtils::isRunningWayland() { return false; }
+bool WMUtils::isGpuSlow() { return false; }
+
 static QVariantMap firstDevice(const char* json)
 {
     QString error;

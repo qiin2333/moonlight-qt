@@ -72,13 +72,13 @@ popd
 # 享的），configure 前清掉防陈旧缓存；主工程的 LTO 环境变量不带给它。
 echo Building USB forwarding helper
 USB_HELPER_BUILD=$BUILD_ROOT/usb-helper-$MOONLIGHT_ARCH
-rm -rf $USB_HELPER_BUILD
+rm -rf "$USB_HELPER_BUILD"
 (
   unset CFLAGS CXXFLAGS LDFLAGS
-  cmake -S $SOURCE_ROOT/usb-helper -B $USB_HELPER_BUILD \
+  cmake -S "$SOURCE_ROOT/usb-helper" -B "$USB_HELPER_BUILD" \
     -DCMAKE_BUILD_TYPE=$BUILD_CONFIG \
     -DCMAKE_OSX_ARCHITECTURES=$MOONLIGHT_ARCH || exit 1
-  cmake --build $USB_HELPER_BUILD -j$(sysctl -n hw.logicalcpu) || exit 1
+  cmake --build "$USB_HELPER_BUILD" -j$(sysctl -n hw.logicalcpu) || exit 1
 ) || fail "USB helper build failed!"
 
 echo Saving dSYM file
@@ -114,7 +114,7 @@ fi
 cp "$HELPER_BINARY" $BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/ || fail "Clipboard helper copy failed!"
 
 echo Copying USB forwarding helper into app bundle
-cp $USB_HELPER_BUILD/moonlight-usbd $BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/ || fail "USB helper copy failed!"
+cp "$USB_HELPER_BUILD/moonlight-usbd" $BUILD_FOLDER/app/Moonlight.app/Contents/MacOS/ || fail "USB helper copy failed!"
 
 # macdeployqt only rewrites Qt references in the main executable and the
 # plugins it deploys, so the clipboard helper has to be named explicitly with

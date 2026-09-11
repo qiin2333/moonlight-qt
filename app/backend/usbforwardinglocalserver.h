@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QString>
 #include <QStringList>
 
@@ -14,9 +15,10 @@ class QProcess;
  * the helper's ephemeral loopback port. The helper exits by itself when its
  * stdin closes, so teardown only has to drop this object.
  *
- * Like ClipboardHelperClient, this must be used from the Session thread only
- * (Session::exec runs the SDL loop without a Qt event loop); all waits are
- * blocking instead of signal-based.
+ * Like ClipboardHelperClient, all waits are blocking instead of signal-based,
+ * except the stderr drain after READY (the helper logs there for its whole
+ * lifetime; the pipe must not fill), which requires this object to live on a
+ * thread with a running event loop.
  */
 class UsbForwardingLocalServer
 {
@@ -43,4 +45,7 @@ public:
 
 private:
     QProcess* m_Process = nullptr;
+
+    // Bounded tail of the helper's stderr after READY, kept for diagnostics.
+    QByteArray m_StderrTail;
 };

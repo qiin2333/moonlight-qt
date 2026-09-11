@@ -14,6 +14,7 @@ static constexpr int START_TIMEOUT_MS = 10000;
 static constexpr int PROCESS_START_TIMEOUT_MS = 2000;
 static constexpr int STOP_TIMEOUT_MS = 2000;
 static constexpr int KILL_TIMEOUT_MS = 1000;
+static constexpr int STDERR_TAIL_LIMIT = 8192;
 
 bool UsbForwardingLocalServer::spawnSupported()
 {
@@ -115,6 +116,21 @@ bool UsbForwardingLocalServer::start(const QStringList& busIds, quint16* actualP
                 const int port = QString::fromLatin1(line.mid(6)).toInt(&portOk);
                 if (portOk && port >= 1 && port <= 65535) {
                     *actualPort = static_cast<quint16>(port);
+                    // The helper logs to stderr for its entire lifetime
+                    // (usbipdcpp/spdlog). Keep draining it into a bounded
+                    // tail so the pipe never fills and blocks the helper.
+                    // This connection needs a running event loop on this
+                    // object's thread (startConfiguredRemoteUsb runs on the
+                    // GUI thread via the queued worker callback).
+                    auto drainStderr = [this] {
+                        m_StderrTail += m_Process->readAllStandardError();
+                        if (m_StderrTail.size() > STDERR_TAIL_LIMIT) {
+                            m_StderrTail.remove(0, m_StderrTail.size() - STDERR_TAIL_LIMIT);
+                        }
+                    };
+                    QObject::connect(m_Process, &QProcess::readyReadStandardError,
+                                     m_Process, drainStderr);
+                    drainStderr();
                     return true;
                 }
                 *error = QStringLiteral("invalid_ready_line: ") + QString::fromLatin1(line);

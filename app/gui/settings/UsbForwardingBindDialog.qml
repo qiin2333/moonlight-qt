@@ -100,7 +100,7 @@ NavigableDialog {
                 Text {
                     Layout.fillWidth: true
                     text: dialog.isMac
-                          ? qsTr("Stop sharing to restore it. Sharing is remembered by Moonlight and needs no administrator confirmation.")
+                          ? qsTr("To restore a device during a stream, release it from the USB Devices menu in the stream overlay or end the stream. Sharing is remembered by Moonlight and needs no administrator confirmation.")
                           : qsTr("Stop sharing to restore it. Sharing needs administrator confirmation, once per device.")
                     color: Theme.textDim
                     font.family: Theme.fontSans
