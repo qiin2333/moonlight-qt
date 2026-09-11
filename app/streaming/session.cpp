@@ -14,6 +14,7 @@
 #include "backend/identitymanager.h"
 #include "backend/usbforwardingbackend.h"
 #include "backend/usbforwardingenvironment.h"
+#include "backend/usbforwardinglocalserver.h"
 #include "gui/windowsdisplaygeometry.h"
 
 #include <Limelight.h>
@@ -1269,6 +1270,12 @@ Session::~Session()
         m_UsbTunnel = nullptr;
     }
 
+    if (m_UsbLocalServer != nullptr) {
+        m_UsbLocalServer->stop();
+        delete m_UsbLocalServer;
+        m_UsbLocalServer = nullptr;
+    }
+
     delete m_DualSenseHapticsRenderer;
     m_DualSenseHapticsRenderer = nullptr;
 
@@ -1461,6 +1468,36 @@ void Session::startRemoteUsb(const QString &deviceId)
 
 void Session::startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config)
 {
+#ifdef Q_OS_DARWIN
+    /* macOS has no resident USB/IP service: spawn the bundled moonlight-usbd
+     * for this device and point the tunnel at its ephemeral loopback port.
+     * Spawned on the Session thread with blocking waits (like the clipboard
+     * helper), never on the capability worker above. */
+    m_UsbLocalServer = new UsbForwardingLocalServer();
+    quint16 helperPort = 0;
+    QString helperError;
+    if (!m_UsbLocalServer->start({QString::fromUtf8(config.busId)},
+                                 &helperPort, &helperError)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "USB helper failed to start: %s",
+                    helperError.toUtf8().constData());
+        const QString message = helperError.contains(QLatin1String("device_occupied"))
+                ? tr("This USB device is in use by macOS and cannot be forwarded.")
+                : helperError.contains(QLatin1String("device_not_found"))
+                      ? tr("The USB device was unplugged. Refresh the list and try again.")
+                      : tr("Could not start the local USB sharing service.");
+        delete m_UsbLocalServer;
+        m_UsbLocalServer = nullptr;
+        teardownUsbTunnel();
+        m_RemoteUsbDetail = message;
+        updateRemoteUsbMenuState();
+        showStreamingToast(message, 5000);
+        return;
+    }
+    config.localHost = QStringLiteral("127.0.0.1");
+    config.localPort = helperPort;
+#endif
+
     m_RemoteUsbDetail = tr("Connecting");
     updateRemoteUsbMenuState();
     m_UsbTunnel = new UsbForwarding::Tunnel(std::move(config), this);
@@ -1507,6 +1544,11 @@ void Session::teardownUsbTunnel()
         m_UsbTunnel->stop();
         m_UsbTunnel->deleteLater();
         m_UsbTunnel = nullptr;
+    }
+    if (m_UsbLocalServer != nullptr) {
+        m_UsbLocalServer->stop();
+        delete m_UsbLocalServer;
+        m_UsbLocalServer = nullptr;
     }
     m_RemoteUsbActiveDeviceId.clear();
     m_RemoteUsbState = OverlayMenuPanel::RemoteUsbState::Available;
@@ -4771,9 +4813,16 @@ void Session::exec()
         // visibility as active Qt work forces this SDL loop to wake and drain
         // all Qt events every 10 ms even while the button is idle, which can
         // delay input and video processing.
+        // Remote USB 转发的 queued 工作全部投递在本线程（helper spawn 的
+        // worker-finished lambda、tunnel socket I/O、helper stderr 排水），
+        // 而本循环已取代 app.exec()、只在返回 true 时泵事件：转发存续期间
+        // 必须保持泵转，否则 helper 无法启动、日志会写满 stderr 管道把
+        // moonlight-usbd 卡死、转发数据也会停摆。
         return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
                (m_MenuButton && m_MenuButton->needsEventProcessing()) ||
                (m_Toast && m_Toast->needsEventProcessing()) ||
+               m_UsbCapabilityPending || m_UsbLocalServer != nullptr ||
+               m_UsbTunnel != nullptr ||
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
                (m_StylusReplayTest && m_StylusReplayTest->isPanelVisible());
 #else

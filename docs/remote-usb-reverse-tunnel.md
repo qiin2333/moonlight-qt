@@ -10,8 +10,39 @@ USB 设备 → usbipd-win → Moonlight Tunnel → TLS → Sunshine reverse_tunn
 
 - Windows 客户端：`UsbForwardingBackend` 管理 usbipd-win 的设备共享与枚举。
 - Windows 主机：`usbip_host_controller` 调用 usbip-win2。
-- Android 客户端在 moonlight-vplus 工程中集成独立的 USB/IP 导出后端，使用同一能力接口和隧道协议；本 Qt 工程不提供 Android 或 Linux 客户端 USB 后端。
-- Linux 主机 controller 当前返回 unsupported。macOS 没有本 PR 可用的 USB/IP 后端。
+- macOS 客户端：捆绑 `moonlight-usbd` helper（usbipdcpp v1.0.9 + libusb v1.0.29，`usb-helper/`），详见下文「macOS 客户端」。
+- Android 客户端在 moonlight-vplus 工程中集成独立的 USB/IP 导出后端，使用同一能力接口和隧道协议；本 Qt 工程不提供 Linux 客户端 USB 后端。
+- Linux 主机 controller 当前返回 unsupported。
+
+## macOS 客户端（moonlight-usbd）
+
+macOS 没有常驻 USB/IP 服务，客户端在 app bundle 内自带 `moonlight-usbd`
+（`Contents/MacOS/moonlight-usbd`，源码 `usb-helper/`，CMake 构建，与 qmake 主
+工程隔离；开发时可用 `MOONLIGHT_USB_HELPER` 环境变量指定路径）。基于
+usbipdcpp（LGPL-3.0）的 `LibusbServer` + vendored libusb v1.0.29（LGPL-2.1+，
+直接编译源文件），全部静态链接。许可组合：LGPL-3.0 条款允许单升入 GPL-3.0，
+与 moonlight-qt 的 GPL-3.0 兼容；usbipdcpp README 要求显著署名（About 页法律
+卡已列出）。
+
+行为与 Windows 后端的差异：
+
+- 设备枚举：`moonlight-usbd list --json` 一次性输出（busId/vid/pid/vidPid/
+  serial/manufacturer/product/claimable），`UsbForwardingBackend::refresh()`
+  的 macOS 分支解析（`parseHelperDevices`，tests/usb_forwarding_backend_list
+  覆盖）。busId 是 libusb 拓扑路径（`1-2`，经 hub `1-2.3`），与 usbipdcpp
+  `find_by_busid` 的生成算法保持字节级一致。
+- 绑定持久化在 Moonlight 偏好（`usbforwardingbound`，busid 列表）；Windows
+  上这一状态由 usbipd 自己的注册表承担。bind/unbind 无提权。注意 busid 是
+  拓扑地址：换 USB 口重插会失配，绑定显示为消失（v1 已知限制）。
+- 本地服务器：转发时由 Session 经 `UsbForwardingLocalServer` 拉起
+  `moonlight-usbd serve --bind <busid> --listen 127.0.0.1:0`，读 stdout 的
+  `READY <port>` 行把隧道 `TunnelConfig.localPort` 指到该临时端口；关闭 stdin
+  或 SIGTERM 优雅退出。隧道本体/能力接口/证书校验与 Windows 完全一致。
+- 平台限制（本质，无法在普通权限下绕过）：macOS 系统驱动（HID 手柄/键盘、
+  存储、摄像头）持有的接口 libusb 无法 claim。helper 逐设备做占用探测
+  （claim/release 探测），被占用的设备在列表中标注「In use by macOS」且不可
+  共享。让这类设备可转发需要 root（libusb 1.0.27+ 的 Darwin detach），预留给
+  未来的特权 helper（SMAppService），不在当前范围。
 
 ## 鉴权与配置
 

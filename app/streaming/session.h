@@ -435,8 +435,11 @@ private:
     bool m_CursorUpdateEventQueued = false;
     /* USB forwarding: one reverse tunnel per forwarded device, owned by this
      * session. m_RemoteUsbDevices mirrors the bound-device list from
-     * UsbForwardingBackend and feeds the overlay menu. */
+     * UsbForwardingBackend and feeds the overlay menu. On macOS the local
+     * USB/IP server (moonlight-usbd serve) is spawned per session and torn
+     * down together with the tunnel. */
     UsbForwarding::Tunnel *m_UsbTunnel = nullptr;
+    class UsbForwardingLocalServer* m_UsbLocalServer = nullptr;
     quint64 m_UsbCapabilityGeneration = 0;
     bool m_UsbCapabilityPending = false;
     std::vector<OverlayMenuPanel::RemoteUsbDevice> m_RemoteUsbDevices;
