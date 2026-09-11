@@ -10,3 +10,15 @@ url=https://github.com/qiin2333/moonlight-common-c.git
 [submodule "third-party/AMF"]
 	path = third-party/AMF
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git
+[submodule "usb-helper/third_party/usbipdcpp"]
+	path = usb-helper/third_party/usbipdcpp
+	url = https://github.com/yunsmall/usbipdcpp.git
+[submodule "usb-helper/third_party/libusb"]
+	path = usb-helper/third_party/libusb
+	url = https://github.com/libusb/libusb.git
+[submodule "usb-helper/third_party/asio"]
+	path = usb-helper/third_party/asio
+	url = https://github.com/chriskohlhoff/asio.git
+[submodule "usb-helper/third_party/spdlog"]
+	path = usb-helper/third_party/spdlog
+	url = https://github.com/gabime/spdlog.git

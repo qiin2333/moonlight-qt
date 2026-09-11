@@ -35,6 +35,7 @@ Column {
     readonly property string bilibiliUrl: "https://space.bilibili.com/3690974838524514"
     readonly property string licenseUrl: "https://github.com/AlkaidLab/foundation-sunshine/blob/master/LICENSE"
     readonly property string noticeUrl: "https://github.com/AlkaidLab/foundation-sunshine/blob/master/NOTICE"
+    readonly property string usbipdcppUrl: "https://github.com/yunsmall/usbipdcpp"
 
     function openExternal(url) {
         if (!Qt.openUrlExternally(url)) {
@@ -128,6 +129,25 @@ Column {
                 HardLink {
                     text: qsTr("Third-party notice")
                     onClicked: aboutPage.openExternal(aboutPage.noticeUrl)
+                }
+            }
+        }
+
+        // usbipdcpp（macOS USB 转发 helper 的核心库）的署名要求，文本按其
+        // README 原文给出。
+        SettingsRow {
+            id: usbipdcppRow
+
+            title: qsTr("usbipdcpp (LGPL-3.0)")
+            description: qsTr("This product uses usbipdcpp (https://github.com/yunsmall/usbipdcpp), licensed under LGPLv3.")
+
+            Flow {
+                width: Math.min(300, Math.max(0, usbipdcppRow.width - Theme.spaceMd * 2))
+                spacing: Theme.spaceSm
+
+                HardLink {
+                    text: qsTr("Project")
+                    onClicked: aboutPage.openExternal(aboutPage.usbipdcppUrl)
                 }
             }
         }

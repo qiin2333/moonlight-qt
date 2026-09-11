@@ -1,5 +1,7 @@
 #include "usbforwardingenvironment.h"
 
+#include "usbforwardinglocalserver.h"
+
 #include <QFileInfo>
 #include <QProcess>
 #include <QStandardPaths>
@@ -50,6 +52,20 @@ void UsbForwardingEnvironment::refresh()
     m_State = Checking;
     emit stateChanged();
     startVersionProbe(usbipdExe);
+#elif defined(Q_OS_DARWIN)
+    // macOS has no system USB/IP service; the server (moonlight-usbd, built
+    // on usbipdcpp) ships inside the app bundle and is spawned per session.
+    const QString helperPath = UsbForwardingLocalServer::locateHelper();
+    if (helperPath.isEmpty()) {
+        m_Version.clear();
+        finish(NotInstalled);
+        return;
+    }
+    m_Checking = true;
+    emit checkingChanged();
+    m_State = Checking;
+    emit stateChanged();
+    startHelperVersionProbe(helperPath);
 #else
     m_Version.clear();
     finish(NotInstalled);
@@ -91,6 +107,44 @@ void UsbForwardingEnvironment::startVersionProbe(const QString &usbipdExe)
     probe->start(usbipdExe, {QStringLiteral("--version")});
 }
 
+void UsbForwardingEnvironment::startHelperVersionProbe(const QString &helperPath)
+{
+    QProcess *probe = new QProcess(this);
+    connect(probe, &QProcess::errorOccurred, this,
+            [this, probe](QProcess::ProcessError processError) {
+        if (processError != QProcess::FailedToStart) {
+            return;
+        }
+        probe->deleteLater();
+        finish(CheckFailed);
+    });
+    connect(probe, &QProcess::finished, this, [this, probe](int exitCode) {
+        probe->deleteLater();
+        if (exitCode != 0) {
+            finish(CheckFailed);
+            return;
+        }
+        const QString output =
+                QString::fromLocal8Bit(probe->readAllStandardOutput());
+        const QString firstLine = output.section(QLatin1Char('\n'), 0, 0).simplified();
+        // "moonlight-usbd 1.0.0 (usbipdcpp v1.0.9)" -> "usbipdcpp v1.0.9"
+        QString version = firstLine;
+        const int libraryIndex = version.indexOf(QLatin1String("usbipdcpp"));
+        if (libraryIndex >= 0) {
+            version = version.mid(libraryIndex);
+        }
+        else if (version.startsWith(QLatin1String("moonlight-usbd"), Qt::CaseInsensitive)) {
+            version.remove(0, 14);
+        }
+        m_Version = version.trimmed();
+        // No service or driver concepts on macOS; presence of the helper is
+        // the whole readiness check.
+        finish(Ready);
+    });
+    QTimer::singleShot(8000, probe, &QProcess::kill);
+    probe->start(helperPath, {QStringLiteral("--version")});
+}
+
 void UsbForwardingEnvironment::startServiceProbe()
 {
     finish(probeServices());
@@ -121,6 +175,10 @@ UsbForwardingEnvironment::State UsbForwardingEnvironment::probeServices()
     }
     CloseServiceHandle(manager);
     return result;
+#elif defined(Q_OS_DARWIN)
+    // Called synchronously from the session worker: never spawn a process
+    // here, just check that the bundled helper is present.
+    return UsbForwardingLocalServer::locateHelper().isEmpty() ? NotInstalled : Ready;
 #else
     return NotInstalled;
 #endif
@@ -134,8 +192,15 @@ QString UsbForwardingEnvironment::readinessError(State state)
         return tr("The USB forwarding driver is not running. Start VBoxUSBMon as administrator, or restart Windows.");
     case ServiceStopped:
         return tr("The usbipd service is not running. Start the service and retry.");
+#ifdef Q_OS_DARWIN
+    case NotInstalled:
+        return tr("The bundled USB sharing component is missing. Reinstall Moonlight.");
+    default:
+        return tr("Could not verify the bundled USB sharing component. Reinstall Moonlight.");
+#else
     default:
         return tr("Could not verify the local USB service and driver. Check the usbipd-win installation.");
+#endif
     }
 }
 

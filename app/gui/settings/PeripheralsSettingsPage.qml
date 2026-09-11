@@ -17,6 +17,9 @@ Column {
     width: parent ? parent.width : 0
     spacing: Theme.spaceLg
 
+    // Windows 走外挂 usbipd-win；macOS 走捆绑的 moonlight-usbd（usbipdcpp）。
+    readonly property bool isMac: SystemProperties.isDarwin
+
     SettingsCard {
         id: usbForwardingCard
         title: qsTr("USB Device Forwarding")
@@ -42,7 +45,7 @@ Column {
         SettingsRow {
             id: usbEnvRow
 
-            title: "usbipd-win"
+            title: peripheralsPage.isMac ? qsTr("USB sharing service") : "usbipd-win"
             description: {
                 if (UsbForwardingEnvironment.checking) {
                     return qsTr("Checking environment…")
@@ -53,16 +56,22 @@ Column {
                 case UsbForwardingEnvironment.DriverStopped:
                     return qsTr("USB driver not running. Start VBoxUSBMon as administrator, or restart Windows.")
                 case UsbForwardingEnvironment.CheckFailed:
-                    return qsTr("Could not verify the USB service and driver. Check the usbipd-win installation.")
+                    return peripheralsPage.isMac
+                        ? qsTr("Could not verify the bundled USB sharing service. Reinstall Moonlight.")
+                        : qsTr("Could not verify the USB service and driver. Check the usbipd-win installation.")
                 case UsbForwardingEnvironment.Ready:
-                    return qsTr("v%1 · Service running")
-                        .arg(UsbForwardingEnvironment.usbipdVersion)
+                    return peripheralsPage.isMac
+                        ? qsTr("%1 · Ready").arg(UsbForwardingEnvironment.usbipdVersion)
+                        : qsTr("v%1 · Service running")
+                              .arg(UsbForwardingEnvironment.usbipdVersion)
                 case UsbForwardingEnvironment.ServiceStopped:
                     return qsTr("Installed (v%1). The usbipd service is not running.")
                         .arg(UsbForwardingEnvironment.usbipdVersion)
                 case UsbForwardingEnvironment.NotInstalled:
                 default:
-                    return qsTr("Not installed. usbipd-win is required to share USB devices.")
+                    return peripheralsPage.isMac
+                        ? qsTr("The bundled USB sharing service is missing. Reinstall Moonlight.")
+                        : qsTr("Not installed. usbipd-win is required to share USB devices.")
                 }
             }
             descriptionFontPointSize: Theme.fontSettingsSubtitle + 1
@@ -77,6 +86,7 @@ Column {
                 }
 
                 HardLink {
+                    visible: !peripheralsPage.isMac
                     text: qsTr("Install / Repair")
                     onClicked: peripheralsPage.openExternal(usbForwardingCard.usbipdUrl)
                 }
@@ -97,6 +107,13 @@ Column {
                     onClicked: bindDialog.open()
                 }
             }
+        }
+
+        // macOS 平台说明：被系统驱动占用的设备（HID/存储/摄像头）无法共享。
+        SettingsRow {
+            visible: peripheralsPage.isMac
+            title: qsTr("Device availability")
+            description: qsTr("Devices managed by macOS itself — keyboards, mice, storage, and cameras — are shown as \"In use by macOS\" and cannot be shared without administrator access.")
         }
 
         SettingsRow {

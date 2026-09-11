@@ -1,0 +1,5 @@
+#pragma once
+// 转发头：usbipdcpp 按 Homebrew 布局 include <libusb-1.0/libusb.h>，vendored
+// 源码树（third_party/libusb）的头在 libusb/libusb.h。本文件由 CMake 生成到
+// build/libusb-shim/libusb-1.0/，经 .pc 的 Cflags 暴露给 usbipdcpp。
+#include "@LIBUSB_HEADER_PATH@"

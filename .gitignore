@@ -8,6 +8,12 @@ soundio/libsoundio/
 libs/
 config.tests/*/.qmake.stash
 config.tests/*/Makefile
+tests/*/.qmake.stash
+tests/*/Makefile
+tests/*/Makefile.Debug
+tests/*/Makefile.Release
+tests/*/debug/
+tests/*/release/
 
 .claude/
 .codex-build/

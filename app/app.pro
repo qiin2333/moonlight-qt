@@ -285,6 +285,7 @@ SOURCES += \
     backend/systemproperties.cpp \
     backend/usbforwardingenvironment.cpp \
     backend/usbforwardingbackend.cpp \
+    backend/usbforwardinglocalserver.cpp \
     backend/usbforwardingtunnel.cpp \
     wm.cpp \
     imageutils.cpp \
@@ -296,6 +297,7 @@ HEADERS += \
     backend/nvapp.h \
     backend/usbforwardingenvironment.h \
     backend/usbforwardingbackend.h \
+    backend/usbforwardinglocalserver.h \
     backend/usbforwardingtunnel.h \
     cli/pair.h \
     settings/compatfetcher.h \
