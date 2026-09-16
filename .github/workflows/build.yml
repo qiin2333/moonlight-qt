@@ -47,7 +47,7 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.11.1'
+        version: '6.11.2'
         modules: 'qtmultimedia qtimageformats'
         cache: true
         aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
@@ -156,7 +156,7 @@ jobs:
         arch: win64_msvc2022_64
         host: windows
         target: desktop
-        version: '6.11.1'
+        version: '6.11.2'
         modules: 'qtmultimedia qtimageformats'
         use-naqt: true
 
@@ -282,7 +282,7 @@ jobs:
         dir: ${{ github.workspace }}\arm64\
         host: windows
         target: desktop
-        version: '6.11.1'
+        version: '6.11.2'
         modules: 'qtmultimedia qtimageformats'
         use-naqt: true
 
@@ -354,7 +354,7 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.11.1'
+        version: '6.11.2'
         modules: 'qtmultimedia qtimageformats'
         cache: true
         aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
@@ -435,10 +435,10 @@ jobs:
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
-    - name: Install Qt 6.11.1
+    - name: Install Qt 6.11.2
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.11.1'
+        version: '6.11.2'
         host: ${{ matrix.qt_host }}
         arch: ${{ matrix.qt_arch }}
         modules: 'qtmultimedia qtimageformats'
@@ -563,7 +563,7 @@ jobs:
         pkg-config --modversion vulkan
     - name: Build SDL3
       run: |
-        export SDL3_REV=3bde3e24069db59133bc1e8dbe3c693008821a93
+        export SDL3_REV=ddba673cddfa79ce798eca5ba402e0f1a2a2a243
         git clone https://github.com/libsdl-org/SDL.git SDL3
         cd SDL3
         git checkout $SDL3_REV
@@ -575,7 +575,7 @@ jobs:
 
     - name: Build sdl2-compat
       run: |
-        export SDL2_COMPAT_REV=1c8ece4de9db96d01f99296c26a87a4cabb72f54
+        export SDL2_COMPAT_REV=release-2.32.70
         git clone https://github.com/libsdl-org/sdl2-compat.git sdl2-compat
         cd sdl2-compat
         git checkout $SDL2_COMPAT_REV
@@ -587,10 +587,12 @@ jobs:
 
     - name: Build SDL2_ttf
       run: |
-        export SDL2_TTF_VER=2.22.0
-        wget https://github.com/libsdl-org/SDL_ttf/releases/download/release-$SDL2_TTF_VER/SDL2_ttf-$SDL2_TTF_VER.tar.gz
-        tar -xf SDL2_ttf-$SDL2_TTF_VER.tar.gz
-        cd SDL2_ttf-$SDL2_TTF_VER
+        export SDL2_TTF_REV=a883e490e30fb44a5336ea3dcb990c6982c5216f
+        git clone https://github.com/libsdl-org/SDL_ttf.git SDL_ttf
+        cd SDL_ttf
+        git checkout $SDL2_TTF_REV
+        git submodule update --init --recursive
+        ./autogen.sh
         ./configure
         make -j$(nproc)
         sudo make install
@@ -620,7 +622,7 @@ jobs:
 
     - name: Build dav1d
       run: |
-        export DAV1D_VER=1.5.0
+        export DAV1D_VER=1.5.4
         git clone --branch $DAV1D_VER --depth 1 https://code.videolan.org/videolan/dav1d.git
         cd dav1d
         meson setup build -Ddefault_library=static -Dbuildtype=release -Denable_tools=false -Denable_tests=false
@@ -631,7 +633,7 @@ jobs:
 
     - name: Build libplacebo
       run: |
-        export LIBPLACEBO_REV=2d0979fb54e025e904c7372666fffbf5dae40f66
+        export LIBPLACEBO_REV=41ac2980e1a898f41d7c2e07999f9862ee89d99f
         git clone https://code.videolan.org/videolan/libplacebo.git
         cd libplacebo
         git checkout $LIBPLACEBO_REV
@@ -654,8 +656,8 @@ jobs:
 
     - name: Build FFmpeg
       run: |
-        export FFMPEG_REV=87ccf995cb855f0baced9916928b7b48d8b6ed9d
-        export FFMPEG_CONFIGURE_ARGS="--enable-pic --disable-static --enable-shared --disable-all --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d"
+        export FFMPEG_REV=n9.0
+        export FFMPEG_CONFIGURE_ARGS="--enable-pic --enable-lto --disable-static --enable-shared --disable-all --disable-autodetect --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-vaapi --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-vdpau --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-vulkan --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d"
         git clone https://github.com/FFmpeg/FFmpeg.git FFmpeg
         cd FFmpeg
         git checkout $FFMPEG_REV
