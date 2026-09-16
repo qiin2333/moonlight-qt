@@ -469,7 +469,7 @@ jobs:
         ccache --max-size=2G
         ccache -z
 
-    # 注意顺序：上面的 install-qt-action 已经装好了 6.11.1 并把它的 qmake 放进 PATH，
+    # 注意顺序：上面的 install-qt-action 已经装好了 6.11.2 并把它的 qmake 放进 PATH，
     # 这一步在它之后。所以这里不要再 apt 装任何 Qt 包 —— 发行版的 Qt（jammy 上是
     # 6.2.x）不会被用到，装了只是白下载，还可能在 AppImage 打包阶段被扫进去。
     - name: Install packaged deps
@@ -479,11 +479,9 @@ jobs:
         # 头文件和 glslang 在下一步单独编。
         if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
           wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
-          if [[ $UBUNTU_RELEASE == "20.04" ]]; then
-            sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.4.313-focal.list https://packages.lunarg.com/vulkan/1.4.313/lunarg-vulkan-1.4.313-focal.list
-          else
-            sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.4.313-jammy.list https://packages.lunarg.com/vulkan/1.4.313/lunarg-vulkan-1.4.313-jammy.list
-          fi
+          # 1.4.313 只有 jammy/noble 的 list(focal 已停发);矩阵里 LunarG 只在
+          # 22.04 上消费,固定用 jammy 的
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.4.313-jammy.list https://packages.lunarg.com/vulkan/1.4.313/lunarg-vulkan-1.4.313-jammy.list
         fi
         sudo apt update || true
         sudo apt install -y \
@@ -575,7 +573,8 @@ jobs:
 
     - name: Build sdl2-compat
       run: |
-        export SDL2_COMPAT_REV=release-2.32.70
+        # release-2.32.70 的不可变 commit(可变 ref 会让同 workflow 拿到不同源码)
+        export SDL2_COMPAT_REV=a53b6ad90ecd2d0ccfe01d5cfd2059793acf8c12
         git clone https://github.com/libsdl-org/sdl2-compat.git sdl2-compat
         cd sdl2-compat
         git checkout $SDL2_COMPAT_REV
