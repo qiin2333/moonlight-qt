@@ -157,101 +157,64 @@ jobs:
 
         echo Build Windows x64 completed successfully!
 
-    - name: Test DualSense haptics rendering
+    - name: Test input & overlay logic
       shell: cmd
       run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
+        rem 统一入口 scripts\run-test.bat:qmake -> jom release -> 运行,法规约见脚本头注释。
+        rem 新增测试时在这里加一对 call + errorlevel 检查即可。
+        call scripts\run-test.bat ds5_ir_renderer ds5_ir_renderer_test
         if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\ds5_ir_renderer
-        qmake ds5_ir_renderer.pro
+        call scripts\run-test.bat pen_history_selection pen_history_selection_test
         if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
+        call scripts\run-test.bat stylus_replay stylus_replay_test
         if errorlevel 1 exit /b %ERRORLEVEL%
-        release\ds5_ir_renderer_test.exe
+        call scripts\run-test.bat overlay_event_wake_state overlay_event_wake_state
         if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-
-    - name: Test pen history selection
-      shell: cmd
-      run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
+        call scripts\run-test.bat overlay_button_native_wake overlay_button_native_wake
         if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\pen_history_selection
-        qmake pen_history_selection.pro
+        call scripts\run-test.bat overlay_toast_event_state overlay_toast_event_state
         if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
+        rem overlay_menu_navigation 用 QTest 合成鼠标事件,CI 无桌面会话,必须 offscreen
+        set QT_QPA_PLATFORM=offscreen
+        call scripts\run-test.bat overlay_menu_navigation overlay_menu_navigation
         if errorlevel 1 exit /b %ERRORLEVEL%
-        release\pen_history_selection_test.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-
-    - name: Test stylus recording replay
-      shell: cmd
-      run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\stylus_replay
-        qmake stylus_replay.pro
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        release\stylus_replay_test.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-
-    - name: Test overlay event wakeups
-      shell: cmd
-      run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\overlay_event_wake_state
-        qmake overlay_event_wake_state.pro
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        release\overlay_event_wake_state.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-        pushd tests\overlay_button_native_wake
-        qmake overlay_button_native_wake.pro
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        release\overlay_button_native_wake.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-        pushd tests\overlay_toast_event_state
-        qmake overlay_toast_event_state.pro
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        release\overlay_toast_event_state.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
 
     - name: Test compiled Chinese translations and settings navigation layout
       shell: cmd
       run: |
+        rem qmltestrunner 流程与普通测试不同,不走 run-test.bat。
         lrelease app\languages\qml_zh_CN.ts
         if errorlevel 1 exit /b %ERRORLEVEL%
         set QT_QPA_PLATFORM=offscreen
         qmltestrunner -input tests\settings_localization -translation app\languages\qml_zh_CN.qm
         if errorlevel 1 exit /b %ERRORLEVEL%
 
-    - name: Test overlay submenu navigation
+    - name: Test clipboard / cursor / file-mapping / overlay layout logic
       shell: cmd
       run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
+        rem 以下均为 QCoreApplication 纯逻辑测试,已在本机以 Qt 6.11.1 + MSVC 逐一验证。
+        call scripts\run-test.bat cursor_shape_classification cursor_shape_classification
         if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\overlay_menu_navigation
-        qmake overlay_menu_navigation.pro
+        call scripts\run-test.bat clipboard_payload_routing clipboard_payload_routing
         if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
+        call scripts\run-test.bat overlay_button_position overlay_button_position
         if errorlevel 1 exit /b %ERRORLEVEL%
-        set QT_QPA_PLATFORM=offscreen
-        release\overlay_menu_navigation.exe
+        call scripts\run-test.bat file_mapping_websocket_framing file_mapping_websocket_framing
         if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
+        call scripts\run-test.bat file_mapping_mirror_e2e file_mapping_mirror_e2e
+        if errorlevel 1 exit /b %ERRORLEVEL%
+
+    - name: Test USB forwarding logic
+      shell: cmd
+      run: |
+        call scripts\run-test.bat usb_forwarding_capability usb_forwarding_capability_test
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat usb_forwarding_environment usb_forwarding_environment_test
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat usb_forwarding_backend_list usb_forwarding_backend_list_test
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        rem usb_forwarding_tunnel 是需要真实 USB/IP 会话的手动联调探针,不进 CI,
+        rem 用法见 tests/README.md。
 
     - name: Install Qt arm64
       uses: jdpurcell/install-qt-action@v5
@@ -428,6 +391,24 @@ jobs:
         echo "$HOME/local/bin" >> $GITHUB_PATH
         echo "PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$HOME/local/lib/${{ matrix.multiarch }}/pkgconfig" >> $GITHUB_ENV
         echo "UBUNTU_RELEASE=$(lsb_release -rs)" >> $GITHUB_ENV
+
+    # 编译缓存:SDL3/FFmpeg/libplacebo 等源码依赖每次全量重编是本 job 的耗时大头。
+    # 这些依赖的 REV 全部钉死,ccache 命中率接近 100%;app 自身增量变更也吃得到。
+    - name: Restore ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-linux-${{ matrix.arch }}-${{ github.run_id }}
+        restore-keys: |
+          ccache-linux-${{ matrix.arch }}-
+
+    - name: Install ccache
+      run: |
+        sudo apt-get install -y ccache
+        # 把 /usr/lib/ccache(编译器包装器目录)顶到 PATH 最前,cmake/make/configure 无感知接入
+        echo "/usr/lib/ccache" >> $GITHUB_PATH
+        ccache --max-size=2G
+        ccache -z
 
     # 注意顺序：上面的 install-qt-action 已经装好了 6.11.1 并把它的 qmake 放进 PATH，
     # 这一步在它之后。所以这里不要再 apt 装任何 Qt 包 —— 发行版的 Qt（jammy 上是
@@ -625,6 +606,9 @@ jobs:
         sudo ldconfig
         cd ..
 
+    - name: Show ccache stats
+      run: ccache --show-stats
+
     - name: Install linuxdeploy
       run: |
         mkdir -p $HOME/bin
@@ -719,9 +703,26 @@ jobs:
         sudo apt update
         sudo apt install -y libc6:i386 libstdc++6:i386
 
+    - name: Derive weekly cache key
+      run: echo "WEEK=$(date +%G-W%V)" >> $GITHUB_ENV
+
+    - name: Restore SteamLink SDK
+      id: steamlink-sdk
+      uses: actions/cache@v4
+      with:
+        path: ~/steamlink-sdk
+        key: steamlink-sdk-${{ env.WEEK }}
+        restore-keys: |
+          steamlink-sdk-
+
     - name: Download SteamLink SDK
+      if: steps.steamlink-sdk.outputs.cache-hit != 'true'
       run: |
-        git clone --depth=1 https://github.com/ValveSoftware/steamlink-sdk.git $HOME/steamlink-sdk
+        # restore-keys 命中上周缓存时目录已存在,跳过 clone(SDK 变更不频繁,
+        # 最多滞后一周;真的需要追新就把 WEEK key 顶掉或手动清缓存)
+        if [ ! -d "$HOME/steamlink-sdk/.git" ]; then
+          git clone --depth=1 https://github.com/ValveSoftware/steamlink-sdk.git $HOME/steamlink-sdk
+        fi
 
     - name: Get version
       run: |
