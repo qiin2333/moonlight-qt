@@ -47,7 +47,7 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.11.2'
+        version: '6.11.1'
         modules: 'qtmultimedia qtimageformats'
         cache: true
         aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
@@ -156,7 +156,7 @@ jobs:
         arch: win64_msvc2022_64
         host: windows
         target: desktop
-        version: '6.11.2'
+        version: '6.11.1'
         modules: 'qtmultimedia qtimageformats'
         use-naqt: true
 
@@ -282,7 +282,7 @@ jobs:
         dir: ${{ github.workspace }}\arm64\
         host: windows
         target: desktop
-        version: '6.11.2'
+        version: '6.11.1'
         modules: 'qtmultimedia qtimageformats'
         use-naqt: true
 
@@ -354,7 +354,7 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.11.2'
+        version: '6.11.1'
         modules: 'qtmultimedia qtimageformats'
         cache: true
         aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
@@ -435,10 +435,10 @@ jobs:
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "CI_VERSION=$VERSION" >> $GITHUB_ENV
 
-    - name: Install Qt 6.11.2
+    - name: Install Qt 6.11.1
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.11.2'
+        version: '6.11.1'
         host: ${{ matrix.qt_host }}
         arch: ${{ matrix.qt_arch }}
         modules: 'qtmultimedia qtimageformats'
@@ -469,7 +469,9 @@ jobs:
         ccache --max-size=2G
         ccache -z
 
-    # 注意顺序：上面的 install-qt-action 已经装好了 6.11.2 并把它的 qmake 放进 PATH，
+    # 注意顺序：上面的 install-qt-action 已经装好了 6.11.1 并把它的 qmake 放进 PATH，
+    # （Qt 暂回 6.11.1：6.11.2 下 overlay_button_native_wake 各唤醒点全挂，
+    #   疑似 6.11.2 XCB 事件投递行为变化，排查清楚前不跟）
     # 这一步在它之后。所以这里不要再 apt 装任何 Qt 包 —— 发行版的 Qt（jammy 上是
     # 6.2.x）不会被用到，装了只是白下载，还可能在 AppImage 打包阶段被扫进去。
     - name: Install packaged deps
