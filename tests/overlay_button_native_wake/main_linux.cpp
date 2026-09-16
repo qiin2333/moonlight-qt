@@ -203,8 +203,7 @@ int main(int argc, char* argv[])
             drainSemaphore(wakeSemaphore);
         }
     }
-    require(rewoken,
-            "pointer motion must wake a re-shown overlay button");
+    require(rewoken, "pointer motion must wake a re-shown overlay button");
     settleQtEvents(button);
     drainSemaphore(wakeSemaphore);
     const int reattachedWakeCount = wakeCount.load(std::memory_order_acquire);
