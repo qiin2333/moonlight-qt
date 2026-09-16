@@ -7,7 +7,7 @@ import shutil
 
 ORGANIZATION = "moonlight-stream"
 PREBUILT_REPO = "moonlight-qt-deps"
-TAG = "v12"
+TAG = "v15"
 
 def get_platform_config():
     system = platform.system()
@@ -21,7 +21,7 @@ def get_platform_config():
 
 def download_and_extract():
     subfolder, asset_name = get_platform_config()
-
+    
     target_dir = os.path.join(os.getcwd(), "libs", subfolder)
     url = f"https://github.com/{ORGANIZATION}/{PREBUILT_REPO}/releases/download/{TAG}/{asset_name}"
 

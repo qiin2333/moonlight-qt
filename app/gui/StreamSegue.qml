@@ -149,7 +149,6 @@ Item {
         backgroundZoomAnimation.start()
 
         // Kick off the stream
-        spinnerTimer.start()
         streamLoader.active = true
     }
 
@@ -285,18 +284,6 @@ Item {
     }
 
     Timer {
-        id: spinnerTimer
-
-        // Display the spinner appearance a bit to allow us to reach
-        // the code in Session.exec() that pumps the event loop.
-        // If we display it immediately, it will briefly hang in the
-        // middle of the animation on Windows, which looks very
-        // obviously broken.
-        interval: 100
-        onTriggered: stageSpinner.visible = true
-    }
-
-    Timer {
         id: startSessionTimer
         onTriggered: {
             // Garbage collect QML stuff before we start streaming,
@@ -331,6 +318,11 @@ Item {
                 sessionReadyForDeletion();
                 return;
             }
+
+            // This spinner is shown only after session.initialize() has completed
+            // to prevent active animations from running during decoder probing,
+            // which causes re-entrant event loop livelocks with libdecor-gtk.
+            stageSpinner.visible = true
 
             // Don't wait unless we have toasts to display
             startSessionTimer.interval = 0

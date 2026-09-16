@@ -4,3 +4,17 @@
 # upstream-status.sh 靠提交信息里的 (cherry picked from commit ...) 自动识别。
 
 fcba7df8 README 构建要求；我们的 README 是重写过的中文版，对应段落已写明「建议使用与 CI 接近的 Qt 6.11.x」，比上游表述更准
+
+# 2026-09-16 同步(34 项积压清零)的决策轨迹
+c1623ff4 color range 系列已由 #151/#160 重实现;本次 merge 实测两侧内容等价(git 自动归零)
+b2f0828d 同上(color range 系列)
+3f26217d 同上(color range 系列)
+4570fba8 同上(color range 系列)
+7cf8b46c 同上(color range 系列)
+a903c5ce 同上(color range 系列)
+2bea406f 同上(color range 系列)
+2e13ed99 FFmpeg D3D11VA full range 已由 #160 重实现;上游的 FFmpeg REV 钉不跟,用我们自己的
+0eff3b9b Qt 6.11.2 暂缓:全仓保持 6.11.1,升级涉及 6 处 CI 钉,单独评估
+da331234 不删仓库内 vswhere.exe:scripts/run-test.bat 依赖它定位 MSVC 环境
+6cae32bf 不删仓库内 jom.exe:scripts/run-test.bat 依赖它做并行编译
+14c26d8c common-c 指向我方 fork(qiin2333/moonlight-common-c),上游 gitlink 不跟;frame loss 修复待单独移植(待办)
