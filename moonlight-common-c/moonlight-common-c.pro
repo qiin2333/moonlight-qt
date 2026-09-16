@@ -100,7 +100,8 @@ CONFIG(debug, debug|release) {
 # common-c (mic 线) 使用 C11 <stdatomic.h>,旧默认标准下 MSVC 直接 #error、
 # GCC gnu99 亦不可靠,统一提到 C11
 win32-msvc {
-    QMAKE_CFLAGS += /std:c11
+    # MSVC 的 C11 原子是实验特性(VS 2022 17.5+),除 /std:c11 外必须显式开启
+    QMAKE_CFLAGS += /std:c11 /experimental:c11atomics
 }
 
 # Older GCC versions defaulted to GNU89
