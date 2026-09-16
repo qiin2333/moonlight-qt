@@ -25,7 +25,7 @@ jobs:
         arch: win64_msvc2022_64
         host: windows
         target: desktop
-        version: '6.11.1'
+        version: '6.11.2'
         modules: 'qtmultimedia'
         use-naqt: true
 

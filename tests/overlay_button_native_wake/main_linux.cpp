@@ -46,6 +46,25 @@ void drainSemaphore(QSemaphore& semaphore)
     }
 }
 
+// X11 监视器的挂载/重挂载都经 SDL owner loop 异步完成:settle 后的 drain 可能
+// 先吃掉挂载本身产生的唤醒,此时单次合成事件会落进尚未监听的窗口。有限次
+// 重试"发事件-等唤醒",挂载完成后第一次事件即成功。
+// 只用于幂等的指针运动:点击有副作用(超时的点击可能仍在队列,settle 处理后
+// 计数 +1,重发会打破精确计数断言),点击一律单次发送 + 长等待。
+template <typename Fire>
+bool pokeUntilWake(OverlayMenuButton& button, Fire fire, QSemaphore& wakeSemaphore)
+{
+    for (int attempt = 0; attempt < 10; attempt++) {
+        fire();
+        if (wakeSemaphore.tryAcquire(1, 200)) {
+            return true;
+        }
+        settleQtEvents(button);
+        drainSemaphore(wakeSemaphore);
+    }
+    return false;
+}
+
 void sendPointerMotion(Display* display, const QPoint& globalPosition)
 {
     require(XTestFakeMotionEvent(display,
@@ -150,8 +169,8 @@ int main(int argc, char* argv[])
     // Move onto the button and finish that Qt pass first. The click below is
     // then delivered while the pointer is stationary, which exercises X11's
     // implicit pointer grab instead of relying on an EnterNotify wakeup.
-    sendPointerMotion(display, buttonCenter);
-    require(wakeSemaphore.tryAcquire(1, 1000),
+    require(pokeUntilWake(
+                button, [&] { sendPointerMotion(display, buttonCenter); }, wakeSemaphore),
             "real X11 pointer motion must wake the SDL owner loop");
     settleQtEvents(button);
     drainSemaphore(wakeSemaphore);
@@ -194,16 +213,9 @@ int main(int argc, char* argv[])
     // showButton may already be consumed by the drain above while the X11 monitor
     // is not reattached yet, so a single motion can fall on the floor. Poke the
     // pointer a bounded number of times until the reattached monitor wakes.
-    bool rewoken = false;
-    for (int attempt = 0; attempt < 10 && !rewoken; attempt++) {
-        sendPointerMotion(display, reattachedButtonCenter);
-        rewoken = wakeSemaphore.tryAcquire(1, 200);
-        if (!rewoken) {
-            settleQtEvents(button);
-            drainSemaphore(wakeSemaphore);
-        }
-    }
-    require(rewoken, "pointer motion must wake a re-shown overlay button");
+    require(pokeUntilWake(
+                button, [&] { sendPointerMotion(display, reattachedButtonCenter); }, wakeSemaphore),
+            "pointer motion must wake a re-shown overlay button");
     settleQtEvents(button);
     drainSemaphore(wakeSemaphore);
     const int reattachedWakeCount = wakeCount.load(std::memory_order_acquire);
