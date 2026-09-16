@@ -71,6 +71,8 @@ SOURCES += \
     $$COMMON_C_DIR/src/PlatformSockets.c \
     $$COMMON_C_DIR/src/RtpAudioQueue.c \
     $$COMMON_C_DIR/src/RtpVideoQueue.c \
+    $$COMMON_C_DIR/src/RecorderCallbacks.c \
+    $$COMMON_C_DIR/src/RemoteTextContextStream.c \
     $$COMMON_C_DIR/src/RtspConnection.c \
     $$COMMON_C_DIR/src/RtspParser.c \
     $$COMMON_C_DIR/src/SdpGenerator.c \
@@ -95,9 +97,15 @@ CONFIG(debug, debug|release) {
     DEFINES += LC_DEBUG
 }
 
+# common-c (mic 线) 使用 C11 <stdatomic.h>,旧默认标准下 MSVC 直接 #error、
+# GCC gnu99 亦不可靠,统一提到 C11
+win32-msvc {
+    QMAKE_CFLAGS += /std:c11
+}
+
 # Older GCC versions defaulted to GNU89
 *-g++ {
-    QMAKE_CFLAGS += -std=gnu99
+    QMAKE_CFLAGS += -std=gnu11
 }
 
 # Disable unused parameter warnings on GCC and Clang
