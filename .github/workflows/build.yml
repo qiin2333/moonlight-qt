@@ -96,10 +96,24 @@ jobs:
         clang-format --version
 
     - name: Check formatting of changed lines
-      if: github.event_name == 'pull_request'
+      env:
+        BASE_REF: ${{ github.base_ref }}
+        EVENT_NAME: ${{ github.event_name }}
+        BEFORE: ${{ github.event.before }}
       run: |
-        BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
-        echo "格式检查基线: $BASE"
+        # 每种事件的检查基线:
+        #   pull_request -> 与目标分支的 merge-base;
+        #   push         -> 上一提交(weblate 机器人会直推 master,也要拦);
+        #   release/tag dispatch -> merge-base 退化 HEAD(tag 指向的提交在
+        #   master 落地时已被 PR 检查过),自然通过,不再是空转的假 job。
+        if [ -n "$BASE_REF" ]; then
+          BASE=$(git merge-base "origin/$BASE_REF" HEAD)
+        elif [ "$EVENT_NAME" = "push" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+          BASE=$BEFORE
+        else
+          BASE=$(git merge-base origin/master HEAD)
+        fi
+        echo "格式检查基线: $BASE (event=$EVENT_NAME)"
         # git clang-format --diff 只对 diff 触及的行重排并报告结果,不改工作区。
         # 无需格式化时输出 "none" / "no modified files to format" 等固定文案。
         OUTPUT=$(git clang-format --diff --style file "$BASE" 2>&1)
@@ -763,10 +777,15 @@ jobs:
     - name: Download SteamLink SDK
       if: steps.steamlink-sdk.outputs.cache-hit != 'true'
       run: |
-        # restore-keys 命中上周缓存时目录已存在,跳过 clone(SDK 变更不频繁,
-        # 最多滞后一周;真的需要追新就把 WEEK key 顶掉或手动清缓存)
-        if [ ! -d "$HOME/steamlink-sdk/.git" ]; then
-          git clone --depth=1 https://github.com/ValveSoftware/steamlink-sdk.git $HOME/steamlink-sdk
+        # restore-keys 命中上周缓存时目录已存在——不能直接沿用,否则旧 SDK 会被
+        # cache post-step 打上本周的新 key 无限传递。fetch + reset 到远端 HEAD,
+        # 让 SDK 始终跟住上游默认分支(变更不频繁,fetch 增量很小)。
+        if [ -d "$HOME/steamlink-sdk/.git" ]; then
+          git -C "$HOME/steamlink-sdk" fetch --depth=1 origin
+          git -C "$HOME/steamlink-sdk" remote set-head origin --auto
+          git -C "$HOME/steamlink-sdk" reset --hard origin/HEAD
+        else
+          git clone --depth=1 https://github.com/ValveSoftware/steamlink-sdk.git "$HOME/steamlink-sdk"
         fi
 
     - name: Get version

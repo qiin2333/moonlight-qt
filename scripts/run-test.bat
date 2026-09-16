@@ -23,7 +23,24 @@ qmake %~1.pro
 if errorlevel 1 exit /b %ERRORLEVEL%
 ..\..\scripts\jom.exe %JOM_JOBS% release
 if errorlevel 1 exit /b %ERRORLEVEL%
-release\%~2.exe %3 %4 %5 %6 %7 %8 %9
-set RC=%ERRORLEVEL%
+
+rem Forward every extra arg (%3 and beyond) to the test binary. Batch tops out
+rem at %9, so collect them with a shift loop instead of listing %3..%9.
+rem Delayed expansion keeps argument content (quotes included) out of the parser.
+rem Capture %~2 BEFORE shifting: shift moves it to old %3's slot.
+set "TARGET_EXE=%~2"
+setlocal EnableExtensions EnableDelayedExpansion
+set "TESTARGS="
+shift
+shift
+:collect_args
+set "CUR=%~1"
+if not defined CUR goto run_test
+if defined TESTARGS (set "TESTARGS=!TESTARGS! !CUR!") else set "TESTARGS=!CUR!"
+shift
+goto collect_args
+:run_test
+release\!TARGET_EXE!.exe !TESTARGS!
+endlocal & set "RC=%ERRORLEVEL%"
 popd
 exit /b %RC%

@@ -57,8 +57,17 @@ jobs:
           printf '</details>\n'
         )
 
-        NUMBER=$(gh issue list --repo "$REPO" --state open --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number' || true)
-        CLOSED=$(gh issue list --repo "$REPO" --state closed --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number' || true)
+        # tracking issue 的身份标识 = 专用标签 + 只认机器人作者 + 标题,
+        # 防止人工创建的同名 issue 被本任务误编辑/关闭。
+        SYNC_LABEL="upstream-sync"
+        BOT_AUTHOR="github-actions[bot]"
+        gh label create "$SYNC_LABEL" --repo "$REPO" --color 5319E7 \
+          --description "上游同步自动化报告" --force >/dev/null 2>&1 || true
+
+        NUMBER=$(gh issue list --repo "$REPO" --state open --author "$BOT_AUTHOR" \
+          --label "$SYNC_LABEL" --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number' || true)
+        CLOSED=$(gh issue list --repo "$REPO" --state closed --author "$BOT_AUTHOR" \
+          --label "$SYNC_LABEL" --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number' || true)
 
         if [ "$PENDING" -eq 0 ]; then
           # 积压清零:关掉常亮的 tracking issue,避免失去警示意义
@@ -74,6 +83,8 @@ jobs:
           gh issue edit "$CLOSED" --repo "$REPO" --body "$BODY"
           echo "已重开 issue #$CLOSED"
         else
-          gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body "$BODY"
+          # 标签创建失败(权限等)时降级为无标签建 issue,author 过滤仍然生效
+          gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body "$BODY" --label "$SYNC_LABEL" \
+            || gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body "$BODY"
           echo "已创建 tracking issue"
         fi
