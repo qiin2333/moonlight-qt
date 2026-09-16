@@ -34,7 +34,7 @@ set "TESTARGS="
 shift
 shift
 :collect_args
-set "CUR=%~1"
+set "CUR=%1"
 if not defined CUR goto run_test
 if defined TESTARGS (set "TESTARGS=!TESTARGS! !CUR!") else set "TESTARGS=!CUR!"
 shift
