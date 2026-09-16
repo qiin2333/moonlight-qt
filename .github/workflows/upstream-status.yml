@@ -1,0 +1,79 @@
+name: Upstream sync status
+
+# 每周一自动跑 scripts/upstream-status.sh,把「上游有、我们还没处理」的提交
+# 报到一张 tracking issue 上,让同步积压可见 —— 防止再出现 2026-07 之后
+# 51 天无人同步、25 个提交堆积的失速状态。流程与判重口径见 docs/upstream-sync.md。
+
+on:
+  schedule:
+    # 每周一 01:23 UTC(北京时间周一上午),错开整点高峰
+    - cron: '23 1 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream-status
+  cancel-in-progress: true
+
+env:
+  ISSUE_TITLE: 上游同步状态跟踪（自动化报告）
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run upstream status
+      run: |
+        scripts/upstream-status.sh | tee report.txt
+        echo "## 运行详情" >> "$GITHUB_STEP_SUMMARY"
+        echo '```' >> "$GITHUB_STEP_SUMMARY"
+        cat report.txt >> "$GITHUB_STEP_SUMMARY"
+        echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Create or update tracking issue
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        REPORT=$(cat report.txt)
+        PENDING=$(grep -cE '^(★|☆)' report.txt || true)
+        STAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
+
+        BODY=$(
+          printf '%s\n\n' "由 [upstream-status workflow]($RUN_URL) 于 $STAMP 生成。待处理 **$PENDING** 条。"
+          printf '处理流程见 docs/upstream-sync.md:要跟 → merge upstream/master(手工摘提交必须带 -x);\n'
+          printf '不跟/已重实现 → 把短 sha 和原因写进 scripts/upstream-skip.txt。\n\n'
+          printf '<details>\n<summary>upstream-status.sh 完整输出</summary>\n\n'
+          printf '```\n%s\n```\n' "$REPORT"
+          printf '</details>\n'
+        )
+
+        NUMBER=$(gh issue list --repo "$REPO" --state open --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number' || true)
+        CLOSED=$(gh issue list --repo "$REPO" --state closed --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number' || true)
+
+        if [ "$PENDING" -eq 0 ]; then
+          # 积压清零:关掉常亮的 tracking issue,避免失去警示意义
+          if [ -n "$NUMBER" ]; then
+            gh issue close "$NUMBER" --repo "$REPO" --comment "本次检查无待处理的上游提交,自动关闭;下次有积压时会重开。"
+          fi
+          echo "无待处理项,收工"
+        elif [ -n "$NUMBER" ]; then
+          gh issue edit "$NUMBER" --repo "$REPO" --body "$BODY"
+          echo "已更新 issue #$NUMBER"
+        elif [ -n "$CLOSED" ]; then
+          gh issue reopen "$CLOSED" --repo "$REPO"
+          gh issue edit "$CLOSED" --repo "$REPO" --body "$BODY"
+          echo "已重开 issue #$CLOSED"
+        else
+          gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body "$BODY"
+          echo "已创建 tracking issue"
+        fi
