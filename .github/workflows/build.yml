@@ -17,7 +17,6 @@ on:
 permissions:
   contents: write
   packages: write
-  security-events: write
   actions: read
 
 concurrency:
@@ -69,6 +68,66 @@ jobs:
 
     - name: Test version derivation
       run: python3 -m unittest discover -s tests/derive_version -p 'test_*.py'
+
+  cpp-format:
+    # C++ 格式门禁:用 git clang-format 只检查相对目标分支**改动过的行**,
+    # 不做全量重排 —— 全量重排会让每次 merge 上游都变成格式冲突灾难。
+    # 与 qml-lint 同理收权到只读,防止 PR 作者借脚本提权。
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Install pinned clang-format
+      run: |
+        # 版本必须钉死:不同 clang-format 版本对同一份 .clang-format 的输出有差异。
+        # 本地请装同一版本(pip install clang-format==21.1.8)再跑 git clang-format。
+        # PyPI 包自带配套的 git-clang-format 驱动,无需另行下载;runner 预装的
+        # /usr/bin/clang-format 版本未知,靠 ~/.local/bin 在 PATH 里靠前来压过它。
+        pipx install clang-format==21.1.8
+        command -v clang-format git-clang-format
+        clang-format --version
+
+    - name: Check formatting of changed lines
+      env:
+        BASE_REF: ${{ github.base_ref }}
+        EVENT_NAME: ${{ github.event_name }}
+        BEFORE: ${{ github.event.before }}
+      run: |
+        # 每种事件的检查基线:
+        #   pull_request -> 与目标分支的 merge-base;
+        #   push         -> 上一提交(weblate 机器人会直推 master,也要拦);
+        #   release/tag dispatch -> merge-base 退化 HEAD(tag 指向的提交在
+        #   master 落地时已被 PR 检查过),自然通过,不再是空转的假 job。
+        if [ -n "$BASE_REF" ]; then
+          BASE=$(git merge-base "origin/$BASE_REF" HEAD)
+        elif [ "$EVENT_NAME" = "push" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+          BASE=$BEFORE
+        else
+          BASE=$(git merge-base origin/master HEAD)
+        fi
+        echo "格式检查基线: $BASE (event=$EVENT_NAME)"
+        # git clang-format --diff 只对 diff 触及的行重排并报告结果,不改工作区。
+        # 无需格式化时输出 "none" / "no modified files to format" 等固定文案。
+        OUTPUT=$(git clang-format --diff --style file "$BASE" 2>&1)
+        case "$OUTPUT" in
+          none|*"no modified files to format"|*"clang-format did not modify any files")
+            echo "格式检查通过"
+            ;;
+          *)
+            echo "$OUTPUT"
+            echo "::error::C++ 改动行未通过 clang-format。本地执行 pip install clang-format==21.1.8 后跑 git clang-format 即可自动修复"
+            exit 1
+            ;;
+        esac
+
 
   build-windows:
     runs-on: windows-2022
@@ -157,101 +216,64 @@ jobs:
 
         echo Build Windows x64 completed successfully!
 
-    - name: Test DualSense haptics rendering
+    - name: Test input & overlay logic
       shell: cmd
       run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
+        rem 统一入口 scripts\run-test.bat:qmake -> jom release -> 运行,法规约见脚本头注释。
+        rem 新增测试时在这里加一对 call + errorlevel 检查即可。
+        call scripts\run-test.bat ds5_ir_renderer ds5_ir_renderer_test
         if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\ds5_ir_renderer
-        qmake ds5_ir_renderer.pro
+        call scripts\run-test.bat pen_history_selection pen_history_selection_test
         if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
+        call scripts\run-test.bat stylus_replay stylus_replay_test
         if errorlevel 1 exit /b %ERRORLEVEL%
-        release\ds5_ir_renderer_test.exe
+        call scripts\run-test.bat overlay_event_wake_state overlay_event_wake_state
         if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-
-    - name: Test pen history selection
-      shell: cmd
-      run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
+        call scripts\run-test.bat overlay_button_native_wake overlay_button_native_wake
         if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\pen_history_selection
-        qmake pen_history_selection.pro
+        call scripts\run-test.bat overlay_toast_event_state overlay_toast_event_state
         if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
+        rem overlay_menu_navigation 用 QTest 合成鼠标事件,CI 无桌面会话,必须 offscreen
+        set QT_QPA_PLATFORM=offscreen
+        call scripts\run-test.bat overlay_menu_navigation overlay_menu_navigation
         if errorlevel 1 exit /b %ERRORLEVEL%
-        release\pen_history_selection_test.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-
-    - name: Test stylus recording replay
-      shell: cmd
-      run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\stylus_replay
-        qmake stylus_replay.pro
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        release\stylus_replay_test.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-
-    - name: Test overlay event wakeups
-      shell: cmd
-      run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\overlay_event_wake_state
-        qmake overlay_event_wake_state.pro
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        release\overlay_event_wake_state.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-        pushd tests\overlay_button_native_wake
-        qmake overlay_button_native_wake.pro
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        release\overlay_button_native_wake.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
-        pushd tests\overlay_toast_event_state
-        qmake overlay_toast_event_state.pro
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        release\overlay_toast_event_state.exe
-        if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
 
     - name: Test compiled Chinese translations and settings navigation layout
       shell: cmd
       run: |
+        rem qmltestrunner 流程与普通测试不同,不走 run-test.bat。
         lrelease app\languages\qml_zh_CN.ts
         if errorlevel 1 exit /b %ERRORLEVEL%
         set QT_QPA_PLATFORM=offscreen
         qmltestrunner -input tests\settings_localization -translation app\languages\qml_zh_CN.qm
         if errorlevel 1 exit /b %ERRORLEVEL%
 
-    - name: Test overlay submenu navigation
+    - name: Test clipboard / cursor / file-mapping / overlay layout logic
       shell: cmd
       run: |
-        for /f "usebackq delims=" %%i in (`scripts\vswhere.exe -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" AMD64
+        rem 以下均为 QCoreApplication 纯逻辑测试,已在本机以 Qt 6.11.1 + MSVC 逐一验证。
+        call scripts\run-test.bat cursor_shape_classification cursor_shape_classification
         if errorlevel 1 exit /b %ERRORLEVEL%
-        pushd tests\overlay_menu_navigation
-        qmake overlay_menu_navigation.pro
+        call scripts\run-test.bat clipboard_payload_routing clipboard_payload_routing
         if errorlevel 1 exit /b %ERRORLEVEL%
-        ..\..\scripts\jom.exe release
+        call scripts\run-test.bat overlay_button_position overlay_button_position
         if errorlevel 1 exit /b %ERRORLEVEL%
-        set QT_QPA_PLATFORM=offscreen
-        release\overlay_menu_navigation.exe
+        call scripts\run-test.bat file_mapping_websocket_framing file_mapping_websocket_framing
         if errorlevel 1 exit /b %ERRORLEVEL%
-        popd
+        call scripts\run-test.bat file_mapping_mirror_e2e file_mapping_mirror_e2e
+        if errorlevel 1 exit /b %ERRORLEVEL%
+
+    - name: Test USB forwarding logic
+      shell: cmd
+      run: |
+        call scripts\run-test.bat usb_forwarding_capability usb_forwarding_capability_test
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat usb_forwarding_environment usb_forwarding_environment_test
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat usb_forwarding_backend_list usb_forwarding_backend_list_test
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        rem usb_forwarding_tunnel 是需要真实 USB/IP 会话的手动联调探针,不进 CI,
+        rem 用法见 tests/README.md。
 
     - name: Install Qt arm64
       uses: jdpurcell/install-qt-action@v5
@@ -428,6 +450,24 @@ jobs:
         echo "$HOME/local/bin" >> $GITHUB_PATH
         echo "PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$HOME/local/lib/${{ matrix.multiarch }}/pkgconfig" >> $GITHUB_ENV
         echo "UBUNTU_RELEASE=$(lsb_release -rs)" >> $GITHUB_ENV
+
+    # 编译缓存:SDL3/FFmpeg/libplacebo 等源码依赖每次全量重编是本 job 的耗时大头。
+    # 这些依赖的 REV 全部钉死,ccache 命中率接近 100%;app 自身增量变更也吃得到。
+    - name: Restore ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-linux-${{ matrix.arch }}-${{ github.run_id }}
+        restore-keys: |
+          ccache-linux-${{ matrix.arch }}-
+
+    - name: Install ccache
+      run: |
+        sudo apt-get install -y ccache
+        # 把 /usr/lib/ccache(编译器包装器目录)顶到 PATH 最前,cmake/make/configure 无感知接入
+        echo "/usr/lib/ccache" >> $GITHUB_PATH
+        ccache --max-size=2G
+        ccache -z
 
     # 注意顺序：上面的 install-qt-action 已经装好了 6.11.1 并把它的 qmake 放进 PATH，
     # 这一步在它之后。所以这里不要再 apt 装任何 Qt 包 —— 发行版的 Qt（jammy 上是
@@ -625,6 +665,9 @@ jobs:
         sudo ldconfig
         cd ..
 
+    - name: Show ccache stats
+      run: ccache --show-stats
+
     - name: Install linuxdeploy
       run: |
         mkdir -p $HOME/bin
@@ -719,9 +762,31 @@ jobs:
         sudo apt update
         sudo apt install -y libc6:i386 libstdc++6:i386
 
+    - name: Derive weekly cache key
+      run: echo "WEEK=$(date +%G-W%V)" >> $GITHUB_ENV
+
+    - name: Restore SteamLink SDK
+      id: steamlink-sdk
+      uses: actions/cache@v4
+      with:
+        path: ~/steamlink-sdk
+        key: steamlink-sdk-${{ env.WEEK }}
+        restore-keys: |
+          steamlink-sdk-
+
     - name: Download SteamLink SDK
+      if: steps.steamlink-sdk.outputs.cache-hit != 'true'
       run: |
-        git clone --depth=1 https://github.com/ValveSoftware/steamlink-sdk.git $HOME/steamlink-sdk
+        # restore-keys 命中上周缓存时目录已存在——不能直接沿用,否则旧 SDK 会被
+        # cache post-step 打上本周的新 key 无限传递。fetch + reset 到远端 HEAD,
+        # 让 SDK 始终跟住上游默认分支(变更不频繁,fetch 增量很小)。
+        if [ -d "$HOME/steamlink-sdk/.git" ]; then
+          git -C "$HOME/steamlink-sdk" fetch --depth=1 origin
+          git -C "$HOME/steamlink-sdk" remote set-head origin --auto
+          git -C "$HOME/steamlink-sdk" reset --hard origin/HEAD
+        else
+          git clone --depth=1 https://github.com/ValveSoftware/steamlink-sdk.git "$HOME/steamlink-sdk"
+        fi
 
     - name: Get version
       run: |
@@ -741,7 +806,7 @@ jobs:
 
   release:
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_release && github.ref_type == 'tag')
-    needs: [qml-lint, version-tests, build-windows, build-macos, build-linux, build-steamlink]
+    needs: [qml-lint, version-tests, cpp-format, build-windows, build-macos, build-linux, build-steamlink]
     runs-on: ubuntu-latest
 
     steps:

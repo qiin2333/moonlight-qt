@@ -12,6 +12,8 @@ tests/*/.qmake.stash
 tests/*/Makefile
 tests/*/Makefile.Debug
 tests/*/Makefile.Release
+tests/*/*.o
+tests/*/*.obj
 tests/*/debug/
 tests/*/release/
 
