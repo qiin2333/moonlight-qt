@@ -89,11 +89,10 @@ jobs:
       run: |
         # 版本必须钉死:不同 clang-format 版本对同一份 .clang-format 的输出有差异。
         # 本地请装同一版本(pip install clang-format==21.1.8)再跑 git clang-format。
+        # PyPI 包自带配套的 git-clang-format 驱动,无需另行下载;runner 预装的
+        # /usr/bin/clang-format 版本未知,靠 ~/.local/bin 在 PATH 里靠前来压过它。
         pipx install clang-format==21.1.8
-        # PyPI 的 clang-format 包不带 git-clang-format 驱动脚本,从同版本 LLVM 分支取
-        curl -fsSL -o "$HOME/.local/bin/git-clang-format" \
-          https://raw.githubusercontent.com/llvm/llvm-project/release/21.x/clang/tools/clang-format/git-clang-format
-        chmod +x "$HOME/.local/bin/git-clang-format"
+        command -v clang-format git-clang-format
         clang-format --version
 
     - name: Check formatting of changed lines
