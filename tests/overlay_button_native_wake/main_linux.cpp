@@ -190,8 +190,20 @@ int main(int argc, char* argv[])
     settleQtEvents(button);
     drainSemaphore(wakeSemaphore);
     const QPoint reattachedButtonCenter = nativeWindowCenter(display, button.winId());
-    sendPointerMotion(display, reattachedButtonCenter);
-    require(wakeSemaphore.tryAcquire(1, 1000),
+    // Reattachment goes through the SDL owner loop asynchronously: the wake from
+    // showButton may already be consumed by the drain above while the X11 monitor
+    // is not reattached yet, so a single motion can fall on the floor. Poke the
+    // pointer a bounded number of times until the reattached monitor wakes.
+    bool rewoken = false;
+    for (int attempt = 0; attempt < 10 && !rewoken; attempt++) {
+        sendPointerMotion(display, reattachedButtonCenter);
+        rewoken = wakeSemaphore.tryAcquire(1, 200);
+        if (!rewoken) {
+            settleQtEvents(button);
+            drainSemaphore(wakeSemaphore);
+        }
+    }
+    require(rewoken,
             "pointer motion must wake a re-shown overlay button");
     settleQtEvents(button);
     drainSemaphore(wakeSemaphore);
