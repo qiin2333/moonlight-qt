@@ -17,7 +17,6 @@ on:
 permissions:
   contents: write
   packages: write
-  security-events: write
   actions: read
 
 concurrency:
@@ -69,6 +68,53 @@ jobs:
 
     - name: Test version derivation
       run: python3 -m unittest discover -s tests/derive_version -p 'test_*.py'
+
+  cpp-format:
+    # C++ 格式门禁:用 git clang-format 只检查相对目标分支**改动过的行**,
+    # 不做全量重排 —— 全量重排会让每次 merge 上游都变成格式冲突灾难。
+    # 与 qml-lint 同理收权到只读,防止 PR 作者借脚本提权。
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Install pinned clang-format
+      run: |
+        # 版本必须钉死:不同 clang-format 版本对同一份 .clang-format 的输出有差异。
+        # 本地请装同一版本(pip install clang-format==21.1.8)再跑 git clang-format。
+        pipx install clang-format==21.1.8
+        # PyPI 的 clang-format 包不带 git-clang-format 驱动脚本,从同版本 LLVM 分支取
+        curl -fsSL -o "$HOME/.local/bin/git-clang-format" \
+          https://raw.githubusercontent.com/llvm/llvm-project/release/21.x/clang/tools/clang-format/git-clang-format
+        chmod +x "$HOME/.local/bin/git-clang-format"
+        clang-format --version
+
+    - name: Check formatting of changed lines
+      if: github.event_name == 'pull_request'
+      run: |
+        BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+        echo "格式检查基线: $BASE"
+        # git clang-format --diff 只对 diff 触及的行重排并报告结果,不改工作区。
+        # 无需格式化时输出 "none" / "no modified files to format" 等固定文案。
+        OUTPUT=$(git clang-format --diff --style file "$BASE" 2>&1)
+        case "$OUTPUT" in
+          none|*"no modified files to format"|*"clang-format did not modify any files")
+            echo "格式检查通过"
+            ;;
+          *)
+            echo "$OUTPUT"
+            echo "::error::C++ 改动行未通过 clang-format。本地执行 pip install clang-format==21.1.8 后跑 git clang-format 即可自动修复"
+            exit 1
+            ;;
+        esac
+
 
   build-windows:
     runs-on: windows-2022
@@ -742,7 +788,7 @@ jobs:
 
   release:
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_release && github.ref_type == 'tag')
-    needs: [qml-lint, version-tests, build-windows, build-macos, build-linux, build-steamlink]
+    needs: [qml-lint, version-tests, cpp-format, build-windows, build-macos, build-linux, build-steamlink]
     runs-on: ubuntu-latest
 
     steps:

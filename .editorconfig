@@ -1,0 +1,27 @@
+# 统一编辑器行为,防空白/换行漂移。配合 .clang-format(C++ 深度格式化走那边)。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Windows 批处理/PowerShell 脚本必须 CRLF,否则 cmd 会偶发解析错误
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# Markdown 行尾双空格是硬换行语义,不清理
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+[*.{cpp,h,hpp,c,mm,qml,js,py}]
+indent_style = space
+indent_size = 4
+
+[Makefile*]
+indent_style = tab
