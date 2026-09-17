@@ -27,6 +27,7 @@ extern "C" int ClipboardHelperPasteboardChangeCount();
 extern "C" bool ClipboardHelperWritePasteboardCompound(const char* utf8Text,
                                                        const unsigned char* pngBytes,
                                                        int pngLength);
+extern "C" bool ClipboardHelperIsFinderPasteboard();
 #endif
 
 namespace {
@@ -767,11 +768,25 @@ void ClipboardSync::onLocalClipboardChanged()
 
     const QMimeData* mime = cb->mimeData();
 
-    // Finder and Explorer file copies may include icon/thumbnail image data.
-    // The protocol cannot carry file references, and sending that fallback
-    // image allows the host echo to replace the original local file clipboard.
-    if (hasFileReferences(mime)) {
-        ClipboardLog::debug("ClipboardSync: local file clipboard detected; sync skipped");
+    // File copies must not leak their contents as clipboard messages:
+    // Finder/Explorer copies would send the file name as text and their
+    // icon bitmap as an image. But document- and chat-app image copies
+    // (Preview, WeChat/QQ message copies) also attach local file
+    // references alongside the real bitmap — those must still sync, or
+    // the most common macOS image-copy flows silently do nothing.
+    // Distinguish by origin: Finder stamps its file clipboards with
+    // noderef/fndf markers; anything else carrying a transferable image
+    // is treated as an image copy. File references without a usable
+    // image stay skipped (the inbound guards below still protect a
+    // pending local file paste from being clobbered by remote content).
+    bool finderOrigin = false;
+#ifdef Q_OS_MACOS
+    // Finder stamps its file copies with node-reference flavors that Qt
+    // never surfaces in QMimeData::formats(); ask the raw pasteboard.
+    finderOrigin = ClipboardHelperIsFinderPasteboard();
+#endif
+    if (finderOrigin) {
+        ClipboardLog::debug("ClipboardSync: Finder file clipboard detected; sync skipped");
         return;
     }
 
@@ -782,6 +797,11 @@ void ClipboardSync::onLocalClipboardChanged()
     QByteArray png;
     QString imageSourceDescription;
     const bool havePng = extractClipboardPng(mime, png, &imageSourceDescription);
+    if (hasFileReferences(mime) && !havePng) {
+        ClipboardLog::debug(
+            "ClipboardSync: file clipboard without transferable image; sync skipped");
+        return;
+    }
 
     // A clipboard change can genuinely carry both flavors (browser image
     // copies attach the source URL, IM clients alt text). Emit both as a

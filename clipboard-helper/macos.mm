@@ -10,6 +10,23 @@ extern "C" int ClipboardHelperPasteboardChangeCount()
     return static_cast<int>([[NSPasteboard generalPasteboard] changeCount]);
 }
 
+// True when the pasteboard was produced by a macOS Finder file copy. Finder
+// stamps node-reference flavors that QMimeData never surfaces (Qt only maps
+// the flavors it understands), so this must read the raw pasteboard types.
+// Finder copies carry only the 512x512 file icon as image data, whereas
+// document/chat-app image copies attach real bitmaps alongside their cache
+// file references and must still sync.
+extern "C" bool ClipboardHelperIsFinderPasteboard()
+{
+    NSPasteboard* pb = [NSPasteboard generalPasteboard];
+    for (NSPasteboardType type in pb.types) {
+        if ([type isEqualToString:@"com.apple.finder.noderef"] || [type isEqualToString:@"fndf"]) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Write text and image flavors in ONE pasteboard transaction. Qt's macOS
 // backend drops the text flavor from a QMimeData that also carries an
 // image, so compound clipboard writes must bypass it. Returns false when

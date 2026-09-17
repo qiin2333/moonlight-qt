@@ -113,9 +113,12 @@ public:
     static constexpr int BURST_RETENTION_MS = 5000;
     static constexpr int MAX_PENDING_BURSTS = 32;
 
-    // File copy/paste is not part of the clipboard sync protocol. Native file
-    // clipboards often also expose a thumbnail or application icon as an image,
-    // so callers must reject file references before considering image formats.
+    // File copy/paste is not part of the clipboard sync protocol. File
+    // clipboards must not leak their filename text or icon bitmaps; but
+    // document/chat-app image copies also attach file references, so the
+    // outbound path only skips a file clipboard when it is Finder-originated
+    // or carries no transferable image. Inbound applies keep rejecting any
+    // file clipboard to preserve a pending local file paste.
     static bool hasFileReferences(const QMimeData* mime);
 
     explicit ClipboardSync(const ClipboardSyncHostContext& hostContext = ClipboardSyncHostContext(),
