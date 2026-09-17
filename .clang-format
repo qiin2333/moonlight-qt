@@ -65,3 +65,70 @@ SeparateDefinitionBlocks: Leave
 MaxEmptyLinesToKeep: 1
 KeepEmptyLinesAtTheStartOfBlocks: true
 InsertNewlineAtEOF: true
+
+---
+Language: ObjC
+# macos.mm mirrors the C++ style below. Without an ObjC section
+# clang-format (>=17, incl. the pinned 21.1.8) refuses to process .mm
+# files at all, which made the cpp-format gate fail on any PR that
+# touches macos.mm. Keep this option block in sync with the Cpp one.
+BasedOnStyle: LLVM
+Standard: c++17
+ColumnLimit: 100
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+
+# 指针对齐:仓库里 Left/Right 混用(上游自己也不统一),按每个文件的既有习惯推导,
+# 最大限度避免门禁在无关行上报警
+DerivePointerAlignment: true
+PointerAlignment: Left
+
+# 大括号:函数/类换行,控制语句跟随(Qt 风格)
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: true
+  AfterControlStatement: Never
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortLambdasOnASingleLine: Inline
+
+# 头文件排序不强制:仓库是手写顺序,自动重排会在 diff 里制造大量无关噪音
+SortIncludes: Never
+IncludeBlocks: Preserve
+
+AlignAfterOpenBracket: Align
+AlignConsecutiveMacros: None
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignOperands: Align
+AlignTrailingComments: true
+
+# 初始化列表保持 Qt 手写习惯:{ 项, 项 }(花括号内两侧留空、结尾 } 独立成行)
+Cpp11BracedListStyle: false
+
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceAfterCStyleCast: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+
+# fork 的 file-mapping 有命名空间,上游 app/ 没有;不强插 // namespace 注释
+NamespaceIndentation: None
+FixNamespaceComments: false
+SeparateDefinitionBlocks: Leave
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: true
+InsertNewlineAtEOF: true
