@@ -18,9 +18,9 @@ MOONLIGHT_ARCH=${4:-$(uname -m)}
 
 EXTENSION_NAME=MoonlightFileProviderExtension
 MODULE_NAME=MoonlightFileProviderExtension
-APP_BUNDLE_ID=com.moonlight-stream.Moonlight
+APP_BUNDLE_ID=com.alkaidlab.vpluspc
 EXTENSION_BUNDLE_ID=$APP_BUNDLE_ID.FileProvider
-FILE_PROVIDER_APP_GROUP=${MOONLIGHT_FILE_PROVIDER_APP_GROUP:-group.com.moonlight-stream.Moonlight.FileProvider}
+FILE_PROVIDER_APP_GROUP=${MOONLIGHT_FILE_PROVIDER_APP_GROUP:-group.com.alkaidlab.vpluspc.FileProvider}
 EXTENSION_SOURCE=$SOURCE_ROOT/file-mapping/mount/macos-fileprovider/MoonlightFileProviderExtension
 EXTENSION_BUILD=$BUILD_FOLDER/fileprovider-extension
 APPEX=$APP_BUNDLE/Contents/PlugIns/$EXTENSION_NAME.appex
