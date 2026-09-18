@@ -44,8 +44,7 @@ bool parseArgs(const QStringList& args, QMap<QString, QString>& options, QString
         if (equals >= 0) {
             value = name.mid(equals + 1);
             name = name.left(equals);
-        }
-        else {
+        } else {
             if (i + 1 >= args.size() || args.at(i + 1).startsWith(QStringLiteral("--"))) {
                 error = QStringLiteral("Missing value for --%1").arg(name);
                 return false;
@@ -57,8 +56,7 @@ bool parseArgs(const QStringList& args, QMap<QString, QString>& options, QString
     return true;
 }
 
-QString optionValue(const QMap<QString, QString>& options,
-                    const QString& name,
+QString optionValue(const QMap<QString, QString>& options, const QString& name,
                     const QString& fallback = {})
 {
     return options.value(name, fallback).trimmed();
@@ -160,7 +158,8 @@ int main(int argc, char* argv[])
     }
 
     quint16 httpsPort = 0;
-    if (!parseUInt16(optionValue(options, QStringLiteral("https-port"), QStringLiteral("47984")), httpsPort)) {
+    if (!parseUInt16(optionValue(options, QStringLiteral("https-port"), QStringLiteral("47984")),
+                     httpsPort)) {
         err << "Invalid --https-port\n";
         return 2;
     }
@@ -172,19 +171,24 @@ int main(int argc, char* argv[])
     }
 
     quint32 length = 0;
-    if (!parseUInt32(optionValue(options, QStringLiteral("length"), QStringLiteral("4096")), length) || length == 0) {
+    if (!parseUInt32(optionValue(options, QStringLiteral("length"), QStringLiteral("4096")),
+                     length) ||
+        length == 0) {
         err << "Invalid --length\n";
         return 2;
     }
 
     quint32 timeoutMs = 0;
-    if (!parseUInt32(optionValue(options, QStringLiteral("timeout-ms"), QStringLiteral("5000")), timeoutMs) || timeoutMs == 0) {
+    if (!parseUInt32(optionValue(options, QStringLiteral("timeout-ms"), QStringLiteral("5000")),
+                     timeoutMs) ||
+        timeoutMs == 0) {
         err << "Invalid --timeout-ms\n";
         return 2;
     }
 
     NvComputer computer;
-    const quint16 httpPort = httpsPort <= 65530 ? static_cast<quint16>(httpsPort + 5) : DEFAULT_HTTP_PORT;
+    const quint16 httpPort =
+        httpsPort <= 65530 ? static_cast<quint16>(httpsPort + 5) : DEFAULT_HTTP_PORT;
     computer.activeAddress = NvAddress(host, httpPort);
     computer.activeHttpsPort = httpsPort;
     computer.isNvidiaServerSoftware = false;
@@ -229,16 +233,15 @@ int main(int argc, char* argv[])
             }
             computer.serverCert = pairedCert;
             out << "pairing=passed\n";
-        }
-        catch (const std::exception& e) {
+        } catch (const std::exception& e) {
             err << "pairing=failed\n";
             err << "error=" << e.what() << '\n';
             return 1;
         }
-    }
-    else {
+    } else {
         QString certError;
-        computer.serverCert = loadCertificate(optionValue(options, QStringLiteral("server-cert")), certError);
+        computer.serverCert =
+            loadCertificate(optionValue(options, QStringLiteral("server-cert")), certError);
         if (computer.serverCert.isNull()) {
             err << certError << '\n';
             return 2;
@@ -246,11 +249,8 @@ int main(int argc, char* argv[])
     }
 
     FileMappingClient client(&computer);
-    FileMappingClient::SmokeResult result = client.smokeRead(mapping,
-                                                             relativePath,
-                                                             offset,
-                                                             length,
-                                                             static_cast<int>(timeoutMs));
+    FileMappingClient::SmokeResult result =
+        client.smokeRead(mapping, relativePath, offset, length, static_cast<int>(timeoutMs));
     if (!result.ok) {
         err << "file_mapping_smoke=failed\n";
         err << "error=" << result.error << '\n';

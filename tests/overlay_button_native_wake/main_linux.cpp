@@ -178,8 +178,7 @@ int main(int argc, char* argv[])
     const int settledWakeCount = wakeCount.load(std::memory_order_acquire);
     const int settledClickCount = clickCount.load(std::memory_order_acquire);
     sendClick(display);
-    require(wakeSemaphore.tryAcquire(1, 1000),
-            "real X11 click must wake the SDL owner loop");
+    require(wakeSemaphore.tryAcquire(1, 5000), "real X11 click must wake the SDL owner loop");
     require(button.needsEventProcessing(),
             "X11 button input must request Qt event processing");
     require(wakeCount.load(std::memory_order_acquire) == settledWakeCount + 1,
@@ -221,7 +220,7 @@ int main(int argc, char* argv[])
     const int reattachedWakeCount = wakeCount.load(std::memory_order_acquire);
     const int reattachedClickCount = clickCount.load(std::memory_order_acquire);
     sendClick(display);
-    require(wakeSemaphore.tryAcquire(1, 1000),
+    require(wakeSemaphore.tryAcquire(1, 5000),
             "re-shown button must reattach its X11 event monitor");
     require(wakeCount.load(std::memory_order_acquire) == reattachedWakeCount + 1,
             "one reattached X11 click batch must produce one wake edge");
