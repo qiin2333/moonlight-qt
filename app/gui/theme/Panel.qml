@@ -1,4 +1,4 @@
-import QtQuick 2.9
+import QtQuick
 import "."
 
 // 全应用的主力容器：方角 + 1px 描边 + 零模糊硬偏移投影，可选左侧粗色条。

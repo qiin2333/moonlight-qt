@@ -1,4 +1,4 @@
-import QtQuick 2.9
+import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts 1.3
 import QtQuick.Window 2.2
@@ -673,12 +673,6 @@ CenteredGridView {
         property string activeRequestKey: ""
         property bool lastRequestWasBusy: false
 
-        Settings {
-            id: settings
-            property string cachedImagePath: ""
-            property string cachedSourceKey: ""
-            property real lastRefreshTime: Date.now()
-        }
 
         onStatusChanged: {
             if (status === Image.Loading) {

@@ -1,5 +1,5 @@
 pragma ComponentBehavior: Bound
-import QtQuick 2.9
+import QtQuick
 import "../theme"
 
 // 社区许可立场公示。正文始终完整显示，用分节、列表和警示块建立清晰层级。

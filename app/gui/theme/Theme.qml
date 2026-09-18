@@ -1,5 +1,5 @@
 pragma Singleton
-import QtQuick 2.9
+import QtQuick
 
 // 全应用的设计 token。风格是 neo-brutalism（新粗野主义）深色工业变体，
 // 数值对齐参考站 https://client.cloud.procriva.com/ 的 --cend-* 变量。

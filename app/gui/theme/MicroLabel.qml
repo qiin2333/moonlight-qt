@@ -1,4 +1,4 @@
-import QtQuick 2.9
+import QtQuick
 import "."
 
 // 宽字距大写微标签。等宽字体 + 0.2em 字距 + 次级文字颜色，参考站里的

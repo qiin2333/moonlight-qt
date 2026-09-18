@@ -1,5 +1,5 @@
 pragma ComponentBehavior: Bound
-import QtQuick 2.9
+import QtQuick
 import QtQuick.Controls
 import "."
 import "../theme"

@@ -1,4 +1,4 @@
-import QtQuick 2.9
+import QtQuick
 import "../theme"
 
 // 只读 HUD 芯片标签：深色切角底板、青色细边和状态点。
