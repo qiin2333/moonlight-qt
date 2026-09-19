@@ -128,6 +128,9 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
                     m_DpadNav[dir].held = true;
                     m_DpadNav[dir].downSince = resumeTime;
                     m_DpadNav[dir].lastFire = resumeTime;
+                    // 补发按下：焦点窗口在挂起期间可能已切换，且后面的
+                    // 物理释放需要一次配对的 KeyPress
+                    sendDirectionKey(QEvent::Type::KeyPress, dir);
                 }
             }
         }
