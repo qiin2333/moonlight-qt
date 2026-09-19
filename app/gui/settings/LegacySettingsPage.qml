@@ -7,6 +7,7 @@ import "../theme"
 import "../Brand.js" as Brand
 
 import StreamingPreferences 1.0
+import SdlGamepadKeyNavigation 1.0
 import ComputerManager 1.0
 import SystemProperties 1.0
 import ImageUtils 1.0
@@ -549,8 +550,8 @@ Column {
         }
 
         ToggleRow {
-            title: qsTr("Enable mouse control with gamepads by holding the 'Start' button")
-            description: qsTr("While this is off, holding Start opens the in-stream overlay menu instead.")
+            title: qsTr("Enable mouse control with gamepads by holding the '%1' button").arg(SdlGamepadKeyNavigation.startButtonName())
+            description: qsTr("While this is off, holding %1 opens the in-stream overlay menu instead.").arg(SdlGamepadKeyNavigation.startButtonName())
             checked: StreamingPreferences.gamepadMouse
             onToggled: function(value) { StreamingPreferences.gamepadMouse = value }
         }
@@ -685,7 +686,12 @@ Column {
         ToggleRow {
             title: qsTr("Show performance stats while streaming")
             description: qsTr("Display real-time stream performance information while streaming.") + "\n\n" +
-                         qsTr("You can toggle it at any time while streaming using Ctrl+Alt+Shift+S or Select+L1+R1+X.") + "\n\n" +
+                         qsTr("You can toggle it at any time while streaming using %1 or %2.")
+                             .arg("Ctrl+Alt+Shift+S")
+                             .arg(SdlGamepadKeyNavigation.selectButtonName() + "+" +
+                                  SdlGamepadKeyNavigation.leftShoulderName() + "+" +
+                                  SdlGamepadKeyNavigation.rightShoulderName() + "+" +
+                                  SdlGamepadKeyNavigation.faceButtonGlyph(2)) + "\n\n" +
                          qsTr("The performance overlay is not supported on Steam Link or Raspberry Pi.")
             checked: StreamingPreferences.showPerformanceOverlay
             onToggled: function(value) { StreamingPreferences.showPerformanceOverlay = value }
@@ -698,7 +704,7 @@ Column {
 
         ChoiceRow {
             title: qsTr("Overlay menu position")
-            description: qsTr("With a gamepad connected, holding Start also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).")
+            description: qsTr("With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).").arg(SdlGamepadKeyNavigation.startButtonName())
             selectedValue: StreamingPreferences.overlayMenuPosition
             onValueActivated: function(value) { StreamingPreferences.overlayMenuPosition = value }
 

@@ -25,22 +25,25 @@ Item {
     property bool isResume : false
     property bool quitAfter : false
 
-    // 退出组合键提示随设置走：玩家改了组合键，提示不能还教默认那套
+    // 退出组合键提示随设置走：玩家改了组合键，提示不能还教默认那套。
+    // 按键名按当前手柄风格显示（PS 显示 Options/Share/✕，Switch 显示 +/−）
     function quitComboHintText()
     {
+        var nav = SdlGamepadKeyNavigation
+        var shoulders = nav.leftShoulderName() + "+" + nav.rightShoulderName()
         switch (StreamingPreferences.gamepadQuitCombo) {
         case StreamingPreferences.GQC_SELECT_L1_R1_Y:
-            return qsTr("Select+L1+R1+Y")
+            return nav.selectButtonName() + "+" + shoulders + "+" + nav.faceButtonGlyph(3)
         case StreamingPreferences.GQC_START_L1_R1_A:
-            return qsTr("Start+L1+R1+A")
+            return nav.startButtonName() + "+" + shoulders + "+" + nav.faceButtonGlyph(0)
         case StreamingPreferences.GQC_START_L1_R1_B:
-            return qsTr("Start+L1+R1+B")
+            return nav.startButtonName() + "+" + shoulders + "+" + nav.faceButtonGlyph(1)
         case StreamingPreferences.GQC_L1_R1_X_Y:
-            return qsTr("L1+R1+X+Y")
+            return shoulders + "+" + nav.faceButtonGlyph(2) + "+" + nav.faceButtonGlyph(3)
         case StreamingPreferences.GQC_L1_R1_A_B:
-            return qsTr("L1+R1+A+B")
+            return shoulders + "+" + nav.faceButtonGlyph(0) + "+" + nav.faceButtonGlyph(1)
         default:
-            return qsTr("Start+Select+L1+R1")
+            return nav.startButtonName() + "+" + nav.selectButtonName() + "+" + shoulders
         }
     }
 
