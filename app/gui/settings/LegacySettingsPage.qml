@@ -569,19 +569,52 @@ Column {
         visible: settingsPage.category === "gamepad" && hasVisibleContent
         title: qsTr("Gamepad quit combo")
 
+        // 按键名按当前连接的手柄风格显示(PS 显示 Options/Share/✕,
+        // Switch 显示 +/−/B/A);插拔手柄或切进本页时重建
+        function rebuildQuitComboModel() {
+            quitComboModel.clear()
+            var nav = SdlGamepadKeyNavigation
+            var lb = nav.leftShoulderName()
+            var rb = nav.rightShoulderName()
+            quitComboModel.append({
+                text: nav.startButtonName() + "+" + nav.selectButtonName() + "+" + lb + "+" + rb + " " + qsTr("(Default)"),
+                val: StreamingPreferences.GQC_DEFAULT
+            })
+            quitComboModel.append({
+                text: nav.selectButtonName() + "+" + lb + "+" + rb + "+" + nav.faceButtonGlyph(3),
+                val: StreamingPreferences.GQC_SELECT_L1_R1_Y
+            })
+            quitComboModel.append({
+                text: nav.startButtonName() + "+" + lb + "+" + rb + "+" + nav.faceButtonGlyph(0),
+                val: StreamingPreferences.GQC_START_L1_R1_A
+            })
+            quitComboModel.append({
+                text: nav.startButtonName() + "+" + lb + "+" + rb + "+" + nav.faceButtonGlyph(1),
+                val: StreamingPreferences.GQC_START_L1_R1_B
+            })
+            quitComboModel.append({
+                text: lb + "+" + rb + "+" + nav.faceButtonGlyph(2) + "+" + nav.faceButtonGlyph(3),
+                val: StreamingPreferences.GQC_L1_R1_X_Y
+            })
+            quitComboModel.append({
+                text: lb + "+" + rb + "+" + nav.faceButtonGlyph(0) + "+" + nav.faceButtonGlyph(1),
+                val: StreamingPreferences.GQC_L1_R1_A_B
+            })
+            quitComboRow.syncSelection()
+        }
+
+        Component.onCompleted: rebuildQuitComboModel()
+        onVisibleChanged: if (visible) rebuildQuitComboModel()
+
         ChoiceRow {
+            id: quitComboRow
             title: qsTr("Gamepad quit combo")
             description: qsTr("Choose which button combination exits streaming. Use alternatives if the default doesn't work on your device.")
             selectedValue: StreamingPreferences.gamepadQuitCombo
             onValueActivated: function(value) { StreamingPreferences.gamepadQuitCombo = value }
 
             model: ListModel {
-                ListElement { text: qsTr("Start + Select + L1 + R1 (Default)"); val: StreamingPreferences.GQC_DEFAULT }
-                ListElement { text: qsTr("Select + L1 + R1 + Y"); val: StreamingPreferences.GQC_SELECT_L1_R1_Y }
-                ListElement { text: qsTr("Start + L1 + R1 + A"); val: StreamingPreferences.GQC_START_L1_R1_A }
-                ListElement { text: qsTr("Start + L1 + R1 + B"); val: StreamingPreferences.GQC_START_L1_R1_B }
-                ListElement { text: qsTr("L1 + R1 + X + Y"); val: StreamingPreferences.GQC_L1_R1_X_Y }
-                ListElement { text: qsTr("L1 + R1 + A + B"); val: StreamingPreferences.GQC_L1_R1_A_B }
+                id: quitComboModel
             }
         }
     }
