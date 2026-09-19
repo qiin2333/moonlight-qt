@@ -41,6 +41,15 @@ private:
 
     void updateTimerState();
 
+    // 方向统一映射：普通界面发方向键，设置页 (uiNav) 上下退化为 Tab / Shift+Tab
+    void sendDirectionKey(QEvent::Type type, int dir);
+
+    // 摇杆/D-pad 连发节奏：起步慢，持续按住逐渐加速
+    static Uint32 axisNavRepeatDelayMs(Uint32 heldMs);
+
+    // 失焦、禁用或首轮 flush 时清空按住状态
+    void resetNavRepeatState();
+
 private slots:
     void onPollingTimerFired();
 
@@ -53,5 +62,26 @@ private:
     int m_UiNavSuspendCount;
     bool m_FirstPoll;
     bool m_HasFocus;
-    Uint32 m_LastAxisNavigationEventTime;
+
+    // 摇杆导航的当前方向与计时；阈值滞回防抖，重复随按住时长加速
+    enum AxisNavDir
+    {
+        AxisNavNone,
+        AxisNavUp,
+        AxisNavDown,
+        AxisNavLeft,
+        AxisNavRight,
+    };
+    int m_AxisNavDir = AxisNavNone;
+    Uint32 m_AxisNavDirSince = 0;
+    Uint32 m_AxisNavLastFire = 0;
+
+    // D-pad 连发状态（下标即 AxisNavDir 值，None 不用）
+    struct DpadNavState
+    {
+        bool held = false;
+        Uint32 downSince = 0;
+        Uint32 lastFire = 0;
+    };
+    DpadNavState m_DpadNav[5];
 };

@@ -502,6 +502,44 @@ Column {
             onToggled: function(value) { StreamingPreferences.swapFaceButtons = value }
         }
 
+        SettingsRow {
+            id: stickDeadzoneRow
+            title: qsTr("Joystick deadzone")
+            description: qsTr("Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.")
+
+            Row {
+                width: Math.min(360, Math.max(220, stickDeadzoneRow.width - Theme.spaceMd * 2))
+                height: Math.max(stickDeadzoneSlider.implicitHeight,
+                                 stickDeadzoneValue.implicitHeight)
+                spacing: Theme.spaceSm
+
+                HardSlider {
+                    id: stickDeadzoneSlider
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - stickDeadzoneValue.width - parent.spacing
+                    from: 0
+                    to: 30
+                    stepSize: 1
+                    snapMode: Slider.SnapAlways
+                    value: StreamingPreferences.gamepadDeadzone
+                    Accessible.name: stickDeadzoneRow.title
+                    onMoved: StreamingPreferences.gamepadDeadzone = Math.round(value)
+                }
+
+                Text {
+                    id: stickDeadzoneValue
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 52
+                    text: Math.round(stickDeadzoneSlider.value) + "%"
+                    color: Theme.accent
+                    font.family: Theme.fontMono
+                    font.pointSize: Theme.fontBody
+                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignRight
+                }
+            }
+        }
+
         ToggleRow {
             title: qsTr("Force gamepad #1 always connected")
             description: qsTr("Forces a single gamepad to always stay connected to the host, even if no gamepads are actually connected to this PC.") + " " +
@@ -512,6 +550,7 @@ Column {
 
         ToggleRow {
             title: qsTr("Enable mouse control with gamepads by holding the 'Start' button")
+            description: qsTr("While this is off, holding Start opens the in-stream overlay menu instead.")
             checked: StreamingPreferences.gamepadMouse
             onToggled: function(value) { StreamingPreferences.gamepadMouse = value }
         }
@@ -537,7 +576,6 @@ Column {
 
             model: ListModel {
                 ListElement { text: qsTr("Start + Select + L1 + R1 (Default)"); val: StreamingPreferences.GQC_DEFAULT }
-                ListElement { text: qsTr("Select + L1 + R1 + X"); val: StreamingPreferences.GQC_SELECT_L1_R1_X }
                 ListElement { text: qsTr("Select + L1 + R1 + Y"); val: StreamingPreferences.GQC_SELECT_L1_R1_Y }
                 ListElement { text: qsTr("Start + L1 + R1 + A"); val: StreamingPreferences.GQC_START_L1_R1_A }
                 ListElement { text: qsTr("Start + L1 + R1 + B"); val: StreamingPreferences.GQC_START_L1_R1_B }
@@ -660,6 +698,7 @@ Column {
 
         ChoiceRow {
             title: qsTr("Overlay menu position")
+            description: qsTr("With a gamepad connected, holding Start also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).")
             selectedValue: StreamingPreferences.overlayMenuPosition
             onValueActivated: function(value) { StreamingPreferences.overlayMenuPosition = value }
 
@@ -667,8 +706,8 @@ Column {
                 ListElement { text: qsTr("Top edge"); val: StreamingPreferences.OMP_TOP_EDGE }
                 ListElement { text: qsTr("Right edge"); val: StreamingPreferences.OMP_RIGHT_EDGE }
                 ListElement { text: qsTr("Left edge"); val: StreamingPreferences.OMP_LEFT_EDGE }
-                ListElement { text: qsTr("Floating button"); val: StreamingPreferences.OMP_BUTTON }
-                ListElement { text: qsTr("Disabled (default)"); val: StreamingPreferences.OMP_DISABLED }
+                ListElement { text: qsTr("Floating button (default)"); val: StreamingPreferences.OMP_BUTTON }
+                ListElement { text: qsTr("Disabled"); val: StreamingPreferences.OMP_DISABLED }
             }
         }
     }
