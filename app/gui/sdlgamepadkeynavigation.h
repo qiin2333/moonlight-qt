@@ -2,6 +2,7 @@
 
 #include <QTimer>
 #include <QEvent>
+#include <QString>
 
 #include "SDL_compat.h"
 
@@ -33,6 +34,30 @@ public:
 
     Q_INVOKABLE int getConnectedGamepads();
 
+    // 手柄 UI 风格（按键提示文案用）：按当前连接的第一只手柄自动识别，
+    // 未连接或识别不出时按 Xbox 布局处理
+    enum GamepadUiStyle
+    {
+        UiStyleXbox,
+        UiStylePlayStation,
+        UiStyleNintendo,
+    };
+    Q_ENUM(GamepadUiStyle)
+
+    Q_INVOKABLE int gamepadUiStyle();
+
+    // 面键在当前风格下的显示名。logicalButton 为 SDL 位置语义：0=下(A)
+    // 1=右(B) 2=左(X) 3=上(Y)；PS 显示 ✕/○/□/△，任天堂按其标签布局显示
+    Q_INVOKABLE QString faceButtonGlyph(int logicalButton);
+
+    Q_INVOKABLE QString startButtonName();
+
+    Q_INVOKABLE QString selectButtonName();
+
+    Q_INVOKABLE QString leftShoulderName();
+
+    Q_INVOKABLE QString rightShoulderName();
+
 private:
     // 实际生效的模式：页面要求开启，且当前没有被挂起
     bool uiNavModeActive() const;
@@ -49,6 +74,8 @@ private:
 
     // 失焦、禁用或首轮 flush 时清空按住状态
     void resetNavRepeatState();
+
+    GamepadUiStyle detectUiStyle() const;
 
 private slots:
     void onPollingTimerFired();

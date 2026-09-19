@@ -479,35 +479,48 @@ void SdlInputHandler::handleControllerButtonEvent(SDL_ControllerButtonEvent* eve
         }
 
         if (state->buttons == quitComboMask) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Detected quit gamepad button combo");
+            if (!state->quitComboLatched) {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected quit gamepad button combo");
 
-            // Push a quit event to the main loop
-            SDL_Event event;
-            event.type = SDL_QUIT;
-            event.quit.timestamp = SDL_GetTicks();
-            SDL_PushEvent(&event);
+                // Push a quit event to the main loop
+                SDL_Event event;
+                event.type = SDL_QUIT;
+                event.quit.timestamp = SDL_GetTicks();
+                SDL_PushEvent(&event);
 
-            // Clear buttons down on this gamepad
-            LiSendMultiControllerEvent(state->index, m_GamepadMask,
-                                       0, 0, 0, 0, 0, 0, 0);
+                // Clear buttons down on this gamepad
+                LiSendMultiControllerEvent(state->index, m_GamepadMask, 0, 0, 0, 0, 0, 0, 0);
+                state->quitComboLatched = true;
+            }
             return;
+        }
+        // Edge detection: fire once per press. Re-arm only when one of the
+        // combo's own buttons is released, so pressing and releasing extra
+        // buttons while holding the combo doesn't fire it again.
+        if ((state->buttons & quitComboMask) != quitComboMask) {
+            state->quitComboLatched = false;
         }
     }
 
     // Handle Select+L1+R1+X as a gamepad overlay combo
-    if (state->buttons == (BACK_FLAG | LB_FLAG | RB_FLAG | X_FLAG)) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected stats toggle gamepad combo");
+    const int statsComboMask = BACK_FLAG | LB_FLAG | RB_FLAG | X_FLAG;
+    if (state->buttons == statsComboMask) {
+        if (!state->statsComboLatched) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected stats toggle gamepad combo");
 
-        // Toggle the stats overlay
-        Session::get()->getOverlayManager().setOverlayState(Overlay::OverlayDebug,
-                                                            !Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug));
+            // Toggle the stats overlay
+            Session::get()->getOverlayManager().setOverlayState(
+                Overlay::OverlayDebug,
+                !Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug));
 
-        // Clear buttons down on this gamepad
-        LiSendMultiControllerEvent(state->index, m_GamepadMask,
-                                   0, 0, 0, 0, 0, 0, 0);
+            // Clear buttons down on this gamepad
+            LiSendMultiControllerEvent(state->index, m_GamepadMask, 0, 0, 0, 0, 0, 0, 0);
+            state->statsComboLatched = true;
+        }
         return;
+    }
+    if ((state->buttons & statsComboMask) != statsComboMask) {
+        state->statsComboLatched = false;
     }
 
     // Only send the gamepad state to the host if it's not in mouse emulation mode
@@ -681,6 +694,10 @@ void SdlInputHandler::handleControllerDeviceEvent(SDL_ControllerDeviceEvent* eve
 
         state->controller = controller;
         state->jsId = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(state->controller));
+        // The slot is not zeroed on add; anything the event paths rely on
+        // being false must be initialized here
+        state->quitComboLatched = false;
+        state->statsComboLatched = false;
 
         hapticCaps = 0;
 #if SDL_VERSION_ATLEAST(2, 0, 18)

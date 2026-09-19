@@ -41,6 +41,10 @@ struct GamepadState {
     int mouseEmulationDeadzonePercent;
     // Mask of emulated mouse buttons this session is holding down
     int mouseEmulationButtonsHeld;
+    // Combo edge latch: a combo fires once per press and re-arms only after
+    // one of its own buttons is released (extra held buttons don't re-arm)
+    bool quitComboLatched;
+    bool statsComboLatched;
     uint32_t lastStartDownTime;
 
     bool clickpadButtonEmulationEnabled;
