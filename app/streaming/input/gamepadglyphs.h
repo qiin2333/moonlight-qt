@@ -1,13 +1,12 @@
 #pragma once
 
-#include <cstdint>
-
 #include <QString>
-
-#include <Limelight.h>
 
 // 提示文案里的按键名跟随手柄实体布局：Xbox 布局为缺省，PS/Switch 实机
 // 自动识别。GUI 导航（QML）与串流侧（悬浮菜单/toast）共用同一套定义。
+// 注意保持零协议依赖（tests/overlay_menu_navigation 会独立编译包含本头
+// 文件的 overlaymenupanel.cpp，其 include 路径里没有 moonlight-common-c），
+// LI_CTYPE_* 的映射请放在使用方。
 
 enum GamepadUiStyle
 {
@@ -15,18 +14,6 @@ enum GamepadUiStyle
     GamepadUiStylePlayStation = 1,
     GamepadUiStyleNintendo = 2,
 };
-
-inline GamepadUiStyle gamepadUiStyleFromLiType(uint8_t liType)
-{
-    switch (liType) {
-    case LI_CTYPE_PS:
-        return GamepadUiStylePlayStation;
-    case LI_CTYPE_NINTENDO:
-        return GamepadUiStyleNintendo;
-    default:
-        return GamepadUiStyleXbox;
-    }
-}
 
 // 面键显示名。logicalButton 为 SDL 位置语义：0=下(A) 1=右(B) 2=左(X)
 // 3=上(Y)。任天堂按其标签布局显示（物理下键就叫 B），PS 用符号。

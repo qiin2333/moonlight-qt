@@ -62,7 +62,14 @@ GamepadUiStyle SdlInputHandler::getGamepadUiStyle() const
 #if SDL_VERSION_ATLEAST(2, 0, 14)
     for (int i = 0; i < MAX_GAMEPADS; i++) {
         if (m_GamepadState[i].controller != nullptr) {
-            return gamepadUiStyleFromLiType(m_GamepadState[i].type);
+            switch (m_GamepadState[i].type) {
+            case LI_CTYPE_PS:
+                return GamepadUiStylePlayStation;
+            case LI_CTYPE_NINTENDO:
+                return GamepadUiStyleNintendo;
+            default:
+                return GamepadUiStyleXbox;
+            }
         }
     }
 #endif
