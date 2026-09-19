@@ -18,6 +18,8 @@
 #include <utility>
 #include <vector>
 
+#include "streaming/input/gamepadglyphs.h"
+
 /**
  * OverlayMenuPanel - Multi-level Qt overlay menu for streaming sessions.
  *
@@ -167,10 +169,16 @@ public:
                               std::vector<RemoteUsbDevice> devices,
                               const QString& activeDeviceId,
                               const QString& detail);
-    void setHasGamepads(bool has) {
-        if (m_HasGamepads != has) {
+    // 手柄在位状态、UI 风格与退出组合键 glyph 文案：菜单打开前由 Session
+    // 推送，任一变化即重建菜单级（手柄专属条目与按键提示跟着变）
+    void setGamepadHints(bool has, GamepadUiStyle style, const QString& quitComboGlyphs)
+    {
+        if (m_HasGamepads != has || m_GamepadUiStyle != style ||
+            m_QuitComboGlyphs != quitComboGlyphs) {
             m_HasGamepads = has;
-            buildMenuLevels();  // rebuild to show/hide gamepad items
+            m_GamepadUiStyle = style;
+            m_QuitComboGlyphs = quitComboGlyphs;
+            buildMenuLevels();
         }
     }
 
@@ -268,6 +276,8 @@ private:
     int  m_HoveredIndex;
     bool m_Visible;
     bool m_HasGamepads;
+    GamepadUiStyle m_GamepadUiStyle;
+    QString m_QuitComboGlyphs;
     FileMappingState m_FileMappingState;
     QString m_FileMappingDetail;
     bool m_RemoteUsbAvailable;

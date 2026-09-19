@@ -6,6 +6,8 @@
 
 #include "SDL_compat.h"
 
+#include "streaming/input/gamepadglyphs.h"
+
 #include "settings/streamingpreferences.h"
 
 class SdlGamepadKeyNavigation : public QObject
@@ -35,15 +37,8 @@ public:
     Q_INVOKABLE int getConnectedGamepads();
 
     // 手柄 UI 风格（按键提示文案用）：按当前连接的第一只手柄自动识别，
-    // 未连接或识别不出时按 Xbox 布局处理
-    enum GamepadUiStyle
-    {
-        UiStyleXbox,
-        UiStylePlayStation,
-        UiStyleNintendo,
-    };
-    Q_ENUM(GamepadUiStyle)
-
+    // 未连接或识别不出时按 Xbox 布局处理。枚举与 glyph 函数定义见
+    // streaming/input/gamepadglyphs.h（串流侧悬浮菜单/toast 共用）。
     Q_INVOKABLE int gamepadUiStyle();
 
     // 面键在当前风格下的显示名。logicalButton 为 SDL 位置语义：0=下(A)

@@ -34,23 +34,13 @@ constexpr int kBitrateCommitDelayMs = 450;
 }
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
-    : QRasterWindow(parent),
-      m_CurrentLevel(0),
-      m_HoveredIndex(-1),
-      m_Visible(false),
-      m_HasGamepads(false),
-      m_FileMappingState(FileMappingState::Unknown),
-      m_FileMappingDetail(tr("Checking")),
-      m_RemoteUsbAvailable(false),
-      m_RemoteUsbState(RemoteUsbState::Unavailable),
-      m_RemoteUsbDetail(tr("Unavailable")),
-      m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
-      m_CloseWhenPointerOutside(false),
-      m_ContentOffset(0),
-      m_Closing(false),
-      m_TargetPosition(),
-      m_AnchorMode(AnchorMode::RightEdge),
-      m_TriggerPosition(std::nullopt)
+    : QRasterWindow(parent), m_CurrentLevel(0), m_HoveredIndex(-1), m_Visible(false),
+      m_HasGamepads(false), m_GamepadUiStyle(GamepadUiStyleXbox),
+      m_FileMappingState(FileMappingState::Unknown), m_FileMappingDetail(tr("Checking")),
+      m_RemoteUsbAvailable(false), m_RemoteUsbState(RemoteUsbState::Unavailable),
+      m_RemoteUsbDetail(tr("Unavailable")), m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
+      m_CloseWhenPointerOutside(false), m_ContentOffset(0), m_Closing(false), m_TargetPosition(),
+      m_AnchorMode(AnchorMode::RightEdge), m_TriggerPosition(std::nullopt)
 {
     setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
              | Qt::WindowDoesNotAcceptFocus);
@@ -207,8 +197,8 @@ void OverlayMenuPanel::buildMenuLevels()
         top.items.push_back({tr("Gamepad Mouse"), QString(),  MenuItemType::Toggle,
                              MenuAction::ToggleGamepadMouse, 0, true, false, true}); // separator
     }
-    top.items.push_back({tr("Disconnect"),    QString(),  MenuItemType::Action,
-                         MenuAction::Quit, 0, true, false, false});
+    top.items.push_back({ tr("Disconnect"), m_HasGamepads ? m_QuitComboGlyphs : QString(),
+                          MenuItemType::Action, MenuAction::Quit, 0, true, false, false });
     m_MenuLevels.push_back(top);
 
     // === Level 1: Quick Actions (keyboard shortcuts) ===
@@ -216,8 +206,16 @@ void OverlayMenuPanel::buildMenuLevels()
     shortcuts.title = tr("Quick Actions");
     shortcuts.items.push_back({tr("Quit Moonlight"),      "Ctrl+Alt+Shift+E", MenuItemType::Action,
                                MenuAction::QuitAndExit,           0, true, false, true});
-    shortcuts.items.push_back({tr("Performance Stats"),   "Ctrl+Alt+Shift+S", MenuItemType::Action,
-                               MenuAction::ToggleStatsOverlay,    0, true, false, true});
+    QString statsDetail = QStringLiteral("Ctrl+Alt+Shift+S");
+    if (m_HasGamepads) {
+        // 手柄组合键与键盘快捷键并列展示,按键名按实体手柄风格显示
+        statsDetail += QString::fromUtf8(" \xc2\xb7 ") + gamepadSelectButtonName(m_GamepadUiStyle) +
+                       QStringLiteral("+") + gamepadLeftShoulderName(m_GamepadUiStyle) +
+                       QStringLiteral("+") + gamepadRightShoulderName(m_GamepadUiStyle) +
+                       QStringLiteral("+") + gamepadFaceButtonGlyph(m_GamepadUiStyle, 2);
+    }
+    shortcuts.items.push_back({ tr("Performance Stats"), statsDetail, MenuItemType::Action,
+                                MenuAction::ToggleStatsOverlay, 0, true, false, true });
     shortcuts.items.push_back({tr("Mouse Mode"),          "Ctrl+Alt+Shift+M", MenuItemType::Action,
                                MenuAction::ToggleMouseMode,       0, true, false, false});
     shortcuts.items.push_back({tr("Show/Hide Cursor"),    "Ctrl+Alt+Shift+C", MenuItemType::Action,

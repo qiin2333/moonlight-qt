@@ -399,7 +399,7 @@ void SdlGamepadKeyNavigation::resetNavRepeatState()
     }
 }
 
-SdlGamepadKeyNavigation::GamepadUiStyle SdlGamepadKeyNavigation::detectUiStyle() const
+GamepadUiStyle SdlGamepadKeyNavigation::detectUiStyle() const
 {
     // 与 gamepad.cpp 的 LI_CTYPE 判定使用同一套 SDL 类型与版本守卫
     for (auto gc : std::as_const(m_Gamepads)) {
@@ -407,19 +407,19 @@ SdlGamepadKeyNavigation::GamepadUiStyle SdlGamepadKeyNavigation::detectUiStyle()
         case SDL_CONTROLLER_TYPE_PS3:
         case SDL_CONTROLLER_TYPE_PS4:
         case SDL_CONTROLLER_TYPE_PS5:
-            return UiStylePlayStation;
+            return GamepadUiStylePlayStation;
         case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO:
 #if SDL_VERSION_ATLEAST(2, 24, 0)
         case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_LEFT:
         case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT:
         case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_PAIR:
 #endif
-            return UiStyleNintendo;
+            return GamepadUiStyleNintendo;
         default:
             break;
         }
     }
-    return UiStyleXbox;
+    return GamepadUiStyleXbox;
 }
 
 int SdlGamepadKeyNavigation::gamepadUiStyle()
@@ -429,96 +429,27 @@ int SdlGamepadKeyNavigation::gamepadUiStyle()
 
 QString SdlGamepadKeyNavigation::faceButtonGlyph(int logicalButton)
 {
-    // SDL 是位置语义（use_button_labels=0）：0=下 1=右 2=左 3=上。
-    // 任天堂按标签布局显示（其物理下键就叫 B），PS 用符号。
-    switch (detectUiStyle()) {
-    case UiStylePlayStation:
-        switch (logicalButton) {
-        case 0:
-            return QStringLiteral("✕");
-        case 1:
-            return QStringLiteral("○");
-        case 2:
-            return QStringLiteral("□");
-        case 3:
-            return QStringLiteral("△");
-        }
-        break;
-    case UiStyleNintendo:
-        switch (logicalButton) {
-        case 0:
-            return QStringLiteral("B");
-        case 1:
-            return QStringLiteral("A");
-        case 2:
-            return QStringLiteral("Y");
-        case 3:
-            return QStringLiteral("X");
-        }
-        break;
-    default:
-        break;
-    }
-
-    switch (logicalButton) {
-    case 0:
-        return QStringLiteral("A");
-    case 1:
-        return QStringLiteral("B");
-    case 2:
-        return QStringLiteral("X");
-    case 3:
-        return QStringLiteral("Y");
-    }
-    return QString();
+    return gamepadFaceButtonGlyph(detectUiStyle(), logicalButton);
 }
 
 QString SdlGamepadKeyNavigation::startButtonName()
 {
-    switch (detectUiStyle()) {
-    case UiStylePlayStation:
-        return QStringLiteral("Options");
-    case UiStyleNintendo:
-        return QStringLiteral("+");
-    default:
-        return QStringLiteral("Start");
-    }
+    return gamepadStartButtonName(detectUiStyle());
 }
 
 QString SdlGamepadKeyNavigation::selectButtonName()
 {
-    switch (detectUiStyle()) {
-    case UiStylePlayStation:
-        return QStringLiteral("Share");
-    case UiStyleNintendo:
-        return QStringLiteral("−");
-    default:
-        return QStringLiteral("Select");
-    }
+    return gamepadSelectButtonName(detectUiStyle());
 }
 
 QString SdlGamepadKeyNavigation::leftShoulderName()
 {
-    switch (detectUiStyle()) {
-    case UiStylePlayStation:
-        return QStringLiteral("L1");
-    case UiStyleNintendo:
-        return QStringLiteral("L");
-    default:
-        return QStringLiteral("LB");
-    }
+    return gamepadLeftShoulderName(detectUiStyle());
 }
 
 QString SdlGamepadKeyNavigation::rightShoulderName()
 {
-    switch (detectUiStyle()) {
-    case UiStylePlayStation:
-        return QStringLiteral("R1");
-    case UiStyleNintendo:
-        return QStringLiteral("R");
-    default:
-        return QStringLiteral("RB");
-    }
+    return gamepadRightShoulderName(detectUiStyle());
 }
 
 void SdlGamepadKeyNavigation::updateTimerState()

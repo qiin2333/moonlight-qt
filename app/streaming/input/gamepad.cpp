@@ -57,6 +57,18 @@ int SdlInputHandler::getNativeDualSenseControllerNumber() const
 #endif
 }
 
+GamepadUiStyle SdlInputHandler::getGamepadUiStyle() const
+{
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        if (m_GamepadState[i].controller != nullptr) {
+            return gamepadUiStyleFromLiType(m_GamepadState[i].type);
+        }
+    }
+#endif
+    return GamepadUiStyleXbox;
+}
+
 GamepadState*
 SdlInputHandler::findStateForGamepad(SDL_JoystickID id)
 {
