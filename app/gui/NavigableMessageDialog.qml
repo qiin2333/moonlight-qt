@@ -17,9 +17,19 @@ NavigableDialog {
     property string helpTextSeparator : " "
 
     onOpened: {
-        // Force keyboard focus on the label so keyboard navigation works
+        // Focus a safe default so a single gamepad A press (Return) can't
+        // confirm a destructive action: DialogButtonBox orders buttons per
+        // platform layout (affirmative leftmost on Windows, rightmost on
+        // macOS), so target an explicit No/Cancel by role, not by position.
         if (dialogButtonBox.count > 0) {
-            dialogButtonBox.itemAt(dialogButtonBox.count - 1).forceActiveFocus(Qt.TabFocusReason)
+            var safeIndex = dialogButtonBox.count - 1
+            for (var i = 0; i < dialogButtonBox.count; i++) {
+                var role = dialogButtonBox.itemAt(i).DialogButtonBox.buttonRole
+                if (role === DialogButtonBox.NoRole || role === DialogButtonBox.RejectRole) {
+                    safeIndex = i
+                }
+            }
+            dialogButtonBox.itemAt(safeIndex).forceActiveFocus(Qt.TabFocusReason)
         }
     }
 

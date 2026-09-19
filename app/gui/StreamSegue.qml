@@ -25,6 +25,25 @@ Item {
     property bool isResume : false
     property bool quitAfter : false
 
+    // 退出组合键提示随设置走：玩家改了组合键，提示不能还教默认那套
+    function quitComboHintText()
+    {
+        switch (StreamingPreferences.gamepadQuitCombo) {
+        case StreamingPreferences.GQC_SELECT_L1_R1_Y:
+            return qsTr("Select+L1+R1+Y")
+        case StreamingPreferences.GQC_START_L1_R1_A:
+            return qsTr("Start+L1+R1+A")
+        case StreamingPreferences.GQC_START_L1_R1_B:
+            return qsTr("Start+L1+R1+B")
+        case StreamingPreferences.GQC_L1_R1_X_Y:
+            return qsTr("L1+R1+X+Y")
+        case StreamingPreferences.GQC_L1_R1_A_B:
+            return qsTr("L1+R1+A+B")
+        default:
+            return qsTr("Start+Select+L1+R1")
+        }
+    }
+
     function stageStarting(stage)
     {
         // Update the spinner text
@@ -307,7 +326,7 @@ Item {
             // with Session.exec() which requires no concurrent
             // gamepad usage.
             hintText.text = qsTr("Tip:") + " " + qsTr("Press %1 to disconnect your session").arg(SdlGamepadKeyNavigation.getConnectedGamepads() > 0 ?
-                                                  qsTr("Start+Select+L1+R1") : qsTr("Ctrl+Alt+Shift+Q"))
+                                                  quitComboHintText() : qsTr("Ctrl+Alt+Shift+Q"))
 
             // Stop GUI gamepad usage now
             SdlGamepadKeyNavigation.disable()

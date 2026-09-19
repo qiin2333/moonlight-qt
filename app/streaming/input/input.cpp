@@ -89,6 +89,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_ReverseScrollDirection(prefs.reverseScrollDirection),
       m_SwapFaceButtons(prefs.swapFaceButtons),
       m_GamepadQuitCombo(prefs.gamepadQuitCombo),
+      m_GamepadDeadzone(qBound(0, prefs.gamepadDeadzone, 30)),
       m_MouseWasInVideoRegion(false),
       m_PendingMouseButtonsAllUpOnVideoRegionLeave(false),
       m_PointerRegionLockActive(false),

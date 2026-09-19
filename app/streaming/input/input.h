@@ -36,6 +36,9 @@ struct GamepadState {
 #endif
 
     SDL_TimerID mouseEmulationTimer;
+    // Copied here when emulation activates: the SDL timer callback is
+    // static and can't reach the handler's m_GamepadDeadzone
+    int mouseEmulationDeadzonePercent;
     uint32_t lastStartDownTime;
 
     bool clickpadButtonEmulationEnabled;
@@ -255,6 +258,11 @@ public:
     // Check if any gamepad has mouse emulation currently active
     bool isMouseEmulationActive();
 
+    // Release emulation mouse buttons still held by the host. Emulation can
+    // end (hot-unplug, long-press/menu deactivation) with buttons down, and
+    // the per-button release path only runs while the timer is live.
+    void releaseMouseEmulationButtons();
+
     // Update the gamepad mouse setting at runtime
     void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
 
@@ -390,6 +398,7 @@ private:
     bool m_ReverseScrollDirection;
     bool m_SwapFaceButtons;
     StreamingPreferences::GamepadQuitCombo m_GamepadQuitCombo;
+    int m_GamepadDeadzone;
 
     bool m_NeedsManualCaptureOnLeave;
     bool m_MouseWasInVideoRegion;
