@@ -31,6 +31,8 @@ constexpr int kBitrateLogSteps = 200;
 const double kBitrateLogSpan = qLn(kBitrateMaxKbps / double(kBitrateMinKbps));
 // Idle window after the last scrub tick before the change is committed.
 constexpr int kBitrateCommitDelayMs = 450;
+// Bottom hint bar height, shown only while a gamepad is connected
+constexpr int kGamepadHintBarHeight = 30;
 }
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
@@ -782,6 +784,9 @@ void OverlayMenuPanel::repositionWindow()
     int itemCount  = (int)m_MenuLevels[m_CurrentLevel].items.size();
     int titleH     = m_TitleHeight;
     int menuHeight = titleH + itemCount * m_ItemHeight + m_Padding * 2;
+    if (m_HasGamepads) {
+        menuHeight += kGamepadHintBarHeight;
+    }
 
     const QPoint triggerPosition = m_TriggerPosition.value_or(QPoint());
 
@@ -1231,6 +1236,24 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             int sepY = itemY + m_ItemHeight - 1;
             p.drawLine(labelX, sepY, cw - textPad, sepY);
         }
+    }
+
+    // Gamepad hint bar: pad-only players get the menu bindings on screen
+    // instead of having to know them. Faces follow the controller style
+    // (PS: ✕ Select / ○ Back; Nintendo: B Select / A Back).
+    if (m_HasGamepads) {
+        const int hintTop = ch - m_Padding - kGamepadHintBarHeight;
+        p.setPen(QPen(MenuLine, 1));
+        p.drawLine(textPad, hintTop, cw - textPad, hintTop);
+        p.setFont(m_DetailFont);
+        p.setPen(MenuDim);
+        const QString hint =
+            QStringLiteral("\xe2\x86\x91\xe2\x86\x93 ") + tr("Move") + QStringLiteral("      ") +
+            gamepadFaceButtonGlyph(m_GamepadUiStyle, 0) + QStringLiteral(" ") + tr("Select") +
+            QStringLiteral("      ") + gamepadFaceButtonGlyph(m_GamepadUiStyle, 1) +
+            QStringLiteral(" ") + tr("Back");
+        p.drawText(QRect(textPad, hintTop + 1, cw - textPad * 2, kGamepadHintBarHeight - 1),
+                   Qt::AlignLeft | Qt::AlignVCenter, hint);
     }
 
     p.restore();  // content offset

@@ -944,6 +944,10 @@ ApplicationWindow {
         }
     }
 
+    GamepadKeyboard {
+        id: gamepadKeyboard
+    }
+
     NavigableDialog {
         id: addPcDialog
         property string label: qsTr("Enter the IP address of your host PC:")
@@ -953,6 +957,8 @@ ApplicationWindow {
         onOpened: {
             // Force keyboard focus on the textbox so keyboard navigation works
             editText.forceActiveFocus()
+            // 手柄插拔状态以对话框打开那一刻为准
+            oskHint.visible = SdlGamepadKeyNavigation.getConnectedGamepads() > 0
         }
 
         onClosed: {
@@ -984,6 +990,9 @@ ApplicationWindow {
                 Layout.minimumWidth: 260
                 focus: true
 
+                // 手柄用户:X(Key_Menu)呼出屏幕键盘
+                Keys.onMenuPressed: gamepadKeyboard.openFor(editText)
+
                 Keys.onReturnPressed: {
                     addPcDialog.accept()
                 }
@@ -991,6 +1000,16 @@ ApplicationWindow {
                 Keys.onEnterPressed: {
                     addPcDialog.accept()
                 }
+            }
+
+            Text {
+                id: oskHint
+                visible: false
+                text: qsTr("No keyboard? Press %1 to open the on-screen keyboard.").arg(SdlGamepadKeyNavigation.faceButtonGlyph(2))
+                color: Theme.textFaint
+                font.family: Theme.fontMono
+                font.pointSize: Theme.fontBody
+                Layout.fillWidth: true
             }
 
             // 云主机推广。放在这里是因为「我没有可以串流的主机」正好是打开这个框的

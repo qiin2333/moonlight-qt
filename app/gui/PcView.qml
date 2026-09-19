@@ -583,6 +583,7 @@ CenteredGridView {
         onOpened: {
             // Force keyboard focus on the textbox so keyboard navigation works
             editText.forceActiveFocus()
+            oskHint.visible = SdlGamepadKeyNavigation.getConnectedGamepads() > 0
         }
 
         onClosed: {
@@ -611,6 +612,9 @@ CenteredGridView {
                 Layout.fillWidth: true
                 focus: true
 
+                // 手柄用户:X(Key_Menu)呼出屏幕键盘
+                Keys.onMenuPressed: gamepadKeyboard.openFor(editText)
+
                 Keys.onReturnPressed: {
                     renamePcDialog.accept()
                 }
@@ -619,7 +623,21 @@ CenteredGridView {
                     renamePcDialog.accept()
                 }
             }
+
+            Text {
+                id: oskHint
+                visible: false
+                text: qsTr("No keyboard? Press %1 to open the on-screen keyboard.").arg(SdlGamepadKeyNavigation.faceButtonGlyph(2))
+                color: Theme.textFaint
+                font.family: Theme.fontMono
+                font.pointSize: Theme.fontBody
+                Layout.fillWidth: true
+            }
         }
+    }
+
+    GamepadKeyboard {
+        id: gamepadKeyboard
     }
 
     // 和 AppView 的地址选择框是同一个组件，只有提示语和落地方式不同
