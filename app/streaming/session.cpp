@@ -8,6 +8,7 @@
 #include "streaming/audio/dualsensehapticscalibration.h"
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
 #include "streaming/input/stylusreplaytest.h"
+#include "streaming/input/gamepadglyphs.h"
 #endif
 #include "backend/richpresencemanager.h"
 #include "backend/nvhttp.h"
@@ -263,6 +264,35 @@ QRect qtOverlayGeometryForSdlWindow(SDL_Window* window)
 
     return QRect(x, y, width, height);
 #endif
+}
+
+// 退出组合键的 glyph 文案,按键名按手柄 UI 风格显示
+// (与 StreamSegue.qml 的 quitComboHintText 保持同一映射)
+static QString gamepadQuitComboGlyphText(GamepadUiStyle style,
+                                         StreamingPreferences::GamepadQuitCombo combo)
+{
+    QString lb = gamepadLeftShoulderName(style);
+    QString rb = gamepadRightShoulderName(style);
+    auto face = [style](int logicalButton) {
+        return gamepadFaceButtonGlyph(style, logicalButton);
+    };
+
+    switch (combo) {
+    case StreamingPreferences::GQC_SELECT_L1_R1_Y:
+        return gamepadSelectButtonName(style) + "+" + lb + "+" + rb + "+" + face(3);
+    case StreamingPreferences::GQC_START_L1_R1_A:
+        return gamepadStartButtonName(style) + "+" + lb + "+" + rb + "+" + face(0);
+    case StreamingPreferences::GQC_START_L1_R1_B:
+        return gamepadStartButtonName(style) + "+" + lb + "+" + rb + "+" + face(1);
+    case StreamingPreferences::GQC_L1_R1_X_Y:
+        return lb + "+" + rb + "+" + face(2) + "+" + face(3);
+    case StreamingPreferences::GQC_L1_R1_A_B:
+        return lb + "+" + rb + "+" + face(0) + "+" + face(1);
+    case StreamingPreferences::GQC_DEFAULT:
+    default:
+        return gamepadStartButtonName(style) + "+" + gamepadSelectButtonName(style) + "+" + lb +
+               "+" + rb;
+    }
 }
 
 OverlayMenuPanel::MenuAction menuPlacementActionForPreference(
@@ -2592,7 +2622,10 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
     SDL_FlushEvent(SDL_MOUSEMOTION);
 
     // Rebuild for the current gamepad set before applying dynamic menu state.
-    m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
+    GamepadUiStyle gamepadUiStyle = m_InputHandler->getGamepadUiStyle();
+    m_MenuPanel->setGamepadHints(
+        m_InputHandler->getAttachedGamepadMask() != 0, gamepadUiStyle,
+        gamepadQuitComboGlyphText(gamepadUiStyle, m_InputHandler->getGamepadQuitCombo()));
 
     if (m_Preferences->usbForwardingEnabled &&
         m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Opening &&
@@ -3521,7 +3554,12 @@ void Session::notifyMouseEmulationMode(bool enabled)
 
     // We re-use the status update overlay for mouse mode notification
     if (m_MouseEmulationRefCount > 0) {
-        m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate, "Gamepad mouse mode active\nLong press Start to deactivate");
+        m_OverlayManager.updateOverlayText(
+            Overlay::OverlayStatusUpdate,
+            QStringLiteral("Gamepad mouse mode active\nLong press %1 to deactivate")
+                .arg(gamepadStartButtonName(m_InputHandler->getGamepadUiStyle()))
+                .toUtf8()
+                .constData());
         m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
     }
     else {
