@@ -10,13 +10,16 @@
 #define AXIS_NAV_ACTIVATE_THRESHOLD 20000
 #define AXIS_NAV_RELEASE_THRESHOLD 16000
 
+// 按 AxisNavDir 方向值索引（None 占位不用），恢复轮询时读当前按住状态用
+static const SDL_GameControllerButton k_DpadNavButtons[] = {
+    SDL_CONTROLLER_BUTTON_INVALID,    SDL_CONTROLLER_BUTTON_DPAD_UP,
+    SDL_CONTROLLER_BUTTON_DPAD_DOWN,  SDL_CONTROLLER_BUTTON_DPAD_LEFT,
+    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+};
+
 SdlGamepadKeyNavigation::SdlGamepadKeyNavigation(StreamingPreferences* prefs)
-    : m_Prefs(prefs),
-      m_Enabled(false),
-      m_UiNavMode(false),
-      m_UiNavSuspendCount(0),
-      m_FirstPoll(false),
-      m_HasFocus(false)
+    : m_Prefs(prefs), m_Enabled(false), m_UiNavMode(false), m_UiNavSuspendCount(0),
+      m_FirstPoll(false), m_HasFocus(false)
 {
     m_PollingTimer = new QTimer(this);
     connect(m_PollingTimer, &QTimer::timeout, this, &SdlGamepadKeyNavigation::onPollingTimerFired);
@@ -114,8 +117,20 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
     if (m_FirstPoll) {
         SDL_FlushEvent(SDL_CONTROLLERBUTTONDOWN);
         SDL_FlushEvent(SDL_CONTROLLERBUTTONUP);
-        // 暂停轮询期间手柄可能一直被按住，恢复时按新按下处理
+        // 暂停轮询期间手柄可能一直被按住：挂起期间的 DOWN 已被 flush，
+        // 不会再有按下事件，直接读当前状态恢复连发（按住时长从恢复点重算）
         resetNavRepeatState();
+        Uint32 resumeTime = SDL_GetTicks();
+        for (auto gc : std::as_const(m_Gamepads)) {
+            for (int dir = AxisNavUp; dir <= AxisNavRight; dir++) {
+                if (!m_DpadNav[dir].held &&
+                    SDL_GameControllerGetButton(gc, k_DpadNavButtons[dir])) {
+                    m_DpadNav[dir].held = true;
+                    m_DpadNav[dir].downSince = resumeTime;
+                    m_DpadNav[dir].lastFire = resumeTime;
+                }
+            }
+        }
         m_FirstPoll = false;
     }
 
@@ -157,8 +172,7 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
             case SDL_CONTROLLER_BUTTON_DPAD_UP:
             case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
             case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
-            case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
-            {
+            case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: {
                 int dir;
                 switch (event.cbutton.button) {
                 case SDL_CONTROLLER_BUTTON_DPAD_UP:
@@ -180,8 +194,7 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
                     m_DpadNav[dir].held = true;
                     m_DpadNav[dir].downSince = SDL_GetTicks();
                     m_DpadNav[dir].lastFire = SDL_GetTicks();
-                }
-                else {
+                } else {
                     m_DpadNav[dir].held = false;
                 }
 
@@ -252,22 +265,41 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
         short leftX = SDL_GameControllerGetAxis(gc, SDL_CONTROLLER_AXIS_LEFTX);
         short leftY = SDL_GameControllerGetAxis(gc, SDL_CONTROLLER_AXIS_LEFTY);
 
-        // A held direction must drop to the lower release threshold before
-        // another can trigger, so a stick resting near the threshold
-        // doesn't flicker between directions
-        int threshold = m_AxisNavDir == AxisNavNone ?
-                    AXIS_NAV_ACTIVATE_THRESHOLD : AXIS_NAV_RELEASE_THRESHOLD;
+        if (m_AxisNavDir != AxisNavNone) {
+            // The held direction owns the stick until it drops to the lower
+            // release threshold. Only after it releases can a new direction
+            // activate, and then only past the activation threshold - an
+            // orthogonal axis between the two thresholds must not steal
+            // navigation mid-hold.
+            bool stillHeld;
+            switch (m_AxisNavDir) {
+            case AxisNavUp:
+                stillHeld = leftY < -AXIS_NAV_RELEASE_THRESHOLD;
+                break;
+            case AxisNavDown:
+                stillHeld = leftY > AXIS_NAV_RELEASE_THRESHOLD;
+                break;
+            case AxisNavLeft:
+                stillHeld = leftX < -AXIS_NAV_RELEASE_THRESHOLD;
+                break;
+            default:
+                stillHeld = leftX > AXIS_NAV_RELEASE_THRESHOLD;
+                break;
+            }
 
-        if (leftY < -threshold) {
+            if (stillHeld) {
+                stickDir = m_AxisNavDir;
+                break;
+            }
+        }
+
+        if (leftY < -AXIS_NAV_ACTIVATE_THRESHOLD) {
             stickDir = AxisNavUp;
-        }
-        else if (leftY > threshold) {
+        } else if (leftY > AXIS_NAV_ACTIVATE_THRESHOLD) {
             stickDir = AxisNavDown;
-        }
-        else if (leftX < -threshold) {
+        } else if (leftX < -AXIS_NAV_ACTIVATE_THRESHOLD) {
             stickDir = AxisNavLeft;
-        }
-        else if (leftX > threshold) {
+        } else if (leftX > AXIS_NAV_ACTIVATE_THRESHOLD) {
             stickDir = AxisNavRight;
         }
 
@@ -286,9 +318,8 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
             sendDirectionKey(QEvent::Type::KeyRelease, stickDir);
             m_AxisNavLastFire = now;
         }
-    }
-    else if (stickDir != AxisNavNone &&
-             now - m_AxisNavLastFire >= axisNavRepeatDelayMs(now - m_AxisNavDirSince)) {
+    } else if (stickDir != AxisNavNone &&
+               now - m_AxisNavLastFire >= axisNavRepeatDelayMs(now - m_AxisNavDirSince)) {
         sendDirectionKey(QEvent::Type::KeyPress, stickDir);
         sendDirectionKey(QEvent::Type::KeyRelease, stickDir);
         m_AxisNavLastFire = now;
@@ -326,16 +357,14 @@ void SdlGamepadKeyNavigation::sendDirectionKey(QEvent::Type type, int dir)
         if (uiNavModeActive()) {
             // Back-tab
             sendKey(type, Qt::Key_Tab, Qt::ShiftModifier);
-        }
-        else {
+        } else {
             sendKey(type, Qt::Key_Up);
         }
         break;
     case AxisNavDown:
         if (uiNavModeActive()) {
             sendKey(type, Qt::Key_Tab);
-        }
-        else {
+        } else {
             sendKey(type, Qt::Key_Down);
         }
         break;
@@ -352,11 +381,9 @@ Uint32 SdlGamepadKeyNavigation::axisNavRepeatDelayMs(Uint32 heldMs)
 {
     if (heldMs < 400) {
         return 400;
-    }
-    else if (heldMs < 1600) {
+    } else if (heldMs < 1600) {
         return 150;
-    }
-    else {
+    } else {
         return 75;
     }
 }

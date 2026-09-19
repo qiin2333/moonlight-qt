@@ -133,11 +133,11 @@ public:
 
     enum OverlayMenuPosition
     {
-        OMP_DISABLED   = 0,  // Do not show the overlay menu
-        OMP_BUTTON     = 1,  // Show a floating button on the streaming window
-        OMP_TOP_EDGE   = 2,  // Show from the top edge of the streaming window
-        OMP_RIGHT_EDGE = 3,  // Show on right edge
-        OMP_LEFT_EDGE  = 4,  // Show on left edge
+        OMP_DISABLED = 0,   // Do not show the overlay menu
+        OMP_BUTTON = 1,     // Show a floating button on the streaming window
+        OMP_TOP_EDGE = 2,   // Show from the top edge of the streaming window
+        OMP_RIGHT_EDGE = 3, // Show on right edge
+        OMP_LEFT_EDGE = 4,  // Show on left edge
     };
     Q_ENUM(OverlayMenuPosition);
 
@@ -179,13 +179,14 @@ public:
 
     enum GamepadQuitCombo
     {
-        GQC_DEFAULT         = 0,  // Start + Select + L1 + R1 (original)
-        GQC_SELECT_L1_R1_X  = 1,  // Deprecated: same combo as the stats overlay toggle; migrated to GQC_SELECT_L1_R1_Y on load
-        GQC_SELECT_L1_R1_Y  = 2,  // Select + L1 + R1 + Y
-        GQC_START_L1_R1_A   = 3,  // Start + L1 + R1 + A (avoids Select conflict)
-        GQC_START_L1_R1_B   = 4,  // Start + L1 + R1 + B (avoids Select conflict)
-        GQC_L1_R1_X_Y       = 5,  // L1 + R1 + X + Y (no Select/Start at all)
-        GQC_L1_R1_A_B       = 6,  // L1 + R1 + A + B (no Select/Start at all)
+        GQC_DEFAULT = 0,        // Start + Select + L1 + R1 (original)
+        GQC_SELECT_L1_R1_X = 1, // Deprecated: same combo as the stats overlay toggle; migrated to
+                                // GQC_SELECT_L1_R1_Y on load
+        GQC_SELECT_L1_R1_Y = 2, // Select + L1 + R1 + Y
+        GQC_START_L1_R1_A = 3,  // Start + L1 + R1 + A (avoids Select conflict)
+        GQC_START_L1_R1_B = 4,  // Start + L1 + R1 + B (avoids Select conflict)
+        GQC_L1_R1_X_Y = 5,      // L1 + R1 + X + Y (no Select/Start at all)
+        GQC_L1_R1_A_B = 6,      // L1 + R1 + A + B (no Select/Start at all)
     };
     Q_ENUM(GamepadQuitCombo);
 
