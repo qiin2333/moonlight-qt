@@ -1,6 +1,8 @@
 import QtQuick 2.9
 import QtQuick.Controls
 
+import SdlGamepadKeyNavigation 1.0
+
 import "."
 
 // 方角输入框。FluentWinUI3 的 TextField 背景是圆角 + 底部一条粗下划线，
@@ -22,6 +24,18 @@ TextField {
     rightPadding: Theme.spaceSm
     topPadding: Theme.spaceXs
     bottomPadding: Theme.spaceXs
+
+    // 手柄用户:X(Key_Menu)呼出屏幕键盘(实例挂在 main.qml,所有文本框
+    // 自动获得该能力)。没接手柄时不拦截按键,保留 Qt 自带的文本编辑菜单。
+    Keys.onMenuPressed: function(event) {
+        if (typeof window !== "undefined" && window.gamepadOsk !== null &&
+                SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
+            window.gamepadOsk.openFor(control)
+        }
+        else {
+            event.accepted = false
+        }
+    }
 
     background: Rectangle {
         implicitWidth: 120

@@ -216,6 +216,9 @@ ApplicationWindow {
     readonly property bool showGlobalBackground:
         !(stackView.currentItem && stackView.currentItem.usesOwnBackground === true)
 
+    // 屏幕键盘单例,HardTextField 组件统一从这里取(见 theme/HardTextField.qml)
+    readonly property alias gamepadOsk: gamepadKeyboard
+
     Image {
         anchors.fill: parent
         anchors.topMargin: -window.chromeInset
@@ -723,24 +726,6 @@ ApplicationWindow {
             }
 
             NavigableToolButton {
-                // TODO: Implement gamepad mapping then unhide this button
-                visible: false
-
-                ToolTip.delay: 1000
-                ToolTip.timeout: 3000
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Gamepad Mapper")
-
-                iconSource: "qrc:/res/fluent/tb-gamepad.svg"
-
-                onClicked: navigateTo("qrc:/gui/GamepadMapper.qml", GamepadMapper)
-
-                Keys.onDownPressed: {
-                    stackView.currentItem.forceActiveFocus(Qt.TabFocusReason)
-                }
-            }
-
-            NavigableToolButton {
                 id: ipSettingsButton
                 visible: stackView.currentItem instanceof AppView &&
                          stackView.currentItem.hasMultipleAddresses
@@ -944,6 +929,10 @@ ApplicationWindow {
         }
     }
 
+    GamepadKeyboard {
+        id: gamepadKeyboard
+    }
+
     NavigableDialog {
         id: addPcDialog
         property string label: qsTr("Enter the IP address of your host PC:")
@@ -953,6 +942,8 @@ ApplicationWindow {
         onOpened: {
             // Force keyboard focus on the textbox so keyboard navigation works
             editText.forceActiveFocus()
+            // 手柄插拔状态以对话框打开那一刻为准
+            oskHint.visible = SdlGamepadKeyNavigation.getConnectedGamepads() > 0
         }
 
         onClosed: {
@@ -991,6 +982,16 @@ ApplicationWindow {
                 Keys.onEnterPressed: {
                     addPcDialog.accept()
                 }
+            }
+
+            Text {
+                id: oskHint
+                visible: false
+                text: qsTr("No keyboard? Press %1 to open the on-screen keyboard.").arg(SdlGamepadKeyNavigation.faceButtonGlyph(2))
+                color: Theme.textFaint
+                font.family: Theme.fontMono
+                font.pointSize: Theme.fontBody
+                Layout.fillWidth: true
             }
 
             // 云主机推广。放在这里是因为「我没有可以串流的主机」正好是打开这个框的

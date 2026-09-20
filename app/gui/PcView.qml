@@ -583,6 +583,7 @@ CenteredGridView {
         onOpened: {
             // Force keyboard focus on the textbox so keyboard navigation works
             editText.forceActiveFocus()
+            oskHint.visible = SdlGamepadKeyNavigation.getConnectedGamepads() > 0
         }
 
         onClosed: {
@@ -619,8 +620,20 @@ CenteredGridView {
                     renamePcDialog.accept()
                 }
             }
+
+            Text {
+                id: oskHint
+                visible: false
+                text: qsTr("No keyboard? Press %1 to open the on-screen keyboard.").arg(SdlGamepadKeyNavigation.faceButtonGlyph(2))
+                color: Theme.textFaint
+                font.family: Theme.fontMono
+                font.pointSize: Theme.fontBody
+                Layout.fillWidth: true
+            }
         }
     }
+
+    // 屏幕键盘由 main.qml 的 gamepadOsk 单例提供,HardTextField 自动接入
 
     // 和 AppView 的地址选择框是同一个组件，只有提示语和落地方式不同
     SelectAddressDialog {

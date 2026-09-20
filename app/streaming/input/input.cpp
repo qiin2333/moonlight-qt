@@ -81,83 +81,52 @@ bool toSdlSystemCursor(NativeCursorShape shape, SDL_SystemCursor& systemCursor)
 
 SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight,
                                  bool enablePhysicalDualSenseHaptics)
-    : m_MultiController(prefs.multiController),
-      m_GamepadMouse(prefs.gamepadMouse),
+    : m_MultiController(prefs.multiController), m_GamepadMouse(prefs.gamepadMouse),
       m_EnableDualSenseHaptics(enablePhysicalDualSenseHaptics),
-      m_SwapMouseButtons(prefs.swapMouseButtons),
-      m_SwapWinAltKeys(prefs.swapWinAltKeys),
+      m_SwapMouseButtons(prefs.swapMouseButtons), m_SwapWinAltKeys(prefs.swapWinAltKeys),
       m_ReverseScrollDirection(prefs.reverseScrollDirection),
-      m_SwapFaceButtons(prefs.swapFaceButtons),
-      m_GamepadQuitCombo(prefs.gamepadQuitCombo),
-      m_MouseWasInVideoRegion(false),
-      m_PendingMouseButtonsAllUpOnVideoRegionLeave(false),
-      m_PointerRegionLockActive(false),
-      m_PointerRegionLockToggledByUser(false),
-      m_FakeMouseCaptureActive(false),
-      m_KeyboardCaptureActive(false),
-      m_CaptureSystemKeysMode(prefs.captureSysKeysMode),
+      m_SwapFaceButtons(prefs.swapFaceButtons), m_GamepadQuitCombo(prefs.gamepadQuitCombo),
+      m_GamepadQuitEnabled(qgetenv("NO_GAMEPAD_QUIT") != "1"),
+      m_GamepadDeadzone(qBound(0, prefs.gamepadDeadzone, 30)), m_MouseWasInVideoRegion(false),
+      m_PendingMouseButtonsAllUpOnVideoRegionLeave(false), m_PointerRegionLockActive(false),
+      m_PointerRegionLockToggledByUser(false), m_FakeMouseCaptureActive(false),
+      m_KeyboardCaptureActive(false), m_CaptureSystemKeysMode(prefs.captureSysKeysMode),
       m_MouseCursorCapturedVisibilityState(prefs.showLocalCursor ? SDL_ENABLE : SDL_DISABLE),
-      m_LocalCursorMode(prefs.absoluteMouseMode && prefs.showLocalCursor ?
-                            LI_CURSOR_MODE_LOCAL : LI_CURSOR_MODE_VIDEO),
-      m_RemoteCursorVisible(true),
-      m_RemoteCursor(nullptr),
-      m_LastCursorClass(NativeCursorShape::Unknown),
-      m_HasLastCursorShape(false),
-      m_RemoteCursorScale(1.0),
-      m_RemoteCursorHideTimer(0),
-      m_LongPressTimer(0),
-      m_StreamWidth(streamWidth),
-      m_StreamHeight(streamHeight),
-      m_AbsoluteMouseMode(prefs.absoluteMouseMode),
-      m_AbsoluteTouchMode(prefs.absoluteTouchMode),
+      m_LocalCursorMode(prefs.absoluteMouseMode && prefs.showLocalCursor ? LI_CURSOR_MODE_LOCAL
+                                                                         : LI_CURSOR_MODE_VIDEO),
+      m_RemoteCursorVisible(true), m_RemoteCursor(nullptr),
+      m_LastCursorClass(NativeCursorShape::Unknown), m_HasLastCursorShape(false),
+      m_RemoteCursorScale(1.0), m_RemoteCursorHideTimer(0), m_LongPressTimer(0),
+      m_StreamWidth(streamWidth), m_StreamHeight(streamHeight),
+      m_AbsoluteMouseMode(prefs.absoluteMouseMode), m_AbsoluteTouchMode(prefs.absoluteTouchMode),
       m_DisabledTouchFeedback(false),
 #ifdef HAVE_WINDOWS_PEN_INPUT
-      m_WindowsPenWindow(nullptr),
-      m_WindowsPenSubclassContext(nullptr),
-      m_WindowsPenPointerId(0),
-      m_WindowsPenFallbackPointerId(UINT32_MAX),
-      m_WindowsPenSuppressedPointerId(UINT32_MAX),
-      m_WindowsPenSubclassInstalled(false),
-      m_WindowsPenPointerTracked(false),
-      m_WindowsPenCancelPending(false),
-      m_WindowsPenLastSentStateKey(0),
-      m_WindowsPenLastSentStateValid(false),
-      m_WindowsPenHistoryStats{},
+      m_WindowsPenWindow(nullptr), m_WindowsPenSubclassContext(nullptr), m_WindowsPenPointerId(0),
+      m_WindowsPenFallbackPointerId(UINT32_MAX), m_WindowsPenSuppressedPointerId(UINT32_MAX),
+      m_WindowsPenSubclassInstalled(false), m_WindowsPenPointerTracked(false),
+      m_WindowsPenCancelPending(false), m_WindowsPenLastSentStateKey(0),
+      m_WindowsPenLastSentStateValid(false), m_WindowsPenHistoryStats{},
 #endif
-      m_NativeTouchpadEnabled(SDL_GetHintBoolean(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, SDL_FALSE) == SDL_TRUE),
-      m_TouchpadFlushEventQueued(false),
-      m_NativeTouchpadTransport(NTT_UNKNOWN),
-      m_PendingTouchpadId(0),
-      m_PendingTouchpadTimestamp(0),
-      m_PendingTouchpadContactCount(0),
-      m_ActiveTouchpadId(0),
-      m_LastTouchpadScrollTimestamp(0),
+      m_NativeTouchpadEnabled(SDL_GetHintBoolean(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, SDL_FALSE) ==
+                              SDL_TRUE),
+      m_TouchpadFlushEventQueued(false), m_NativeTouchpadTransport(NTT_UNKNOWN),
+      m_PendingTouchpadId(0), m_PendingTouchpadTimestamp(0), m_PendingTouchpadContactCount(0),
+      m_ActiveTouchpadId(0), m_LastTouchpadScrollTimestamp(0),
 #ifdef HAVE_MACOS_NATIVE_TOUCHPAD
-      m_MacTouchpadSuppressedMouseButtons(0),
-      m_MacTouchpadPendingTapButtons(0),
-      m_MacTouchpadLastTapTimestamp(0),
-      m_MacTouchpadGestureStartTimestamp(0),
-      m_MacTouchpadGesturePrimaryFinger(0),
-      m_MacTouchpadGestureStartX(0),
-      m_MacTouchpadGestureStartY(0),
-      m_MacTouchpadGestureMaxContacts(0),
-      m_MacTouchpadGestureMoved(false),
-      m_MacTouchpadGestureHadPhysicalButton(false),
+      m_MacTouchpadSuppressedMouseButtons(0), m_MacTouchpadPendingTapButtons(0),
+      m_MacTouchpadLastTapTimestamp(0), m_MacTouchpadGestureStartTimestamp(0),
+      m_MacTouchpadGesturePrimaryFinger(0), m_MacTouchpadGestureStartX(0),
+      m_MacTouchpadGestureStartY(0), m_MacTouchpadGestureMaxContacts(0),
+      m_MacTouchpadGestureMoved(false), m_MacTouchpadGestureHadPhysicalButton(false),
       m_MacTouchpadButtonDown(false),
 #endif
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
-      m_ActiveWindowsTouchpadDevice(0),
-      m_LastWindowsTouchpadFrameTicks(0),
-      m_SuppressedWindowsTouchpadMouseButtons(0),
-      m_WindowsTouchpadButtonDown(false),
-      m_WindowsTouchpadButtonUsesMouseFallback(false),
-      m_WindowsTouchpadWidthMm(0),
+      m_ActiveWindowsTouchpadDevice(0), m_LastWindowsTouchpadFrameTicks(0),
+      m_SuppressedWindowsTouchpadMouseButtons(0), m_WindowsTouchpadButtonDown(false),
+      m_WindowsTouchpadButtonUsesMouseFallback(false), m_WindowsTouchpadWidthMm(0),
       m_WindowsTouchpadHeightMm(0),
 #endif
-      m_LeftButtonReleaseTimer(0),
-      m_RightButtonReleaseTimer(0),
-      m_DragTimer(0),
-      m_DragButton(0),
+      m_LeftButtonReleaseTimer(0), m_RightButtonReleaseTimer(0), m_DragTimer(0), m_DragButton(0),
       m_NumFingersDown(0)
 {
     // System keys are always captured when running without a DE
@@ -368,6 +337,9 @@ SdlInputHandler::~SdlInputHandler()
         if (m_GamepadState[i].mouseEmulationTimer != 0) {
             Session::get()->notifyMouseEmulationMode(false);
             SDL_RemoveTimer(m_GamepadState[i].mouseEmulationTimer);
+            // 析构是模拟鼠标键释放的第四条路径:会话结束时按住的键同样要
+            // 还给主机,否则主机侧鼠标键卡死
+            releaseMouseEmulationButtons(&m_GamepadState[i]);
         }
 #if !SDL_VERSION_ATLEAST(2, 0, 9)
         if (m_GamepadState[i].haptic != nullptr) {
