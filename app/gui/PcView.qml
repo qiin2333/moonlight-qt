@@ -612,9 +612,6 @@ CenteredGridView {
                 Layout.fillWidth: true
                 focus: true
 
-                // 手柄用户:X(Key_Menu)呼出屏幕键盘
-                Keys.onMenuPressed: gamepadKeyboard.openFor(editText)
-
                 Keys.onReturnPressed: {
                     renamePcDialog.accept()
                 }
@@ -636,9 +633,7 @@ CenteredGridView {
         }
     }
 
-    GamepadKeyboard {
-        id: gamepadKeyboard
-    }
+    // 屏幕键盘由 main.qml 的 gamepadOsk 单例提供,HardTextField 自动接入
 
     // 和 AppView 的地址选择框是同一个组件，只有提示语和落地方式不同
     SelectAddressDialog {

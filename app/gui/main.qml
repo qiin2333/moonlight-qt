@@ -216,6 +216,9 @@ ApplicationWindow {
     readonly property bool showGlobalBackground:
         !(stackView.currentItem && stackView.currentItem.usesOwnBackground === true)
 
+    // 屏幕键盘单例,HardTextField 组件统一从这里取(见 theme/HardTextField.qml)
+    readonly property alias gamepadOsk: gamepadKeyboard
+
     Image {
         anchors.fill: parent
         anchors.topMargin: -window.chromeInset
@@ -989,9 +992,6 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 260
                 focus: true
-
-                // 手柄用户:X(Key_Menu)呼出屏幕键盘
-                Keys.onMenuPressed: gamepadKeyboard.openFor(editText)
 
                 Keys.onReturnPressed: {
                     addPcDialog.accept()
