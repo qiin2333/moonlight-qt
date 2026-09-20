@@ -36,6 +36,9 @@ public:
 
     Q_INVOKABLE int getConnectedGamepads();
 
+    // NO_GAMEPAD_QUIT=1 时游戏柄退出组合键被禁用,提示文案据此回落
+    Q_INVOKABLE bool gamepadQuitComboEnabled() const;
+
     // 手柄 UI 风格（按键提示文案用）：按当前连接的第一只手柄自动识别，
     // 未连接或识别不出时按 Xbox 布局处理。枚举与 glyph 函数定义见
     // streaming/input/gamepadglyphs.h（串流侧悬浮菜单/toast 共用）。

@@ -76,6 +76,16 @@ GamepadUiStyle SdlInputHandler::getGamepadUiStyle() const
     return GamepadUiStyleXbox;
 }
 
+bool SdlInputHandler::hasConnectedGamepads() const
+{
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        if (m_GamepadState[i].controller != nullptr) {
+            return true;
+        }
+    }
+    return false;
+}
+
 GamepadState*
 SdlInputHandler::findStateForGamepad(SDL_JoystickID id)
 {
@@ -468,8 +478,11 @@ void SdlInputHandler::handleControllerButtonEvent(SDL_ControllerButtonEvent* eve
         else if (state->mouseEmulationTimer != 0) {
             for (const auto& binding : k_MouseEmulationButtons) {
                 if (event->button == binding.controllerButton) {
-                    LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, binding.mouseButton);
                     state->mouseEmulationButtonsHeld &= ~binding.flag;
+                    // 另一只手柄的会话仍按着同一个键时,不能替它松开
+                    if (!anotherSessionOwnsEmulatedButton(state, binding.flag)) {
+                        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, binding.mouseButton);
+                    }
                     break;
                 }
             }
@@ -1239,6 +1252,18 @@ int SdlInputHandler::getAttachedGamepadMask()
     return mask;
 }
 
+bool SdlInputHandler::anotherSessionOwnsEmulatedButton(const GamepadState* state, int flag) const
+{
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        const GamepadState* other = &m_GamepadState[i];
+        if (other != state && other->controller != nullptr && other->mouseEmulationTimer != 0 &&
+            (other->mouseEmulationButtonsHeld & flag)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void SdlInputHandler::releaseMouseEmulationButtons(GamepadState* state)
 {
     // Emulation can end (hot-unplug, long-press/menu deactivation) while
@@ -1252,17 +1277,7 @@ void SdlInputHandler::releaseMouseEmulationButtons(GamepadState* state)
             continue;
         }
 
-        bool ownedElsewhere = false;
-        for (int i = 0; i < MAX_GAMEPADS; i++) {
-            GamepadState* other = &m_GamepadState[i];
-            if (other != state && other->controller != nullptr && other->mouseEmulationTimer != 0 &&
-                (other->mouseEmulationButtonsHeld & binding.flag)) {
-                ownedElsewhere = true;
-                break;
-            }
-        }
-
-        if (!ownedElsewhere) {
+        if (!anotherSessionOwnsEmulatedButton(state, binding.flag)) {
             LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, binding.mouseButton);
         }
     }

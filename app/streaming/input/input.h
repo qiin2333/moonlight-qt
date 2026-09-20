@@ -278,6 +278,16 @@ public:
     // the per-button release path only runs while the timer is live.
     void releaseMouseEmulationButtons(GamepadState* state);
 
+    // Whether any OTHER gamepad's active emulation session still holds flag;
+    // shared host buttons must not be released on behalf of another session
+    bool anotherSessionOwnsEmulatedButton(const GamepadState* state, int flag) const;
+
+    // Actual slot occupancy, unlike getAttachedGamepadMask() which reports
+    // 0x1 in single-controller mode even with no physical gamepad
+    bool hasConnectedGamepads() const;
+
+    bool getGamepadQuitEnabled() const { return m_GamepadQuitEnabled; }
+
     // Update the gamepad mouse setting at runtime
     void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
 

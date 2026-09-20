@@ -337,6 +337,9 @@ SdlInputHandler::~SdlInputHandler()
         if (m_GamepadState[i].mouseEmulationTimer != 0) {
             Session::get()->notifyMouseEmulationMode(false);
             SDL_RemoveTimer(m_GamepadState[i].mouseEmulationTimer);
+            // 析构是模拟鼠标键释放的第四条路径:会话结束时按住的键同样要
+            // 还给主机,否则主机侧鼠标键卡死
+            releaseMouseEmulationButtons(&m_GamepadState[i]);
         }
 #if !SDL_VERSION_ATLEAST(2, 0, 9)
         if (m_GamepadState[i].haptic != nullptr) {

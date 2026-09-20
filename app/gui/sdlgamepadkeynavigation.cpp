@@ -427,6 +427,12 @@ int SdlGamepadKeyNavigation::gamepadUiStyle()
     return detectUiStyle();
 }
 
+bool SdlGamepadKeyNavigation::gamepadQuitComboEnabled() const
+{
+    // 与 gamepad.cpp 的 m_GamepadQuitEnabled 同一开关
+    return qgetenv("NO_GAMEPAD_QUIT") != "1";
+}
+
 QString SdlGamepadKeyNavigation::faceButtonGlyph(int logicalButton)
 {
     return gamepadFaceButtonGlyph(detectUiStyle(), logicalButton);

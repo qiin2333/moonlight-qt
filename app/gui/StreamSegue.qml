@@ -26,22 +26,27 @@ Item {
     property bool quitAfter : false
 
     // 退出组合键提示随设置走：玩家改了组合键，提示不能还教默认那套。
-    // 按键名按当前手柄风格显示（PS 显示 Options/Share/✕，Switch 显示 +/−）
+    // 按键名按当前手柄风格显示（PS 显示 Options/Share/✕，Switch 显示 +/−），
+    // swapFaceButtons 时补偿到实际要按的物理键
     function quitComboHintText()
     {
         var nav = SdlGamepadKeyNavigation
-        var shoulders = nav.leftShoulderName() + "+" + nav.rightShoulderName()
+        var swap = StreamingPreferences.swapFaceButtons
+        var lb = nav.leftShoulderName()
+        var rb = nav.rightShoulderName()
+        var face = function(i) { return nav.faceButtonGlyph(swap ? (i ^ 1) : i) }
+        var shoulders = lb + "+" + rb
         switch (StreamingPreferences.gamepadQuitCombo) {
         case StreamingPreferences.GQC_SELECT_L1_R1_Y:
-            return nav.selectButtonName() + "+" + shoulders + "+" + nav.faceButtonGlyph(3)
+            return nav.selectButtonName() + "+" + shoulders + "+" + face(3)
         case StreamingPreferences.GQC_START_L1_R1_A:
-            return nav.startButtonName() + "+" + shoulders + "+" + nav.faceButtonGlyph(0)
+            return nav.startButtonName() + "+" + shoulders + "+" + face(0)
         case StreamingPreferences.GQC_START_L1_R1_B:
-            return nav.startButtonName() + "+" + shoulders + "+" + nav.faceButtonGlyph(1)
+            return nav.startButtonName() + "+" + shoulders + "+" + face(1)
         case StreamingPreferences.GQC_L1_R1_X_Y:
-            return shoulders + "+" + nav.faceButtonGlyph(2) + "+" + nav.faceButtonGlyph(3)
+            return shoulders + "+" + face(2) + "+" + face(3)
         case StreamingPreferences.GQC_L1_R1_A_B:
-            return shoulders + "+" + nav.faceButtonGlyph(0) + "+" + nav.faceButtonGlyph(1)
+            return shoulders + "+" + face(0) + "+" + face(1)
         default:
             return nav.startButtonName() + "+" + nav.selectButtonName() + "+" + shoulders
         }
@@ -328,7 +333,8 @@ Item {
             // in the hintText control itself to synchronize
             // with Session.exec() which requires no concurrent
             // gamepad usage.
-            hintText.text = qsTr("Tip:") + " " + qsTr("Press %1 to disconnect your session").arg(SdlGamepadKeyNavigation.getConnectedGamepads() > 0 ?
+            hintText.text = qsTr("Tip:") + " " + qsTr("Press %1 to disconnect your session").arg(SdlGamepadKeyNavigation.getConnectedGamepads() > 0 &&
+                                                  SdlGamepadKeyNavigation.gamepadQuitComboEnabled() ?
                                                   quitComboHintText() : qsTr("Ctrl+Alt+Shift+Q"))
 
             // Stop GUI gamepad usage now

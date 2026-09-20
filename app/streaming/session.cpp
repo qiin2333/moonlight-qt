@@ -280,12 +280,15 @@ static void pushEventOrWarn(SDL_Event& event)
 // 退出组合键的 glyph 文案,按键名按手柄 UI 风格显示
 // (与 StreamSegue.qml 的 quitComboHintText 保持同一映射)
 static QString gamepadQuitComboGlyphText(GamepadUiStyle style,
-                                         StreamingPreferences::GamepadQuitCombo combo)
+                                         StreamingPreferences::GamepadQuitCombo combo,
+                                         bool swapFaceButtons)
 {
     QString lb = gamepadLeftShoulderName(style);
     QString rb = gamepadRightShoulderName(style);
-    auto face = [style](int logicalButton) {
-        return gamepadFaceButtonGlyph(style, logicalButton);
+    // swapFaceButtons 在组合键匹配前交换事件,提示必须显示"要按的那颗物理
+    // 键":逻辑面键取对侧位置(0↔1、2↔3)
+    auto face = [style, swapFaceButtons](int logicalButton) {
+        return gamepadFaceButtonGlyph(style, swapFaceButtons ? (logicalButton ^ 1) : logicalButton);
     };
 
     switch (combo) {
@@ -2635,8 +2638,11 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
     // Rebuild for the current gamepad set before applying dynamic menu state.
     GamepadUiStyle gamepadUiStyle = m_InputHandler->getGamepadUiStyle();
     m_MenuPanel->setGamepadHints(
-        m_InputHandler->getAttachedGamepadMask() != 0, gamepadUiStyle,
-        gamepadQuitComboGlyphText(gamepadUiStyle, m_InputHandler->getGamepadQuitCombo()));
+        m_InputHandler->hasConnectedGamepads(), gamepadUiStyle, m_Preferences->swapFaceButtons,
+        m_InputHandler->getGamepadQuitEnabled()
+            ? gamepadQuitComboGlyphText(gamepadUiStyle, m_InputHandler->getGamepadQuitCombo(),
+                                        m_Preferences->swapFaceButtons)
+            : QString());
 
     if (m_Preferences->usbForwardingEnabled &&
         m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Opening &&

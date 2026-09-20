@@ -37,7 +37,7 @@ constexpr int kGamepadHintBarHeight = 30;
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     : QRasterWindow(parent), m_CurrentLevel(0), m_HoveredIndex(-1), m_Visible(false),
-      m_HasGamepads(false), m_GamepadUiStyle(GamepadUiStyleXbox),
+      m_HasGamepads(false), m_GamepadUiStyle(GamepadUiStyleXbox), m_SwapFaceButtons(false),
       m_FileMappingState(FileMappingState::Unknown), m_FileMappingDetail(tr("Checking")),
       m_RemoteUsbAvailable(false), m_RemoteUsbState(RemoteUsbState::Unavailable),
       m_RemoteUsbDetail(tr("Unavailable")), m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
@@ -210,11 +210,13 @@ void OverlayMenuPanel::buildMenuLevels()
                                MenuAction::QuitAndExit,           0, true, false, true});
     QString statsDetail = QStringLiteral("Ctrl+Alt+Shift+S");
     if (m_HasGamepads) {
-        // 手柄组合键与键盘快捷键并列展示,按键名按实体手柄风格显示
+        // 手柄组合键与键盘快捷键并列展示,按键名按实体手柄风格显示;
+        // swapFaceButtons 时同样补偿到实际要按的物理键
+        const int statsFace = m_SwapFaceButtons ? 3 : 2;
         statsDetail += QString::fromUtf8(" \xc2\xb7 ") + gamepadSelectButtonName(m_GamepadUiStyle) +
                        QStringLiteral("+") + gamepadLeftShoulderName(m_GamepadUiStyle) +
                        QStringLiteral("+") + gamepadRightShoulderName(m_GamepadUiStyle) +
-                       QStringLiteral("+") + gamepadFaceButtonGlyph(m_GamepadUiStyle, 2);
+                       QStringLiteral("+") + gamepadFaceButtonGlyph(m_GamepadUiStyle, statsFace);
     }
     shortcuts.items.push_back({ tr("Performance Stats"), statsDetail, MenuItemType::Action,
                                 MenuAction::ToggleStatsOverlay, 0, true, false, true });
@@ -1240,18 +1242,20 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
 
     // Gamepad hint bar: pad-only players get the menu bindings on screen
     // instead of having to know them. Faces follow the controller style
-    // (PS: ✕ Select / ○ Back; Nintendo: B Select / A Back).
+    // (PS: ✕ Select / ○ Back; Nintendo: B Select / A Back), compensated for
+    // swapFaceButtons so the hint names the physical button to press.
     if (m_HasGamepads) {
         const int hintTop = ch - m_Padding - kGamepadHintBarHeight;
         p.setPen(QPen(MenuLine, 1));
         p.drawLine(textPad, hintTop, cw - textPad, hintTop);
         p.setFont(m_DetailFont);
         p.setPen(MenuDim);
-        const QString hint =
-            QStringLiteral("\xe2\x86\x91\xe2\x86\x93 ") + tr("Move") + QStringLiteral("      ") +
-            gamepadFaceButtonGlyph(m_GamepadUiStyle, 0) + QStringLiteral(" ") + tr("Select") +
-            QStringLiteral("      ") + gamepadFaceButtonGlyph(m_GamepadUiStyle, 1) +
-            QStringLiteral(" ") + tr("Back");
+        const QString hint = QStringLiteral("\xe2\x86\x91\xe2\x86\x93 ") + tr("Move") +
+                             QStringLiteral("      ") +
+                             gamepadFaceButtonGlyph(m_GamepadUiStyle, m_SwapFaceButtons ? 1 : 0) +
+                             QStringLiteral(" ") + tr("Select") + QStringLiteral("      ") +
+                             gamepadFaceButtonGlyph(m_GamepadUiStyle, m_SwapFaceButtons ? 0 : 1) +
+                             QStringLiteral(" ") + tr("Back");
         p.drawText(QRect(textPad, hintTop + 1, cw - textPad * 2, kGamepadHintBarHeight - 1),
                    Qt::AlignLeft | Qt::AlignVCenter, hint);
     }

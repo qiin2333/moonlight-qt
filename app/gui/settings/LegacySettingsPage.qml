@@ -570,10 +570,13 @@ Column {
         title: qsTr("Gamepad quit combo")
 
         // 按键名按当前连接的手柄风格显示(PS 显示 Options/Share/✕,
-        // Switch 显示 +/−/B/A);插拔手柄或切进本页时重建
+        // Switch 显示 +/−/B/A);swapFaceButtons 时补偿到实际要按的物理键。
+        // 插拔手柄或切进本页时重建
         function rebuildQuitComboModel() {
             quitComboModel.clear()
             var nav = SdlGamepadKeyNavigation
+            var swap = StreamingPreferences.swapFaceButtons
+            var face = function(i) { return nav.faceButtonGlyph(swap ? (i ^ 1) : i) }
             var lb = nav.leftShoulderName()
             var rb = nav.rightShoulderName()
             quitComboModel.append({
@@ -581,23 +584,23 @@ Column {
                 val: StreamingPreferences.GQC_DEFAULT
             })
             quitComboModel.append({
-                text: nav.selectButtonName() + "+" + lb + "+" + rb + "+" + nav.faceButtonGlyph(3),
+                text: nav.selectButtonName() + "+" + lb + "+" + rb + "+" + face(3),
                 val: StreamingPreferences.GQC_SELECT_L1_R1_Y
             })
             quitComboModel.append({
-                text: nav.startButtonName() + "+" + lb + "+" + rb + "+" + nav.faceButtonGlyph(0),
+                text: nav.startButtonName() + "+" + lb + "+" + rb + "+" + face(0),
                 val: StreamingPreferences.GQC_START_L1_R1_A
             })
             quitComboModel.append({
-                text: nav.startButtonName() + "+" + lb + "+" + rb + "+" + nav.faceButtonGlyph(1),
+                text: nav.startButtonName() + "+" + lb + "+" + rb + "+" + face(1),
                 val: StreamingPreferences.GQC_START_L1_R1_B
             })
             quitComboModel.append({
-                text: lb + "+" + rb + "+" + nav.faceButtonGlyph(2) + "+" + nav.faceButtonGlyph(3),
+                text: lb + "+" + rb + "+" + face(2) + "+" + face(3),
                 val: StreamingPreferences.GQC_L1_R1_X_Y
             })
             quitComboModel.append({
-                text: lb + "+" + rb + "+" + nav.faceButtonGlyph(0) + "+" + nav.faceButtonGlyph(1),
+                text: lb + "+" + rb + "+" + face(0) + "+" + face(1),
                 val: StreamingPreferences.GQC_L1_R1_A_B
             })
             quitComboRow.syncSelection()
@@ -724,7 +727,8 @@ Column {
                              .arg(SdlGamepadKeyNavigation.selectButtonName() + "+" +
                                   SdlGamepadKeyNavigation.leftShoulderName() + "+" +
                                   SdlGamepadKeyNavigation.rightShoulderName() + "+" +
-                                  SdlGamepadKeyNavigation.faceButtonGlyph(2)) + "\n\n" +
+                                  SdlGamepadKeyNavigation.faceButtonGlyph(
+                                      StreamingPreferences.swapFaceButtons ? 3 : 2)) + "\n\n" +
                          qsTr("The performance overlay is not supported on Steam Link or Raspberry Pi.")
             checked: StreamingPreferences.showPerformanceOverlay
             onToggled: function(value) { StreamingPreferences.showPerformanceOverlay = value }

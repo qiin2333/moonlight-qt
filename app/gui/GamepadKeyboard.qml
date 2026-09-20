@@ -2,6 +2,8 @@ import QtQuick 2.9
 import QtQuick.Controls
 import QtQuick.Layouts
 
+import SdlGamepadKeyNavigation 1.0
+
 import "."
 import "theme"
 
@@ -28,6 +30,11 @@ NavigableDialog {
     function openFor(field) {
         targetField = field
         bufferField.text = field.text
+        if (!visible) {
+            // 设置页等 ui-nav 激活的场景下,网格需要真实方向键而不是被
+            // 翻译成 Tab/Shift+Tab;关闭时按计数归还
+            SdlGamepadKeyNavigation.suspendUiNavMode()
+        }
         open()
         // 落在 QWERTY 第二行正中,往哪个方向都有键位
         _moveFocus(1, 4)
@@ -56,10 +63,23 @@ NavigableDialog {
             return null
         }
         var gridRow = keyColumn.children[row]
-        if (!gridRow || col < 0 || col >= gridRow.children.length) {
+        if (!gridRow) {
             return null
         }
-        return gridRow.children[col]
+        // Row.children 里混着 Repeater 本体(它会把委托排在自己前面),
+        // 按 objectName 过滤出真实键位,不能直接用 children 下标
+        var n = 0
+        for (var i = 0; i < gridRow.children.length; i++) {
+            var item = gridRow.children[i]
+            if (item.objectName !== "oskKey") {
+                continue
+            }
+            if (n === col) {
+                return item
+            }
+            n++
+        }
+        return null
     }
 
     function _moveFocus(row, col) {
@@ -70,6 +90,7 @@ NavigableDialog {
     }
 
     onClosed: {
+        SdlGamepadKeyNavigation.resumeUiNavMode()
         // Escape/B 关闭同样保留已输入文本,焦点还给来源输入框
         if (targetField) {
             targetField.text = bufferField.text
@@ -112,6 +133,7 @@ NavigableDialog {
                             readonly property int row: parent.row
                             readonly property int col: index
 
+                            objectName: "oskKey"
                             text: modelData
                             implicitWidth: 30
                             implicitHeight: 30

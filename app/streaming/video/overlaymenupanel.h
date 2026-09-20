@@ -169,14 +169,17 @@ public:
                               std::vector<RemoteUsbDevice> devices,
                               const QString& activeDeviceId,
                               const QString& detail);
-    // 手柄在位状态、UI 风格与退出组合键 glyph 文案：菜单打开前由 Session
-    // 推送，任一变化即重建菜单级（手柄专属条目与按键提示跟着变）
-    void setGamepadHints(bool has, GamepadUiStyle style, const QString& quitComboGlyphs)
+    // 手柄在位状态、UI 风格、swapFaceButtons 与退出组合键 glyph 文案：菜单
+    // 打开前由 Session 推送，任一变化即重建菜单级（手柄专属条目与按键提示
+    // 跟着变）
+    void setGamepadHints(bool has, GamepadUiStyle style, bool swapFaceButtons,
+                         const QString& quitComboGlyphs)
     {
         if (m_HasGamepads != has || m_GamepadUiStyle != style ||
-            m_QuitComboGlyphs != quitComboGlyphs) {
+            m_SwapFaceButtons != swapFaceButtons || m_QuitComboGlyphs != quitComboGlyphs) {
             m_HasGamepads = has;
             m_GamepadUiStyle = style;
+            m_SwapFaceButtons = swapFaceButtons;
             m_QuitComboGlyphs = quitComboGlyphs;
             buildMenuLevels();
         }
@@ -277,6 +280,7 @@ private:
     bool m_Visible;
     bool m_HasGamepads;
     GamepadUiStyle m_GamepadUiStyle;
+    bool m_SwapFaceButtons;
     QString m_QuitComboGlyphs;
     FileMappingState m_FileMappingState;
     QString m_FileMappingDetail;
