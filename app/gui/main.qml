@@ -723,24 +723,6 @@ ApplicationWindow {
             }
 
             NavigableToolButton {
-                // TODO: Implement gamepad mapping then unhide this button
-                visible: false
-
-                ToolTip.delay: 1000
-                ToolTip.timeout: 3000
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Gamepad Mapper")
-
-                iconSource: "qrc:/res/fluent/tb-gamepad.svg"
-
-                onClicked: navigateTo("qrc:/gui/GamepadMapper.qml", GamepadMapper)
-
-                Keys.onDownPressed: {
-                    stackView.currentItem.forceActiveFocus(Qt.TabFocusReason)
-                }
-            }
-
-            NavigableToolButton {
                 id: ipSettingsButton
                 visible: stackView.currentItem instanceof AppView &&
                          stackView.currentItem.hasMultipleAddresses
