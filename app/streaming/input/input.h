@@ -413,6 +413,8 @@ private:
     bool m_ReverseScrollDirection;
     bool m_SwapFaceButtons;
     StreamingPreferences::GamepadQuitCombo m_GamepadQuitCombo;
+    // Cached at construction: the opt-out env var doesn't change mid-session
+    bool m_GamepadQuitEnabled;
     int m_GamepadDeadzone;
 
     bool m_NeedsManualCaptureOnLeave;

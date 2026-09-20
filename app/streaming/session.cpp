@@ -266,6 +266,17 @@ QRect qtOverlayGeometryForSdlWindow(SDL_Window* window)
 #endif
 }
 
+// SDL 事件队列默认容量不小,但满的时候 SDL_PushEvent 会静默失败。这里排队
+// 的事件丢了症状都很隐蔽(震动失灵、传感器停发、重连后画面不恢复等),
+// 所以至少把失败写进日志。
+static void pushEventOrWarn(SDL_Event& event)
+{
+    if (SDL_PushEvent(&event) < 0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to queue SDL event (type=0x%x): %s",
+                    event.type, SDL_GetError());
+    }
+}
+
 // 退出组合键的 glyph 文案,按键名按手柄 UI 风格显示
 // (与 StreamSegue.qml 的 quitComboHintText 保持同一映射)
 static QString gamepadQuitComboGlyphText(GamepadUiStyle style,
@@ -604,7 +615,7 @@ void Session::clConnectionTerminated(int errorCode)
         SDL_Event event;
         event.type = SDL_QUIT;
         event.quit.timestamp = SDL_GetTicks();
-        SDL_PushEvent(&event);
+        pushEventOrWarn(event);
         return;
     }
 
@@ -619,7 +630,7 @@ void Session::clConnectionTerminated(int errorCode)
     SDL_Event event;
     event.type = SDL_QUIT;
     event.quit.timestamp = SDL_GetTicks();
-    SDL_PushEvent(&event);
+    pushEventOrWarn(event);
 }
 
 void Session::displayTerminationError(int errorCode)
@@ -714,7 +725,7 @@ void Session::clRumble(unsigned short controllerNumber, unsigned short lowFreqMo
     rumbleEvent.user.code = SDL_CODE_GAMECONTROLLER_RUMBLE;
     rumbleEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
     rumbleEvent.user.data2 = (void*)(uintptr_t)((lowFreqMotor << 16) | highFreqMotor);
-    SDL_PushEvent(&rumbleEvent);
+    pushEventOrWarn(rumbleEvent);
 }
 
 void Session::clConnectionStatusUpdate(int connectionStatus)
@@ -863,7 +874,7 @@ void Session::clRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger, 
     rumbleEvent.user.code = SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS;
     rumbleEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
     rumbleEvent.user.data2 = (void*)(uintptr_t)((leftTrigger << 16) | rightTrigger);
-    SDL_PushEvent(&rumbleEvent);
+    pushEventOrWarn(rumbleEvent);
 }
 
 void Session::clSetMotionEventState(uint16_t controllerNumber, uint8_t motionType, uint16_t reportRateHz)
@@ -876,7 +887,7 @@ void Session::clSetMotionEventState(uint16_t controllerNumber, uint8_t motionTyp
     setMotionEventStateEvent.user.code = SDL_CODE_GAMECONTROLLER_SET_MOTION_EVENT_STATE;
     setMotionEventStateEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
     setMotionEventStateEvent.user.data2 = (void*)(uintptr_t)((motionType << 16) | reportRateHz);
-    SDL_PushEvent(&setMotionEventStateEvent);
+    pushEventOrWarn(setMotionEventStateEvent);
 }
 
 void Session::clSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b)
@@ -889,7 +900,7 @@ void Session::clSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g
     setControllerLEDEvent.user.code = SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED;
     setControllerLEDEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
     setControllerLEDEvent.user.data2 = (void*)(uintptr_t)(r << 16 | g << 8 | b);
-    SDL_PushEvent(&setControllerLEDEvent);
+    pushEventOrWarn(setControllerLEDEvent);
 }
 
 void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlags, uint8_t typeLeft, uint8_t typeRight, uint8_t *left, uint8_t *right){
@@ -3831,7 +3842,7 @@ bool Session::tryReconnect()
         // format. Recreate the decoder through the normal reset path.
         SDL_Event resetEvent = {};
         resetEvent.type = SDL_RENDER_DEVICE_RESET;
-        SDL_PushEvent(&resetEvent);
+        pushEventOrWarn(resetEvent);
 
         // Streaming is healthy again, so a subsequent SDL_QUIT is expected
         // to mean a real termination rather than another reconnect.
@@ -4197,7 +4208,7 @@ void Session::flushWindowEvents()
     SDL_Event flushEvent = {};
     flushEvent.type = SDL_USEREVENT;
     flushEvent.user.code = SDL_CODE_FLUSH_WINDOW_EVENT_BARRIER;
-    SDL_PushEvent(&flushEvent);
+    pushEventOrWarn(flushEvent);
 }
 
 void Session::setShouldExit(bool quitHostApp)
@@ -4279,7 +4290,7 @@ void Session::interrupt()
     SDL_Event event;
     event.type = SDL_QUIT;
     event.quit.timestamp = SDL_GetTicks();
-    SDL_PushEvent(&event);
+    pushEventOrWarn(event);
 }
 
 #ifdef Q_OS_WIN32
@@ -4821,7 +4832,7 @@ void Session::exec()
         SDL_Event wakeEvent = {};
         wakeEvent.type = SDL_USEREVENT;
         wakeEvent.user.code = SDL_CODE_PROCESS_QT_OVERLAY_EVENTS;
-        SDL_PushEvent(&wakeEvent);
+        pushEventOrWarn(wakeEvent);
     });
 #endif
     m_MenuButton->setClickCallback([this](const QPoint& globalPosition,

@@ -270,6 +270,10 @@ void SdlInputHandler::sendGamepadArrival(GamepadState* state,
 
 Uint32 SdlInputHandler::mouseEmulationTimerCallback(Uint32 interval, void *param)
 {
+    // NB: This runs on SDL's timer thread and reads stick values written by
+    // the main thread without synchronization. The race is inherited from the
+    // upstream design and tolerated: aligned 16-bit reads don't tear in
+    // practice, and a stale sample costs at most one 50 ms tick of latency.
     auto gamepad = reinterpret_cast<GamepadState*>(param);
 
     int rawX;
@@ -473,7 +477,7 @@ void SdlInputHandler::handleControllerButtonEvent(SDL_ControllerButtonEvent* eve
     }
 
     // Handle configurable gamepad quit combo
-    if (qgetenv("NO_GAMEPAD_QUIT") != "1") {
+    if (m_GamepadQuitEnabled) {
         int quitComboMask;
         switch (m_GamepadQuitCombo) {
         case StreamingPreferences::GQC_SELECT_L1_R1_Y:
