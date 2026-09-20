@@ -22,13 +22,69 @@ const QColor MenuFaint("#7E858E");
 const QColor MenuAccent("#39C5BB");
 const QColor MenuDanger("#FF876F");
 
-// Bitrate scrubber range and granularity — log scale like the settings page
-// slider. The maximum matches Sunshine's /bitrate runtime endpoint cap
-// (800000 Kbps); higher values would be rejected by the host.
+// Piecewise-linear bitrate scale. Values are Kbps.
 constexpr int kBitrateMinKbps = 500;
 constexpr int kBitrateMaxKbps = 800000;
-constexpr int kBitrateLogSteps = 200;
-const double kBitrateLogSpan = qLn(kBitrateMaxKbps / double(kBitrateMinKbps));
+struct BitrateSegment
+{
+    int maxKbps;
+    int stepKbps;
+};
+constexpr BitrateSegment kBitrateSegments[] = {
+    { 5000,     500 }, // 0.5–5 Mbps: 0.5 Mbps
+    { 20000,   1000 }, // 5–20 Mbps: 1 Mbps
+    { 50000,   2000 }, // 20–50 Mbps: 2 Mbps
+    { 100000,  5000 }, // 50–100 Mbps: 5 Mbps
+    { 200000, 10000 }, // 100–200 Mbps: 10 Mbps
+    { 400000, 50000 }, // 200–400 Mbps: 50 Mbps
+    { 800000, 100000 }, // 400–800 Mbps: 100 Mbps
+};
+
+constexpr int bitrateSliderMaximum()
+{
+    int position = 0;
+    int segmentMinKbps = kBitrateMinKbps;
+    for (const auto& segment : kBitrateSegments) {
+        position += (segment.maxKbps - segmentMinKbps) / segment.stepKbps;
+        segmentMinKbps = segment.maxKbps;
+    }
+    return position;
+}
+constexpr int kBitrateSliderMax = bitrateSliderMaximum();
+
+double bitrateToSliderPosition(int bitrateKbps)
+{
+    const int bitrate = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    double position = 0;
+    int segmentMinKbps = kBitrateMinKbps;
+    for (const auto& segment : kBitrateSegments) {
+        if (bitrate <= segment.maxKbps) {
+            return position +
+                (bitrate - segmentMinKbps) / double(segment.stepKbps);
+        }
+        position += (segment.maxKbps - segmentMinKbps) / double(segment.stepKbps);
+        segmentMinKbps = segment.maxKbps;
+    }
+    return position;
+}
+
+int sliderPositionToBitrate(double sliderPosition)
+{
+    const int position = qBound(0, qRound(sliderPosition), kBitrateSliderMax);
+    int segmentStart = 0;
+    int segmentMinKbps = kBitrateMinKbps;
+    for (const auto& segment : kBitrateSegments) {
+        const int segmentSteps =
+            (segment.maxKbps - segmentMinKbps) / segment.stepKbps;
+        if (position <= segmentStart + segmentSteps) {
+            return segmentMinKbps +
+                (position - segmentStart) * segment.stepKbps;
+        }
+        segmentStart += segmentSteps;
+        segmentMinKbps = segment.maxKbps;
+    }
+    return kBitrateMaxKbps;
+}
 // Idle window after the last scrub tick before the change is committed.
 constexpr int kBitrateCommitDelayMs = 450;
 // Bottom hint bar height, shown only while a gamepad is connected
@@ -234,7 +290,7 @@ void OverlayMenuPanel::buildMenuLevels()
                                MenuAction::TogglePointerRegionLock, 0, true, false, false});
     m_MenuLevels.push_back(shortcuts);
 
-    // === Level 2: Bitrate (log-scale scrubber row + presets) ===
+    // === Level 2: Bitrate (piecewise-linear scrubber row + presets) ===
     MenuLevel bitrate;
     bitrate.title = tr("Bitrate");
     bitrate.items.push_back({QString(), QString(), MenuItemType::Slider,
@@ -417,22 +473,13 @@ void OverlayMenuPanel::refreshBitrateDetails()
 
 double OverlayMenuPanel::bitrateFraction() const
 {
-    return qBound(0.0, qLn(m_BitrateKbps / double(kBitrateMinKbps)) / kBitrateLogSpan, 1.0);
+    return qBound(0.0, bitrateToSliderPosition(m_BitrateKbps) / kBitrateSliderMax, 1.0);
 }
 
 void OverlayMenuPanel::setBitrateKbps(int bitrateKbps)
 {
     bitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
-    // Round to display-friendly granularity so the label doesn't flicker
-    // while scrubbing (also keeps committed values tidy).
-    if (bitrateKbps < 10000) {
-        bitrateKbps = qRound(bitrateKbps / 50.0) * 50;
-    } else if (bitrateKbps < 100000) {
-        bitrateKbps = qRound(bitrateKbps / 500.0) * 500;
-    } else {
-        bitrateKbps = qRound(bitrateKbps / 5000.0) * 5000;
-    }
-    bitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    bitrateKbps = sliderPositionToBitrate(bitrateToSliderPosition(bitrateKbps));
     if (bitrateKbps == m_BitrateKbps) return;
 
     m_BitrateKbps = bitrateKbps;
@@ -444,12 +491,12 @@ void OverlayMenuPanel::setBitrateKbps(int bitrateKbps)
 void OverlayMenuPanel::setBitrateFromFraction(double fraction)
 {
     fraction = qBound(0.0, fraction, 1.0);
-    setBitrateKbps(qRound(kBitrateMinKbps * qExp(fraction * kBitrateLogSpan)));
+    setBitrateKbps(sliderPositionToBitrate(fraction * kBitrateSliderMax));
 }
 
 void OverlayMenuPanel::adjustBitrateStep(int direction, int multiplier)
 {
-    const double step = (kBitrateLogSpan / kBitrateLogSteps) * qMax(1, multiplier);
+    const double step = qMax(1, multiplier) / double(kBitrateSliderMax);
     setBitrateFromFraction(bitrateFraction() + direction * step);
 }
 
