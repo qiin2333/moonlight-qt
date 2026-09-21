@@ -496,8 +496,10 @@ void OverlayMenuPanel::setBitrateFromFraction(double fraction)
 
 void OverlayMenuPanel::adjustBitrateStep(int direction, int multiplier)
 {
-    const double step = qMax(1, multiplier) / double(kBitrateSliderMax);
-    setBitrateFromFraction(bitrateFraction() + direction * step);
+    const double position = bitrateToSliderPosition(m_BitrateKbps);
+    const int alignedPosition = direction > 0 ? qFloor(position) : qCeil(position);
+    const int nextPosition = alignedPosition + direction * qMax(1, multiplier);
+    setBitrateKbps(sliderPositionToBitrate(nextPosition));
 }
 
 void OverlayMenuPanel::commitBitrateNow()
