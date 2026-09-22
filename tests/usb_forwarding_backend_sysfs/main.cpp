@@ -135,7 +135,17 @@ int main(int argc, char **argv)
     }
 
     // 身份替换标记：绑定快照与活体身份不符 → isReplaced。
+    // Windows 建不了 driver symlink，3-1 在拷贝里显式置 isBound，
+    // 保证标记逻辑的平台无关性断言在 Windows CI 同样成立。
     QVariantList replaced = devices;
+    for (QVariant &entry : replaced) {
+        QVariantMap device = entry.toMap();
+        if (device.value(QStringLiteral("busId")).toString() == QStringLiteral("3-1")) {
+            device.insert(QStringLiteral("isBound"), true);
+            entry = device;
+            break;
+        }
+    }
     QMap<QString, QString> bindings;
     bindings.insert(QStringLiteral("1-1"), QStringLiteral("076b:6666:spike0001"));
     bindings.insert(QStringLiteral("3-1"), QStringLiteral("054c:0ce6:original-serial"));

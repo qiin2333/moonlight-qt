@@ -72,6 +72,9 @@ constexpr auto kLinuxBindingsPath = "/var/lib/moonlight-qt/bindings";
 constexpr auto kLinuxHelperScript = R"HELPER(#!/bin/sh
 # Moonlight USB forwarding privileged helper (Linux usbip-host backend).
 # Installed and invoked only via pkexec; validates its own arguments.
+# NOTE: keep this script ASCII-only. MSVC rejects some non-ASCII punctuation
+# (em dash, CJK ideographs) inside raw string literals (error C3872), so the
+# prose lives in the C++ comment above instead.
 set -u
 ACTION=${1:-}
 BUSID=${2:-}
@@ -83,19 +86,21 @@ command -v usbip >/dev/null 2>&1 || { echo "usbip tool not found" >&2; exit 3; }
 if [ ! -d /sys/module/usbip_host ]; then
     modprobe usbip_host 2>/dev/null || { echo "cannot load usbip_host module" >&2; exit 4; }
 fi
-# 绑定快照：身份 = vidPid + serial，跨重插稳定。usbip 的 match_busid 只认
-# 端口不认设备——共享期间拔掉、同端口插上另一台设备会被 usbip-host 静默
-# 认领；快照让客户端枚举时能识别这种替换，不再转发张冠李戴的设备。
+# identity() snapshots are vidPid + serial: stable across replug. usbip's
+# match_busid matches ports, not devices, so a different device plugged into
+# a shared port would be silently claimed by usbip-host. The snapshot lets
+# the client detect that substitution and refuse to forward the wrong device.
 forget() {
     mkdir -p "$STATE_DIR"
-    awk -F'\t' -v b="$BUSID" '$1 != b' "$STATE_FILE" > "$STATE_FILE.new" 2>/dev/null &&
+    [ -f "$STATE_FILE" ] || return 0
+    awk -F'\t' -v b="$BUSID" '$1 != b' "$STATE_FILE" > "$STATE_FILE.new" &&
         mv "$STATE_FILE.new" "$STATE_FILE"
 }
 record() {
     VID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idVendor" 2>/dev/null)
     PID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idProduct" 2>/dev/null)
     SERIAL=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/serial" 2>/dev/null)
-    [ -n "$VID" ] && [ -n "$PID" ] || return 0
+    [ -n "$VID" ] && [ -n "$PID" ] || return 1
     forget
     printf '%s\t%s:%s\t%s\n' "$BUSID" \
         "$(printf '%s' "$VID" | tr 'A-F' 'a-f')" \
@@ -112,11 +117,18 @@ if [ "$ACTION" = "bind" ]; then
     echo "$OUT"
     case "$OUT" in *"already bound"*) RC=0;; esac
     if [ $RC -eq 0 ]; then
-        record
+        record || true
     fi
     exit $RC
 fi
-usbip unbind -b "$BUSID" 2>/dev/null
+OUT=$(usbip unbind -b "$BUSID" 2>&1)
+RC=$?
+echo "$OUT"
+if [ $RC -ne 0 ]; then
+    # Unbind failed: keep the snapshot so replacement detection still guards
+    # whatever is still bound at this port.
+    exit $RC
+fi
 echo "$BUSID" > /sys/bus/usb/drivers_probe 2>/dev/null || true
 forget
 )HELPER";
@@ -500,7 +512,12 @@ QVariantList UsbForwardingBackend::parseSysfsDevices(const QString &sysfsBusPath
 
 QString UsbForwardingBackend::deviceIdentity(const QString &vidPid, const QString &serial)
 {
-    return vidPid.toLower() + QLatin1Char(':') + serial;
+    // 与 helper 的 `tr -d ' \t\n\r'` 对齐：快照与活体两侧同样剥离空白，
+    // 否则序列号里含空格的设备刚共享就会被误判成「已更换」。
+    static const QRegularExpression whitespaceRe(QStringLiteral("[ \\t\\r\\n]"));
+    QString normalizedSerial = serial;
+    normalizedSerial.remove(whitespaceRe);
+    return vidPid.toLower() + QLatin1Char(':') + normalizedSerial;
 }
 
 QMap<QString, QString> UsbForwardingBackend::parseBindIdentities(const QByteArray &bindingsFile)
