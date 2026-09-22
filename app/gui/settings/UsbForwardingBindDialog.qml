@@ -18,6 +18,7 @@ NavigableDialog {
     id: dialog
 
     readonly property bool isMac: SystemProperties.isDarwin
+    readonly property bool isLinux: Qt.platform.os === "linux"
 
     title: qsTr("Share USB devices")
     closePolicy: Popup.CloseOnEscape
@@ -42,7 +43,7 @@ NavigableDialog {
 
     function deviceStatusText(d) {
         if (d.isOccupied !== undefined && d.isOccupied) {
-            return qsTr("In use by macOS")
+            return dialog.isMac ? qsTr("In use by macOS") : qsTr("In use")
         }
         if (!d.isConnected) {
             return d.isBound ? qsTr("Not connected") : ""
@@ -90,7 +91,9 @@ NavigableDialog {
 
                 Text {
                     Layout.fillWidth: true
-                    text: qsTr("A shared device is taken over by the forwarding service and becomes unavailable on this computer.")
+                    text: dialog.isLinux
+                          ? qsTr("Sharing keeps the device usable locally. It becomes unavailable on this computer only while forwarding is active.")
+                          : qsTr("A shared device is taken over by the forwarding service and becomes unavailable on this computer.")
                     color: Theme.text
                     font.family: Theme.fontSans
                     font.pointSize: Theme.fontBody
@@ -99,7 +102,9 @@ NavigableDialog {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: dialog.isMac
+                    text: dialog.isLinux
+                          ? qsTr("Forwarding asks for administrator authorization. Release the device from USB Devices in the stream overlay, or end the stream, to restore local use.")
+                          : dialog.isMac
                           ? qsTr("To restore a device during a stream, release it from the USB Devices menu in the stream overlay or end the stream. Sharing is remembered by Moonlight and needs no administrator confirmation.")
                           : qsTr("Stop sharing to restore it. Sharing needs administrator confirmation, once per device.")
                     color: Theme.textDim

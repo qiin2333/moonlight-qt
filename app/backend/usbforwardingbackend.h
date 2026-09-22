@@ -12,6 +12,9 @@
 //    （parseHelperDevices 解析），bind/unbind 只是改 Moonlight 自己的偏好
 //    （StreamingPreferences::usbForwardingBoundDevices），无提权。转发用的
 //    serve 进程由 Session 经 UsbForwardingLocalServer 按需拉起。
+//  - Linux: moonlight-usb-host enumerates sysfs without claiming interfaces.
+//    Registration uses topology + VID/PID + serial; instanceId identifies the
+//    current connection. Only forwarding elevates and binds to usbip-host.
 // 与 UsbForwardingEnvironment 的分工：后者只做环境体检（版本 + 服务状态），
 // 这里做真正的设备编排。
 //
@@ -19,15 +22,16 @@
 //   busId         Windows "1-2" / "IncompatibleHub" / ""（未连接）；macOS 拓扑
 //                 路径 "1-2" / "1-2.3"（经 hub 时带点）
 //   description   设备描述名
-//   instanceId    Windows 实例 ID（USB\VID_XXXX&PID_YYYY\...）；macOS 为序列号
+//   instanceId    Windows 实例 ID（USB\VID_XXXX&PID_YYYY\...）；macOS 为序列号；Linux connection identity
 //   vidPid        "xxxx:yyyy"
 //   isBound       bool（Windows：PersistedGuid 非空；macOS：在偏好列表中）
 //   isConnected   bool，当前在枚举输出里
 //   isAttached    bool，正在被某客户端使用（macOS 恒 false）
 //   isSupported   bool，可共享（已连接、busid 合法；macOS 还要求未被系统占用）
 //   isForced      bool（仅 Windows）
-//   persistedGuid 已持久化的共享 GUID（仅 Windows；macOS 恒空）
-//   isOccupied    bool（仅 macOS）：接口被 macOS 系统驱动占用，无法共享
+//   persistedGuid Windows GUID or Linux registration key; empty on macOS
+//   isOccupied    bool: macOS driver ownership, or Linux device already exported
+//   registrationKey Linux stable registration key; macOS bus ID
 class UsbForwardingBackend : public QObject
 {
     Q_OBJECT
@@ -63,7 +67,7 @@ private:
 
     void setBusy(bool busy);
     void setError(const QString &error);
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_DARWIN) || (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID))
     void refreshFromHelper();
 #endif
 

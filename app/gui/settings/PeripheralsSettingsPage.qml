@@ -19,6 +19,7 @@ Column {
 
     // Windows 走外挂 usbipd-win；macOS 走捆绑的 moonlight-usbd（usbipdcpp）。
     readonly property bool isMac: SystemProperties.isDarwin
+    readonly property bool isLinux: Qt.platform.os === "linux"
 
     SettingsCard {
         id: usbForwardingCard
@@ -45,10 +46,17 @@ Column {
         SettingsRow {
             id: usbEnvRow
 
-            title: peripheralsPage.isMac ? qsTr("USB sharing service") : "usbipd-win"
+            title: (peripheralsPage.isMac || peripheralsPage.isLinux) ? qsTr("USB sharing service") : "usbipd-win"
             description: {
                 if (UsbForwardingEnvironment.checking) {
                     return qsTr("Checking environment…")
+                }
+                if (peripheralsPage.isLinux) {
+                    if (UsbForwardingEnvironment.state === UsbForwardingEnvironment.Ready)
+                        return qsTr("Ready · Administrator authorization is requested when forwarding starts.")
+                    if (UsbForwardingEnvironment.state === UsbForwardingEnvironment.CheckFailed)
+                        return qsTr("Check the bundled USB helper, polkit, and your desktop authentication agent.")
+                    return qsTr("USB forwarding requires the usbip-host kernel module and Moonlight's bundled USB helper.")
                 }
                 switch (UsbForwardingEnvironment.state) {
                 case UsbForwardingEnvironment.Checking:
@@ -86,7 +94,7 @@ Column {
                 }
 
                 HardLink {
-                    visible: !peripheralsPage.isMac
+                    visible: !peripheralsPage.isMac && !peripheralsPage.isLinux
                     text: qsTr("Install / Repair")
                     onClicked: peripheralsPage.openExternal(usbForwardingCard.usbipdUrl)
                 }
@@ -95,7 +103,9 @@ Column {
 
         SettingsRow {
             title: qsTr("Shared devices")
-            description: qsTr("Choose which devices can be forwarded to the streaming host. Sharing takes over the device on this computer.")
+            description: peripheralsPage.isLinux
+                ? qsTr("Sharing remembers your selection and keeps the device usable locally. During a stream, open the overlay (Ctrl+Alt+Shift+O) and choose USB Devices to activate forwarding.")
+                : qsTr("Choose which devices can be forwarded to the streaming host. Sharing takes over the device on this computer.")
 
             Flow {
                 width: Math.min(260, Math.max(0, usbEnvRow.width - Theme.spaceMd * 2))

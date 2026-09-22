@@ -97,6 +97,7 @@ public:
         QString label;
         QString detail;
         bool supported = true;
+        QString nativeIdentity; // Snapshot checked again after Linux authorization.
     };
 
     enum class MenuItemType {

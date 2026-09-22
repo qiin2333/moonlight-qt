@@ -1,8 +1,13 @@
 #include "systemproperties.h"
+#include "SDL_compat.h"
 #include "utils.h"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QLibraryInfo>
+#include <QSysInfo>
 
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
@@ -45,6 +50,37 @@ private:
     SystemProperties* m_Properties;
 };
 
+bool SystemProperties::isUsbForwardingSupported()
+{
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+    return true;
+#elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    // Detect loaded/built-in support or an installed module for the running
+    // kernel without loading a driver just by opening settings.
+    if (QFileInfo::exists(QStringLiteral("/sys/bus/usb/drivers/usbip-host"))) {
+        return true;
+    }
+
+    const QDir kernel(QStringLiteral("/lib/modules/") + QSysInfo::kernelVersion());
+    QFile dependencies(kernel.filePath(QStringLiteral("modules.dep")));
+    if (!dependencies.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    while (!dependencies.atEnd()) {
+        const QString path = QString::fromLocal8Bit(dependencies.readLine()).section(QLatin1Char(':'), 0, 0);
+        const QString name = QFileInfo(path).fileName();
+        if ((name == QLatin1String("usbip-host.ko") || name == QLatin1String("usbip-host.ko.xz") ||
+             name == QLatin1String("usbip-host.ko.zst") || name == QLatin1String("usbip-host.ko.gz")) &&
+            QFileInfo::exists(kernel.filePath(path))) {
+            return true;
+        }
+    }
+    return false;
+#else
+    return false;
+#endif
+}
+
 SystemProperties::SystemProperties()
 {
     versionString = QString(VERSION_STR);
@@ -61,13 +97,7 @@ SystemProperties::SystemProperties()
     isDarwin = false;
 #endif
 
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
-    // Windows attaches to an external usbipd-win server; macOS ships the
-    // moonlight-usbd helper (usbipdcpp) inside the app bundle. The Linux
-    // usbip-host backend and the Android service are future work; see the
-    // platform table in docs/remote-usb-reverse-tunnel.md.
-    usbForwardingAvailable = true;
-#endif
+    usbForwardingAvailable = isUsbForwardingSupported();
 
     QString nativeArch = QSysInfo::currentCpuArchitecture();
 

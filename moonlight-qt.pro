@@ -23,3 +23,8 @@ CONFIG += debug_and_release
 load(configure)
 qtCompileTest(SL)
 qtCompileTest(EGL)
+
+linux:!android:!config_SL {
+    SUBDIRS += usb-helper/linux
+    app.depends += usb-helper/linux
+}

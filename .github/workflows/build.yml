@@ -525,6 +525,14 @@ jobs:
           sudo apt install libfuse2
         fi
 
+    - name: Test Linux USB device snapshots
+      run: |
+        pushd tests/usb_forwarding_linux
+        qmake usb_forwarding_linux.pro
+        make -j"$(nproc)"
+        ./usb_forwarding_linux_test
+        popd
+
     - name: Test Linux display event wakeups
       run: |
         pushd tests/linux_display_event_monitor

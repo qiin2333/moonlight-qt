@@ -8,10 +8,12 @@
  *
  *   local  : TCP to the platform USB/IP server (usbipd-win on 3240 on
  *            Windows; the per-session moonlight-usbd helper on an
- *            ephemeral loopback port on macOS)
+ *            ephemeral loopback port on macOS; native moonlight-usb-host
+ *            on Linux)
  *   remote : TLS to Sunshine, authenticated with the paired client
  *            certificate, carrying the configured shared token
  *
+ * Transport sockets run on a dedicated event loop, independent of the GUI.
  * Session owns the tunnel and closes it when streaming ends. The tunnel uses
  * a separate socket from video/audio/control; its port and token come from
  * the GET /api/v1/usb-forwarding capability endpoint.
@@ -23,10 +25,7 @@
 #include <QObject>
 #include <QSslConfiguration>
 #include <QString>
-
-class QSslSocket;
-class QTcpSocket;
-class QTimer;
+#include <memory>
 
 namespace UsbForwarding {
 
@@ -60,7 +59,10 @@ public:
 
     Q_DISABLE_COPY(Tunnel)
 
+    // Call on this object's owning thread. Notifications return to that
+    // thread; sockets and timers are serviced by a private worker thread.
     bool start(QString *error = nullptr);
+    // Closes the transport and joins its worker before returning.
     void stop() noexcept;
 
 signals:
@@ -70,19 +72,8 @@ signals:
     void finished(QString message);
 
 private:
-    void handleRemoteReadyRead();
-    void handleLocalReadyRead();
-    void failWith(const QString &message);
-    void finishCleanly();
-
-    TunnelConfig m_Config;
-    QTcpSocket *m_Local = nullptr;
-    QSslSocket *m_Remote = nullptr;
-    QTimer *m_StartupTimer = nullptr;
-    QByteArray m_HandshakeBuffer;
-    bool m_HandshakeDone = false;
-    bool m_PeerVerified = false;
-    bool m_Finished = false;
+    class Impl;
+    std::unique_ptr<Impl> m_Impl;
 };
 
 } // namespace UsbForwarding

@@ -3,7 +3,7 @@
 #include <QObject>
 #include <QRect>
 
-#include "SDL_compat.h"
+struct SDL_Window;
 
 class SystemProperties : public QObject
 {
@@ -14,6 +14,9 @@ class SystemProperties : public QObject
 public:
     SystemProperties();
     ~SystemProperties();
+
+    // Read-only platform check; does not load drivers or claim USB devices.
+    static bool isUsbForwardingSupported();
 
     // Static properties queried synchronously during the constructor
     Q_PROPERTY(bool isRunningWayland MEMBER isRunningWayland CONSTANT)

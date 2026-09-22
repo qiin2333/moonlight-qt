@@ -1,6 +1,10 @@
 #include "../../app/backend/usbforwardingenvironment.h"
+#include "../../app/backend/systemproperties.h"
 #include <QCoreApplication>
 #include <QDebug>
+
+// These checks cover readiness messages and services on a supported platform.
+bool SystemProperties::isUsbForwardingSupported() { return true; }
 
 int main(int argc, char** argv)
 {

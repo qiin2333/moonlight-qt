@@ -55,7 +55,7 @@ pushd $BUILD_FOLDER
 # work even in X11. To avoid this, we will disable Wayland support for the AppImage.
 #
 # We disable DRM support because linuxdeploy doesn't bundle the appropriate libraries for Qt EGLFS.
-qmake6 $SOURCE_ROOT/moonlight-qt.pro CONFIG+=disable-wayland CONFIG+=disable-libdrm PREFIX=$DEPLOY_FOLDER/usr DEFINES+=APP_IMAGE || fail "Qmake failed!"
+qmake6 $SOURCE_ROOT/moonlight-qt.pro CONFIG+=disable-wayland CONFIG+=disable-libdrm CONFIG+=usb-host-static PREFIX=$DEPLOY_FOLDER/usr DEFINES+=APP_IMAGE || fail "Qmake failed!"
 popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration
@@ -67,6 +67,14 @@ echo Deploying to staging directory
 pushd $BUILD_FOLDER
 make install || fail "Make install failed!"
 popd
+
+# The elevated helper runs outside AppImage's loader environment. Verify that
+# it was installed and needs neither the bundled Qt nor C++ runtime libraries.
+USB_HELPER="$DEPLOY_FOLDER/usr/bin/moonlight-usb-host"
+env -u LD_LIBRARY_PATH "$USB_HELPER" --version || fail "Native USB helper is missing or cannot run!"
+if readelf -d "$USB_HELPER" | grep -E 'NEEDED.*(libQt|libstdc\+\+|libgcc_s)'; then
+  fail "Native USB helper must not depend on AppImage runtime libraries!"
+fi
 
 echo Updating metadata
 perl -pi -e 's/__GITHUB_REF_NAME__/$ENV{GITHUB_REF_NAME}/' $DEPLOY_FOLDER/usr/share/metainfo/com.moonlight_stream.Moonlight.appdata.xml

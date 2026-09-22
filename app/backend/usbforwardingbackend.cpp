@@ -2,9 +2,10 @@
 #include "usbforwardingenvironment.h"
 
 #include "usbforwardinglocalserver.h"
+#include "systemproperties.h"
 
-#ifdef Q_OS_DARWIN
-// 仅 macOS 的绑定偏好持久化用到；不无条件引入，让 tests/ 无需 Qt Qml。
+#if defined(Q_OS_DARWIN) || (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID))
+// 仅 linux/macOS 的绑定偏好持久化用到；不无条件引入，让 tests/ 无需 Qt Qml。
 #include "settings/streamingpreferences.h"
 #endif
 
@@ -22,7 +23,7 @@
 
 namespace {
 
-#ifndef Q_OS_DARWIN
+#if !defined(Q_OS_DARWIN) && !(defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID))
 // 从 Windows 实例 ID（USB\VID_054C&PID_0CE6\...）解析出 "054c:0ce6"。
 QString vidPidFromInstanceId(const QString &instanceId)
 {
@@ -46,9 +47,9 @@ bool isRealBusId(const QString &busId)
 }
 #endif
 
-// macOS helper 的 busid 是 libusb 拓扑路径："1-2"，经 hub 时 "1-2.3"。
+// linux/macOS helper 的 busid 是 libusb 拓扑路径："1-2"，经 hub 时 "1-2.3"。
 // 必须与 usbipdcpp 的 find_by_busid 生成算法一致（bus + "-" + 端口链 "." 连接）。
-bool isMacBusId(const QString &busId)
+bool isHelperBusId(const QString &busId)
 {
     static const QRegularExpression macRe(
         QStringLiteral("^[1-9][0-9]*-[0-9]+(\\.[0-9]+)*$"));
@@ -98,22 +99,24 @@ QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJs
             description = vidPid;
         }
 
+        const bool native = o.contains(QLatin1String("registrationKey"));
         const bool occupied = !claimable;
 
         QVariantMap device;
         device.insert(QStringLiteral("busId"), busId);
         device.insert(QStringLiteral("description"), description);
         device.insert(QStringLiteral("instanceId"),
-                      o.value(QLatin1String("serial")).toString());
+                      o.value(native ? QLatin1String("identity") : QLatin1String("serial")).toString());
+        device.insert(QStringLiteral("registrationKey"), native ? o.value(QLatin1String("registrationKey")).toString() : busId);
         device.insert(QStringLiteral("vidPid"), vidPid);
         // isBound 恒 false，由 refreshFromHelper() 按用户偏好叠加。
         device.insert(QStringLiteral("isBound"), false);
         // 出现在枚举输出里即已连接。
         device.insert(QStringLiteral("isConnected"), true);
-        device.insert(QStringLiteral("isAttached"), false);
-        device.insert(QStringLiteral("isSupported"), isMacBusId(busId) && claimable);
+        device.insert(QStringLiteral("isAttached"), o.value(QLatin1String("attached")).toBool());
+        device.insert(QStringLiteral("isSupported"), isHelperBusId(busId) && claimable);
         device.insert(QStringLiteral("isForced"), false);
-        device.insert(QStringLiteral("persistedGuid"), QString());
+        device.insert(QStringLiteral("persistedGuid"), native ? o.value(QLatin1String("registrationKey")).toString() : QString());
         device.insert(QStringLiteral("isOccupied"), occupied);
         devices.append(device);
     }
@@ -144,7 +147,7 @@ void UsbForwardingBackend::refresh()
     if (m_Busy) {
         return;
     }
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_DARWIN) || (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID))
     refreshFromHelper();
 #else
     const QString exe = UsbForwardingEnvironment::locateUsbipd();
@@ -239,11 +242,17 @@ void UsbForwardingBackend::refresh()
 #endif
 }
 
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_DARWIN) || (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID))
 
 void UsbForwardingBackend::refreshFromHelper()
 {
     const QString helper = UsbForwardingLocalServer::locateHelper();
+    if (!SystemProperties::isUsbForwardingSupported()) {
+        m_Devices.clear();
+        emit devicesChanged();
+        setError(UsbForwardingEnvironment::readinessError(UsbForwardingEnvironment::NotInstalled));
+        return;
+    }
     if (helper.isEmpty()) {
         m_Devices.clear();
         emit devicesChanged();
@@ -296,10 +305,31 @@ void UsbForwardingBackend::refreshFromHelper()
         for (QVariant &value : devices) {
             QVariantMap device = value.toMap();
             device.insert(QStringLiteral("isBound"),
-                          bound.contains(device.value(QStringLiteral("busId")).toString()));
+                          bound.contains(device.value(QStringLiteral("registrationKey")).toString()));
             value = device;
         }
 
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+        // Keep disconnected registrations removable from settings.
+        for (const QString& key : bound) {
+            if (!key.startsWith(QLatin1String("linux:"))) continue;
+            bool present = false;
+            for (const auto& row : devices) {
+                if (row.toMap().value(QStringLiteral("registrationKey")).toString() == key) { present = true; break; }
+            }
+            if (present) continue;
+            const QStringList parts = key.split(QLatin1Char(':'));
+            if (parts.size() != 5) continue;
+            devices.append(QVariantMap {
+                {QStringLiteral("busId"), QString()},
+                {QStringLiteral("description"), tr("USB device (%1)").arg(parts[1])},
+                {QStringLiteral("vidPid"), parts[2] + QLatin1Char(':') + parts[3]},
+                {QStringLiteral("registrationKey"), key}, {QStringLiteral("persistedGuid"), key},
+                {QStringLiteral("isBound"), true}, {QStringLiteral("isConnected"), false},
+                {QStringLiteral("isSupported"), false}, {QStringLiteral("isAttached"), false}
+            });
+        }
+#endif
         m_Devices = devices;
         emit devicesChanged();
     });
@@ -314,13 +344,26 @@ void UsbForwardingBackend::bind(const QString &busId)
     if (busId.isEmpty()) {
         return;
     }
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_DARWIN) || (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID))
     // macOS 上绑定只是记偏好：serve 进程由 Session 在转发时按需拉起，
     // 因此无需提权，立即生效（正在转发的会话不受影响，下次选择时生效）。
     StreamingPreferences *prefs = StreamingPreferences::get();
     QStringList bound = prefs->usbForwardingBoundDevices();
-    if (!bound.contains(busId)) {
-        bound.append(busId);
+    QString key = busId;
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    key.clear();
+    for (const auto& row : m_Devices) {
+        const auto device = row.toMap();
+        if (device.value(QStringLiteral("busId")).toString() == busId &&
+            device.value(QStringLiteral("isSupported")).toBool()) {
+            key = device.value(QStringLiteral("registrationKey")).toString();
+            break;
+        }
+    }
+    if (key.isEmpty()) { emit operationFinished(false, tr("Refresh the USB device list and try again.")); return; }
+#endif
+    if (!bound.contains(key)) {
+        bound.append(key);
         prefs->setUsbForwardingBoundDevices(bound);
         prefs->save();
     }
@@ -357,11 +400,16 @@ void UsbForwardingBackend::unbind(const QString &busId, const QString &persisted
     if (busId.isEmpty() && persistedGuid.isEmpty()) {
         return;
     }
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_DARWIN) || (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID))
     // macOS：从偏好列表移除即可；persistedGuid 是 Windows 概念，忽略。
     StreamingPreferences *prefs = StreamingPreferences::get();
     QStringList bound = prefs->usbForwardingBoundDevices();
-    if (bound.removeAll(busId) > 0) {
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    const QString key = persistedGuid;
+#else
+    const QString key = busId;
+#endif
+    if (bound.removeAll(key) > 0) {
         prefs->setUsbForwardingBoundDevices(bound);
         prefs->save();
     }

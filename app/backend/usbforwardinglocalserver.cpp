@@ -5,6 +5,11 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QProcess>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QTimer>
+#include <QDebug>
+#include <memory>
 
 // The helper prints "READY <port>" on stdout once its USB/IP listener is up
 // and an "ERROR {json...}" line instead when it cannot serve. After that
@@ -15,10 +20,13 @@ static constexpr int PROCESS_START_TIMEOUT_MS = 2000;
 static constexpr int STOP_TIMEOUT_MS = 2000;
 static constexpr int KILL_TIMEOUT_MS = 1000;
 static constexpr int STDERR_TAIL_LIMIT = 8192;
+static int nativeProcesses = 0;
+
+bool UsbForwardingLocalServer::hasPendingNativeCleanup() { return nativeProcesses > 0; }
 
 bool UsbForwardingLocalServer::spawnSupported()
 {
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_DARWIN) || (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID))
     return true;
 #else
     return false;
@@ -27,6 +35,13 @@ bool UsbForwardingLocalServer::spawnSupported()
 
 QString UsbForwardingLocalServer::locateHelper()
 {
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QStringList candidates = {
+        QDir(appDir).filePath(QStringLiteral("moonlight-usb-host")),
+        QDir(appDir).filePath(QStringLiteral("../usb-helper/linux/moonlight-usb-host"))
+    };
+#else
     const QString helperName = QStringLiteral("moonlight-usbd");
 
     QString envPath = QString::fromLocal8Bit(qgetenv("MOONLIGHT_USB_HELPER"));
@@ -42,9 +57,10 @@ QString UsbForwardingLocalServer::locateHelper()
         QDir(QDir::currentPath()).filePath(helperName)
     };
 
+#endif
     for (const QString& candidate : candidates) {
         const QString cleanPath = QDir::cleanPath(candidate);
-        if (QFileInfo::exists(cleanPath)) {
+        if (QFileInfo(cleanPath).isExecutable() && QFileInfo(cleanPath).isFile()) {
             return cleanPath;
         }
     }
@@ -55,6 +71,108 @@ QString UsbForwardingLocalServer::locateHelper()
 UsbForwardingLocalServer::~UsbForwardingLocalServer()
 {
     stop();
+}
+
+void UsbForwardingLocalServer::startNative(const QString& busId, const QString& identity,
+                                           StartCallback ready,
+                                           std::function<void(const QString&)> exited)
+{
+    if (m_Process) { ready(0, QStringLiteral("already_running")); return; }
+    const QString helper = locateHelper();
+    const QString pkexec = QStandardPaths::findExecutable(QStringLiteral("pkexec"),
+        {QStringLiteral("/usr/bin"), QStringLiteral("/bin")});
+    if (helper.isEmpty() || pkexec.isEmpty()) {
+        ready(0, helper.isEmpty() ? QStringLiteral("helper_not_found") : QStringLiteral("authorization_unavailable"));
+        return;
+    }
+
+    // Root cannot normally access another user's AppImage FUSE mount. Copy
+    // the small helper outside it, retaining the directory through rollback.
+    // AppImage builds link its C++ runtime statically: pkexec clears LD_*.
+    const QString cache = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    if (cache.isEmpty() || !QDir().mkpath(cache)) { ready(0, QStringLiteral("helper_staging_failed")); return; }
+    auto staging = std::make_shared<QTemporaryDir>(cache + QStringLiteral("/usb-helper-XXXXXX"));
+    const QString executable = staging->filePath(QStringLiteral("moonlight-usb-host"));
+    if (!staging->isValid() || !QFile::copy(helper, executable) ||
+        !QFile::setPermissions(executable, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner)) {
+        ready(0, QStringLiteral("helper_staging_failed"));
+        return;
+    }
+
+    startNativeProcess(pkexec, {QStringLiteral("--disable-internal-agent"), executable,
+                               QStringLiteral("serve"), QStringLiteral("--busid"), busId,
+                               QStringLiteral("--identity"), identity}, staging, std::move(ready), std::move(exited));
+}
+
+void UsbForwardingLocalServer::startNativeProcess(const QString& program, const QStringList& arguments,
+                                                  std::shared_ptr<QTemporaryDir> staging, StartCallback ready,
+                                                  std::function<void(const QString&)> exited)
+{
+    struct Startup { QByteArray pending, errors; bool complete = false, ready = false; };
+    auto state = std::make_shared<Startup>();
+    m_Native = true;
+    auto* process = m_Process = new QProcess;
+    ++nativeProcesses;
+    // finish/FailedToStart occur exactly once per process. Count those rather
+    // than deferred deletion, which the SDL event loop may postpone.
+    process->setProcessChannelMode(QProcess::SeparateChannels);
+    // These connections outlive this object when stop() hands cleanup off.
+    QObject::connect(process, &QProcess::readyReadStandardError, process, [process, state] {
+        state->errors = (state->errors + process->readAllStandardError()).right(STDERR_TAIL_LIMIT);
+    });
+    QObject::connect(process, &QProcess::finished, process, [process, staging, state, exited](int code) {
+        --nativeProcesses;
+        state->errors = (state->errors + process->readAllStandardError()).right(STDERR_TAIL_LIMIT);
+        if (code) qWarning() << "Native USB helper exited:" << code << state->errors;
+        process->deleteLater();
+        if (state->ready) exited(code ? QString::fromUtf8(state->errors) : QString());
+    });
+    QObject::connect(process, &QProcess::errorOccurred, process, [process, staging](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) { --nativeProcesses; process->deleteLater(); }
+    });
+    auto fail = [this, state, ready](const QString& error) {
+        if (state->complete) return;
+        state->complete = true;
+        stop();
+        ready(0, error); // May destroy this object; do not access it afterwards.
+    };
+    QObject::connect(process, &QProcess::readyReadStandardOutput, this, [state, process, ready, fail] {
+        const QByteArray output = process->readAllStandardOutput();
+        if (state->complete) return;
+        state->pending += output;
+        if (state->pending.size() > 4096) { fail(QStringLiteral("invalid_ready_line")); return; }
+        const int newline = state->pending.indexOf('\n');
+        if (newline < 0) return;
+        const QByteArray line = state->pending.left(newline).trimmed();
+        bool ok = false;
+        const int port = line.startsWith("READY ") ? line.mid(6).toInt(&ok) : 0;
+        if (!ok || port < 1 || port > 65535) {
+            fail(QString::fromUtf8(line) + QLatin1Char(' ') + QString::fromUtf8(state->errors));
+            return;
+        }
+        state->complete = true;
+        state->ready = true;
+        ready(static_cast<quint16>(port), {});
+    });
+    QObject::connect(process, &QProcess::errorOccurred, this, [fail](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) fail(QStringLiteral("authorization_unavailable"));
+    });
+    QObject::connect(process, &QProcess::finished, this, [this, process, state, fail](int code) {
+        state->errors = (state->errors + process->readAllStandardError()).right(STDERR_TAIL_LIMIT);
+        if (!state->complete) {
+            fail(code == 126 ? QStringLiteral("authorization_cancelled") :
+                 code == 127 ? QStringLiteral("authorization_failed") : QString::fromUtf8(state->errors));
+            return;
+        }
+        m_Process = nullptr;
+    });
+    // Timer belongs to the process: destroying the server disconnects the
+    // callback, and a completed startup cannot time out an active forwarding.
+    auto* timer = new QTimer(process);
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, this, [fail] { fail(QStringLiteral("authorization_timeout")); });
+    timer->start(120000);
+    process->start(program, arguments);
 }
 
 bool UsbForwardingLocalServer::start(const QStringList& busIds, quint16* actualPort, QString* error)
@@ -169,6 +287,18 @@ bool UsbForwardingLocalServer::start(const QStringList& busIds, quint16* actualP
 void UsbForwardingLocalServer::stop()
 {
     if (m_Process == nullptr) {
+        return;
+    }
+
+    if (m_Native) {
+        // The elevated supervisor owns rollback, including parent death. Keep
+        // the process (and staged helper) alive until it finishes cleanup.
+        QProcess* process = m_Process;
+        m_Process = nullptr;
+        process->disconnect(this);
+        for (auto* timer : process->findChildren<QTimer*>()) timer->disconnect(this);
+        process->closeWriteChannel();
+        if (process->state() == QProcess::NotRunning) process->deleteLater();
         return;
     }
 

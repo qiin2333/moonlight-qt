@@ -7,8 +7,11 @@
 
 // wm.cpp 拖入 SDL/X11 依赖，这里用桩替代（非 Wayland 平台真实现同样返回 false）。
 #include "../../app/utils.h"
+#include "../../app/backend/systemproperties.h"
 bool WMUtils::isRunningWayland() { return false; }
 bool WMUtils::isGpuSlow() { return false; }
+// Device-list parsing is independent of the machine's USB kernel support.
+bool SystemProperties::isUsbForwardingSupported() { return true; }
 
 static QVariantMap firstDevice(const char* json)
 {
@@ -105,6 +108,18 @@ int main(int argc, char** argv)
             qWarning() << "malformed input should set error:" << invalid;
             return 7;
         }
+    }
+
+    {
+        const QVariantMap native = firstDevice(R"([{"busId":"1-2.3","vidPid":"054c:0ce6",
+            "product":"Native USB","serial":"serial","identity":"snapshot",
+            "registrationKey":"linux:1-2.3:054c:0ce6:73657269616c","claimable":true,"attached":false}])");
+        if (native.value("instanceId") != "snapshot" || !native.value("isSupported").toBool() ||
+            native.value("registrationKey") != native.value("persistedGuid") ||
+            native.value("isBound").toBool()) return 8;
+        const QVariantMap external = firstDevice(R"([{"busId":"1-2.3","registrationKey":"linux:1-2.3:054c:0ce6:",
+            "identity":"snapshot","claimable":false,"attached":true}])");
+        if (external.value("isSupported").toBool() || !external.value("isAttached").toBool()) return 9;
     }
 
     qInfo() << "PASS helper list parsing: dotted busid, occupied, fallbacks, empty, malformed";

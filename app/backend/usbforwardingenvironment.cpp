@@ -1,6 +1,7 @@
 #include "usbforwardingenvironment.h"
 
 #include "usbforwardinglocalserver.h"
+#include "systemproperties.h"
 
 #include <QFileInfo>
 #include <QProcess>
@@ -52,6 +53,18 @@ void UsbForwardingEnvironment::refresh()
     m_State = Checking;
     emit stateChanged();
     startVersionProbe(usbipdExe);
+#elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    const State readiness = probeServices();
+    if (readiness != Ready) {
+        m_Version.clear();
+        finish(readiness);
+        return;
+    }
+    m_Checking = true;
+    emit checkingChanged();
+    m_State = Checking;
+    emit stateChanged();
+    startHelperVersionProbe(UsbForwardingLocalServer::locateHelper());
 #elif defined(Q_OS_DARWIN)
     // macOS has no system USB/IP service; the server (moonlight-usbd, built
     // on usbipdcpp) ships inside the app bundle and is spawned per session.
@@ -175,6 +188,11 @@ UsbForwardingEnvironment::State UsbForwardingEnvironment::probeServices()
     }
     CloseServiceHandle(manager);
     return result;
+#elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    if (!SystemProperties::isUsbForwardingSupported() || UsbForwardingLocalServer::locateHelper().isEmpty())
+        return NotInstalled;
+    return QStandardPaths::findExecutable(QStringLiteral("pkexec"),
+        {QStringLiteral("/usr/bin"), QStringLiteral("/bin")}).isEmpty() ? CheckFailed : Ready;
 #elif defined(Q_OS_DARWIN)
     // Called synchronously from the session worker: never spawn a process
     // here, just check that the bundled helper is present.
@@ -192,7 +210,12 @@ QString UsbForwardingEnvironment::readinessError(State state)
         return tr("The USB forwarding driver is not running. Start VBoxUSBMon as administrator, or restart Windows.");
     case ServiceStopped:
         return tr("The usbipd service is not running. Start the service and retry.");
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    case NotInstalled:
+        return tr("USB forwarding requires the usbip-host kernel module and Moonlight's bundled USB helper.");
+    default:
+        return tr("USB forwarding requires polkit (pkexec) and a desktop authentication agent.");
+#elif defined(Q_OS_DARWIN)
     case NotInstalled:
         return tr("The bundled USB sharing component is missing. Reinstall Moonlight.");
     default:
