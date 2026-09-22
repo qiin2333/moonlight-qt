@@ -44,8 +44,9 @@ std::vector<uint8_t> deviceDescriptor(const Device& device);
 bool negotiate(int socket, const Device& device, const std::function<void(int)>& exportSocket,
                int controlFd);
 
-// The supervisor and worker share this state so a worker crash anywhere in
-// binding still permits rollback. Set each flag BEFORE the corresponding write.
+// The supervisor and worker share this state for rollback after a worker crash.
+// detached/matched record intent before writes; bound/automaticBindingDisabled
+// record observed state of the pinned device.
 struct BindingProgress
 {
     volatile int detached = 0;
@@ -58,11 +59,12 @@ class DeviceAccess
 {
 public:
     virtual ~DeviceAccess() = default;
+    // Retain the kernel object through any rollback, including after unplug.
+    virtual void pin(const Device& device) = 0;
     virtual Device current() const = 0;
     virtual void writeDriver(const std::string& driver, const std::string& attribute,
                              const std::string& value) = 0;
     virtual void writeDevice(const std::string& attribute, const std::string& value) = 0;
-    virtual void probe() = 0;
     virtual bool hasMatch() const = 0;
 };
 
@@ -71,12 +73,15 @@ class Binding
 public:
     Binding(DeviceAccess& access, Device original, BindingProgress& progress);
     void bind();
-    // Idempotent. Never rebind a replacement device that reused the bus ID.
-    void restore();
+    // Idempotent. A live supervisor must own replacement recovery and its
+    // device pin; its worker passes false and leaves that cleanup to it.
+    void restore(bool recoverReplacements = true);
     void exportSocket(int socket);
 
 private:
     void requireSameDevice() const;
+    void changeDriver(const std::string& driver, const std::string& attribute);
+    void disableAutomaticBinding();
     DeviceAccess& m_Access;
     Device m_Original;
     BindingProgress& m_Progress;
@@ -89,16 +94,16 @@ class SysfsDevice final : public DeviceAccess
 public:
     explicit SysfsDevice(std::string busId);
     ~SysfsDevice() override;
-    void pin(const Device& device);
+    void pin(const Device& device) override;
     Device current() const override;
     void writeDriver(const std::string&, const std::string&, const std::string&) override;
     void writeDevice(const std::string&, const std::string&) override;
-    void probe() override;
     bool hasMatch() const override;
 
 private:
     std::string m_BusId;
-    int m_DeviceFd = -1;
+    std::vector<int> m_DeviceFds;
+    int m_SysfsFd = -1;
 };
 
 int serve(const std::string& busId, const std::string& expectedIdentity);

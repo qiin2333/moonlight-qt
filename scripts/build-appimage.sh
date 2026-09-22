@@ -24,6 +24,7 @@ esac
 
 command -v qmake6 >/dev/null 2>&1 || fail "Unable to find 'qmake6' in your PATH!"
 command -v $LINUXDEPLOY >/dev/null 2>&1 || fail "Unable to find '$LINUXDEPLOY' in your PATH!"
+command -v readelf >/dev/null 2>&1 || fail "Unable to find 'readelf' in your PATH (install binutils)!"
 
 echo "MOONLIGHT BUILD ENVIRONMENT"
 qmake --version
@@ -72,7 +73,8 @@ popd
 # it was installed and needs neither the bundled Qt nor C++ runtime libraries.
 USB_HELPER="$DEPLOY_FOLDER/usr/bin/moonlight-usb-host"
 env -u LD_LIBRARY_PATH "$USB_HELPER" --version || fail "Native USB helper is missing or cannot run!"
-if readelf -d "$USB_HELPER" | grep -E 'NEEDED.*(libQt|libstdc\+\+|libgcc_s)'; then
+USB_HELPER_DYNAMIC=$(readelf -d "$USB_HELPER") || fail "Unable to inspect native USB helper dependencies!"
+if grep -E 'NEEDED.*(libQt|libstdc\+\+|libgcc_s)' <<< "$USB_HELPER_DYNAMIC"; then
   fail "Native USB helper must not depend on AppImage runtime libraries!"
 fi
 

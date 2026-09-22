@@ -52,7 +52,7 @@ private:
 
 bool SystemProperties::isUsbForwardingSupported()
 {
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || defined(Q_OS_ANDROID)
     return true;
 #elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     // Detect loaded/built-in support or an installed module for the running

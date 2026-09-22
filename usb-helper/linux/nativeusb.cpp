@@ -478,6 +478,40 @@ void Binding::requireSameDevice() const
     if (m_Access.current().identity() != m_Original.identity())
         throw std::runtime_error("device_changed");
 }
+
+void Binding::changeDriver(const std::string& driver, const std::string& attribute)
+{
+    requireSameDevice();
+    try {
+        m_Access.writeDriver(driver, attribute, m_Original.busId);
+    } catch (...) {
+        // A replacement may have been automatically captured by our match,
+        // even when the explicit bind failed because it was already bound.
+        requireSameDevice();
+        throw;
+    }
+    // A replacement's final driver does not prove which device this write
+    // affected. Abort without guessing its previous non-exporter driver.
+    requireSameDevice();
+}
+
+void Binding::disableAutomaticBinding()
+{
+    requireSameDevice();
+    m_Access.writeDriver("usbip-host", "match_busid", "del " + m_Original.busId);
+    try {
+        requireSameDevice();
+    } catch (const DeviceGone&) {
+        // The completed removal still needs cleanup after unplug. Keep the
+        // original device pin and this progress for the supervisor's retry.
+        m_Progress.automaticBindingDisabled = 1;
+        throw;
+    }
+    // A different identity must throw without marking its unpinned kernel
+    // reference safe. Replacement recovery selects and pins its own target.
+    m_Progress.automaticBindingDisabled = 1;
+}
+
 void Binding::bind()
 {
     requireSameDevice();
@@ -485,19 +519,18 @@ void Binding::bind()
         throw std::runtime_error("device_busy");
     m_Progress.detached = 1;
     if (!m_Original.driver.empty())
-        m_Access.writeDriver(m_Original.driver, "unbind", m_Original.busId);
+        changeDriver(m_Original.driver, "unbind");
     requireSameDevice();
     m_Progress.matched = 1;
     m_Access.writeDriver("usbip-host", "match_busid", "add " + m_Original.busId);
     requireSameDevice();
-    m_Access.writeDriver("usbip-host", "bind", m_Original.busId);
+    changeDriver("usbip-host", "bind");
     if (m_Access.current().driver != "usbip-host")
         throw std::runtime_error("bind_failed");
     m_Progress.bound = 1;
     // Mark for removal while still bound. Otherwise unplugging leaves an
     // ADDED match which can seize a different device reusing this port.
-    m_Access.writeDriver("usbip-host", "match_busid", "del " + m_Original.busId);
-    m_Progress.automaticBindingDisabled = 1;
+    disableAutomaticBinding();
 }
 void Binding::exportSocket(int socket)
 {
@@ -506,33 +539,46 @@ void Binding::exportSocket(int socket)
     if (current.driver != "usbip-host" || current.attached)
         throw std::runtime_error("device_busy");
     m_Access.writeDevice("usbip_sockfd", std::to_string(socket) + "\n");
+    requireSameDevice();
 }
-void Binding::restore()
+void Binding::restore(bool recoverReplacements)
 {
     if (!m_Progress.detached)
         return;
     bool same = false;
     try {
-        same = m_Access.current().identity() == m_Original.identity();
+        const auto current = m_Access.current();
+        same = current.identity() == m_Original.identity();
+        if (!same && !recoverReplacements)
+            throw std::runtime_error("device_changed");
+        if (!same && m_Progress.matched && current.driver == "usbip-host") {
+            // Recover only an exporter claim made through our active match.
+            // The supervisor selects and pins this target after the worker
+            // exits, before unbinding. Retain the target and shared progress
+            // in this Binding so a failed cleanup can resume after unbind.
+            m_Access.pin(current);
+            m_Original = current;
+            m_Original.driver.clear();
+            m_Progress.bound = 1;
+            m_Progress.automaticBindingDisabled = 0;
+            same = true;
+        }
     } catch (const DeviceGone&) {
     }
     if (same && m_Access.current().driver == "usbip-host") {
         m_Progress.bound = 1;
-        m_Access.writeDriver("usbip-host", "match_busid", "del " + m_Original.busId);
-        m_Progress.automaticBindingDisabled = 1;
-        requireSameDevice();
+        disableAutomaticBinding();
         // Unbind also terminates the kernel connection and waits for URBs.
-        m_Access.writeDriver("usbip-host", "unbind", m_Original.busId);
+        changeDriver("usbip-host", "unbind");
     }
     std::exception_ptr matchError;
     try {
         if (m_Progress.matched && m_Access.hasMatch()) {
             m_Access.writeDriver("usbip-host", "match_busid", "del " + m_Original.busId);
             // rebind dereferences the kernel's saved usb_device. Only use it
-            // after an observed successful bind. SysfsDevice pins that object
-            // through cleanup, even after unplug. Never pass an uninitialized
-            // match entry.
-            if (m_Progress.bound && (same || m_Progress.automaticBindingDisabled)) {
+            // after disabling automatic capture for the verified, pinned
+            // object, so another hotplug cannot replace that saved pointer.
+            if (m_Progress.bound && m_Progress.automaticBindingDisabled) {
                 m_Access.writeDriver("usbip-host", "rebind", m_Original.busId);
             }
         }
@@ -542,9 +588,9 @@ void Binding::restore()
     if (same) {
         requireSameDevice();
         if (!m_Original.driver.empty() && m_Access.current().driver.empty())
-            m_Access.probe();
+            changeDriver("usb", "bind");
         if (m_Original.driver.empty() && m_Access.current().driver == "usb")
-            m_Access.writeDriver("usb", "unbind", m_Original.busId);
+            changeDriver("usb", "unbind");
         if (!m_Original.driver.empty() && m_Access.current().driver != m_Original.driver)
             throw std::runtime_error("restore_failed");
     }
@@ -564,20 +610,33 @@ SysfsDevice::SysfsDevice(std::string busId) : m_BusId(std::move(busId))
 }
 SysfsDevice::~SysfsDevice()
 {
-    if (m_DeviceFd >= 0)
-        close(m_DeviceFd);
+    for (int fd : m_DeviceFds)
+        close(fd);
+    if (m_SysfsFd >= 0)
+        close(m_SysfsFd);
 }
 void SysfsDevice::pin(const Device& device)
 {
     char path[64];
     std::snprintf(path, sizeof(path), "/dev/bus/usb/%03u/%03u", device.bus, device.number);
-    m_DeviceFd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    Fd fd(open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
     struct stat info{};
-    if (m_DeviceFd < 0 || fstat(m_DeviceFd, &info) != 0 || !S_ISCHR(info.st_mode) ||
+    if (fd.value < 0 || fstat(fd.value, &info) != 0 || !S_ISCHR(info.st_mode) ||
         major(info.st_rdev) != 189 ||
         minor(info.st_rdev) != (device.bus - 1) * 128 + device.number - 1 ||
         current().identity() != device.identity())
         throw std::runtime_error("device_changed");
+    if (m_SysfsFd < 0) {
+        Fd directory(open((fs::path("/sys/bus/usb/devices") / m_BusId).c_str(),
+                          O_PATH | O_DIRECTORY | O_CLOEXEC));
+        if (directory.value < 0 || fstat(directory.value, &info) != 0 ||
+            info.st_ino != device.inode)
+            throw std::runtime_error("device_changed");
+        m_SysfsFd = directory.value;
+        directory.value = -1;
+    }
+    m_DeviceFds.push_back(fd.value);
+    fd.value = -1;
 }
 Device SysfsDevice::current() const
 {
@@ -590,11 +649,12 @@ void SysfsDevice::writeDriver(const std::string& driver, const std::string& attr
 }
 void SysfsDevice::writeDevice(const std::string& attribute, const std::string& value)
 {
-    writeText(fs::path("/sys/bus/usb/devices") / m_BusId / attribute, value);
-}
-void SysfsDevice::probe()
-{
-    writeDriver("usb", "bind", m_BusId);
+    // Resolve attributes relative to the original sysfs object, never a new
+    // device which subsequently reused its bus ID. Removed nodes fail writes.
+    Fd fd(openat(m_SysfsFd, attribute.c_str(), O_WRONLY | O_CLOEXEC | O_NOFOLLOW));
+    if (fd.value < 0 ||
+        write(fd.value, value.data(), value.size()) != static_cast<ssize_t>(value.size()))
+        throw std::runtime_error("sysfs_write_failed");
 }
 bool SysfsDevice::hasMatch() const
 {
@@ -641,6 +701,7 @@ int serve(const std::string& busId, const std::string& expectedIdentity)
         munmap(progress, sizeof(*progress));
         throw std::runtime_error("supervisor_failed");
     }
+    const pid_t supervisorPid = getpid();
     const pid_t child = fork();
     if (child < 0) {
         close(channels[0]);
@@ -661,7 +722,10 @@ int serve(const std::string& busId, const std::string& expectedIdentity)
             result = 1;
         }
         try {
-            binding.restore();
+            // Leave replacement cleanup to the live supervisor. Otherwise
+            // its worker could die holding the only pin and recovery state
+            // for that replacement. An orphan must perform its own cleanup.
+            binding.restore(getppid() != supervisorPid);
         } catch (const std::exception&) {
             result = 1;
         }
