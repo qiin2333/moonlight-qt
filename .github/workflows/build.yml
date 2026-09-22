@@ -306,29 +306,44 @@ jobs:
         call scripts\generate-bundle.bat release
         if errorlevel 1 exit /b %ERRORLEVEL%
 
-    - name: Upload portable artifact
+    - name: Upload portable artifact x64
       uses: actions/upload-artifact@v4
       with:
         name: Moonlight-VPlus-Portable-x64-r${{ env.BUILD_NUMBER }}
-        path: |
-          build/installer-x64-release/Moonlight-VPlus-Portable-x64-*.zip
-          build/installer-x64-release/MoonlightPortable-x64-*.zip
+        path: build/installer-x64-release/Moonlight-VPlus-Portable-x64-*.zip
+
+    - name: Upload legacy portable artifact x64
+      if: github.event_name != 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: MoonlightPortable-x64-r${{ env.BUILD_NUMBER }}
+        path: build/installer-x64-release/MoonlightPortable-x64-*.zip
 
     - name: Upload portable artifact arm64
       uses: actions/upload-artifact@v4
       with:
         name: Moonlight-VPlus-Portable-arm64-r${{ env.BUILD_NUMBER }}
-        path: |
-          build/installer-arm64-release/Moonlight-VPlus-Portable-arm64-*.zip
-          build/installer-arm64-release/MoonlightPortable-arm64-*.zip
+        path: build/installer-arm64-release/Moonlight-VPlus-Portable-arm64-*.zip
+
+    - name: Upload legacy portable artifact arm64
+      if: github.event_name != 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: MoonlightPortable-arm64-r${{ env.BUILD_NUMBER }}
+        path: build/installer-arm64-release/MoonlightPortable-arm64-*.zip
 
     - name: Upload executable artifact
       uses: actions/upload-artifact@v4
       with:
         name: Moonlight-VPlus-Setup-r${{ env.BUILD_NUMBER }}.exe
-        path: |
-          build/installer-Release/Moonlight-VPlus-Setup-*.exe
-          build/installer-Release/MoonlightSetup-*.exe
+        path: build/installer-Release/Moonlight-VPlus-Setup-*.exe
+
+    - name: Upload legacy executable artifact
+      if: github.event_name != 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: MoonlightSetup-r${{ env.BUILD_NUMBER }}.exe
+        path: build/installer-Release/MoonlightSetup-*.exe
 
   build-macos:
     runs-on: macos-15
