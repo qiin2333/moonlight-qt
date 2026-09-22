@@ -87,9 +87,18 @@ private:
 #ifdef Q_OS_LINUX
     // 首次共享时把内置 helper 脚本与 polkit policy 以一次提权安装到位，
     // 之后 bind/unbind 走 app 自己的 auth_admin_keep action。
-    void runPrivileged(const QString &action, const QString &busId);
-    bool installPrivilegedHelper(const QString &action, const QString &busId);
-    void runHelperAction(const QString &action, const QString &busId);
+    // bind 额外携带用户点选时的设备身份（deviceIdentity 结果），helper
+    // 在 root 下重读 sysfs 比对，不符拒绝绑定（TOCTOU 窗口从授权等待的
+    // 秒级压到 root 内的微秒级）。
+    void runPrivileged(const QString &action, const QString &busId,
+                       const QString &expectedIdentity = QString());
+    bool installPrivilegedHelper(const QString &action, const QString &busId,
+                                 const QString &expectedIdentity = QString());
+    void runHelperAction(const QString &action, const QString &busId,
+                         const QString &expectedIdentity = QString());
+    // 从当前枚举结果查 busId 的设备身份；找不到（列表过期）返回空串，
+    // 调用方以此拒绝发起 bind，强制用户刷新列表。
+    QString expectedIdentityFor(const QString &busId) const;
 #endif
 
     QVariantList m_Devices;

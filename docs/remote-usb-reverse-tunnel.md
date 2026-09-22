@@ -38,6 +38,10 @@ Ubuntu 26.04/内核 7.0 上全链路验证通过，含虚拟设备数据面回�
   同端口换成另一台设备会被 usbip-host 静默认领。helper 在 bind 时把设备
   身份（vidPid+serial）记入 `/var/lib/moonlight-qt/bindings`，客户端枚举时
   比对，不符则标 `isReplaced`：悬浮菜单拒绝转发，绑定对话框提示重新共享。
+  bind 还携带用户点选时的身份，helper 在 root 下重读 sysfs 比对、不符拒绝
+  绑定（把 polkit 授权等待造成的 TOCTOU 窗口压到 root 内微秒级）。无序列
+  号设备退化为 vidPid 级身份：跨型号替换仍能识别，同型号孪生不可区分
+  （Linux 上这类设备不存在跨重插稳定的设备级标识）。
 - **环境体检**：`usbip` 二进制 + `/sys/module/usbip_host` + 3240 端口
   连通性三步探测；daemon 不在时绑定过程自动拉起，不阻塞用户。
 - 隧道直连 `127.0.0.1:3240`（`TunnelConfig` 默认值，与 Windows usbipd-win

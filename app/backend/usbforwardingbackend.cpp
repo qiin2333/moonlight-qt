@@ -90,6 +90,15 @@ fi
 # match_busid matches ports, not devices, so a different device plugged into
 # a shared port would be silently claimed by usbip-host. The snapshot lets
 # the client detect that substitution and refuse to forward the wrong device.
+# Serial-less devices degrade to a vidPid-only identity: cross-model swaps
+# are still caught, same-model twins are indistinguishable (there is no
+# replug-stable per-device identity for such devices on Linux).
+read_identity_attrs() {
+    VID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idVendor" 2>/dev/null | tr 'A-F' 'a-f')
+    PID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idProduct" 2>/dev/null | tr 'A-F' 'a-f')
+    SERIAL=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/serial" 2>/dev/null)
+    [ -n "$VID" ] && [ -n "$PID" ]
+}
 forget() {
     mkdir -p "$STATE_DIR"
     [ -f "$STATE_FILE" ] || return 0
@@ -97,14 +106,9 @@ forget() {
         mv "$STATE_FILE.new" "$STATE_FILE"
 }
 record() {
-    VID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idVendor" 2>/dev/null)
-    PID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idProduct" 2>/dev/null)
-    SERIAL=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/serial" 2>/dev/null)
-    [ -n "$VID" ] && [ -n "$PID" ] || return 1
+    read_identity_attrs || return 1
     forget
-    printf '%s\t%s:%s\t%s\n' "$BUSID" \
-        "$(printf '%s' "$VID" | tr 'A-F' 'a-f')" \
-        "$(printf '%s' "$PID" | tr 'A-F' 'a-f')" "$SERIAL" >> "$STATE_FILE"
+    printf '%s\t%s:%s\t%s\n' "$BUSID" "$VID" "$PID" "$SERIAL" >> "$STATE_FILE"
     chmod 644 "$STATE_FILE"
 }
 if [ "$ACTION" = "bind" ] && ! pgrep -x usbipd >/dev/null 2>&1; then
@@ -112,6 +116,16 @@ if [ "$ACTION" = "bind" ] && ! pgrep -x usbipd >/dev/null 2>&1; then
     sleep 0.5
 fi
 if [ "$ACTION" = "bind" ]; then
+    # TOCTOU guard: $3 is the identity the user saw when requesting sharing.
+    # Re-read sysfs as root and refuse to bind anything else at this port.
+    EXPECTED=${3:-}
+    if [ -z "$EXPECTED" ] || [ "${#EXPECTED}" -gt 512 ]; then
+        echo "missing expected identity" >&2; exit 2
+    fi
+    case "$EXPECTED" in *[![:print:]]*) echo "invalid identity" >&2; exit 2;; esac
+    if ! read_identity_attrs || [ "$VID:$PID:$SERIAL" != "$EXPECTED" ]; then
+        echo "device_changed" >&2; exit 5
+    fi
     OUT=$(usbip bind -b "$BUSID" 2>&1)
     RC=$?
     echo "$OUT"
@@ -514,6 +528,9 @@ QString UsbForwardingBackend::deviceIdentity(const QString &vidPid, const QStrin
 {
     // 与 helper 的 `tr -d ' \t\n\r'` 对齐：快照与活体两侧同样剥离空白，
     // 否则序列号里含空格的设备刚共享就会被误判成「已更换」。
+    // 空序列号退化为 vidPid 级身份：跨型号替换仍能识别；同型号且无序列
+    // 号的两台设备在 Linux 上不存在跨重插稳定的设备级标识（Windows 的
+    // 实例 ID 也只是端口计数），故不做区分、照常共享。
     static const QRegularExpression whitespaceRe(QStringLiteral("[ \\t\\r\\n]"));
     QString normalizedSerial = serial;
     normalizedSerial.remove(whitespaceRe);
@@ -585,7 +602,14 @@ void UsbForwardingBackend::bind(const QString &busId)
         emit operationFinished(false, tr("This USB device cannot be shared."));
         return;
     }
-    runPrivileged(QStringLiteral("bind"), busId);
+    const QString expectedIdentity = expectedIdentityFor(busId);
+    if (expectedIdentity.isEmpty()) {
+        // 列表过期（枚举后设备被拔/换）：不带身份盲绑正是 TOCTOU 要堵的口。
+        emit operationFinished(false,
+                               tr("The device list is out of date. Refresh it and try again."));
+        return;
+    }
+    runPrivileged(QStringLiteral("bind"), busId, expectedIdentity);
 #else
     const QString exe = UsbForwardingEnvironment::locateUsbipd();
     if (exe.isEmpty()) {
@@ -671,7 +695,8 @@ void UsbForwardingBackend::unbind(const QString &busId, const QString &persisted
 
 #ifdef Q_OS_LINUX
 
-void UsbForwardingBackend::runPrivileged(const QString &action, const QString &busId)
+void UsbForwardingBackend::runPrivileged(const QString &action, const QString &busId,
+                                         const QString &expectedIdentity)
 {
     if (m_Busy) {
         return;
@@ -682,13 +707,14 @@ void UsbForwardingBackend::runPrivileged(const QString &action, const QString &b
     const bool installed = QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath)) &&
                            QFileInfo::exists(QString::fromLatin1(kLinuxPolicyPath));
     if (installed) {
-        runHelperAction(action, busId);
+        runHelperAction(action, busId, expectedIdentity);
     } else {
-        installPrivilegedHelper(action, busId);
+        installPrivilegedHelper(action, busId, expectedIdentity);
     }
 }
 
-bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const QString &busId)
+bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const QString &busId,
+                                                   const QString &expectedIdentity)
 {
     // 临时目录活到安装进程把它消费掉为止：finished 回调里显式释放。
     QTemporaryDir *temp = new QTemporaryDir();
@@ -741,22 +767,24 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
                     false,
                     tr("pkexec is not available. A polkit authentication agent is required."));
             });
-    connect(install, &QProcess::finished, this, [this, install, temp, action, busId](int exitCode) {
-        install->deleteLater();
-        delete temp;
-        if (exitCode != 0 || !QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath))) {
-            setBusy(false);
-            emit operationFinished(false, tr("The elevation was cancelled or failed."));
-            return;
-        }
-        runHelperAction(action, busId);
-    });
+    connect(install, &QProcess::finished, this,
+            [this, install, temp, action, busId, expectedIdentity](int exitCode) {
+                install->deleteLater();
+                delete temp;
+                if (exitCode != 0 || !QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath))) {
+                    setBusy(false);
+                    emit operationFinished(false, tr("The elevation was cancelled or failed."));
+                    return;
+                }
+                runHelperAction(action, busId, expectedIdentity);
+            });
     install->start(QStringLiteral("pkexec"),
                    { QStringLiteral("/bin/sh"), QStringLiteral("-c"), command });
     return true;
 }
 
-void UsbForwardingBackend::runHelperAction(const QString &action, const QString &busId)
+void UsbForwardingBackend::runHelperAction(const QString &action, const QString &busId,
+                                           const QString &expectedIdentity)
 {
     QProcess *proc = new QProcess(this);
     connect(
@@ -782,6 +810,14 @@ void UsbForwardingBackend::runHelperAction(const QString &action, const QString 
             QTimer::singleShot(500, this, [this] { refresh(); });
             return;
         }
+        // 授权等待期间端口上的设备变了：helper 拒绝绑定（TOCTOU 防护）。
+        if (exitCode == 5 || combined.contains(QLatin1String("device_changed"))) {
+            emit operationFinished(false,
+                                   tr("The USB device changed while the authorization was pending. "
+                                      "Refresh the device list and share again."));
+            QTimer::singleShot(500, this, [this] { refresh(); });
+            return;
+        }
         // bind 一个已共享的设备是幂等成功（内核态已是目标状态）。
         if (action == QLatin1String("bind") && combined.contains(QLatin1String("already bound"))) {
             emit operationFinished(true, tr("Device is already shared."));
@@ -800,7 +836,23 @@ void UsbForwardingBackend::runHelperAction(const QString &action, const QString 
                                    ? tr("The USB sharing operation failed (exit %1).").arg(exitCode)
                                    : detail);
     });
-    proc->start(QStringLiteral("pkexec"), { QString::fromLatin1(kLinuxHelperPath), action, busId });
+    QStringList arguments{ QString::fromLatin1(kLinuxHelperPath), action, busId };
+    if (action == QLatin1String("bind")) {
+        arguments << expectedIdentity;
+    }
+    proc->start(QStringLiteral("pkexec"), arguments);
+}
+
+QString UsbForwardingBackend::expectedIdentityFor(const QString &busId) const
+{
+    for (const QVariant &entry : m_Devices) {
+        const QVariantMap device = entry.toMap();
+        if (device.value(QStringLiteral("busId")).toString() == busId) {
+            return deviceIdentity(device.value(QStringLiteral("vidPid")).toString(),
+                                  device.value(QStringLiteral("instanceId")).toString());
+        }
+    }
+    return QString();
 }
 
 #endif // Q_OS_LINUX

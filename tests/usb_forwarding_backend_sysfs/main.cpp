@@ -171,6 +171,20 @@ int main(int argc, char **argv)
         ++failures;
     }
 
+    // 身份构造：空白剥离与 helper 对齐；空序列号退化为 vidPid 级
+    // （同型号无序列号孪生设备不做区分，见 deviceIdentity 注释）。
+    if (UsbForwardingBackend::deviceIdentity(QStringLiteral("054C:0CE6"),
+                                             QStringLiteral(" A B \n")) !=
+        QStringLiteral("054c:0ce6:AB")) {
+        qCritical() << "deviceIdentity should strip whitespace";
+        ++failures;
+    }
+    if (UsbForwardingBackend::deviceIdentity(QStringLiteral("054c:0ce6"), QString()) !=
+        QStringLiteral("054c:0ce6:")) {
+        qCritical() << "empty serial should degrade to vidPid identity";
+        ++failures;
+    }
+
     if (failures != 0) {
         qCritical() << failures << "failure(s)";
         return 1;
