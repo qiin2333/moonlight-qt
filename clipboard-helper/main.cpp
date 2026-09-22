@@ -162,9 +162,8 @@ int main(int argc, char* argv[])
     StdinReaderThread stdinThread;
     // Bound the reader to one GUI delivery at a time. Otherwise a blocked
     // clipboard provider lets the worker enqueue an unbounded number of frames.
-    QObject::connect(&stdinThread, &StdinReaderThread::lineReceived,
-                     &controller, &ClipboardHelperController::handleLine,
-                     Qt::BlockingQueuedConnection);
+    QObject::connect(&stdinThread, &StdinReaderThread::lineReceived, &controller,
+                     &ClipboardHelperController::handleLine, Qt::BlockingQueuedConnection);
 
     stdinThread.start();
     int rc = app.exec();

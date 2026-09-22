@@ -184,8 +184,8 @@ void ClipboardHelperClient::processPendingMessages()
         return;
     }
     const quint32 now = SDL_GetTicks();
-    if (SDL_TICKS_PASSED(now, m_LastResponseTicks + 30000)
-            || (!m_HelperReady && SDL_TICKS_PASSED(now, m_ConfigSentTicks + 30000))) {
+    if (SDL_TICKS_PASSED(now, m_LastResponseTicks + 30000) ||
+        (!m_HelperReady && SDL_TICKS_PASSED(now, m_ConfigSentTicks + 30000))) {
         restartHelper("helper response timeout");
         return;
     }

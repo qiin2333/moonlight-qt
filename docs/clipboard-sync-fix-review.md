@@ -74,7 +74,7 @@ Linux 编译另发现一个已验证 MIME 分支中的枚举/整数条件表达�
 
 ## Sunshine 修复后复测（2026-09-23）
 
-上述两个主机端问题已在 [Sunshine Control Panel #148](https://github.com/qiin2333/sunshine-control-panel/pull/148) 修复，Core 集成见 [Sunshine #1084](https://github.com/AlkaidLab/foundation-sunshine/pull/1084)。新面板改为完整当前快照去重，序列化接收写入与 watcher 读取，并使用 `text/plain` 上传文本。
+上述两个主机端问题已在 [Sunshine Control Panel #148](https://github.com/qiin2333/sunshine-control-panel/pull/148) 修复；按维护者要求不更新 Sunshine 主项目的子模块 pin。新面板改为完整当前快照去重，序列化接收写入与 watcher 读取，并使用 `text/plain` 上传文本。
 
 使用实际构建的新 Windows 面板进程（已核对可执行文件路径）、原 Core 服务和上述修复版 Linux Moonlight 重新串流：主矩阵 **18/18**、补充保护用例 **5/5** 全部通过。每项主矩阵内容匹配后再等待 800 ms 检查，防止把短暂正确但随后被覆盖算为成功。线上已确认 compound 两帧共享非零 token，主机大文本 REF 使用 `text/plain`。面板完整 Rust 测试 223 通过、3 忽略、0 失败，前端和 Windows MSVC 构建通过。
 

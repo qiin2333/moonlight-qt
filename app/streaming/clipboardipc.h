@@ -8,7 +8,8 @@ namespace ClipboardIpc {
 static constexpr int PROTOCOL_VERSION = 1;
 static constexpr int MAX_LINE_BYTES = 1024 * 1024;
 
-enum class MessageType {
+enum class MessageType
+{
     Unknown,
     Configure,
     HostFrame,

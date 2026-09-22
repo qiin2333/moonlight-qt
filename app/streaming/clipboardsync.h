@@ -83,13 +83,13 @@ public:
     static constexpr int     MAX_PAYLOAD  = 65535 - 10; // wire frame must fit u16 length
     // Encrypted control length also includes seq (4), GCM tag (16) and the
     // inner control header (4). Reserve those bytes for outbound inline frames.
-    static constexpr int     MAX_INLINE_PAYLOAD = MAX_PAYLOAD - 24;
+    static constexpr int MAX_INLINE_PAYLOAD = MAX_PAYLOAD - 24;
     // Payload size at/above which we switch from inline KIND_TEXT/KIND_PNG to
     // out-of-band blob transfer (KIND_REF). Leaves headroom under the wire cap.
     static constexpr int     INLINE_THRESHOLD = 60000;
     // Mirrors the cross-client cap (64 MiB) shared with the Android and
     // HarmonyOS clients. The service-side blob store accepts up to this much.
-    static constexpr qint64  MAX_BLOB_BYTES   = 64LL * 1024 * 1024;
+    static constexpr qint64 MAX_BLOB_BYTES = 64LL * 1024 * 1024;
     // Mirror the Android client's cap (32 Mpx) so a stray full-screen capture
     // doesn't try to PNG-encode a 100 MB bitmap and stall the GUI thread.
     static constexpr qint64  MAX_IMAGE_PIXELS = 32LL * 1024 * 1024;
@@ -197,10 +197,8 @@ private:
     bool extractClipboardPng(const QMimeData* mime,
                              QByteArray& outPng,
                              QString* outSourceDescription = nullptr) const;
-    bool tryExtractImageBytes(const QMimeData* mime,
-                              const QStringList& preferredFormats,
-                              QByteArray& outPng,
-                              QString* outSourceDescription) const;
+    bool tryExtractImageBytes(const QMimeData* mime, const QStringList& preferredFormats,
+                              QByteArray& outPng, QString* outSourceDescription) const;
     bool tryExtractImageFromHtml(const QMimeData* mime,
                                  QByteArray& outPng,
                                  QString* outSourceDescription) const;
@@ -245,5 +243,4 @@ private:
     QTimer* m_PasteboardPollTimer = nullptr;
     int m_LastPasteboardChangeCount = -1;
 #endif
-
 };
