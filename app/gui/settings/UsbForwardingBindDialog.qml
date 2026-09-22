@@ -42,6 +42,9 @@ NavigableDialog {
     }
 
     function deviceStatusText(d) {
+        if (d.isReplaced !== undefined && d.isReplaced) {
+            return qsTr("Device changed — release and share again")
+        }
         if (d.isOccupied !== undefined && d.isOccupied) {
             return qsTr("In use by macOS")
         }
@@ -58,6 +61,9 @@ NavigableDialog {
     }
 
     function deviceStatusColor(d) {
+        if (d.isReplaced !== undefined && d.isReplaced) {
+            return Theme.danger
+        }
         if (d.isOccupied !== undefined && d.isOccupied) {
             return Theme.danger
         }

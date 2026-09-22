@@ -67,6 +67,7 @@ bool isTopologyBusId(const QString &busId)
 constexpr auto kLinuxHelperPath = "/usr/lib/moonlight-qt/moonlight-usb-helper";
 constexpr auto kLinuxPolicyPath =
     "/usr/share/polkit-1/actions/org.moonlight.qt.usbforwarding.policy";
+constexpr auto kLinuxBindingsPath = "/var/lib/moonlight-qt/bindings";
 
 constexpr auto kLinuxHelperScript = R"HELPER(#!/bin/sh
 # Moonlight USB forwarding privileged helper (Linux usbip-host backend).
@@ -74,22 +75,50 @@ constexpr auto kLinuxHelperScript = R"HELPER(#!/bin/sh
 set -u
 ACTION=${1:-}
 BUSID=${2:-}
+STATE_DIR=/var/lib/moonlight-qt
+STATE_FILE=$STATE_DIR/bindings
 case "$ACTION" in bind|unbind) ;; *) echo "unsupported action" >&2; exit 2;; esac
 case "$BUSID" in ''|*[!0-9.-]*) echo "invalid busid" >&2; exit 2;; esac
 command -v usbip >/dev/null 2>&1 || { echo "usbip tool not found" >&2; exit 3; }
 if [ ! -d /sys/module/usbip_host ]; then
     modprobe usbip_host 2>/dev/null || { echo "cannot load usbip_host module" >&2; exit 4; }
 fi
+# 绑定快照：身份 = vidPid + serial，跨重插稳定。usbip 的 match_busid 只认
+# 端口不认设备——共享期间拔掉、同端口插上另一台设备会被 usbip-host 静默
+# 认领；快照让客户端枚举时能识别这种替换，不再转发张冠李戴的设备。
+forget() {
+    mkdir -p "$STATE_DIR"
+    awk -F'\t' -v b="$BUSID" '$1 != b' "$STATE_FILE" > "$STATE_FILE.new" 2>/dev/null &&
+        mv "$STATE_FILE.new" "$STATE_FILE"
+}
+record() {
+    VID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idVendor" 2>/dev/null)
+    PID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idProduct" 2>/dev/null)
+    SERIAL=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/serial" 2>/dev/null)
+    [ -n "$VID" ] && [ -n "$PID" ] || return 0
+    forget
+    printf '%s\t%s:%s\t%s\n' "$BUSID" \
+        "$(printf '%s' "$VID" | tr 'A-F' 'a-f')" \
+        "$(printf '%s' "$PID" | tr 'A-F' 'a-f')" "$SERIAL" >> "$STATE_FILE"
+    chmod 644 "$STATE_FILE"
+}
 if [ "$ACTION" = "bind" ] && ! pgrep -x usbipd >/dev/null 2>&1; then
     usbipd -D >/dev/null 2>&1
     sleep 0.5
 fi
 if [ "$ACTION" = "bind" ]; then
-    usbip bind -b "$BUSID"
-else
-    usbip unbind -b "$BUSID" 2>/dev/null
-    echo "$BUSID" > /sys/bus/usb/drivers_probe 2>/dev/null || true
+    OUT=$(usbip bind -b "$BUSID" 2>&1)
+    RC=$?
+    echo "$OUT"
+    case "$OUT" in *"already bound"*) RC=0;; esac
+    if [ $RC -eq 0 ]; then
+        record
+    fi
+    exit $RC
 fi
+usbip unbind -b "$BUSID" 2>/dev/null
+echo "$BUSID" > /sys/bus/usb/drivers_probe 2>/dev/null || true
+forget
 )HELPER";
 
 constexpr auto kLinuxPolicyXml = R"POLICY(<?xml version="1.0" encoding="UTF-8"?>
@@ -213,14 +242,19 @@ void UsbForwardingBackend::refresh()
     }
     setError(QString());
     QString parseError;
-    const QVariantList devices =
-        parseSysfsDevices(QStringLiteral("/sys/bus/usb/devices"), &parseError);
+    QVariantList devices = parseSysfsDevices(QStringLiteral("/sys/bus/usb/devices"), &parseError);
     if (!parseError.isEmpty()) {
         m_Devices.clear();
         emit devicesChanged();
         setError(parseError);
         return;
     }
+    // 绑定快照比对：共享后端口上被换成别的设备时标记 isReplaced，
+    // 悬浮菜单不再转发它，绑定对话框给出重共享提示。
+    QFile bindingsFile(QString::fromLatin1(kLinuxBindingsPath));
+    const QMap<QString, QString> bindings = parseBindIdentities(
+        bindingsFile.open(QIODevice::ReadOnly) ? bindingsFile.readAll() : QByteArray());
+    markReplacedDevices(devices, bindings);
     m_Devices = devices;
     emit devicesChanged();
 #else
@@ -428,6 +462,11 @@ QVariantList UsbForwardingBackend::parseSysfsDevices(const QString &sysfsBusPath
         if (readAttr(devicePath + QStringLiteral("/bDeviceClass")) == QLatin1String("09")) {
             continue;
         }
+        // vhci 导入进来的设备（本机也在用 USB/IP 时）再共享会被内核防环
+        // 保护拒绝（"bind loop detected"），直接从列表排除。
+        if (QFileInfo(devicePath).canonicalFilePath().contains(QLatin1String("vhci"))) {
+            continue;
+        }
 
         const QString vidPid = vendor.toLower() + QLatin1Char(':') + product.toLower();
         QString description = readAttr(devicePath + QStringLiteral("/product"));
@@ -459,6 +498,54 @@ QVariantList UsbForwardingBackend::parseSysfsDevices(const QString &sysfsBusPath
     }
 
     return devices;
+}
+
+QString UsbForwardingBackend::deviceIdentity(const QString &vidPid, const QString &serial)
+{
+    return vidPid.toLower() + QLatin1Char(':') + serial;
+}
+
+QMap<QString, QString> UsbForwardingBackend::parseBindIdentities(const QByteArray &bindingsFile)
+{
+    // 每行：busid \t vidPid \t serial（serial 可能为空，行内不含换行——
+    // helper 写入时已剥掉控制字符）。
+    QMap<QString, QString> bindings;
+    const QList<QByteArray> lines = bindingsFile.split('\n');
+    for (const QByteArray &line : lines) {
+        const QList<QByteArray> fields = line.split('\t');
+        if (fields.size() != 3) {
+            continue;
+        }
+        const QString busId = QString::fromLatin1(fields[0]).trimmed();
+        if (!isTopologyBusId(busId)) {
+            continue;
+        }
+        bindings.insert(
+            busId, deviceIdentity(QString::fromLatin1(fields[1]), QString::fromLatin1(fields[2])));
+    }
+    return bindings;
+}
+
+void UsbForwardingBackend::markReplacedDevices(QVariantList &devices,
+                                               const QMap<QString, QString> &bindings)
+{
+    for (QVariant &value : devices) {
+        QVariantMap device = value.toMap();
+        if (!device.value(QStringLiteral("isBound")).toBool()) {
+            continue;
+        }
+        const auto binding = bindings.constFind(device.value(QStringLiteral("busId")).toString());
+        if (binding == bindings.constEnd()) {
+            // 没有快照（早于本功能共享、或状态文件丢失）：无从判断，不标。
+            continue;
+        }
+        const QString live = deviceIdentity(device.value(QStringLiteral("vidPid")).toString(),
+                                            device.value(QStringLiteral("instanceId")).toString());
+        if (binding.value() != live) {
+            device.insert(QStringLiteral("isReplaced"), true);
+            value = device;
+        }
+    }
 }
 
 #endif // Q_OS_LINUX

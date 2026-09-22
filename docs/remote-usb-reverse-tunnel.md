@@ -34,6 +34,10 @@ Ubuntu 26.04/内核 7.0 上全链路验证通过，含虚拟设备数据面回�
   `usbip_host` 模块、按需拉起 `usbipd -D`，再执行 `usbip bind/unbind`。
 - **绑定语义**：对已被内核驱动（usb-storage 等）认领的设备直接 bind 即可，
   内核自动让位，无需预解绑；unbind 后补一次 `drivers_probe` 让设备回本机。
+- **替换设备防护**：usbip 按 busid 寻址、match_busid 只认端口——共享期间
+  同端口换成另一台设备会被 usbip-host 静默认领。helper 在 bind 时把设备
+  身份（vidPid+serial）记入 `/var/lib/moonlight-qt/bindings`，客户端枚举时
+  比对，不符则标 `isReplaced`：悬浮菜单拒绝转发，绑定对话框提示重新共享。
 - **环境体检**：`usbip` 二进制 + `/sys/module/usbip_host` + 3240 端口
   连通性三步探测；daemon 不在时绑定过程自动拉起，不阻塞用户。
 - 隧道直连 `127.0.0.1:3240`（`TunnelConfig` 默认值，与 Windows usbipd-win

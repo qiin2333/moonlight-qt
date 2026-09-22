@@ -67,6 +67,17 @@ int main(int argc, char **argv)
     writeAttr(root, "1-2/idProduct", "0ce6\n");
     writeAttr(root, "1-2/bDeviceClass", "00\n");
 
+    // 换装设备：同 VID/PID、不同序列号，已绑定（仅 Unix 建链）——
+    // 模拟「共享后同端口插上另一台设备被 usbip-host 认领」。
+    writeAttr(root, "3-1/idVendor", "054c\n");
+    writeAttr(root, "3-1/idProduct", "0ce6\n");
+    writeAttr(root, "3-1/bDeviceClass", "00\n");
+    writeAttr(root, "3-1/serial", "changed-serial\n");
+#ifdef Q_OS_UNIX
+    QFile::link(QStringLiteral("/sys/bus/usb/drivers/usbip-host"),
+                root.filePath(QStringLiteral("3-1/driver")));
+#endif
+
     // hub（bDeviceClass 09）→ 跳过。
     writeAttr(root, "2-1.2/idVendor", "1d6b\n");
     writeAttr(root, "2-1.2/idProduct", "0104\n");
@@ -85,8 +96,8 @@ int main(int argc, char **argv)
         qCritical() << "unexpected error:" << error;
         ++failures;
     }
-    if (devices.size() != 2) {
-        qCritical() << "expected 2 devices, got" << devices.size();
+    if (devices.size() != 3) {
+        qCritical() << "expected 3 devices, got" << devices.size();
         ++failures;
     }
 
@@ -120,6 +131,33 @@ int main(int argc, char **argv)
         UsbForwardingBackend::parseSysfsDevices(root.filePath("does-not-exist"), &missingError);
     if (missingError.isEmpty() || !missing.isEmpty()) {
         qCritical() << "missing dir should error:" << missingError << missing.size();
+        ++failures;
+    }
+
+    // 身份替换标记：绑定快照与活体身份不符 → isReplaced。
+    QVariantList replaced = devices;
+    QMap<QString, QString> bindings;
+    bindings.insert(QStringLiteral("1-1"), QStringLiteral("076b:6666:spike0001"));
+    bindings.insert(QStringLiteral("3-1"), QStringLiteral("054c:0ce6:original-serial"));
+    UsbForwardingBackend::markReplacedDevices(replaced, bindings);
+    const QVariantMap sameIdentity = findDevice(replaced, "1-1");
+    if (sameIdentity.value("isReplaced").toBool()) {
+        qCritical() << "1-1 identity matches snapshot, should not be replaced";
+        ++failures;
+    }
+    const QVariantMap swappedIdentity = findDevice(replaced, "3-1");
+    if (!swappedIdentity.value("isReplaced").toBool()) {
+        qCritical() << "3-1 identity differs from snapshot, should be replaced";
+        ++failures;
+    }
+
+    // 无快照的已共享设备：无从判断，不标。
+    QVariantList onlyOne;
+    onlyOne.append(findDevice(devices, "1-1"));
+    QMap<QString, QString> noSnapshot;
+    UsbForwardingBackend::markReplacedDevices(onlyOne, noSnapshot);
+    if (findDevice(onlyOne, "1-1").contains("isReplaced")) {
+        qCritical() << "no snapshot should not mark replaced";
         ++failures;
     }
 

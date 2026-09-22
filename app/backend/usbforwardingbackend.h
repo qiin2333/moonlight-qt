@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QMap>
 #include <QString>
 #include <QVariantList>
 
@@ -53,6 +54,14 @@ public:
     // 跳过根 hub（usbN）与 hub 设备（bDeviceClass 09）。公开成静态纯函数
     // 以便用夹具目录做单元测试（tests/usb_forwarding_backend_sysfs）。
     static QVariantList parseSysfsDevices(const QString &sysfsBusPath, QString *error);
+
+    // 设备身份 = vidPid + 序列号，跨重插稳定；用于识别「共享后端口上换成
+    // 另一台设备」——usbip 按 busid 寻址，内核 match_busid 只认端口不认
+    // 设备，重插后换上的不同设备会被 usbip-host 静默认领。绑定快照由
+    // 特权 helper 在 bind 时写入 /var/lib/moonlight-qt/bindings。
+    static QString deviceIdentity(const QString &vidPid, const QString &serial);
+    static QMap<QString, QString> parseBindIdentities(const QByteArray &bindingsFile);
+    static void markReplacedDevices(QVariantList &devices, const QMap<QString, QString> &bindings);
 #endif
 
     Q_INVOKABLE void refresh();

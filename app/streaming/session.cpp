@@ -1351,6 +1351,11 @@ void Session::refreshRemoteUsbDevices()
                 !device.value(QStringLiteral("isConnected")).toBool()) {
                 continue;
             }
+            // Linux：共享后端口上被换成另一台设备（busid 相同、身份不符）
+            // 时禁止转发，避免张冠李戴；isReplaced 仅 Linux 后端产生。
+            if (device.value(QStringLiteral("isReplaced")).toBool()) {
+                continue;
+            }
             OverlayMenuPanel::RemoteUsbDevice menuDevice;
             menuDevice.id = device.value(QStringLiteral("busId")).toString();
             if (menuDevice.id.isEmpty()) {
