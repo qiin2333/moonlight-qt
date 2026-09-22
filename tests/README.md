@@ -21,7 +21,7 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | usb_forwarding_capability | helper 能力 JSON 解析(端口/token/畸形输入) | Windows |
 | usb_forwarding_environment | USB 转发就绪态 → 错误文案映射(--require-ready 走活探测) | Windows |
 | usb_forwarding_backend_list | moonlight-usbd `list --json` → 设备表解析 | Windows |
-| usb_forwarding_linux | Linux native device snapshot: USB reset, replacement, unplugging, and retry limit | Linux |
+| usb_forwarding_linux | Linux USB snapshots, reset/retry limits, distro bind/unbind lifecycle, hotplug rollback and match cleanup | Linux |
 | ds5_ir_renderer | DualSense 触觉 IR 渲染 | Windows |
 | pen_history_selection | 手写笔历史选择 | Windows |
 | stylus_replay | 手写笔录制回放 | Windows |

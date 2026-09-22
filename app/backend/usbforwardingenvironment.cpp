@@ -7,9 +7,19 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QTcpSocket>
 
 #ifdef Q_OS_WIN32
 #include <windows.h>
+#endif
+
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+static QString locateLinuxTool(const QString &name)
+{
+    return QStandardPaths::findExecutable(name,
+                                          { QStringLiteral("/usr/sbin"), QStringLiteral("/sbin"),
+                                            QStringLiteral("/usr/bin"), QStringLiteral("/bin") });
+}
 #endif
 
 UsbForwardingEnvironment::UsbForwardingEnvironment(QObject *parent)
@@ -190,13 +200,17 @@ UsbForwardingEnvironment::State UsbForwardingEnvironment::probeServices()
     return result;
 #elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     if (!SystemProperties::isUsbForwardingSupported() ||
-        UsbForwardingLocalServer::locateHelper().isEmpty())
+        UsbForwardingLocalServer::locateHelper().isEmpty() ||
+        locateLinuxTool(QStringLiteral("usbip")).isEmpty() ||
+        locateLinuxTool(QStringLiteral("usbipd")).isEmpty())
         return NotInstalled;
-    return QStandardPaths::findExecutable(QStringLiteral("pkexec"),
-                                          { QStringLiteral("/usr/bin"), QStringLiteral("/bin") })
-                   .isEmpty()
-               ? CheckFailed
-               : Ready;
+    if (QStandardPaths::findExecutable(QStringLiteral("pkexec"),
+                                       { QStringLiteral("/usr/bin"), QStringLiteral("/bin") })
+            .isEmpty())
+        return CheckFailed;
+    QTcpSocket daemon;
+    daemon.connectToHost(QHostAddress::LocalHost, 3240);
+    return daemon.waitForConnected(300) ? Ready : ServiceStopped;
 #elif defined(Q_OS_DARWIN)
     // Called synchronously from the session worker: never spawn a process
     // here, just check that the bundled helper is present.
@@ -211,13 +225,22 @@ QString UsbForwardingEnvironment::readinessError(State state)
     switch (state) {
     case Ready: return {};
     case DriverStopped:
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+        return tr("The usbip-host kernel module is not available.");
+#else
         return tr("The USB forwarding driver is not running. Start VBoxUSBMon as administrator, or restart Windows.");
+#endif
     case ServiceStopped:
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+        return tr("The USB/IP service is not running. Start your distribution's usbipd service "
+                  "and retry.");
+#else
         return tr("The usbipd service is not running. Start the service and retry.");
+#endif
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     case NotInstalled:
-        return tr("USB forwarding requires the usbip-host kernel module and Moonlight's bundled "
-                  "USB helper.");
+        return tr("USB forwarding requires your distribution's USB/IP tools (usbip and usbipd), "
+                  "the usbip-host kernel module, and Moonlight's USB control helper.");
     default:
         return tr("USB forwarding requires polkit (pkexec) and a desktop authentication agent.");
 #elif defined(Q_OS_DARWIN)

@@ -8,7 +8,7 @@
  *
  *   local  : TCP to the platform USB/IP server (usbipd-win on 3240 on
  *            Windows; the per-session moonlight-usbd helper on an
- *            ephemeral loopback port on macOS; native moonlight-usb-host
+ *            ephemeral loopback port on macOS; distro usbipd on 3240
  *            on Linux)
  *   remote : TLS to Sunshine, authenticated with the paired client
  *            certificate, carrying the configured shared token

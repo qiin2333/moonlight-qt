@@ -2,7 +2,6 @@
 
 #include <array>
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <stdexcept>
 #include <vector>
@@ -37,12 +36,6 @@ struct Device
 Device readDevice(const std::string& busId, const std::string& root = "/sys/bus/usb/devices",
                   bool interfaces = true);
 std::string deviceListJson(const std::string& root = "/sys/bus/usb/devices");
-std::vector<uint8_t> deviceDescriptor(const Device& device);
-
-// Import negotiation only. After exportSocket(), usbip-host owns all USB/IP
-// transfer processing.
-bool negotiate(int socket, const Device& device, const std::function<void(int)>& exportSocket,
-               int controlFd);
 
 // The supervisor and worker share this state for rollback after a worker crash.
 // detached/matched record intent before writes; bound/automaticBindingDisabled
@@ -64,7 +57,8 @@ public:
     virtual Device current() const = 0;
     virtual void writeDriver(const std::string& driver, const std::string& attribute,
                              const std::string& value) = 0;
-    virtual void writeDevice(const std::string& attribute, const std::string& value) = 0;
+    virtual void bindDevice() = 0;
+    virtual void unbindDevice() = 0;
     virtual bool hasMatch() const = 0;
 };
 
@@ -76,7 +70,6 @@ public:
     // Idempotent. A live supervisor must own replacement recovery and its
     // device pin; its worker passes false and leaves that cleanup to it.
     void restore(bool recoverReplacements = true);
-    void exportSocket(int socket);
 
 private:
     void requireSameDevice() const;
@@ -97,7 +90,8 @@ public:
     void pin(const Device& device) override;
     Device current() const override;
     void writeDriver(const std::string&, const std::string&, const std::string&) override;
-    void writeDevice(const std::string&, const std::string&) override;
+    void bindDevice() override;
+    void unbindDevice() override;
     bool hasMatch() const override;
 
 private:

@@ -146,9 +146,24 @@ public:
         pinned.push_back(device.inode);
     }
     bool hasMatch() const override { return match != None; }
-    void writeDevice(const std::string&, const std::string&) override
+    void bindDevice() override
     {
-        require(false, "replacement tests must never export a socket");
+        ++bindCalls;
+        // Model the distro tool's sequence; Binding checks identity around
+        // the command, not inside the implementation of usbip itself.
+        const auto driver = device.driver;
+        if (!driver.empty())
+            writeDriver(driver, "unbind", device.busId);
+        writeDriver("usbip-host", "match_busid", "add " + device.busId);
+        writeDriver("usbip-host", "bind", device.busId);
+    }
+    void unbindDevice() override
+    {
+        ++unbindCalls;
+        require(match == Removing, "disable automatic capture before calling usbip unbind");
+        writeDriver("usbip-host", "unbind", device.busId);
+        writeDriver("usbip-host", "match_busid", "del " + device.busId);
+        writeDriver("usbip-host", "rebind", device.busId);
     }
     void writeDriver(const std::string& driver, const std::string& attribute,
                      const std::string& value) override
@@ -210,15 +225,22 @@ public:
             gone = true;
             device.driver.clear();
         }
+        if (operation == failAfterOperation) {
+            failAfterOperation.clear();
+            throw std::runtime_error("usbip_failed");
+        }
     }
 
     NativeUsb::Device device;
     std::string replaceAt;
+    std::string failAfterOperation;
     bool replaceAfterUnbind = false;
     bool failNextRebind = false;
     bool unplugAfterRemoval = false;
     bool gone = false;
     int writes = 0;
+    int bindCalls = 0;
+    int unbindCalls = 0;
 
 private:
     enum Match
@@ -245,6 +267,29 @@ void testDriverMutationRaces()
         binding.restore();
         require(access.device.driver == driver && !access.hasMatch(),
                 "ordinary bind/release must preserve the original driver");
+        require(access.bindCalls == 1 && access.unbindCalls == 1,
+                "normal forwarding must use the distro bind and unbind commands once");
+    }
+    for (const bool failBinding : { true, false }) {
+        HotplugAccess access;
+        access.pin(access.device);
+        NativeUsb::BindingProgress progress;
+        NativeUsb::Binding binding(access, access.device, progress);
+        if (!failBinding)
+            binding.bind();
+        access.failAfterOperation = failBinding ? "usbip-host/bind" : "usbip-host/unbind";
+        try {
+            if (failBinding)
+                binding.bind();
+            else
+                binding.restore();
+            require(false, "a distro command failure must be reported");
+        } catch (const std::runtime_error& error) {
+            require(std::string(error.what()) == "usbip_failed", "preserve the command failure");
+        }
+        binding.restore();
+        require(access.device.driver == "usb" && !access.hasMatch() && !progress.detached,
+                "recover local use when a distro command fails after changing the driver");
     }
     for (const std::string operation :
          { "usb/unbind", "usbip-host/bind", "usbip-host/match_busid/del" }) {
@@ -322,8 +367,8 @@ void testDriverMutationRaces()
                     "report post-unbind replacement");
         }
         binding.restore();
-        require(access.device.driver.empty() && !access.hasMatch() && access.writes == 1,
-                "an untouched, unbound replacement must remain unbound");
+        require(access.device.driver.empty() && !access.hasMatch(),
+                "an unbound replacement must remain unbound after tool rollback");
     }
     {
         // The worker can exit before observing the post-bind identity. Its

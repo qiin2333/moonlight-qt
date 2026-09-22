@@ -11,7 +11,7 @@
 #include <QDebug>
 #include <memory>
 
-// The helper prints "READY <port>" on stdout once its USB/IP listener is up
+// The helper prints "READY <port>" on stdout once USB/IP forwarding can start
 // and an "ERROR {json...}" line instead when it cannot serve. After that
 // first line stdout stays silent for the rest of its lifetime (all library
 // logging goes to stderr), so a plain line-based wait is race-free.

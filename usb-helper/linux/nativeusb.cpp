@@ -14,12 +14,11 @@
 #include <stdexcept>
 #include <utility>
 
-#include <arpa/inet.h>
 #include <fcntl.h>
-#include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/file.h>
 #include <sys/mman.h>
+#include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
@@ -102,63 +101,61 @@ std::string jsonString(const std::string& input)
     return output + '"';
 }
 
-void put16(std::vector<uint8_t>& bytes, unsigned value)
-{
-    bytes.push_back(static_cast<uint8_t>(value >> 8));
-    bytes.push_back(static_cast<uint8_t>(value));
-}
-void put32(std::vector<uint8_t>& bytes, uint32_t value)
-{
-    put16(bytes, value >> 16);
-    put16(bytes, value);
-}
-void putString(std::vector<uint8_t>& bytes, const std::string& value, size_t size)
-{
-    const size_t offset = bytes.size();
-    bytes.resize(offset + size, 0);
-    std::copy_n(value.begin(), std::min(size - 1, value.size()), bytes.begin() + offset);
-}
-
 bool cancelled(int controlFd)
 {
     pollfd control{ controlFd, POLLIN, 0 };
     return stopping || (controlFd >= 0 && poll(&control, 1, 0) > 0);
 }
 
-void transfer(int socket, uint8_t* data, size_t size, bool sending, int controlFd)
+// Only distro executables and fixed arguments are accepted. No app-supplied
+// command, PATH, module options, or dynamic-loader environment reaches root.
+void runUsbip(const std::vector<std::string>& arguments)
 {
-    const auto deadline = Clock::now() + std::chrono::seconds(15);
-    while (size) {
-        if (cancelled(controlFd))
-            throw std::runtime_error("cancelled");
-        if (Clock::now() >= deadline)
-            throw std::runtime_error("negotiation_timeout");
-        pollfd pfd{ socket, static_cast<short>(sending ? POLLOUT : POLLIN), 0 };
-        const int ready = poll(&pfd, 1, 100);
-        if (ready < 0 && errno == EINTR)
-            continue;
-        if (ready <= 0)
-            continue;
-        const ssize_t count = sending ? send(socket, data, size, MSG_NOSIGNAL | MSG_DONTWAIT)
-                                      : recv(socket, data, size, MSG_DONTWAIT);
-        if (count < 0 && (errno == EAGAIN || errno == EINTR))
-            continue;
-        if (count <= 0)
-            throw std::runtime_error("connection_closed");
-        data += count;
-        size -= count;
+    const char* executable = nullptr;
+    for (const char* path : { "/usr/sbin/usbip", "/sbin/usbip", "/usr/bin/usbip", "/bin/usbip" }) {
+        if (access(path, X_OK) == 0) {
+            executable = path;
+            break;
+        }
     }
-}
-
-void reply(int socket, uint16_t operation, uint32_t status, std::vector<uint8_t> payload,
-           int controlFd)
-{
-    std::vector<uint8_t> bytes;
-    put16(bytes, 0x0111);
-    put16(bytes, operation);
-    put32(bytes, status);
-    bytes.insert(bytes.end(), payload.begin(), payload.end());
-    transfer(socket, bytes.data(), bytes.size(), true, controlFd);
+    if (!executable)
+        throw std::runtime_error("usbip_not_found");
+    std::vector<char*> args{ const_cast<char*>(executable) };
+    for (const auto& argument : arguments)
+        args.push_back(const_cast<char*>(argument.c_str()));
+    args.push_back(nullptr);
+    const pid_t parent = getpid();
+    const pid_t child = fork();
+    if (child < 0)
+        throw std::runtime_error("usbip_failed");
+    if (child == 0) {
+        if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != parent)
+            _exit(127);
+        dup2(STDERR_FILENO, STDOUT_FILENO);
+        char path[] = "PATH=/usr/sbin:/usr/bin:/sbin:/bin";
+        char locale[] = "LC_ALL=C";
+        char* environment[] = { path, locale, nullptr };
+        execve(executable, args.data(), environment);
+        _exit(127);
+    }
+    int status = 0;
+    const auto deadline = Clock::now() + std::chrono::seconds(10);
+    for (;;) {
+        const pid_t result = waitpid(child, &status, WNOHANG);
+        if (result == child)
+            break;
+        if (result < 0 && errno != EINTR)
+            throw std::runtime_error("usbip_failed");
+        if (Clock::now() >= deadline) {
+            kill(child, SIGKILL);
+            while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
+            }
+            throw std::runtime_error("usbip_timeout");
+        }
+        poll(nullptr, 0, 50);
+    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        throw std::runtime_error("usbip_failed");
 }
 
 void loadModule()
@@ -203,51 +200,36 @@ void loadModule()
     }
 }
 
-void runExporter(SysfsDevice& access, Binding& binding, int controlFd)
+void runForwarding(SysfsDevice& access, Binding& binding, int controlFd)
 {
     if (cancelled(controlFd))
         return;
+    // usbipd is a distro-managed service. Verify its protocol before taking
+    // the device; this helper never accepts or parses USB/IP network traffic.
+    runUsbip({ "list", "--remote=127.0.0.1" });
+    if (cancelled(controlFd))
+        return;
+    const auto identity = access.current().identity();
     binding.bind();
     if (cancelled(controlFd))
         return;
-    Fd listener(socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0));
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if (listener.value < 0 ||
-        ::bind(listener.value, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0 ||
-        listen(listener.value, 1) < 0)
-        throw std::runtime_error("listen_failed");
-    socklen_t size = sizeof(address);
-    if (getsockname(listener.value, reinterpret_cast<sockaddr*>(&address), &size) < 0)
-        throw std::runtime_error("listen_failed");
-    std::printf("READY %u\n", ntohs(address.sin_port));
+    if (access.current().identity() != identity)
+        throw std::runtime_error("device_changed");
+    std::puts("READY 3240");
     std::fflush(stdout);
     const auto deadline = Clock::now() + std::chrono::seconds(30);
+    bool imported = false;
     while (!cancelled(controlFd)) {
-        if (Clock::now() >= deadline)
+        const auto device = access.current();
+        if (device.identity() != identity)
+            throw std::runtime_error("device_changed");
+        if (device.attached)
+            imported = true;
+        else if (imported)
+            return;
+        else if (Clock::now() >= deadline)
             throw std::runtime_error("import_timeout");
-        pollfd pfd{ listener.value, POLLIN, 0 };
-        if (poll(&pfd, 1, 100) <= 0)
-            continue;
-        Fd connection(accept4(listener.value, nullptr, nullptr, SOCK_CLOEXEC));
-        if (connection.value < 0)
-            continue;
-        int on = 1;
-        setsockopt(connection.value, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
-        const auto device = readDevice(access.current().busId);
-        const bool imported = negotiate(
-            connection.value, device, [&binding](int fd) { binding.exportSocket(fd); }, controlFd);
-        if (!imported)
-            continue;
-        // From here only usbip-host reads/writes the socket. Do not consume
-        // even a single byte of its URBs in user space.
-        while (!cancelled(controlFd)) {
-            if (!access.current().attached)
-                return;
-            poll(nullptr, 0, 100);
-        }
-        return;
+        poll(nullptr, 0, 100);
     }
 }
 } // namespace
@@ -413,61 +395,6 @@ std::string deviceListJson(const std::string& root)
     return result + ']';
 }
 
-std::vector<uint8_t> deviceDescriptor(const Device& d)
-{
-    std::vector<uint8_t> bytes;
-    putString(bytes, d.path, 256);
-    putString(bytes, d.busId, 32);
-    put32(bytes, d.bus);
-    put32(bytes, d.number);
-    put32(bytes, d.speed);
-    put16(bytes, d.vendor);
-    put16(bytes, d.productId);
-    put16(bytes, d.revision);
-    bytes.insert(bytes.end(), { d.deviceClass, d.subClass, d.protocol, d.configuration,
-                                d.configurations, static_cast<uint8_t>(d.interfaces.size()) });
-    return bytes;
-}
-
-bool negotiate(int socket, const Device& d, const std::function<void(int)>& exportSocket,
-               int controlFd)
-{
-    std::array<uint8_t, 8> header{};
-    transfer(socket, header.data(), header.size(), false, controlFd);
-    if (header[0] != 1 || header[1] != 0x11 || header[2] != 0x80 || header[4] || header[5] ||
-        header[6] || header[7])
-        throw std::runtime_error("invalid_request");
-    if (header[3] == 5) {
-        std::vector<uint8_t> payload;
-        put32(payload, 1);
-        const auto descriptor = deviceDescriptor(d);
-        payload.insert(payload.end(), descriptor.begin(), descriptor.end());
-        for (const auto& intf : d.interfaces)
-            payload.insert(payload.end(), intf.begin(), intf.end());
-        reply(socket, 5, 0, std::move(payload), controlFd);
-        return false;
-    }
-    if (header[3] != 3)
-        throw std::runtime_error("invalid_operation");
-    std::array<uint8_t, 32> bus{};
-    transfer(socket, bus.data(), bus.size(), false, controlFd);
-    const auto end = std::find(bus.begin(), bus.end(), 0);
-    if (end == bus.end() || std::string(bus.begin(), end) != d.busId) {
-        reply(socket, 3, 4, {}, controlFd); // ST_NODEV
-        return false;
-    }
-    try {
-        // Match Linux usbipd: export before replying, so a success response
-        // never promises an import which the kernel has already rejected.
-        exportSocket(socket);
-    } catch (const std::exception&) {
-        reply(socket, 3, 1, {}, controlFd);
-        throw;
-    }
-    reply(socket, 3, 0, deviceDescriptor(d), controlFd);
-    return true;
-}
-
 Binding::Binding(DeviceAccess& access, Device original, BindingProgress& progress)
     : m_Access(access), m_Original(std::move(original)), m_Progress(progress)
 {
@@ -518,28 +445,20 @@ void Binding::bind()
     if (!m_Original.supported() || m_Access.current().driver == "usbip-host")
         throw std::runtime_error("device_busy");
     m_Progress.detached = 1;
-    if (!m_Original.driver.empty())
-        changeDriver(m_Original.driver, "unbind");
-    requireSameDevice();
     m_Progress.matched = 1;
-    m_Access.writeDriver("usbip-host", "match_busid", "add " + m_Original.busId);
+    try {
+        m_Access.bindDevice();
+    } catch (...) {
+        requireSameDevice();
+        throw;
+    }
     requireSameDevice();
-    changeDriver("usbip-host", "bind");
     if (m_Access.current().driver != "usbip-host")
         throw std::runtime_error("bind_failed");
     m_Progress.bound = 1;
     // Mark for removal while still bound. Otherwise unplugging leaves an
     // ADDED match which can seize a different device reusing this port.
     disableAutomaticBinding();
-}
-void Binding::exportSocket(int socket)
-{
-    requireSameDevice();
-    const auto current = m_Access.current();
-    if (current.driver != "usbip-host" || current.attached)
-        throw std::runtime_error("device_busy");
-    m_Access.writeDevice("usbip_sockfd", std::to_string(socket) + "\n");
-    requireSameDevice();
 }
 void Binding::restore(bool recoverReplacements)
 {
@@ -568,8 +487,16 @@ void Binding::restore(bool recoverReplacements)
     if (same && m_Access.current().driver == "usbip-host") {
         m_Progress.bound = 1;
         disableAutomaticBinding();
-        // Unbind also terminates the kernel connection and waits for URBs.
-        changeDriver("usbip-host", "unbind");
+        // The distro tool performs unbind, match removal and local rebind.
+        // Retain our progress and device pin if it fails partway through.
+        requireSameDevice();
+        try {
+            m_Access.unbindDevice();
+        } catch (...) {
+            requireSameDevice();
+            throw;
+        }
+        requireSameDevice();
     }
     std::exception_ptr matchError;
     try {
@@ -647,14 +574,13 @@ void SysfsDevice::writeDriver(const std::string& driver, const std::string& attr
 {
     writeText(fs::path("/sys/bus/usb/drivers") / driver / attribute, value);
 }
-void SysfsDevice::writeDevice(const std::string& attribute, const std::string& value)
+void SysfsDevice::bindDevice()
 {
-    // Resolve attributes relative to the original sysfs object, never a new
-    // device which subsequently reused its bus ID. Removed nodes fail writes.
-    Fd fd(openat(m_SysfsFd, attribute.c_str(), O_WRONLY | O_CLOEXEC | O_NOFOLLOW));
-    if (fd.value < 0 ||
-        write(fd.value, value.data(), value.size()) != static_cast<ssize_t>(value.size()))
-        throw std::runtime_error("sysfs_write_failed");
+    runUsbip({ "bind", "--busid=" + m_BusId });
+}
+void SysfsDevice::unbindDevice()
+{
+    runUsbip({ "unbind", "--busid=" + m_BusId });
 }
 bool SysfsDevice::hasMatch() const
 {
@@ -673,6 +599,10 @@ int serve(const std::string& busId, const std::string& expectedIdentity)
     std::signal(SIGINT, stopSignal);
     if (cancelled(STDIN_FILENO))
         return 0;
+    // Adopt distro-tool children if the worker dies. No command may finish
+    // binding a device after the supervisor has already restored it.
+    if (prctl(PR_SET_CHILD_SUBREAPER, 1) != 0)
+        throw std::runtime_error("supervisor_failed");
     loadModule();
     SysfsDevice access(busId);
     const auto original = access.current();
@@ -710,13 +640,15 @@ int serve(const std::string& busId, const std::string& expectedIdentity)
         throw std::runtime_error("supervisor_failed");
     }
     if (child == 0) {
+        if (setpgid(0, 0) != 0)
+            _exit(1);
         close(channels[0]);
         close(STDIN_FILENO);
         int result = 0;
         try {
-            runExporter(access, binding, channels[1]);
+            runForwarding(access, binding, channels[1]);
         } catch (const std::exception& error) {
-            std::fprintf(stderr, "USB exporter: %s\n", error.what());
+            std::fprintf(stderr, "USB control: %s\n", error.what());
             // If startup failed, the parent receives the exit, rather than a
             // second stdout protocol line after READY.
             result = 1;
@@ -732,29 +664,31 @@ int serve(const std::string& busId, const std::string& expectedIdentity)
         close(channels[1]);
         _exit(result);
     }
+    setpgid(child, child);
     close(channels[1]);
     Fd control(channels[0]);
     int status = 0;
-    bool exited = false;
-    while (!cancelled(STDIN_FILENO)) {
-        if (waitpid(child, &status, WNOHANG) == child) {
-            exited = true;
-            break;
-        }
+    const auto workerExited = [child] {
+        siginfo_t info{};
+        // Keep its PID reserved until the process group has been stopped.
+        return waitid(P_PID, child, &info, WEXITED | WNOHANG | WNOWAIT) == 0 &&
+               info.si_pid == child;
+    };
+    while (!cancelled(STDIN_FILENO) && !workerExited()) {
         poll(nullptr, 0, 100);
     }
-    if (!exited) {
+    if (!workerExited()) {
         // The child also observes EOF if this supervisor dies, and performs
         // its own rollback. If the worker dies, the supervisor restores it.
         shutdown(control.value, SHUT_RDWR);
         const auto deadline = Clock::now() + std::chrono::seconds(3);
-        while (waitpid(child, &status, WNOHANG) == 0 && Clock::now() < deadline)
+        while (!workerExited() && Clock::now() < deadline)
             poll(nullptr, 0, 50);
-        if (waitpid(child, &status, WNOHANG) == 0) {
-            kill(child, SIGKILL);
-            while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
-            }
-        }
+    }
+    kill(-child, SIGKILL);
+    while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
+    }
+    while (waitpid(-1, nullptr, 0) > 0 || errno == EINTR) {
     }
     bool restored = false;
     for (int attempt = 0; attempt < 3 && !restored; ++attempt) {
@@ -767,7 +701,7 @@ int serve(const std::string& busId, const std::string& expectedIdentity)
     }
     munmap(progress, sizeof(*progress));
     if (!restored)
-        std::fputs("USB exporter: restore_failed; reconnect the USB device\n", stderr);
+        std::fputs("USB control: restore_failed; reconnect the USB device\n", stderr);
     return restored && WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : 1;
 }
 } // namespace NativeUsb

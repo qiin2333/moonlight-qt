@@ -1,4 +1,4 @@
-QT += core qml
+QT += core qml network
 QT -= gui
 CONFIG += c++17 console
 CONFIG -= app_bundle

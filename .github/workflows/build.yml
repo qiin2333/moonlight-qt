@@ -525,7 +525,7 @@ jobs:
           sudo apt install libfuse2
         fi
 
-    - name: Test Linux USB device snapshots
+    - name: Test Linux USB forwarding
       run: |
         pushd tests/usb_forwarding_linux
         qmake usb_forwarding_linux.pro

@@ -56,7 +56,9 @@ Column {
                         return qsTr("Ready · Administrator authorization is requested when forwarding starts.")
                     if (UsbForwardingEnvironment.state === UsbForwardingEnvironment.CheckFailed)
                         return qsTr("Check the bundled USB helper, polkit, and your desktop authentication agent.")
-                    return qsTr("USB forwarding requires the usbip-host kernel module and Moonlight's bundled USB helper.")
+                    if (UsbForwardingEnvironment.state === UsbForwardingEnvironment.ServiceStopped)
+                        return qsTr("Start your distribution's usbipd service on TCP port 3240, then refresh.")
+                    return qsTr("Install your distribution's USB/IP tools (usbip and usbipd). USB forwarding also requires the usbip-host kernel module and Moonlight's bundled USB helper.")
                 }
                 switch (UsbForwardingEnvironment.state) {
                 case UsbForwardingEnvironment.Checking:

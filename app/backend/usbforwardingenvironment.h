@@ -24,7 +24,7 @@ public:
 
     static UsbForwardingEnvironment* get();
     static QString locateUsbipd();
-    // Read-only SCM queries; also used immediately before a tunnel attempt.
+    // Read-only platform readiness check; also used before a tunnel attempt.
     static State probeServices();
     static QString readinessError(State state);
 

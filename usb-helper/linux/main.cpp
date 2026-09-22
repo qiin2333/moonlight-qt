@@ -9,7 +9,7 @@ int main(int argc, char** argv)
 {
     try {
         if (argc == 2 && std::string(argv[1]) == "--version") {
-            std::puts("moonlight-usb-host 1 (Linux usbip-host)");
+            std::puts("moonlight-usb-host 2 (distro usbip control)");
             return 0;
         }
         if (argc == 3 && std::string(argv[1]) == "list" && std::string(argv[2]) == "--json") {
@@ -31,7 +31,7 @@ int main(int argc, char** argv)
         return 2;
     } catch (const std::exception& error) {
         // Do not include USB descriptor strings or tunnel credentials.
-        std::fprintf(stderr, "USB exporter: %s\n", error.what());
+        std::fprintf(stderr, "USB control: %s\n", error.what());
         std::printf("ERROR %s\n", error.what());
         return 1;
     }

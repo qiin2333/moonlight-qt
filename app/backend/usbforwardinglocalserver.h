@@ -11,7 +11,7 @@ class QProcess;
 class QTemporaryDir;
 
 /*
- * Session-scoped local USB/IP server process (Linux/macOS).
+ * Session-scoped USB/IP process management (Linux/macOS).
  *
  * macOS has no system USB/IP daemon to attach to like usbipd-win on Windows.
  * Instead, Session spawns the bundled moonlight-usbd helper for the devices
@@ -19,9 +19,10 @@ class QTemporaryDir;
  * the helper's ephemeral loopback port. The helper exits by itself when its
  * stdin closes, so teardown only has to drop this object.
  *
- * macOS uses blocking startup. Linux elevates moonlight-usb-host through
- * polkit and starts asynchronously, including the authorization prompt. Its
- * supervisor restores the local driver on stdin EOF or exporter failure.
+ * macOS uses blocking startup. Linux uses the distro's usbipd service and
+ * elevates a device-control helper through polkit asynchronously. It invokes
+ * usbip bind/unbind and restores the driver on stdin EOF or forwarding failure;
+ * it does not implement a USB/IP server.
  * Both implementations need a running event loop to drain helper stderr.
  */
 class UsbForwardingLocalServer : public QObject
