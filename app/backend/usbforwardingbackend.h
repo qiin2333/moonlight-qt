@@ -48,11 +48,10 @@ public:
     // 以便脱离进程做单元测试（tests/usb_forwarding_backend_list）。
     static QVariantList parseHelperDevices(const QByteArray& helperJson, QString* error);
 
-#ifdef Q_OS_LINUX
-    // 枚举 <sysfsBusPath>（通常 /sys/bus/usb/devices）下的 USB 设备。
+    // 枚举 <sysfsBusPath>（Linux 上通常 /sys/bus/usb/devices）下的 USB 设备。
     // Linux 枚举数据源：sysfs 属性文件 + driver symlink 判绑定。
-    // 跳过根 hub（usbN）与 hub 设备（bDeviceClass 09）。公开成静态纯函数
-    // 以便用夹具目录做单元测试（tests/usb_forwarding_backend_sysfs）。
+    // 跳过根 hub（usbN）与 hub 设备（bDeviceClass 09）。函数本身是纯 Qt 文件
+    // 访问、平台无关（Windows 测试用夹具目录驱动），不做平台门控。
     static QVariantList parseSysfsDevices(const QString &sysfsBusPath, QString *error);
 
     // 设备身份 = vidPid + 序列号，跨重插稳定；用于识别「共享后端口上换成
@@ -62,7 +61,6 @@ public:
     static QString deviceIdentity(const QString &vidPid, const QString &serial);
     static QMap<QString, QString> parseBindIdentities(const QByteArray &bindingsFile);
     static void markReplacedDevices(QVariantList &devices, const QMap<QString, QString> &bindings);
-#endif
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void bind(const QString &busId);

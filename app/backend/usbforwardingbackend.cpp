@@ -420,8 +420,6 @@ void UsbForwardingBackend::refreshFromHelper()
 
 #endif
 
-#ifdef Q_OS_LINUX
-
 QVariantList UsbForwardingBackend::parseSysfsDevices(const QString &sysfsBusPath, QString *error)
 {
     if (error) {
@@ -547,8 +545,6 @@ void UsbForwardingBackend::markReplacedDevices(QVariantList &devices,
         }
     }
 }
-
-#endif // Q_OS_LINUX
 
 void UsbForwardingBackend::bind(const QString &busId)
 {
@@ -692,6 +688,7 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
         QFile helperFile(helperTmp);
         if (!helperFile.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
             helperFile.write(kLinuxHelperScript) < 0) {
+            delete temp;
             setBusy(false);
             emit operationFinished(false,
                                    tr("Could not create a temporary file for the USB helper."));
@@ -701,6 +698,7 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
         QFile policyFile(policyTmp);
         if (!policyFile.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
             policyFile.write(kLinuxPolicyXml) < 0) {
+            delete temp;
             setBusy(false);
             emit operationFinished(false,
                                    tr("Could not create a temporary file for the USB helper."));
@@ -715,11 +713,12 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
                                 .arg(helperTmp, QString::fromLatin1(kLinuxHelperPath), policyTmp,
                                      QString::fromLatin1(kLinuxPolicyPath));
     connect(install, &QProcess::errorOccurred, this,
-            [this, install](QProcess::ProcessError processError) {
+            [this, install, temp](QProcess::ProcessError processError) {
                 if (processError != QProcess::FailedToStart) {
                     return;
                 }
                 install->deleteLater();
+                delete temp;
                 setBusy(false);
                 emit operationFinished(
                     false,
