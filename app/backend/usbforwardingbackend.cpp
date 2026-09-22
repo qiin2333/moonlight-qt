@@ -37,15 +37,13 @@ QString vidPidFromInstanceId(const QString &instanceId)
     if (!vidMatch.hasMatch() || !pidMatch.hasMatch()) {
         return QString();
     }
-    return vidMatch.captured(1).toLower() + QLatin1Char(':')
-        + pidMatch.captured(1).toLower();
+    return vidMatch.captured(1).toLower() + QLatin1Char(':') + pidMatch.captured(1).toLower();
 }
 
 // "1-2" 这类真实 busid 才可绑定；"IncompatibleHub" 与空串都不可。
 bool isRealBusId(const QString &busId)
 {
-    static const QRegularExpression realRe(
-        QStringLiteral("^[1-9][0-9]*-[1-9][0-9]*$"));
+    static const QRegularExpression realRe(QStringLiteral("^[1-9][0-9]*-[1-9][0-9]*$"));
     return realRe.match(busId).hasMatch();
 }
 #endif
@@ -176,19 +174,15 @@ constexpr auto kLinuxPolicyXml = R"POLICY(<?xml version="1.0" encoding="UTF-8"?>
 
 } // namespace
 
-UsbForwardingBackend::UsbForwardingBackend(QObject *parent)
-    : QObject(parent)
-{
-}
+UsbForwardingBackend::UsbForwardingBackend(QObject *parent) : QObject(parent) {}
 
-UsbForwardingBackend* UsbForwardingBackend::get()
+UsbForwardingBackend *UsbForwardingBackend::get()
 {
     static UsbForwardingBackend backend;
     return &backend;
 }
 
-QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJson,
-                                                     QString *error)
+QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJson, QString *error)
 {
     if (error) {
         error->clear();
@@ -208,8 +202,7 @@ QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJs
         const QString busId = o.value(QLatin1String("busId")).toString();
         const QString vidPid = o.value(QLatin1String("vidPid")).toString().toLower();
         const QString product = o.value(QLatin1String("product")).toString();
-        const QString manufacturer =
-                o.value(QLatin1String("manufacturer")).toString();
+        const QString manufacturer = o.value(QLatin1String("manufacturer")).toString();
         const bool claimable = o.value(QLatin1String("claimable")).toBool();
 
         QString description = !product.isEmpty() ? product : manufacturer;
@@ -222,8 +215,7 @@ QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJs
         QVariantMap device;
         device.insert(QStringLiteral("busId"), busId);
         device.insert(QStringLiteral("description"), description);
-        device.insert(QStringLiteral("instanceId"),
-                      o.value(QLatin1String("serial")).toString());
+        device.insert(QStringLiteral("instanceId"), o.value(QLatin1String("serial")).toString());
         device.insert(QStringLiteral("vidPid"), vidPid);
         // isBound 恒 false，由 refreshFromHelper() 按用户偏好叠加。
         device.insert(QStringLiteral("isBound"), false);
@@ -307,15 +299,15 @@ void UsbForwardingBackend::refresh()
      * busy flag would stick and the device list would go stale. */
     connect(probe, &QProcess::errorOccurred, this,
             [this, probe](QProcess::ProcessError processError) {
-        if (processError != QProcess::FailedToStart) {
-            return;
-        }
-        probe->deleteLater();
-        setBusy(false);
-        m_Devices.clear();
-        emit devicesChanged();
-        setError(tr("usbipd could not be started. Requires usbipd-win 2.2.0+."));
-    });
+                if (processError != QProcess::FailedToStart) {
+                    return;
+                }
+                probe->deleteLater();
+                setBusy(false);
+                m_Devices.clear();
+                emit devicesChanged();
+                setError(tr("usbipd could not be started. Requires usbipd-win 2.2.0+."));
+            });
     connect(probe, &QProcess::finished, this, [this, probe](int exitCode) {
         probe->deleteLater();
         setBusy(false);
@@ -325,10 +317,10 @@ void UsbForwardingBackend::refresh()
                 QString::fromLocal8Bit(probe->readAllStandardError()).simplified();
             m_Devices.clear();
             emit devicesChanged();
-            setError(detail.isEmpty()
-                         ? tr("usbipd state failed (exit %1). Requires usbipd-win 2.2.0+.")
-                               .arg(exitCode)
-                         : detail);
+            setError(
+                detail.isEmpty()
+                    ? tr("usbipd state failed (exit %1). Requires usbipd-win 2.2.0+.").arg(exitCode)
+                    : detail);
             return;
         }
 
@@ -347,15 +339,11 @@ void UsbForwardingBackend::refresh()
         for (const QJsonValue &value : array) {
             const QJsonObject o = value.toObject();
             const QString busId = o.value(QLatin1String("BusId")).toString();
-            const QString clientIp =
-                o.value(QLatin1String("ClientIPAddress")).toString();
-            const QString description =
-                o.value(QLatin1String("Description")).toString();
-            const QString instanceId =
-                o.value(QLatin1String("InstanceId")).toString();
+            const QString clientIp = o.value(QLatin1String("ClientIPAddress")).toString();
+            const QString description = o.value(QLatin1String("Description")).toString();
+            const QString instanceId = o.value(QLatin1String("InstanceId")).toString();
             const bool isForced = o.value(QLatin1String("IsForced")).toBool();
-            const QString persistedGuid =
-                o.value(QLatin1String("PersistedGuid")).toString();
+            const QString persistedGuid = o.value(QLatin1String("PersistedGuid")).toString();
 
             const bool isBound = !persistedGuid.isEmpty();
             const bool isConnected = !busId.isEmpty();
@@ -380,7 +368,7 @@ void UsbForwardingBackend::refresh()
         emit devicesChanged();
     });
     QTimer::singleShot(8000, probe, &QProcess::kill);
-    probe->start(exe, {QStringLiteral("state")});
+    probe->start(exe, { QStringLiteral("state") });
 #endif
 }
 
@@ -402,15 +390,15 @@ void UsbForwardingBackend::refreshFromHelper()
     /* 与 Windows 分支同理：FailedToStart 只发 errorOccurred 不发 finished。 */
     connect(probe, &QProcess::errorOccurred, this,
             [this, probe](QProcess::ProcessError processError) {
-        if (processError != QProcess::FailedToStart) {
-            return;
-        }
-        probe->deleteLater();
-        setBusy(false);
-        m_Devices.clear();
-        emit devicesChanged();
-        setError(tr("The USB helper could not be started."));
-    });
+                if (processError != QProcess::FailedToStart) {
+                    return;
+                }
+                probe->deleteLater();
+                setBusy(false);
+                m_Devices.clear();
+                emit devicesChanged();
+                setError(tr("The USB helper could not be started."));
+            });
     connect(probe, &QProcess::finished, this, [this, probe](int exitCode) {
         probe->deleteLater();
         setBusy(false);
@@ -420,15 +408,13 @@ void UsbForwardingBackend::refreshFromHelper()
                 QString::fromLocal8Bit(probe->readAllStandardError()).simplified();
             m_Devices.clear();
             emit devicesChanged();
-            setError(detail.isEmpty()
-                         ? tr("The USB device list failed (exit %1).").arg(exitCode)
-                         : detail);
+            setError(detail.isEmpty() ? tr("The USB device list failed (exit %1).").arg(exitCode)
+                                      : detail);
             return;
         }
 
         QString parseError;
-        QVariantList devices =
-                parseHelperDevices(probe->readAllStandardOutput(), &parseError);
+        QVariantList devices = parseHelperDevices(probe->readAllStandardOutput(), &parseError);
         if (!parseError.isEmpty()) {
             m_Devices.clear();
             emit devicesChanged();
@@ -436,8 +422,7 @@ void UsbForwardingBackend::refreshFromHelper()
             return;
         }
 
-        const QStringList bound =
-                StreamingPreferences::get()->usbForwardingBoundDevices();
+        const QStringList bound = StreamingPreferences::get()->usbForwardingBoundDevices();
         for (QVariant &value : devices) {
             QVariantMap device = value.toMap();
             device.insert(QStringLiteral("isBound"),
@@ -449,7 +434,7 @@ void UsbForwardingBackend::refreshFromHelper()
         emit devicesChanged();
     });
     QTimer::singleShot(8000, probe, &QProcess::kill);
-    probe->start(helper, {QStringLiteral("list"), QStringLiteral("--json")});
+    probe->start(helper, { QStringLiteral("list"), QStringLiteral("--json") });
 }
 
 #endif
@@ -626,11 +611,9 @@ void UsbForwardingBackend::bind(const QString &busId)
     }
 #ifdef Q_OS_WIN32
     const QString params = QStringLiteral("bind --busid \"%1\"").arg(busId);
-    const HINSTANCE result = ShellExecuteW(
-        nullptr, L"runas",
-        reinterpret_cast<const wchar_t*>(exe.utf16()),
-        reinterpret_cast<const wchar_t*>(params.utf16()),
-        nullptr, SW_HIDE);
+    const HINSTANCE result =
+        ShellExecuteW(nullptr, L"runas", reinterpret_cast<const wchar_t *>(exe.utf16()),
+                      reinterpret_cast<const wchar_t *>(params.utf16()), nullptr, SW_HIDE);
     const bool ok = reinterpret_cast<INT_PTR>(result) > 32;
 #else
     const bool ok = false;
@@ -683,11 +666,9 @@ void UsbForwardingBackend::unbind(const QString &busId, const QString &persisted
     for (const QString &arg : args) {
         params += QLatin1Char('"') + arg + QLatin1String("\" ");
     }
-    const HINSTANCE result = ShellExecuteW(
-        nullptr, L"runas",
-        reinterpret_cast<const wchar_t*>(exe.utf16()),
-        reinterpret_cast<const wchar_t*>(params.utf16()),
-        nullptr, SW_HIDE);
+    const HINSTANCE result =
+        ShellExecuteW(nullptr, L"runas", reinterpret_cast<const wchar_t *>(exe.utf16()),
+                      reinterpret_cast<const wchar_t *>(params.utf16()), nullptr, SW_HIDE);
     const bool ok = reinterpret_cast<INT_PTR>(result) > 32;
 #else
     const bool ok = false;
@@ -757,37 +738,73 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
         }
     }
 
-    // 这一步用 polkit 默认的通用 admin action（每次都要确认）；装好之后
-    // 真正的 bind/unbind 走 app 自己的 auth_admin_keep action。
-    QProcess *install = new QProcess(this);
-    const QString command = QStringLiteral("install -D -m 755 '%1' %2 && install -D -m 644 '%3' %4")
-                                .arg(helperTmp, QString::fromLatin1(kLinuxHelperPath), policyTmp,
-                                     QString::fromLatin1(kLinuxPolicyPath));
-    connect(install, &QProcess::errorOccurred, this,
-            [this, install, temp](QProcess::ProcessError processError) {
+    // 安装走 pkexec 的默认 admin action（本身也是 auth_admin_keep，首次
+    // 输一次密码）；装好之后 bind/unbind 走 app 自己的固定 action。
+    // pkexec 直接 exec 目标程序、argv 直传不经 shell——任何路径（包括
+    // TMPDIR 里的引号等特字符）都不可能注入命令（CodeRabbit #242, CWE-78）。
+    const QString installTool = QStandardPaths::findExecutable(QStringLiteral("install"));
+    if (installTool.isEmpty()) {
+        delete temp;
+        setBusy(false);
+        emit operationFinished(false, tr("The install tool is not available on this system."));
+        return false;
+    }
+
+    // 回调在事件循环里晚于本函数触发：栈上的 failInstall 必须按值捕获
+    // （this 是单例，永生，引用安全）。
+    const auto failInstall = [this, temp](const QString &message) {
+        delete temp;
+        setBusy(false);
+        emit operationFinished(false, message);
+    };
+
+    QProcess *policyStep = new QProcess(this);
+    connect(policyStep, &QProcess::errorOccurred, this,
+            [this, policyStep, failInstall](QProcess::ProcessError processError) {
                 if (processError != QProcess::FailedToStart) {
                     return;
                 }
-                install->deleteLater();
-                delete temp;
-                setBusy(false);
-                emit operationFinished(
-                    false,
+                policyStep->deleteLater();
+                failInstall(
                     tr("pkexec is not available. A polkit authentication agent is required."));
             });
-    connect(install, &QProcess::finished, this,
-            [this, install, temp, action, busId, expectedIdentity](int exitCode) {
-                install->deleteLater();
+    connect(policyStep, &QProcess::finished, this,
+            [this, policyStep, temp, action, busId, expectedIdentity, failInstall](int exitCode) {
+                policyStep->deleteLater();
                 delete temp;
                 if (exitCode != 0 || !QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath))) {
-                    setBusy(false);
-                    emit operationFinished(false, tr("The elevation was cancelled or failed."));
+                    failInstall(tr("The elevation was cancelled or failed."));
                     return;
                 }
                 runHelperAction(action, busId, expectedIdentity);
             });
-    install->start(QStringLiteral("pkexec"),
-                   { QStringLiteral("/bin/sh"), QStringLiteral("-c"), command });
+
+    QProcess *helperStep = new QProcess(this);
+    connect(helperStep, &QProcess::errorOccurred, this,
+            [this, helperStep, failInstall](QProcess::ProcessError processError) {
+                if (processError != QProcess::FailedToStart) {
+                    return;
+                }
+                helperStep->deleteLater();
+                failInstall(
+                    tr("pkexec is not available. A polkit authentication agent is required."));
+            });
+    connect(helperStep, &QProcess::finished, this,
+            [this, helperStep, policyStep, installTool, policyTmp, failInstall](int exitCode) {
+                helperStep->deleteLater();
+                if (exitCode != 0) {
+                    policyStep->deleteLater();
+                    failInstall(tr("The elevation was cancelled or failed."));
+                    return;
+                }
+                policyStep->start(QStringLiteral("pkexec"),
+                                  { installTool, QStringLiteral("-D"), QStringLiteral("-m"),
+                                    QStringLiteral("644"), policyTmp,
+                                    QString::fromLatin1(kLinuxPolicyPath) });
+            });
+    helperStep->start(QStringLiteral("pkexec"),
+                      { installTool, QStringLiteral("-D"), QStringLiteral("-m"),
+                        QStringLiteral("755"), helperTmp, QString::fromLatin1(kLinuxHelperPath) });
     return true;
 }
 
