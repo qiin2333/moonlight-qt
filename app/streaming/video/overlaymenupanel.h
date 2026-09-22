@@ -27,9 +27,10 @@
  * D3D11/SDL/EGL video rendering pipeline.
  *
  * Menu structure:
- *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen, Microphone [toggle], Disconnect
+ *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen,
+ *                        Microphone [toggle], Disconnect
  *   Level 1 (Actions):  Quit, Performance Stats, Mouse Mode, Cursor, Minimize, ...
- *   Level 2 (Bitrate):  log-scale scrubber row + 1/2/5/10/20/30/50/100 Mbps presets
+ *   Level 2 (Bitrate):  piecewise-linear scrubber row + 1/2/5/10/20/30/50/100 Mbps presets
  *   Level 3 (Position): Top, Right, Left, Floating button, Disabled
  *   Developer builds may append a function-test panel entry.
  *
@@ -266,7 +267,7 @@ private:
     // --- Bitrate slider row ---
     SliderRowRects sliderRowRects(int contentWidth, int itemY) const;
     SliderZone sliderZoneAt(const QPoint& localPos, int rowIdx) const;
-    double bitrateFraction() const;                 // m_BitrateKbps on the log scale, 0..1
+    double bitrateFraction() const;                 // m_BitrateKbps on the segmented scale, 0..1
     void setBitrateFromFraction(double fraction);   // inverse of bitrateFraction()
     void setBitrateKbps(int bitrateKbps);           // clamp + refresh + schedule commit
     void adjustBitrateStep(int direction, int multiplier);

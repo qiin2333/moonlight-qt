@@ -15,11 +15,54 @@ Column {
 
     signal languageChanged()
 
+    // Piecewise-linear bitrate scale. Values are Kbps.
+    readonly property int bitrateMinKbps: 500
+    readonly property int bitrateMaxKbps: 800000
+    readonly property var bitrateSegments: [
+        { maxKbps:   5000, stepKbps:    500 }, // 0.5–5 Mbps: 0.5 Mbps
+        { maxKbps:  20000, stepKbps:   1000 }, // 5–20 Mbps: 1 Mbps
+        { maxKbps:  50000, stepKbps:   2000 }, // 20–50 Mbps: 2 Mbps
+        { maxKbps: 100000, stepKbps:   5000 }, // 50–100 Mbps: 5 Mbps
+        { maxKbps: 200000, stepKbps:  10000 }, // 100–200 Mbps: 10 Mbps
+        { maxKbps: 400000, stepKbps:  50000 }, // 200–400 Mbps: 50 Mbps
+        { maxKbps: 800000, stepKbps: 100000 }  // 400–800 Mbps: 100 Mbps
+    ]
+    readonly property int bitrateSliderMax: bitrateToSliderValue(bitrateMaxKbps)
+
+    function bitrateToSliderValue(bitrateKbps) {
+        var bitrate = Math.max(bitrateMinKbps, Math.min(bitrateMaxKbps, bitrateKbps))
+        var position = 0
+        var segmentMinKbps = bitrateMinKbps
+        for (var i = 0; i < bitrateSegments.length; ++i) {
+            var segment = bitrateSegments[i]
+            if (bitrate <= segment.maxKbps)
+                return position + (bitrate - segmentMinKbps) / segment.stepKbps
+            position += (segment.maxKbps - segmentMinKbps) / segment.stepKbps
+            segmentMinKbps = segment.maxKbps
+        }
+        return position
+    }
+
+    function sliderValueToBitrate(sliderValue) {
+        var position = Math.max(0, Math.min(bitrateSliderMax, Math.round(sliderValue)))
+        var segmentStart = 0
+        var segmentMinKbps = bitrateMinKbps
+        for (var i = 0; i < bitrateSegments.length; ++i) {
+            var segment = bitrateSegments[i]
+            var segmentSteps = (segment.maxKbps - segmentMinKbps) / segment.stepKbps
+            if (position <= segmentStart + segmentSteps)
+                return segmentMinKbps + (position - segmentStart) * segment.stepKbps
+            segmentStart += segmentSteps
+            segmentMinKbps = segment.maxKbps
+        }
+        return bitrateMaxKbps
+    }
+
     width: parent ? parent.width : 0
     spacing: Theme.spaceLg
 
     function syncBitrateFromPreferences() {
-        bitrateSlider.value = Math.log(StreamingPreferences.bitrateKbps)
+        bitrateSlider.value = bitrateToSliderValue(StreamingPreferences.bitrateKbps)
     }
 
     // ================= 画面 =================
@@ -191,7 +234,7 @@ Column {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                bitrateSlider.value = Math.log(StreamingPreferences.bitrateKbps)
+                                bitrateSlider.value = bitrateToSliderValue(StreamingPreferences.bitrateKbps)
                             }
                         }
 
@@ -364,7 +407,7 @@ Column {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                bitrateSlider.value = Math.log(StreamingPreferences.bitrateKbps)
+                                bitrateSlider.value = bitrateToSliderValue(StreamingPreferences.bitrateKbps)
                             }
                         }
 
@@ -582,7 +625,7 @@ Column {
 
             Text {
                 text: {
-                    var mbps = Math.exp(bitrateSlider.value) / 1000.0
+                    var mbps = sliderValueToBitrate(bitrateSlider.value) / 1000.0
                     return mbps < 100 ? mbps.toFixed(1) + " Mbps" : Math.round(mbps) + " Mbps"
                 }
                 color: Theme.accent
@@ -614,19 +657,15 @@ Column {
                     id: bitrateSlider
                     width: parent.width
 
-                    // 使用对数刻度来实现非线性调整
-                    // 上限对齐 Sunshine /bitrate 接口的 800000 Kbps 拒绝线
-                    property real logMin: Math.log(500)
-                    property real logMax: Math.log(800000)
-
-                    value: Math.log(StreamingPreferences.bitrateKbps)
-                    stepSize: (logMax - logMin) / 200
-                    from: logMin
-                    to: logMax
+                    // 分段线性刻度：低码率精调，高码率快速覆盖完整范围。
+                    value: bitrateToSliderValue(StreamingPreferences.bitrateKbps)
+                    stepSize: 1
+                    from: 0
+                    to: bitrateSliderMax
                     snapMode: Slider.SnapOnRelease
 
                     onValueChanged: {
-                        StreamingPreferences.bitrateKbps = Math.exp(value)
+                        StreamingPreferences.bitrateKbps = sliderValueToBitrate(value)
                     }
 
                     onMoved: {
@@ -687,7 +726,7 @@ Column {
                         onClicked: {
                             StreamingPreferences.bitrateKbps = defaultBitrate
                             StreamingPreferences.autoAdjustBitrate = true
-                            bitrateSlider.value = Math.log(defaultBitrate)
+                            bitrateSlider.value = bitrateToSliderValue(defaultBitrate)
                         }
                     }
                 }
