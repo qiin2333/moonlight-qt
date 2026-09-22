@@ -27,7 +27,8 @@
  * D3D11/SDL/EGL video rendering pipeline.
  *
  * Menu structure:
- *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen, Microphone [toggle], Disconnect
+ *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen,
+ *                        Microphone [toggle], Disconnect
  *   Level 1 (Actions):  Quit, Performance Stats, Mouse Mode, Cursor, Minimize, ...
  *   Level 2 (Bitrate):  piecewise-linear scrubber row + 1/2/5/10/20/30/50/100 Mbps presets
  *   Level 3 (Position): Top, Right, Left, Floating button, Disabled

@@ -31,12 +31,12 @@ struct BitrateSegment
     int stepKbps;
 };
 constexpr BitrateSegment kBitrateSegments[] = {
-    { 5000,     500 }, // 0.5–5 Mbps: 0.5 Mbps
-    { 20000,   1000 }, // 5–20 Mbps: 1 Mbps
-    { 50000,   2000 }, // 20–50 Mbps: 2 Mbps
-    { 100000,  5000 }, // 50–100 Mbps: 5 Mbps
-    { 200000, 10000 }, // 100–200 Mbps: 10 Mbps
-    { 400000, 50000 }, // 200–400 Mbps: 50 Mbps
+    { 5000, 500 },      // 0.5–5 Mbps: 0.5 Mbps
+    { 20000, 1000 },    // 5–20 Mbps: 1 Mbps
+    { 50000, 2000 },    // 20–50 Mbps: 2 Mbps
+    { 100000, 5000 },   // 50–100 Mbps: 5 Mbps
+    { 200000, 10000 },  // 100–200 Mbps: 10 Mbps
+    { 400000, 50000 },  // 200–400 Mbps: 50 Mbps
     { 800000, 100000 }, // 400–800 Mbps: 100 Mbps
 };
 
@@ -59,8 +59,7 @@ double bitrateToSliderPosition(int bitrateKbps)
     int segmentMinKbps = kBitrateMinKbps;
     for (const auto& segment : kBitrateSegments) {
         if (bitrate <= segment.maxKbps) {
-            return position +
-                (bitrate - segmentMinKbps) / double(segment.stepKbps);
+            return position + (bitrate - segmentMinKbps) / double(segment.stepKbps);
         }
         position += (segment.maxKbps - segmentMinKbps) / double(segment.stepKbps);
         segmentMinKbps = segment.maxKbps;
@@ -74,11 +73,9 @@ int sliderPositionToBitrate(double sliderPosition)
     int segmentStart = 0;
     int segmentMinKbps = kBitrateMinKbps;
     for (const auto& segment : kBitrateSegments) {
-        const int segmentSteps =
-            (segment.maxKbps - segmentMinKbps) / segment.stepKbps;
+        const int segmentSteps = (segment.maxKbps - segmentMinKbps) / segment.stepKbps;
         if (position <= segmentStart + segmentSteps) {
-            return segmentMinKbps +
-                (position - segmentStart) * segment.stepKbps;
+            return segmentMinKbps + (position - segmentStart) * segment.stepKbps;
         }
         segmentStart += segmentSteps;
         segmentMinKbps = segment.maxKbps;
