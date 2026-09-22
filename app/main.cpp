@@ -4,6 +4,7 @@
 #include <QQmlContext>
 #include <QDir>
 #include <QIcon>
+#include <QLibraryInfo>
 #include <QQuickStyle>
 #include <QMutex>
 #include <QtDebug>
@@ -729,6 +730,45 @@ void configureSignalHandlers()
 
 #endif
 
+// 暗色 Material 配置：Qt <6.8 的默认样式，也是发行版 Qt 缺 FluentWinUI3 时
+// 的回退（Ubuntu 26.04 的 Qt 就没带这个样式的 QML）。图标按暗色主题绘制，
+// 所以主题不允许用户覆盖；其余 Material 变量保留用户覆盖权。
+static void configureMaterialFallback()
+{
+    QQuickStyle::setStyle("Material");
+
+    // Our icons are styled for a dark theme, so we do not allow the user to override this
+    qputenv("QT_QUICK_CONTROLS_MATERIAL_THEME", "Dark");
+
+    // These are defaults that we allow the user to override
+    if (!qEnvironmentVariableIsSet("QT_QUICK_CONTROLS_MATERIAL_ACCENT")) {
+        qputenv("QT_QUICK_CONTROLS_MATERIAL_ACCENT", "Purple");
+    }
+    if (!qEnvironmentVariableIsSet("QT_QUICK_CONTROLS_MATERIAL_VARIANT")) {
+        qputenv("QT_QUICK_CONTROLS_MATERIAL_VARIANT", "Dense");
+    }
+    if (!qEnvironmentVariableIsSet("QT_QUICK_CONTROLS_MATERIAL_PRIMARY")) {
+        // Qt 6.9 began to use a different shade of Material.Indigo when we use a dark theme
+        // (which is all the time). The new color looks washed out, so manually specify the
+        // old primary color unless the user overrides it themselves.
+        qputenv("QT_QUICK_CONTROLS_MATERIAL_PRIMARY", "#3F51B5");
+    }
+}
+
+// Qt Quick Controls 的样式就是 QML imports 下的一个目录；QQuickStyle 没有公开
+// 的样式枚举，所以用文件系统探测。样式缺失时硬 setStyle 会让整个 QML 树
+// 加载失败（Ubuntu 26.04 的 Qt 不带 FluentWinUI3，实测如此）。只在 6.8+ 分支
+// 被调用；QLibraryInfo::QmlImportsPath 是 Qt 6.2+ API，老 Qt（SteamLink）编
+// 不过，跟着调用点一起锁版本。
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+static bool styleQmlAvailable(const QString& style)
+{
+    const QString qmldir = QLibraryInfo::path(QLibraryInfo::QmlImportsPath) +
+                           QStringLiteral("/QtQuick/Controls/") + style + QStringLiteral("/qmldir");
+    return QFile::exists(qmldir);
+}
+#endif
+
 int main(int argc, char *argv[])
 {
     SDL_SetMainReady();
@@ -1334,76 +1374,68 @@ int main(int argc, char *argv[])
     // around. It picks light/dark from the application color scheme (there is no env
     // var equivalent to the Material ones), and our icons are styled for a dark theme,
     // so we force dark here rather than following the system.
-    QQuickStyle::setStyle("FluentWinUI3");
-    QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
-
-    // Unlike the Material style, FluentWinUI3 takes all of its colors from the
-    // application palette: ApplicationWindow is literally "color: palette.window",
-    // and the checked color of check boxes, switches, sliders and progress bars
-    // comes from palette.accent. setColorScheme() above only swaps the style's own
-    // assets; on macOS the palette still follows the system appearance, so under a
-    // light system theme every page we haven't restyled ourselves (the connection
-    // spinner, the legacy settings groups) renders as white-on-white.
     //
-    // Force a dark palette built from the alkaidlab.com design variables so the
-    // whole app is consistent regardless of the system appearance.
-    {
-        const QColor background(0x0F, 0x17, 0x2A);  // --background-darker
-        const QColor surface(0x1E, 0x29, 0x3B);     // --background-dark
-        const QColor border(0x33, 0x41, 0x55);      // --border-dark
-        const QColor text(0xF1, 0xF5, 0xF9);
-        const QColor textMuted(0x94, 0xA3, 0xB8);   // --text-muted
-        const QColor accent(0x39, 0xC5, 0xBB);      // --primary-color
+    // Not every distro ships the FluentWinUI3 QML with its Qt (Ubuntu 26.04
+    // doesn't): hard-setting it there makes the whole QML tree fail to load,
+    // and Fusion leaves half the controls light-on-dark. Fall back to the
+    // dark Material setup when the style is not actually available.
+    if (styleQmlAvailable(QStringLiteral("FluentWinUI3"))) {
+        QQuickStyle::setStyle("FluentWinUI3");
+        QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
 
-        QPalette palette;
-        palette.setColor(QPalette::Window, background);
-        palette.setColor(QPalette::WindowText, text);
-        palette.setColor(QPalette::Base, surface);
-        palette.setColor(QPalette::AlternateBase, border);
-        palette.setColor(QPalette::Text, text);
-        palette.setColor(QPalette::Button, surface);
-        palette.setColor(QPalette::ButtonText, text);
-        palette.setColor(QPalette::BrightText, text);
-        palette.setColor(QPalette::ToolTipBase, surface);
-        palette.setColor(QPalette::ToolTipText, text);
-        palette.setColor(QPalette::PlaceholderText, textMuted);
-        palette.setColor(QPalette::Mid, border);
-        palette.setColor(QPalette::Dark, background);
-        palette.setColor(QPalette::Light, border);
-        palette.setColor(QPalette::Midlight, border);
-        palette.setColor(QPalette::Shadow, background);
-        palette.setColor(QPalette::Accent, accent);
-        palette.setColor(QPalette::Highlight, accent);
-        palette.setColor(QPalette::HighlightedText, background);
-        palette.setColor(QPalette::Link, accent);
-        palette.setColor(QPalette::LinkVisited, accent);
+        // Unlike the Material style, FluentWinUI3 takes all of its colors from the
+        // application palette: ApplicationWindow is literally "color: palette.window",
+        // and the checked color of check boxes, switches, sliders and progress bars
+        // comes from palette.accent. setColorScheme() above only swaps the style's own
+        // assets; on macOS the palette still follows the system appearance, so under a
+        // light system theme every page we haven't restyled ourselves (the connection
+        // spinner, the legacy settings groups) renders as white-on-white.
+        //
+        // Force a dark palette built from the alkaidlab.com design variables so the
+        // whole app is consistent regardless of the system appearance.
+        {
+            const QColor background(0x0F, 0x17, 0x2A); // --background-darker
+            const QColor surface(0x1E, 0x29, 0x3B);    // --background-dark
+            const QColor border(0x33, 0x41, 0x55);     // --border-dark
+            const QColor text(0xF1, 0xF5, 0xF9);
+            const QColor textMuted(0x94, 0xA3, 0xB8); // --text-muted
+            const QColor accent(0x39, 0xC5, 0xBB);    // --primary-color
 
-        palette.setColor(QPalette::Disabled, QPalette::WindowText, textMuted);
-        palette.setColor(QPalette::Disabled, QPalette::Text, textMuted);
-        palette.setColor(QPalette::Disabled, QPalette::ButtonText, textMuted);
+            QPalette palette;
+            palette.setColor(QPalette::Window, background);
+            palette.setColor(QPalette::WindowText, text);
+            palette.setColor(QPalette::Base, surface);
+            palette.setColor(QPalette::AlternateBase, border);
+            palette.setColor(QPalette::Text, text);
+            palette.setColor(QPalette::Button, surface);
+            palette.setColor(QPalette::ButtonText, text);
+            palette.setColor(QPalette::BrightText, text);
+            palette.setColor(QPalette::ToolTipBase, surface);
+            palette.setColor(QPalette::ToolTipText, text);
+            palette.setColor(QPalette::PlaceholderText, textMuted);
+            palette.setColor(QPalette::Mid, border);
+            palette.setColor(QPalette::Dark, background);
+            palette.setColor(QPalette::Light, border);
+            palette.setColor(QPalette::Midlight, border);
+            palette.setColor(QPalette::Shadow, background);
+            palette.setColor(QPalette::Accent, accent);
+            palette.setColor(QPalette::Highlight, accent);
+            palette.setColor(QPalette::HighlightedText, background);
+            palette.setColor(QPalette::Link, accent);
+            palette.setColor(QPalette::LinkVisited, accent);
 
-        QGuiApplication::setPalette(palette);
+            palette.setColor(QPalette::Disabled, QPalette::WindowText, textMuted);
+            palette.setColor(QPalette::Disabled, QPalette::Text, textMuted);
+            palette.setColor(QPalette::Disabled, QPalette::ButtonText, textMuted);
+
+            QGuiApplication::setPalette(palette);
+        }
+    } else {
+        configureMaterialFallback();
     }
 #else
     // Fall back to the Material theme on older Qt builds
-    QQuickStyle::setStyle("Material");
-
-    // Our icons are styled for a dark theme, so we do not allow the user to override this
-    qputenv("QT_QUICK_CONTROLS_MATERIAL_THEME", "Dark");
-
-    // These are defaults that we allow the user to override
-    if (!qEnvironmentVariableIsSet("QT_QUICK_CONTROLS_MATERIAL_ACCENT")) {
-        qputenv("QT_QUICK_CONTROLS_MATERIAL_ACCENT", "Purple");
-    }
-    if (!qEnvironmentVariableIsSet("QT_QUICK_CONTROLS_MATERIAL_VARIANT")) {
-        qputenv("QT_QUICK_CONTROLS_MATERIAL_VARIANT", "Dense");
-    }
-    if (!qEnvironmentVariableIsSet("QT_QUICK_CONTROLS_MATERIAL_PRIMARY")) {
-        // Qt 6.9 began to use a different shade of Material.Indigo when we use a dark theme
-        // (which is all the time). The new color looks washed out, so manually specify the
-        // old primary color unless the user overrides it themselves.
-        qputenv("QT_QUICK_CONTROLS_MATERIAL_PRIMARY", "#3F51B5");
-    }
+    configureMaterialFallback();
 #endif
 
     // 界面字体：Manrope（正文/标题）+ DM Mono（数字、状态徽标、宽字距微标签），
