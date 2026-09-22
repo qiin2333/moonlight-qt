@@ -12,6 +12,9 @@
 //    （parseHelperDevices 解析），bind/unbind 只是改 Moonlight 自己的偏好
 //    （StreamingPreferences::usbForwardingBoundDevices），无提权。转发用的
 //    serve 进程由 Session 经 UsbForwardingLocalServer 按需拉起。
+//  - Linux：标准 usbip-host 栈。枚举直读 sysfs（parseSysfsDevices），
+//    bind/unbind 经 pkexec 走固定 helper + app 自己的 polkit action
+//    （首次共享时一次性安装），绑定状态就是内核 driver 绑定，如实反映。
 // 与 UsbForwardingEnvironment 的分工：后者只做环境体检（版本 + 服务状态），
 // 这里做真正的设备编排。
 //
@@ -44,6 +47,14 @@ public:
     // 以便脱离进程做单元测试（tests/usb_forwarding_backend_list）。
     static QVariantList parseHelperDevices(const QByteArray& helperJson, QString* error);
 
+#ifdef Q_OS_LINUX
+    // 枚举 <sysfsBusPath>（通常 /sys/bus/usb/devices）下的 USB 设备。
+    // Linux 枚举数据源：sysfs 属性文件 + driver symlink 判绑定。
+    // 跳过根 hub（usbN）与 hub 设备（bDeviceClass 09）。公开成静态纯函数
+    // 以便用夹具目录做单元测试（tests/usb_forwarding_backend_sysfs）。
+    static QVariantList parseSysfsDevices(const QString &sysfsBusPath, QString *error);
+#endif
+
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void bind(const QString &busId);
     Q_INVOKABLE void unbind(const QString &busId, const QString &persistedGuid);
@@ -65,6 +76,13 @@ private:
     void setError(const QString &error);
 #ifdef Q_OS_DARWIN
     void refreshFromHelper();
+#endif
+#ifdef Q_OS_LINUX
+    // 首次共享时把内置 helper 脚本与 polkit policy 以一次提权安装到位，
+    // 之后 bind/unbind 走 app 自己的 auth_admin_keep action。
+    void runPrivileged(const QString &action, const QString &busId);
+    bool installPrivilegedHelper(const QString &action, const QString &busId);
+    void runHelperAction(const QString &action, const QString &busId);
 #endif
 
     QVariantList m_Devices;

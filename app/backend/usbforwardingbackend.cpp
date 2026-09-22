@@ -8,12 +8,16 @@
 #include "settings/streamingpreferences.h"
 #endif
 
+#include <QDir>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QStandardPaths>
 #include <QTimer>
+#include <QTemporaryDir>
 
 #ifdef Q_OS_WIN32
 #include <windows.h>
@@ -48,12 +52,64 @@ bool isRealBusId(const QString &busId)
 
 // macOS helper 的 busid 是 libusb 拓扑路径："1-2"，经 hub 时 "1-2.3"。
 // 必须与 usbipdcpp 的 find_by_busid 生成算法一致（bus + "-" + 端口链 "." 连接）。
-bool isMacBusId(const QString &busId)
+// Linux sysfs 的 busid 同为拓扑路径（"1-1"、"2-1.2"），共用同一校验。
+bool isTopologyBusId(const QString &busId)
 {
-    static const QRegularExpression macRe(
-        QStringLiteral("^[1-9][0-9]*-[0-9]+(\\.[0-9]+)*$"));
-    return macRe.match(busId).hasMatch();
+    static const QRegularExpression topologyRe(QStringLiteral("^[1-9][0-9]*-[0-9]+(\\.[0-9]+)*$"));
+    return topologyRe.match(busId).hasMatch();
 }
+
+#ifdef Q_OS_LINUX
+// 提权面收口成一个固定 helper：pkexec 只执行这两个固定路径，busid 在
+// helper 里再做一次字符集校验（数字、点、横线），不拼任何用户输入进
+// shell。首次共享时由 app 用一次通用 pkexec 安装这两个文件，之后 bind/
+// unbind 都走 app 自己的 auth_admin_keep action（一次授权管几分钟）。
+constexpr auto kLinuxHelperPath = "/usr/lib/moonlight-qt/moonlight-usb-helper";
+constexpr auto kLinuxPolicyPath =
+    "/usr/share/polkit-1/actions/org.moonlight.qt.usbforwarding.policy";
+
+constexpr auto kLinuxHelperScript = R"HELPER(#!/bin/sh
+# Moonlight USB forwarding privileged helper (Linux usbip-host backend).
+# Installed and invoked only via pkexec; validates its own arguments.
+set -u
+ACTION=${1:-}
+BUSID=${2:-}
+case "$ACTION" in bind|unbind) ;; *) echo "unsupported action" >&2; exit 2;; esac
+case "$BUSID" in ''|*[!0-9.-]*) echo "invalid busid" >&2; exit 2;; esac
+command -v usbip >/dev/null 2>&1 || { echo "usbip tool not found" >&2; exit 3; }
+if [ ! -d /sys/module/usbip_host ]; then
+    modprobe usbip_host 2>/dev/null || { echo "cannot load usbip_host module" >&2; exit 4; }
+fi
+if [ "$ACTION" = "bind" ] && ! pgrep -x usbipd >/dev/null 2>&1; then
+    usbipd -D >/dev/null 2>&1
+    sleep 0.5
+fi
+if [ "$ACTION" = "bind" ]; then
+    usbip bind -b "$BUSID"
+else
+    usbip unbind -b "$BUSID" 2>/dev/null
+    echo "$BUSID" > /sys/bus/usb/drivers_probe 2>/dev/null || true
+fi
+)HELPER";
+
+constexpr auto kLinuxPolicyXml = R"POLICY(<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <action id="org.moonlight.qt.usbforwarding.run">
+    <description>Run the Moonlight USB forwarding helper</description>
+    <message>Authentication is required to share or release a USB device with Moonlight</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/moonlight-qt/moonlight-usb-helper</annotate>
+  </action>
+</policyconfig>
+)POLICY";
+#endif // Q_OS_LINUX
 
 } // namespace
 
@@ -111,7 +167,7 @@ QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJs
         // 出现在枚举输出里即已连接。
         device.insert(QStringLiteral("isConnected"), true);
         device.insert(QStringLiteral("isAttached"), false);
-        device.insert(QStringLiteral("isSupported"), isMacBusId(busId) && claimable);
+        device.insert(QStringLiteral("isSupported"), isTopologyBusId(busId) && claimable);
         device.insert(QStringLiteral("isForced"), false);
         device.insert(QStringLiteral("persistedGuid"), QString());
         device.insert(QStringLiteral("isOccupied"), occupied);
@@ -146,6 +202,27 @@ void UsbForwardingBackend::refresh()
     }
 #ifdef Q_OS_DARWIN
     refreshFromHelper();
+#elif defined(Q_OS_LINUX)
+    // sysfs 读取是纯文件访问，同步完成即可，无需 busy 状态机。
+    if (QStandardPaths::findExecutable(QStringLiteral("usbip")).isEmpty()) {
+        m_Devices.clear();
+        emit devicesChanged();
+        setError(tr("The usbip tool is not installed. Install the USB/IP package of your "
+                    "distribution (usbip-utils or linux-tools)."));
+        return;
+    }
+    setError(QString());
+    QString parseError;
+    const QVariantList devices =
+        parseSysfsDevices(QStringLiteral("/sys/bus/usb/devices"), &parseError);
+    if (!parseError.isEmpty()) {
+        m_Devices.clear();
+        emit devicesChanged();
+        setError(parseError);
+        return;
+    }
+    m_Devices = devices;
+    emit devicesChanged();
 #else
     const QString exe = UsbForwardingEnvironment::locateUsbipd();
     if (exe.isEmpty()) {
@@ -309,6 +386,83 @@ void UsbForwardingBackend::refreshFromHelper()
 
 #endif
 
+#ifdef Q_OS_LINUX
+
+QVariantList UsbForwardingBackend::parseSysfsDevices(const QString &sysfsBusPath, QString *error)
+{
+    if (error) {
+        error->clear();
+    }
+    const QDir busDir(sysfsBusPath);
+    if (!busDir.exists()) {
+        if (error) {
+            *error = tr("USB device information is unavailable (sysfs is not mounted).");
+        }
+        return {};
+    }
+
+    // sysfs 属性读取失败返回空串：idVendor/idProduct 缺失的条目不是设备，
+    // 直接跳过；其余属性允许缺失（比如 product 读不出来就用 vidPid 兜底）。
+    const auto readAttr = [](const QString &path) {
+        QFile file(path);
+        return file.open(QIODevice::ReadOnly) ? QString::fromLocal8Bit(file.readAll()).trimmed()
+                                              : QString();
+    };
+
+    QVariantList devices;
+    const QFileInfoList entries =
+        busDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for (const QFileInfo &entry : entries) {
+        const QString busId = entry.fileName();
+        // 接口目录形如 "1-1:1.0"，根 hub 是 "usb1"，都跳过。
+        if (busId.contains(QLatin1Char(':')) || busId.startsWith(QLatin1String("usb"))) {
+            continue;
+        }
+        const QString devicePath = entry.absoluteFilePath();
+        const QString vendor = readAttr(devicePath + QStringLiteral("/idVendor"));
+        const QString product = readAttr(devicePath + QStringLiteral("/idProduct"));
+        if (vendor.isEmpty() || product.isEmpty()) {
+            continue;
+        }
+        // bDeviceClass 09 = hub，usbip 不支持共享 hub。
+        if (readAttr(devicePath + QStringLiteral("/bDeviceClass")) == QLatin1String("09")) {
+            continue;
+        }
+
+        const QString vidPid = vendor.toLower() + QLatin1Char(':') + product.toLower();
+        QString description = readAttr(devicePath + QStringLiteral("/product"));
+        if (description.isEmpty()) {
+            description = readAttr(devicePath + QStringLiteral("/manufacturer"));
+        }
+        if (description.isEmpty()) {
+            description = vidPid;
+        }
+
+        // 绑定状态就是内核状态：driver symlink 指向 usbip-host 即已共享。
+        // （重插后内核重新枚举、绑定丢失，refresh 后如实反映。）
+        const QString driverTarget = QFile::symLinkTarget(devicePath + QStringLiteral("/driver"));
+        const bool isBound = driverTarget.endsWith(QLatin1String("/usbip-host"));
+
+        QVariantMap device;
+        device.insert(QStringLiteral("busId"), busId);
+        device.insert(QStringLiteral("description"), description);
+        device.insert(QStringLiteral("instanceId"),
+                      readAttr(devicePath + QStringLiteral("/serial")));
+        device.insert(QStringLiteral("vidPid"), vidPid);
+        device.insert(QStringLiteral("isBound"), isBound);
+        device.insert(QStringLiteral("isConnected"), true);
+        device.insert(QStringLiteral("isAttached"), false);
+        device.insert(QStringLiteral("isSupported"), isTopologyBusId(busId));
+        device.insert(QStringLiteral("isForced"), false);
+        device.insert(QStringLiteral("persistedGuid"), QString());
+        devices.append(device);
+    }
+
+    return devices;
+}
+
+#endif // Q_OS_LINUX
+
 void UsbForwardingBackend::bind(const QString &busId)
 {
     if (busId.isEmpty()) {
@@ -326,6 +480,12 @@ void UsbForwardingBackend::bind(const QString &busId)
     }
     emit operationFinished(true, tr("Requested sharing. Refreshing device list…"));
     QTimer::singleShot(300, this, [this] { refresh(); });
+#elif defined(Q_OS_LINUX)
+    if (!isTopologyBusId(busId)) {
+        emit operationFinished(false, tr("This USB device cannot be shared."));
+        return;
+    }
+    runPrivileged(QStringLiteral("bind"), busId);
 #else
     const QString exe = UsbForwardingEnvironment::locateUsbipd();
     if (exe.isEmpty()) {
@@ -367,6 +527,11 @@ void UsbForwardingBackend::unbind(const QString &busId, const QString &persisted
     }
     emit operationFinished(true, tr("Requested stop sharing. Refreshing device list…"));
     QTimer::singleShot(300, this, [this] { refresh(); });
+#elif defined(Q_OS_LINUX)
+    if (!isTopologyBusId(busId)) {
+        return;
+    }
+    runPrivileged(QStringLiteral("unbind"), busId);
 #else
     QStringList args;
     if (!busId.isEmpty() && isRealBusId(busId)) {
@@ -403,3 +568,136 @@ void UsbForwardingBackend::unbind(const QString &busId, const QString &persisted
     }
 #endif
 }
+
+#ifdef Q_OS_LINUX
+
+void UsbForwardingBackend::runPrivileged(const QString &action, const QString &busId)
+{
+    if (m_Busy) {
+        return;
+    }
+    setBusy(true);
+    setError(QString());
+
+    const bool installed = QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath)) &&
+                           QFileInfo::exists(QString::fromLatin1(kLinuxPolicyPath));
+    if (installed) {
+        runHelperAction(action, busId);
+    } else {
+        installPrivilegedHelper(action, busId);
+    }
+}
+
+bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const QString &busId)
+{
+    // 临时目录活到安装进程把它消费掉为止：finished 回调里显式释放。
+    QTemporaryDir *temp = new QTemporaryDir();
+    if (!temp->isValid()) {
+        delete temp;
+        setBusy(false);
+        emit operationFinished(false, tr("Could not create a temporary file for the USB helper."));
+        return false;
+    }
+    const QString helperTmp = temp->filePath(QStringLiteral("moonlight-usb-helper"));
+    const QString policyTmp =
+        temp->filePath(QStringLiteral("org.moonlight.qt.usbforwarding.policy"));
+    {
+        QFile helperFile(helperTmp);
+        if (!helperFile.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+            helperFile.write(kLinuxHelperScript) < 0) {
+            setBusy(false);
+            emit operationFinished(false,
+                                   tr("Could not create a temporary file for the USB helper."));
+            return false;
+        }
+        helperFile.setPermissions(QFile::ExeOwner | QFile::ReadOwner);
+        QFile policyFile(policyTmp);
+        if (!policyFile.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+            policyFile.write(kLinuxPolicyXml) < 0) {
+            setBusy(false);
+            emit operationFinished(false,
+                                   tr("Could not create a temporary file for the USB helper."));
+            return false;
+        }
+    }
+
+    // 这一步用 polkit 默认的通用 admin action（每次都要确认）；装好之后
+    // 真正的 bind/unbind 走 app 自己的 auth_admin_keep action。
+    QProcess *install = new QProcess(this);
+    const QString command = QStringLiteral("install -D -m 755 '%1' %2 && install -D -m 644 '%3' %4")
+                                .arg(helperTmp, QString::fromLatin1(kLinuxHelperPath), policyTmp,
+                                     QString::fromLatin1(kLinuxPolicyPath));
+    connect(install, &QProcess::errorOccurred, this,
+            [this, install](QProcess::ProcessError processError) {
+                if (processError != QProcess::FailedToStart) {
+                    return;
+                }
+                install->deleteLater();
+                setBusy(false);
+                emit operationFinished(
+                    false,
+                    tr("pkexec is not available. A polkit authentication agent is required."));
+            });
+    connect(install, &QProcess::finished, this, [this, install, temp, action, busId](int exitCode) {
+        install->deleteLater();
+        delete temp;
+        if (exitCode != 0 || !QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath))) {
+            setBusy(false);
+            emit operationFinished(false, tr("The elevation was cancelled or failed."));
+            return;
+        }
+        runHelperAction(action, busId);
+    });
+    install->start(QStringLiteral("pkexec"),
+                   { QStringLiteral("/bin/sh"), QStringLiteral("-c"), command });
+    return true;
+}
+
+void UsbForwardingBackend::runHelperAction(const QString &action, const QString &busId)
+{
+    QProcess *proc = new QProcess(this);
+    connect(
+        proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError processError) {
+            if (processError != QProcess::FailedToStart) {
+                return;
+            }
+            proc->deleteLater();
+            setBusy(false);
+            emit operationFinished(
+                false, tr("pkexec is not available. A polkit authentication agent is required."));
+        });
+    connect(proc, &QProcess::finished, this, [this, proc, action](int exitCode) {
+        setBusy(false);
+        const QString stdoutText = QString::fromLocal8Bit(proc->readAllStandardOutput());
+        const QString stderrText = QString::fromLocal8Bit(proc->readAllStandardError());
+        proc->deleteLater();
+        const QString combined = stdoutText + QLatin1Char('\n') + stderrText;
+        if (exitCode == 0) {
+            emit operationFinished(true, action == QLatin1String("bind")
+                                             ? tr("Device shared. Refreshing device list…")
+                                             : tr("Sharing stopped. Refreshing device list…"));
+            QTimer::singleShot(500, this, [this] { refresh(); });
+            return;
+        }
+        // bind 一个已共享的设备是幂等成功（内核态已是目标状态）。
+        if (action == QLatin1String("bind") && combined.contains(QLatin1String("already bound"))) {
+            emit operationFinished(true, tr("Device is already shared."));
+            QTimer::singleShot(500, this, [this] { refresh(); });
+            return;
+        }
+        // pkexec 在用户取消认证时以 126 退出；agent 断开时报 "disconnected"。
+        if (exitCode == 126 || combined.contains(QLatin1String("disconnected")) ||
+            combined.contains(QLatin1String("Not authorized"))) {
+            emit operationFinished(false, tr("The elevation was cancelled or failed."));
+            return;
+        }
+        const QString detail = stderrText.section(QLatin1Char('\n'), 0, 0).simplified();
+        emit operationFinished(false,
+                               detail.isEmpty()
+                                   ? tr("The USB sharing operation failed (exit %1).").arg(exitCode)
+                                   : detail);
+    });
+    proc->start(QStringLiteral("pkexec"), { QString::fromLatin1(kLinuxHelperPath), action, busId });
+}
+
+#endif // Q_OS_LINUX

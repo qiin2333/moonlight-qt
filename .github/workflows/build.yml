@@ -272,6 +272,8 @@ jobs:
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat usb_forwarding_backend_list usb_forwarding_backend_list_test
         if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat usb_forwarding_backend_sysfs usb_forwarding_backend_sysfs_test
+        if errorlevel 1 exit /b %ERRORLEVEL%
         rem usb_forwarding_tunnel 是需要真实 USB/IP 会话的手动联调探针,不进 CI,
         rem 用法见 tests/README.md。
 
@@ -539,6 +541,13 @@ jobs:
         # xvfb 下 XTest 合成事件与异步唤醒的时序受 runner 负载影响,偶发抖动
         # (失败点会在多个唤醒断言间轮转);失败自动整测重跑一次
         QT_QPA_PLATFORM=xcb xvfb-run -a ./overlay_button_native_wake ||         QT_QPA_PLATFORM=xcb xvfb-run -a ./overlay_button_native_wake
+        popd
+
+        # Linux 上跑 USB 转发的 sysfs 枚举解析(会覆盖 driver symlink 绑定断言)
+        pushd tests/usb_forwarding_backend_sysfs
+        qmake usb_forwarding_backend_sysfs.pro
+        make -j"$(nproc)"
+        ./usb_forwarding_backend_sysfs_test
         popd
 
     # arm64 上没有 LunarG 源，Vulkan 那套要手工补：noble 自带的 loader 是 1.3.275，
