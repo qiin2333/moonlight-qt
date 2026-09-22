@@ -10,6 +10,8 @@ win32 {
     INCLUDEPATH += ../../libs/windows/include/x64/SDL2
     LIBS += $$PWD/../../libs/windows/lib/x64/SDL2.lib
     QMAKE_POST_LINK += $$QMAKE_COPY $$shell_path($$PWD/../../libs/windows/lib/x64/SDL2.dll) $$shell_path($$OUT_PWD/release/SDL2.dll)
+    # SDL2 is the compatibility library and dynamically loads SDL3 at startup.
+    QMAKE_POST_LINK += $$escape_expand(\\n\\t) $$QMAKE_COPY $$shell_path($$PWD/../../libs/windows/lib/x64/SDL3.dll) $$shell_path($$OUT_PWD/release/SDL3.dll)
 } else {
     CONFIG += link_pkgconfig
     PKGCONFIG += sdl2
