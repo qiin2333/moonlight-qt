@@ -67,10 +67,12 @@ bool SystemProperties::isUsbForwardingSupported()
         return false;
     }
     while (!dependencies.atEnd()) {
-        const QString path = QString::fromLocal8Bit(dependencies.readLine()).section(QLatin1Char(':'), 0, 0);
+        const QString path =
+            QString::fromLocal8Bit(dependencies.readLine()).section(QLatin1Char(':'), 0, 0);
         const QString name = QFileInfo(path).fileName();
         if ((name == QLatin1String("usbip-host.ko") || name == QLatin1String("usbip-host.ko.xz") ||
-             name == QLatin1String("usbip-host.ko.zst") || name == QLatin1String("usbip-host.ko.gz")) &&
+             name == QLatin1String("usbip-host.ko.zst") ||
+             name == QLatin1String("usbip-host.ko.gz")) &&
             QFileInfo::exists(kernel.filePath(path))) {
             return true;
         }

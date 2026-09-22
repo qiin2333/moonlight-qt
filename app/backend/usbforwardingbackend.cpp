@@ -105,9 +105,11 @@ QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJs
         QVariantMap device;
         device.insert(QStringLiteral("busId"), busId);
         device.insert(QStringLiteral("description"), description);
-        device.insert(QStringLiteral("instanceId"),
-                      o.value(native ? QLatin1String("identity") : QLatin1String("serial")).toString());
-        device.insert(QStringLiteral("registrationKey"), native ? o.value(QLatin1String("registrationKey")).toString() : busId);
+        device.insert(
+            QStringLiteral("instanceId"),
+            o.value(native ? QLatin1String("identity") : QLatin1String("serial")).toString());
+        device.insert(QStringLiteral("registrationKey"),
+                      native ? o.value(QLatin1String("registrationKey")).toString() : busId);
         device.insert(QStringLiteral("vidPid"), vidPid);
         // isBound 恒 false，由 refreshFromHelper() 按用户偏好叠加。
         device.insert(QStringLiteral("isBound"), false);
@@ -116,7 +118,8 @@ QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJs
         device.insert(QStringLiteral("isAttached"), o.value(QLatin1String("attached")).toBool());
         device.insert(QStringLiteral("isSupported"), isHelperBusId(busId) && claimable);
         device.insert(QStringLiteral("isForced"), false);
-        device.insert(QStringLiteral("persistedGuid"), native ? o.value(QLatin1String("registrationKey")).toString() : QString());
+        device.insert(QStringLiteral("persistedGuid"),
+                      native ? o.value(QLatin1String("registrationKey")).toString() : QString());
         device.insert(QStringLiteral("isOccupied"), occupied);
         devices.append(device);
     }
@@ -304,30 +307,39 @@ void UsbForwardingBackend::refreshFromHelper()
                 StreamingPreferences::get()->usbForwardingBoundDevices();
         for (QVariant &value : devices) {
             QVariantMap device = value.toMap();
-            device.insert(QStringLiteral("isBound"),
-                          bound.contains(device.value(QStringLiteral("registrationKey")).toString()));
+            device.insert(
+                QStringLiteral("isBound"),
+                bound.contains(device.value(QStringLiteral("registrationKey")).toString()));
             value = device;
         }
 
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
         // Keep disconnected registrations removable from settings.
-        for (const QString& key : bound) {
-            if (!key.startsWith(QLatin1String("linux:"))) continue;
+        for (const QString &key : bound) {
+            if (!key.startsWith(QLatin1String("linux:")))
+                continue;
             bool present = false;
-            for (const auto& row : devices) {
-                if (row.toMap().value(QStringLiteral("registrationKey")).toString() == key) { present = true; break; }
+            for (const auto &row : devices) {
+                if (row.toMap().value(QStringLiteral("registrationKey")).toString() == key) {
+                    present = true;
+                    break;
+                }
             }
-            if (present) continue;
+            if (present)
+                continue;
             const QStringList parts = key.split(QLatin1Char(':'));
-            if (parts.size() != 5) continue;
-            devices.append(QVariantMap {
-                {QStringLiteral("busId"), QString()},
-                {QStringLiteral("description"), tr("USB device (%1)").arg(parts[1])},
-                {QStringLiteral("vidPid"), parts[2] + QLatin1Char(':') + parts[3]},
-                {QStringLiteral("registrationKey"), key}, {QStringLiteral("persistedGuid"), key},
-                {QStringLiteral("isBound"), true}, {QStringLiteral("isConnected"), false},
-                {QStringLiteral("isSupported"), false}, {QStringLiteral("isAttached"), false}
-            });
+            if (parts.size() != 5)
+                continue;
+            devices.append(
+                QVariantMap{ { QStringLiteral("busId"), QString() },
+                             { QStringLiteral("description"), tr("USB device (%1)").arg(parts[1]) },
+                             { QStringLiteral("vidPid"), parts[2] + QLatin1Char(':') + parts[3] },
+                             { QStringLiteral("registrationKey"), key },
+                             { QStringLiteral("persistedGuid"), key },
+                             { QStringLiteral("isBound"), true },
+                             { QStringLiteral("isConnected"), false },
+                             { QStringLiteral("isSupported"), false },
+                             { QStringLiteral("isAttached"), false } });
         }
 #endif
         m_Devices = devices;
@@ -352,7 +364,7 @@ void UsbForwardingBackend::bind(const QString &busId)
     QString key = busId;
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     key.clear();
-    for (const auto& row : m_Devices) {
+    for (const auto &row : m_Devices) {
         const auto device = row.toMap();
         if (device.value(QStringLiteral("busId")).toString() == busId &&
             device.value(QStringLiteral("isSupported")).toBool()) {
@@ -360,7 +372,10 @@ void UsbForwardingBackend::bind(const QString &busId)
             break;
         }
     }
-    if (key.isEmpty()) { emit operationFinished(false, tr("Refresh the USB device list and try again.")); return; }
+    if (key.isEmpty()) {
+        emit operationFinished(false, tr("Refresh the USB device list and try again."));
+        return;
+    }
 #endif
     if (!bound.contains(key)) {
         bound.append(key);

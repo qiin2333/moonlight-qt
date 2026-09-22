@@ -1335,8 +1335,8 @@ void Session::updateRemoteUsbMenuState()
     }
 
     m_MenuPanel->updateRemoteUsbState(
-        m_Preferences->usbForwardingEnabled && SystemProperties::isUsbForwardingSupported(), m_RemoteUsbState,
-        m_RemoteUsbDevices, m_RemoteUsbActiveDeviceId, m_RemoteUsbDetail);
+        m_Preferences->usbForwardingEnabled && SystemProperties::isUsbForwardingSupported(),
+        m_RemoteUsbState, m_RemoteUsbDevices, m_RemoteUsbActiveDeviceId, m_RemoteUsbDetail);
 }
 
 void Session::refreshRemoteUsbDevices()
@@ -1413,7 +1413,8 @@ void Session::enumerateRemoteUsb()
 
 void Session::startRemoteUsb(const QString &deviceId)
 {
-    if (!m_Preferences->usbForwardingEnabled || !SystemProperties::isUsbForwardingSupported() || deviceId.isEmpty()) {
+    if (!m_Preferences->usbForwardingEnabled || !SystemProperties::isUsbForwardingSupported() ||
+        deviceId.isEmpty()) {
         return;
     }
     if (m_UsbTunnel != nullptr || m_UsbCapabilityPending || m_UsbLocalServer != nullptr) {
@@ -1490,36 +1491,43 @@ void Session::startRemoteUsb(const QString &deviceId)
             // Never surface/log a response body that could contain credentials.
         }
     });
-    connect(worker, &QThread::finished, this,
-            [this, result, generation, nativeIdentity, config = std::move(config)]() mutable {
-        if (generation != m_UsbCapabilityGeneration) return;
-        m_UsbCapabilityPending = false;
-        if (!m_Preferences->usbForwardingEnabled || !SystemProperties::isUsbForwardingSupported()) {
-            teardownUsbTunnel();
-            return;
-        }
-        if (!result->localError.isEmpty() || !result->capability || !result->capability->available) {
-            const QString message = !result->localError.isEmpty() ? result->localError : result->hostUpdateRequired
-                ? tr("Update Sunshine to use automatic USB forwarding setup.")
-                : !result->capability ? tr("Could not check host USB forwarding. Try again.")
-                : result->capability->reason == QStringLiteral("disabled")
-                    ? tr("Enable USB forwarding in Sunshine settings and restart the host.")
-                    : tr("Host USB forwarding is unavailable. Check its driver and settings.");
-            teardownUsbTunnel();
-            m_RemoteUsbDetail = message;
-            updateRemoteUsbMenuState();
-            showStreamingToast(message, 5000);
-            return;
-        }
-        config.port = result->capability->port;
-        config.sessionToken = result->capability->token;
-        startConfiguredRemoteUsb(std::move(config), nativeIdentity);
-    });
+    connect(
+        worker, &QThread::finished, this,
+        [this, result, generation, nativeIdentity, config = std::move(config)]() mutable {
+            if (generation != m_UsbCapabilityGeneration)
+                return;
+            m_UsbCapabilityPending = false;
+            if (!m_Preferences->usbForwardingEnabled ||
+                !SystemProperties::isUsbForwardingSupported()) {
+                teardownUsbTunnel();
+                return;
+            }
+            if (!result->localError.isEmpty() || !result->capability ||
+                !result->capability->available) {
+                const QString message =
+                    !result->localError.isEmpty() ? result->localError
+                    : result->hostUpdateRequired
+                        ? tr("Update Sunshine to use automatic USB forwarding setup.")
+                    : !result->capability ? tr("Could not check host USB forwarding. Try again.")
+                    : result->capability->reason == QStringLiteral("disabled")
+                        ? tr("Enable USB forwarding in Sunshine settings and restart the host.")
+                        : tr("Host USB forwarding is unavailable. Check its driver and settings.");
+                teardownUsbTunnel();
+                m_RemoteUsbDetail = message;
+                updateRemoteUsbMenuState();
+                showStreamingToast(message, 5000);
+                return;
+            }
+            config.port = result->capability->port;
+            config.sessionToken = result->capability->token;
+            startConfiguredRemoteUsb(std::move(config), nativeIdentity);
+        });
     connect(worker, &QThread::finished, worker, &QObject::deleteLater);
     worker->start();
 }
 
-void Session::startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config, const QString& nativeIdentity)
+void Session::startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config,
+                                       const QString& nativeIdentity)
 {
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     m_UsbLocalServer = new UsbForwardingLocalServer();
@@ -1527,20 +1535,29 @@ void Session::startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config, const
     updateRemoteUsbMenuState();
     const auto generation = m_UsbCapabilityGeneration;
     const QString busId = QString::fromUtf8(config.busId);
-    m_UsbLocalServer->startNative(busId, nativeIdentity,
+    m_UsbLocalServer->startNative(
+        busId, nativeIdentity,
         [this, generation, config = std::move(config)](quint16 port, const QString& error) mutable {
-            if (generation != m_UsbCapabilityGeneration) return;
+            if (generation != m_UsbCapabilityGeneration)
+                return;
             if (!port) {
-                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Native USB helper startup failed: %s", error.toUtf8().constData());
-                const QString message = error.contains(QLatin1String("restore_failed"))
-                    ? tr("USB cleanup needs attention. Reconnect the device; if forwarding remains unavailable, reload usbip-host or restart Linux.")
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Native USB helper startup failed: %s",
+                            error.toUtf8().constData());
+                const QString message =
+                    error.contains(QLatin1String("restore_failed"))
+                        ? tr("USB cleanup needs attention. Reconnect the device; if forwarding "
+                             "remains unavailable, reload usbip-host or restart Linux.")
                     : error.contains(QLatin1String("authorization"))
-                    ? tr("Administrator authorization was cancelled or unavailable. USB forwarding requires polkit and a desktop authentication agent.")
-                    : error.contains(QLatin1String("device_changed")) || error.contains(QLatin1String("device_not_found"))
-                        ? tr("The USB device changed or was unplugged. Refresh the list and try again.")
-                        : error.contains(QLatin1String("module_"))
-                            ? tr("The usbip-host kernel module could not be loaded.")
-                            : tr("Could not start USB forwarding. Check that the device is available and retry.");
+                        ? tr("Administrator authorization was cancelled or unavailable. USB "
+                             "forwarding requires polkit and a desktop authentication agent.")
+                    : error.contains(QLatin1String("device_changed")) ||
+                            error.contains(QLatin1String("device_not_found"))
+                        ? tr("The USB device changed or was unplugged. Refresh the list and try "
+                             "again.")
+                    : error.contains(QLatin1String("module_"))
+                        ? tr("The usbip-host kernel module could not be loaded.")
+                        : tr("Could not start USB forwarding. Check that the device is available "
+                             "and retry.");
                 teardownUsbTunnel();
                 m_RemoteUsbDetail = message;
                 updateRemoteUsbMenuState();
@@ -1552,23 +1569,29 @@ void Session::startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config, const
             connectRemoteUsbTunnel(std::move(config));
         },
         [session = QPointer<Session>(this), generation](const QString& error) {
-            if (!session) return;
+            if (!session)
+                return;
             // Cleanup may finish after Stop has invalidated the generation.
             // Still report failed restoration; never revive that old attempt.
             if (error.contains(QLatin1String("restore_failed"))) {
-                session->showStreamingToast(tr("USB cleanup needs attention. Reconnect the device; if forwarding remains unavailable, reload usbip-host or restart Linux."), 7000);
+                session->showStreamingToast(
+                    tr("USB cleanup needs attention. Reconnect the device; if forwarding remains "
+                       "unavailable, reload usbip-host or restart Linux."),
+                    7000);
             }
             if (generation != session->m_UsbCapabilityGeneration) {
                 // A list refreshed during forwarding marked the device in
                 // use. Refresh again once its local driver has been restored.
                 if (!session->m_UsbLocalServer && !session->m_UsbTunnel &&
-                    !session->m_UsbCapabilityPending && session->m_Preferences->usbForwardingEnabled)
+                    !session->m_UsbCapabilityPending &&
+                    session->m_Preferences->usbForwardingEnabled)
                     UsbForwardingBackend::get()->refresh();
                 return;
             }
             session->teardownUsbTunnel();
             if (!error.isEmpty() && !error.contains(QLatin1String("restore_failed")))
-                session->showStreamingToast(tr("USB forwarding ended. Check the device connection and retry."), 5000);
+                session->showStreamingToast(
+                    tr("USB forwarding ended. Check the device connection and retry."), 5000);
         });
     return;
 #else
@@ -4939,9 +4962,9 @@ void Session::exec()
         // I/O has its own event loop and does not wait for this 10 ms UI pump.
         return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
                (m_MenuButton && m_MenuButton->needsEventProcessing()) ||
-               (m_Toast && m_Toast->needsEventProcessing()) ||
-               m_UsbCapabilityPending || m_UsbLocalServer != nullptr ||
-               m_UsbTunnel != nullptr || UsbForwardingLocalServer::hasPendingNativeCleanup() ||
+               (m_Toast && m_Toast->needsEventProcessing()) || m_UsbCapabilityPending ||
+               m_UsbLocalServer != nullptr || m_UsbTunnel != nullptr ||
+               UsbForwardingLocalServer::hasPendingNativeCleanup() ||
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
                (m_StylusReplayTest && m_StylusReplayTest->isPanelVisible());
 #else

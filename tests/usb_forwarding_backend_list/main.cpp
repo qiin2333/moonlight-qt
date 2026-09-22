@@ -11,7 +11,10 @@
 bool WMUtils::isRunningWayland() { return false; }
 bool WMUtils::isGpuSlow() { return false; }
 // Device-list parsing is independent of the machine's USB kernel support.
-bool SystemProperties::isUsbForwardingSupported() { return true; }
+bool SystemProperties::isUsbForwardingSupported()
+{
+    return true;
+}
 
 static QVariantMap firstDevice(const char* json)
 {
@@ -116,10 +119,13 @@ int main(int argc, char** argv)
             "registrationKey":"linux:1-2.3:054c:0ce6:73657269616c","claimable":true,"attached":false}])");
         if (native.value("instanceId") != "snapshot" || !native.value("isSupported").toBool() ||
             native.value("registrationKey") != native.value("persistedGuid") ||
-            native.value("isBound").toBool()) return 8;
-        const QVariantMap external = firstDevice(R"([{"busId":"1-2.3","registrationKey":"linux:1-2.3:054c:0ce6:",
+            native.value("isBound").toBool())
+            return 8;
+        const QVariantMap external =
+            firstDevice(R"([{"busId":"1-2.3","registrationKey":"linux:1-2.3:054c:0ce6:",
             "identity":"snapshot","claimable":false,"attached":true}])");
-        if (external.value("isSupported").toBool() || !external.value("isAttached").toBool()) return 9;
+        if (external.value("isSupported").toBool() || !external.value("isAttached").toBool())
+            return 9;
     }
 
     qInfo() << "PASS helper list parsing: dotted busid, occupied, fallbacks, empty, malformed";

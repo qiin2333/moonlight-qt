@@ -62,6 +62,7 @@ public:
 signals:
     void forwarding();
     void finished(QString message);
+
 private:
     void handleRemoteReadyRead();
     void handleLocalReadyRead();
@@ -77,14 +78,13 @@ private:
     bool m_Finished = false;
 };
 
-TunnelWorker::TunnelWorker(TunnelConfig config, QObject *parent)
+TunnelWorker::TunnelWorker(TunnelConfig config, QObject* parent)
     : QObject(parent), m_Config(std::move(config))
 {
     m_StartupTimer = new QTimer(this);
     m_StartupTimer->setSingleShot(true);
-    connect(m_StartupTimer, &QTimer::timeout, this, [this] {
-        failWith(Tunnel::tr("The USB tunnel connection timed out."));
-    });
+    connect(m_StartupTimer, &QTimer::timeout, this,
+            [this] { failWith(Tunnel::tr("The USB tunnel connection timed out.")); });
 }
 
 TunnelWorker::~TunnelWorker()
@@ -92,7 +92,7 @@ TunnelWorker::~TunnelWorker()
     stop();
 }
 
-bool TunnelWorker::start(QString *error)
+bool TunnelWorker::start(QString* error)
 {
     if (!m_Config.valid()) {
         if (error != nullptr) {
@@ -156,24 +156,22 @@ bool TunnelWorker::start(QString *error)
         line.append('\n');
         m_Remote->write(line);
     });
-    connect(m_Remote, &QSslSocket::readyRead,
-            this, &TunnelWorker::handleRemoteReadyRead);
+    connect(m_Remote, &QSslSocket::readyRead, this, &TunnelWorker::handleRemoteReadyRead);
     connect(m_Remote, &QSslSocket::disconnected, this, [this] {
         finishCleanly();
     });
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
-    connect(m_Remote, &QSslSocket::errorOccurred, this,
-            [this](QAbstractSocket::SocketError) {
-        failWith(Tunnel::tr("The connection to the host was lost: %1")
-                     .arg(m_Remote->errorString()));
+    connect(m_Remote, &QSslSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
+        failWith(
+            Tunnel::tr("The connection to the host was lost: %1").arg(m_Remote->errorString()));
     });
 #else
-    connect(m_Remote,
-            QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error),
-            this, [this](QAbstractSocket::SocketError) {
-        failWith(Tunnel::tr("The connection to the host was lost: %1")
-                     .arg(m_Remote->errorString()));
-    });
+    connect(
+        m_Remote, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error), this,
+        [this](QAbstractSocket::SocketError) {
+            failWith(
+                Tunnel::tr("The connection to the host was lost: %1").arg(m_Remote->errorString()));
+        });
 #endif
     connect(m_Remote,
             QOverload<const QList<QSslError>&>::of(&QSslSocket::sslErrors),
@@ -196,8 +194,7 @@ bool TunnelWorker::start(QString *error)
     connect(m_Remote, &QSslSocket::bytesWritten, this,
             [this](qint64) { handleLocalReadyRead(); });
 
-    connect(m_Local, &QTcpSocket::readyRead,
-            this, &TunnelWorker::handleLocalReadyRead);
+    connect(m_Local, &QTcpSocket::readyRead, this, &TunnelWorker::handleLocalReadyRead);
     connect(m_Local, &QTcpSocket::connected, this, [this] {
         // The loopback hop carries the same latency-sensitive USB requests.
         m_Local->setSocketOption(QAbstractSocket::LowDelayOption, 1);
@@ -207,18 +204,16 @@ bool TunnelWorker::start(QString *error)
         finishCleanly();
     });
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
-    connect(m_Local, &QTcpSocket::errorOccurred, this,
-            [this](QAbstractSocket::SocketError) {
-        failWith(Tunnel::tr("The local USB service connection failed: %1")
-                     .arg(m_Local->errorString()));
+    connect(m_Local, &QTcpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
+        failWith(
+            Tunnel::tr("The local USB service connection failed: %1").arg(m_Local->errorString()));
     });
 #else
-    connect(m_Local,
-            QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error),
-            this, [this](QAbstractSocket::SocketError) {
-        failWith(Tunnel::tr("The local USB service connection failed: %1")
-                     .arg(m_Local->errorString()));
-    });
+    connect(m_Local, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error), this,
+            [this](QAbstractSocket::SocketError) {
+                failWith(Tunnel::tr("The local USB service connection failed: %1")
+                             .arg(m_Local->errorString()));
+            });
 #endif
     connect(m_Local, &QTcpSocket::bytesWritten, this,
             [this](qint64) { handleRemoteReadyRead(); });
@@ -284,8 +279,7 @@ void TunnelWorker::handleRemoteReadyRead()
                 reply.value(QStringLiteral("reason")).toString();
             failWith(reason.isEmpty()
                          ? Tunnel::tr("The host could not start USB forwarding.")
-                         : Tunnel::tr("The host could not start USB forwarding: %1")
-                               .arg(reason));
+                         : Tunnel::tr("The host could not start USB forwarding: %1").arg(reason));
             return;
         }
         m_HandshakeDone = true;
@@ -341,7 +335,7 @@ void TunnelWorker::handleLocalReadyRead()
     }
 }
 
-void TunnelWorker::failWith(const QString &message)
+void TunnelWorker::failWith(const QString& message)
 {
     if (m_Finished) {
         return;
@@ -386,15 +380,18 @@ Tunnel::~Tunnel()
 bool Tunnel::start(QString* error)
 {
     if (!m_Impl->config.valid()) {
-        if (error) *error = tr("The USB tunnel configuration is incomplete.");
+        if (error)
+            *error = tr("The USB tunnel configuration is incomplete.");
         return false;
     }
     if (m_Impl->worker) {
-        if (error) *error = tr("The USB tunnel is already running.");
+        if (error)
+            *error = tr("The USB tunnel is already running.");
         return false;
     }
     if (m_Impl->config.pinnedServerCertificate.isNull()) {
-        if (error) *error = tr("Pair with this host before forwarding USB devices.");
+        if (error)
+            *error = tr("Pair with this host before forwarding USB devices.");
         return false;
     }
 
@@ -405,13 +402,16 @@ bool Tunnel::start(QString* error)
     connect(&m_Impl->ioThread, &QThread::finished, worker, &QObject::deleteLater);
     connect(&m_Impl->ioThread, &QThread::started, worker, [worker] {
         QString error;
-        if (!worker->start(&error)) emit worker->finished(error);
+        if (!worker->start(&error))
+            emit worker->finished(error);
     });
     connect(worker, &TunnelWorker::forwarding, this, [this, generation] {
-        if (m_Impl->worker && generation == m_Impl->generation) emit forwarding();
+        if (m_Impl->worker && generation == m_Impl->generation)
+            emit forwarding();
     });
     connect(worker, &TunnelWorker::finished, this, [this, generation](const QString& message) {
-        if (!m_Impl->worker || generation != m_Impl->generation) return;
+        if (!m_Impl->worker || generation != m_Impl->generation)
+            return;
         stop();
         emit finished(message);
     });
@@ -422,7 +422,8 @@ bool Tunnel::start(QString* error)
 void Tunnel::stop() noexcept
 {
     auto* worker = m_Impl->worker;
-    if (!worker) return;
+    if (!worker)
+        return;
     m_Impl->worker = nullptr;
     ++m_Impl->generation;
     worker->disconnect(this);

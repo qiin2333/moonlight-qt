@@ -46,8 +46,8 @@ public:
     // Linux authorization and startup run asynchronously. Closing stdin also
     // cancels a pending authorization: a late approval must not take a device.
     using StartCallback = std::function<void(quint16, const QString&)>;
-    void startNative(const QString& busId, const QString& identity,
-                     StartCallback ready, std::function<void(const QString&)> exited);
+    void startNative(const QString& busId, const QString& identity, StartCallback ready,
+                     std::function<void(const QString&)> exited);
 
     // Graceful stop: closing the helper's stdin makes it exit by itself.
     void stop();

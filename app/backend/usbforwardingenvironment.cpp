@@ -189,10 +189,14 @@ UsbForwardingEnvironment::State UsbForwardingEnvironment::probeServices()
     CloseServiceHandle(manager);
     return result;
 #elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
-    if (!SystemProperties::isUsbForwardingSupported() || UsbForwardingLocalServer::locateHelper().isEmpty())
+    if (!SystemProperties::isUsbForwardingSupported() ||
+        UsbForwardingLocalServer::locateHelper().isEmpty())
         return NotInstalled;
     return QStandardPaths::findExecutable(QStringLiteral("pkexec"),
-        {QStringLiteral("/usr/bin"), QStringLiteral("/bin")}).isEmpty() ? CheckFailed : Ready;
+                                          { QStringLiteral("/usr/bin"), QStringLiteral("/bin") })
+                   .isEmpty()
+               ? CheckFailed
+               : Ready;
 #elif defined(Q_OS_DARWIN)
     // Called synchronously from the session worker: never spawn a process
     // here, just check that the bundled helper is present.
@@ -212,7 +216,8 @@ QString UsbForwardingEnvironment::readinessError(State state)
         return tr("The usbipd service is not running. Start the service and retry.");
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     case NotInstalled:
-        return tr("USB forwarding requires the usbip-host kernel module and Moonlight's bundled USB helper.");
+        return tr("USB forwarding requires the usbip-host kernel module and Moonlight's bundled "
+                  "USB helper.");
     default:
         return tr("USB forwarding requires polkit (pkexec) and a desktop authentication agent.");
 #elif defined(Q_OS_DARWIN)

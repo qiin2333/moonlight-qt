@@ -340,7 +340,8 @@ private:
     void refreshRemoteUsbDevices();
     void enumerateRemoteUsb();
     void startRemoteUsb(const QString &deviceId);
-    void startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config, const QString& nativeIdentity);
+    void startConfiguredRemoteUsb(UsbForwarding::TunnelConfig config,
+                                  const QString& nativeIdentity);
     void connectRemoteUsbTunnel(UsbForwarding::TunnelConfig config);
     void stopRemoteUsb();
     void teardownUsbTunnel();

@@ -22,16 +22,13 @@
 //   busId         Windows "1-2" / "IncompatibleHub" / ""（未连接）；macOS 拓扑
 //                 路径 "1-2" / "1-2.3"（经 hub 时带点）
 //   description   设备描述名
-//   instanceId    Windows 实例 ID（USB\VID_XXXX&PID_YYYY\...）；macOS 为序列号；Linux connection identity
-//   vidPid        "xxxx:yyyy"
-//   isBound       bool（Windows：PersistedGuid 非空；macOS：在偏好列表中）
-//   isConnected   bool，当前在枚举输出里
-//   isAttached    bool，正在被某客户端使用（macOS 恒 false）
-//   isSupported   bool，可共享（已连接、busid 合法；macOS 还要求未被系统占用）
-//   isForced      bool（仅 Windows）
-//   persistedGuid Windows GUID or Linux registration key; empty on macOS
-//   isOccupied    bool: macOS driver ownership, or Linux device already exported
-//   registrationKey Linux stable registration key; macOS bus ID
+//   instanceId    Windows 实例 ID（USB\VID_XXXX&PID_YYYY\...）；macOS 为序列号；Linux connection
+//   identity vidPid        "xxxx:yyyy" isBound       bool（Windows：PersistedGuid
+//   非空；macOS：在偏好列表中） isConnected   bool，当前在枚举输出里 isAttached
+//   bool，正在被某客户端使用（macOS 恒 false） isSupported   bool，可共享（已连接、busid
+//   合法；macOS 还要求未被系统占用） isForced      bool（仅 Windows） persistedGuid Windows GUID or
+//   Linux registration key; empty on macOS isOccupied    bool: macOS driver ownership, or Linux
+//   device already exported registrationKey Linux stable registration key; macOS bus ID
 class UsbForwardingBackend : public QObject
 {
     Q_OBJECT
