@@ -9,6 +9,44 @@
 #include <SDL.h>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
+#include <condition_variable>
+#include <cstdlib>
+#include <mutex>
+#include <thread>
+
+// A stuck process API must fail the regression instead of occupying a CI runner
+// indefinitely. This watchdog does not depend on the Qt event loop under test.
+class TestDeadline
+{
+public:
+    TestDeadline()
+        : worker([this] {
+              std::unique_lock<std::mutex> lock(mutex);
+              if (!finished.wait_for(lock, std::chrono::seconds(60), [this] { return done; })) {
+                  std::fputs("FAIL: clipboard helper lifecycle exceeded 60 seconds\n", stderr);
+                  std::fflush(stderr);
+                  std::_Exit(EXIT_FAILURE);
+              }
+          })
+    {
+    }
+    ~TestDeadline()
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            done = true;
+        }
+        finished.notify_one();
+        worker.join();
+    }
+
+private:
+    std::mutex mutex;
+    std::condition_variable finished;
+    bool done = false;
+    std::thread worker;
+};
 
 // The test exercises process supervision, never the user's paired identity or
 // a real streaming connection. Keep those external dependencies inert.
@@ -34,9 +72,13 @@ class ClipboardHelperClientTest
 public:
     static bool start(ClipboardHelperClient& client, const QString& mode)
     {
+        std::fprintf(stderr, "Starting lifecycle case: %s\n", qPrintable(mode));
+        std::fflush(stderr);
         client.m_Enabled = true;
         client.m_Process = new QProcess(&client);
         client.m_Process->start(QCoreApplication::applicationFilePath(), { mode });
+        std::fputs("Helper process launched; initializing timer\n", stderr);
+        std::fflush(stderr);
         client.m_LastPingTicks = client.m_LastResponseTicks = SDL_GetTicks();
         return client.m_Process->waitForStarted(3000);
     }
@@ -109,6 +151,9 @@ int main(int argc, char** argv)
         QThread::sleep(15);
         return 0;
     }
+    std::fputs("Starting clipboard helper lifecycle regression\n", stderr);
+    std::fflush(stderr);
+    TestDeadline deadline;
     QCoreApplication app(argc, argv);
     QTextStream err(stderr), out(stdout);
     if (!ClipboardHelperClientTest::run(err))
