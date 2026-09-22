@@ -17,3 +17,7 @@ macx:SOURCES += ../../clipboard-helper/macos.mm
 HEADERS += \
     ../../app/streaming/clipboardlogging.h \
     ../../app/streaming/clipboardsync.h
+
+SOURCES += regression.cpp ../../app/streaming/clipboardipc.cpp
+HEADERS += ../../app/streaming/clipboardipc.h
+RESOURCES += fixtures.qrc

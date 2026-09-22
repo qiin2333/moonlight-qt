@@ -251,10 +251,12 @@ jobs:
     - name: Test clipboard / cursor / file-mapping / overlay layout logic
       shell: cmd
       run: |
-        rem 以下均为 QCoreApplication 纯逻辑测试,已在本机以 Qt 6.11.1 + MSVC 逐一验证。
+        rem 剪贴板回归使用 offscreen GUI 和本地 TLS，其余为独立逻辑测试。
         call scripts\run-test.bat cursor_shape_classification cursor_shape_classification
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat clipboard_payload_routing clipboard_payload_routing
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat clipboard_helper_lifecycle clipboard_helper_lifecycle
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat overlay_button_position overlay_button_position
         if errorlevel 1 exit /b %ERRORLEVEL%

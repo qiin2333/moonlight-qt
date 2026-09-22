@@ -16,6 +16,8 @@ enum class MessageType {
     Ready,
     Error,
     Stop,
+    Ping,
+    Pong,
 };
 
 struct HostConfig {
@@ -41,6 +43,11 @@ QByteArray encodeLocalFrame(quint32 sequence, const QByteArray& frame);
 QByteArray encodeReady(quint32 sequence);
 QByteArray encodeError(quint32 sequence, const QString& code, const QString& text);
 QByteArray encodeStop(quint32 sequence);
+QByteArray encodePing(quint32 sequence);
+QByteArray encodePong(quint32 sequence);
+
+// Extract one complete bounded line. A partial line returns false without an error.
+bool takeLine(QByteArray& buffer, QByteArray& line, QString& error);
 
 bool decodeLine(const QByteArray& line, Message& outMessage, QString& outError);
 
