@@ -108,8 +108,10 @@ forget() {
 record() {
     read_identity_attrs || return 1
     forget
-    printf '%s\t%s:%s\t%s\n' "$BUSID" "$VID" "$PID" "$SERIAL" >> "$STATE_FILE"
-    chmod 644 "$STATE_FILE"
+    # Append failure (read-only /var/lib, full disk) must surface: a bound
+    # device without a snapshot silently disables replacement detection.
+    printf '%s\t%s:%s\t%s\n' "$BUSID" "$VID" "$PID" "$SERIAL" >> "$STATE_FILE" || return 1
+    chmod 644 "$STATE_FILE" 2>/dev/null || true
 }
 if [ "$ACTION" = "bind" ] && ! pgrep -x usbipd >/dev/null 2>&1; then
     usbipd -D >/dev/null 2>&1
@@ -131,7 +133,13 @@ if [ "$ACTION" = "bind" ]; then
     echo "$OUT"
     case "$OUT" in *"already bound"*) RC=0;; esac
     if [ $RC -eq 0 ]; then
-        record || true
+        if ! record; then
+            # Keep the bind (sharing itself is fine and matches what
+            # usbipd-win offers), but tell the caller that replacement
+            # detection is unavailable for this port.
+            echo "snapshot_failed" >&2
+            exit 6
+        fi
     fi
     exit $RC
 fi
@@ -807,6 +815,15 @@ void UsbForwardingBackend::runHelperAction(const QString &action, const QString 
             emit operationFinished(true, action == QLatin1String("bind")
                                              ? tr("Device shared. Refreshing device list…")
                                              : tr("Sharing stopped. Refreshing device list…"));
+            QTimer::singleShot(500, this, [this] { refresh(); });
+            return;
+        }
+        // 快照写不进（/var/lib 只读、磁盘满等）：绑定本身成功保留
+        // （与 usbipd-win 等位），但替换检测对该端口不可用，如实告知。
+        if (exitCode == 6 || combined.contains(QLatin1String("snapshot_failed"))) {
+            emit operationFinished(true,
+                                   tr("Device shared, but its identity could not be recorded. "
+                                      "Replacement detection is unavailable for this device."));
             QTimer::singleShot(500, this, [this] { refresh(); });
             return;
         }
