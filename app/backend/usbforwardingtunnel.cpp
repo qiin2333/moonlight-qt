@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QSslError>
 #include <QSslSocket>
+#include <QThread>
 #include <QTimer>
 #include <QTcpSocket>
 
@@ -27,8 +28,8 @@ constexpr qsizetype kMaxBusIdBytes = 31;
 
 bool TunnelConfig::valid() const noexcept
 {
-    if (host.isEmpty() || port == 0 || sessionToken.isEmpty() ||
-        busId.isEmpty() || localPort == 0) {
+    if (host.isEmpty() || port == 0 || sessionToken.isEmpty() || busId.isEmpty() ||
+        localPort == 0) {
         return false;
     }
     /* Mirror the server's valid_busid(): printable busid characters only,
@@ -37,10 +38,8 @@ bool TunnelConfig::valid() const noexcept
         return false;
     }
     for (const char c : busId) {
-        const bool allowed = (c >= '0' && c <= '9') ||
-                             (c >= 'a' && c <= 'z') ||
-                             (c >= 'A' && c <= 'Z') ||
-                             c == '-' || c == '.';
+        const bool allowed = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
+                             (c >= 'A' && c <= 'Z') || c == '-' || c == '.';
         if (!allowed) {
             return false;
         }
@@ -48,32 +47,67 @@ bool TunnelConfig::valid() const noexcept
     return true;
 }
 
-Tunnel::Tunnel(TunnelConfig config, QObject *parent)
+/* Socket I/O must continue while Session's SDL loop owns the GUI thread.
+ * Keep the transport and its timers together on one dedicated event loop.
+ * Design from aldobarr's #241 IO-thread rework, adopted after his
+ * mouse-latency measurements reproduced on #242. User-facing strings stay
+ * in Tunnel's tr() context so existing translations keep matching. */
+class TunnelWorker final : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit TunnelWorker(TunnelConfig config, QObject *parent = nullptr);
+    ~TunnelWorker() override;
+
+    bool start(QString *error = nullptr);
+    void stop() noexcept;
+
+signals:
+    void forwarding();
+    void finished(QString message);
+
+private:
+    void handleRemoteReadyRead();
+    void handleLocalReadyRead();
+    void failWith(const QString &message);
+    void finishCleanly();
+
+    TunnelConfig m_Config;
+    QTcpSocket *m_Local = nullptr;
+    QSslSocket *m_Remote = nullptr;
+    QTimer *m_StartupTimer = nullptr;
+    QByteArray m_HandshakeBuffer;
+    bool m_HandshakeDone = false;
+    bool m_PeerVerified = false;
+    bool m_Finished = false;
+};
+
+TunnelWorker::TunnelWorker(TunnelConfig config, QObject *parent)
     : QObject(parent), m_Config(std::move(config))
 {
     m_StartupTimer = new QTimer(this);
     m_StartupTimer->setSingleShot(true);
-    connect(m_StartupTimer, &QTimer::timeout, this, [this] {
-        failWith(tr("The USB tunnel connection timed out."));
-    });
+    connect(m_StartupTimer, &QTimer::timeout, this,
+            [this] { failWith(Tunnel::tr("The USB tunnel connection timed out.")); });
 }
 
-Tunnel::~Tunnel()
+TunnelWorker::~TunnelWorker()
 {
     stop();
 }
 
-bool Tunnel::start(QString *error)
+bool TunnelWorker::start(QString *error)
 {
     if (!m_Config.valid()) {
         if (error != nullptr) {
-            *error = tr("The USB tunnel configuration is incomplete.");
+            *error = Tunnel::tr("The USB tunnel configuration is incomplete.");
         }
         return false;
     }
     if (m_Local != nullptr || m_Remote != nullptr) {
         if (error != nullptr) {
-            *error = tr("The USB tunnel is already running.");
+            *error = Tunnel::tr("The USB tunnel is already running.");
         }
         return false;
     }
@@ -82,7 +116,7 @@ bool Tunnel::start(QString *error)
         /* A forwarded USB device is a high-trust channel: never fall back to
          * default CA verification. Require the cert pinned at pairing time. */
         if (error != nullptr) {
-            *error = tr("Pair with this host before forwarding USB devices.");
+            *error = Tunnel::tr("Pair with this host before forwarding USB devices.");
         }
         return false;
     }
@@ -104,87 +138,81 @@ bool Tunnel::start(QString *error)
     sslConfig.setPeerVerifyMode(QSslSocket::VerifyNone);
     m_Remote->setSslConfiguration(sslConfig);
 
+    connect(m_Remote, &QSslSocket::connected, this, [this] {
+        /* USB interrupt reports must not wait for Nagle's algorithm and a
+         * delayed peer ACK. Set this after the native socket exists. */
+        m_Remote->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+    });
     connect(m_Remote, &QSslSocket::encrypted, this, [this] {
         if (m_Remote->peerCertificate() != m_Config.pinnedServerCertificate) {
-            failWith(tr("The host certificate was rejected: unexpected certificate"));
+            failWith(Tunnel::tr("The host certificate was rejected: unexpected certificate"));
             return;
         }
         m_PeerVerified = true;
         /* The handshake is the only Moonlight-owned protocol on this socket. */
-        QJsonObject request {
+        QJsonObject request{
             { QStringLiteral("op"), QStringLiteral("forward") },
-            { QStringLiteral("token"),
-              QString::fromUtf8(m_Config.sessionToken) },
+            { QStringLiteral("token"), QString::fromUtf8(m_Config.sessionToken) },
             { QStringLiteral("busid"), QString::fromUtf8(m_Config.busId) },
         };
-        QByteArray line =
-            QJsonDocument(request).toJson(QJsonDocument::Compact);
+        QByteArray line = QJsonDocument(request).toJson(QJsonDocument::Compact);
         line.append('\n');
         m_Remote->write(line);
     });
-    connect(m_Remote, &QSslSocket::readyRead,
-            this, &Tunnel::handleRemoteReadyRead);
-    connect(m_Remote, &QSslSocket::disconnected, this, [this] {
-        finishCleanly();
-    });
+    connect(m_Remote, &QSslSocket::readyRead, this, &TunnelWorker::handleRemoteReadyRead);
+    connect(m_Remote, &QSslSocket::disconnected, this, [this] { finishCleanly(); });
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
-    connect(m_Remote, &QSslSocket::errorOccurred, this,
-            [this](QAbstractSocket::SocketError) {
-        failWith(tr("The connection to the host was lost: %1")
-                     .arg(m_Remote->errorString()));
+    connect(m_Remote, &QSslSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
+        failWith(
+            Tunnel::tr("The connection to the host was lost: %1").arg(m_Remote->errorString()));
     });
 #else
-    connect(m_Remote,
-            QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error),
-            this, [this](QAbstractSocket::SocketError) {
-        failWith(tr("The connection to the host was lost: %1")
-                     .arg(m_Remote->errorString()));
-    });
+    connect(
+        m_Remote, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error), this,
+        [this](QAbstractSocket::SocketError) {
+            failWith(
+                Tunnel::tr("The connection to the host was lost: %1").arg(m_Remote->errorString()));
+        });
 #endif
-    connect(m_Remote,
-            QOverload<const QList<QSslError>&>::of(&QSslSocket::sslErrors),
-            this, [this](const QList<QSslError> &errors) {
-        // Pairing pins the exact certificate, independent of hostname/CA
-        // validity. Never ignore errors for a different peer certificate.
-        if (m_Remote->peerCertificate() == m_Config.pinnedServerCertificate) {
-            m_Remote->ignoreSslErrors(errors);
-            return;
-        }
-        QStringList messages;
-        for (const QSslError &sslError : errors) {
-            messages.append(sslError.errorString());
-        }
-        failWith(tr("The host certificate was rejected: %1")
-                     .arg(messages.join(QStringLiteral("; "))));
-    });
+    connect(m_Remote, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this,
+            [this](const QList<QSslError> &errors) {
+                // Pairing pins the exact certificate, independent of hostname/CA
+                // validity. Never ignore errors for a different peer certificate.
+                if (m_Remote->peerCertificate() == m_Config.pinnedServerCertificate) {
+                    m_Remote->ignoreSslErrors(errors);
+                    return;
+                }
+                QStringList messages;
+                for (const QSslError &sslError : errors) {
+                    messages.append(sslError.errorString());
+                }
+                failWith(Tunnel::tr("The host certificate was rejected: %1")
+                             .arg(messages.join(QStringLiteral("; "))));
+            });
     /* Drain the peer once our queue empties so the pump resumes after a
      * high-water pause. */
-    connect(m_Remote, &QSslSocket::bytesWritten, this,
-            [this](qint64) { handleLocalReadyRead(); });
+    connect(m_Remote, &QSslSocket::bytesWritten, this, [this](qint64) { handleLocalReadyRead(); });
 
-    connect(m_Local, &QTcpSocket::readyRead,
-            this, &Tunnel::handleLocalReadyRead);
-    connect(m_Local, &QTcpSocket::connected,
-            this, &Tunnel::handleRemoteReadyRead);
-    connect(m_Local, &QTcpSocket::disconnected, this, [this] {
-        finishCleanly();
+    connect(m_Local, &QTcpSocket::readyRead, this, &TunnelWorker::handleLocalReadyRead);
+    connect(m_Local, &QTcpSocket::connected, this, [this] {
+        /* The loopback hop carries the same latency-sensitive USB requests. */
+        m_Local->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+        handleRemoteReadyRead();
     });
+    connect(m_Local, &QTcpSocket::disconnected, this, [this] { finishCleanly(); });
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
-    connect(m_Local, &QTcpSocket::errorOccurred, this,
-            [this](QAbstractSocket::SocketError) {
-        failWith(tr("The local USB service connection failed: %1")
-                     .arg(m_Local->errorString()));
+    connect(m_Local, &QTcpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
+        failWith(
+            Tunnel::tr("The local USB service connection failed: %1").arg(m_Local->errorString()));
     });
 #else
-    connect(m_Local,
-            QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error),
-            this, [this](QAbstractSocket::SocketError) {
-        failWith(tr("The local USB service connection failed: %1")
-                     .arg(m_Local->errorString()));
-    });
+    connect(m_Local, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error), this,
+            [this](QAbstractSocket::SocketError) {
+                failWith(Tunnel::tr("The local USB service connection failed: %1")
+                             .arg(m_Local->errorString()));
+            });
 #endif
-    connect(m_Local, &QTcpSocket::bytesWritten, this,
-            [this](qint64) { handleRemoteReadyRead(); });
+    connect(m_Local, &QTcpSocket::bytesWritten, this, [this](qint64) { handleRemoteReadyRead(); });
 
     m_Local->connectToHost(m_Config.localHost, m_Config.localPort);
     m_Remote->connectToHostEncrypted(m_Config.host, m_Config.port);
@@ -192,7 +220,7 @@ bool Tunnel::start(QString *error)
     return true;
 }
 
-void Tunnel::stop() noexcept
+void TunnelWorker::stop() noexcept
 {
     m_Finished = true;
     m_StartupTimer->stop();
@@ -210,7 +238,7 @@ void Tunnel::stop() noexcept
     }
 }
 
-void Tunnel::handleRemoteReadyRead()
+void TunnelWorker::handleRemoteReadyRead()
 {
     if (m_Finished || !m_PeerVerified || m_Remote == nullptr || m_Local == nullptr ||
         m_Local->state() != QAbstractSocket::ConnectedState) {
@@ -222,39 +250,33 @@ void Tunnel::handleRemoteReadyRead()
         const qsizetype newline = m_HandshakeBuffer.indexOf('\n');
         if (newline < 0) {
             if (m_HandshakeBuffer.size() > kMaxHandshakeBytes) {
-                failWith(tr("The host sent an invalid USB tunnel response."));
+                failWith(Tunnel::tr("The host sent an invalid USB tunnel response."));
             }
             return;
         }
         if (newline > kMaxHandshakeBytes) {
             /* Content alone exceeds the mirrored server limit; the server
              * would have closed at the same boundary. */
-            failWith(tr("The host sent an invalid USB tunnel response."));
-            return;
-        }
-        if (newline > kMaxHandshakeBytes) {
-            failWith(tr("The host sent an invalid USB tunnel response."));
+            failWith(Tunnel::tr("The host sent an invalid USB tunnel response."));
             return;
         }
         const QByteArray line = m_HandshakeBuffer.left(newline);
         m_HandshakeBuffer.remove(0, newline + 1);
 
-        const QJsonObject reply =
-            QJsonDocument::fromJson(line).object();
+        const QJsonObject reply = QJsonDocument::fromJson(line).object();
         const QString op = reply.value(QStringLiteral("op")).toString();
         if (op != QStringLiteral("ready")) {
-            const QString reason =
-                reply.value(QStringLiteral("reason")).toString();
+            const QString reason = reply.value(QStringLiteral("reason")).toString();
             failWith(reason.isEmpty()
-                         ? tr("The host could not start USB forwarding.")
-                         : tr("The host could not start USB forwarding: %1")
-                               .arg(reason));
+                         ? Tunnel::tr("The host could not start USB forwarding.")
+                         : Tunnel::tr("The host could not start USB forwarding: %1").arg(reason));
             return;
         }
         m_HandshakeDone = true;
         m_StartupTimer->stop();
         emit forwarding();
-        if (m_Finished) return;
+        if (m_Finished)
+            return;
         /* Residual bytes past the handshake line stay in m_HandshakeBuffer and
          * are flushed through the bounded pump below — never written directly,
          * so kHighWaterMark always applies. */
@@ -280,12 +302,13 @@ void Tunnel::handleRemoteReadyRead()
     }
 
     /* Drain anything the local USB/IP server queued before we were ready. */
-    if (!m_Finished && m_Local && m_HandshakeBuffer.isEmpty() && m_Local->bytesToWrite() < kHighWaterMark) {
+    if (!m_Finished && m_Local && m_HandshakeBuffer.isEmpty() &&
+        m_Local->bytesToWrite() < kHighWaterMark) {
         handleLocalReadyRead();
     }
 }
 
-void Tunnel::handleLocalReadyRead()
+void TunnelWorker::handleLocalReadyRead()
 {
     if (m_Remote == nullptr || m_Local == nullptr || !m_HandshakeDone) {
         /* Hold local data until the authenticated tunnel is ready. USB/IP
@@ -304,7 +327,7 @@ void Tunnel::handleLocalReadyRead()
     }
 }
 
-void Tunnel::failWith(const QString &message)
+void TunnelWorker::failWith(const QString &message)
 {
     if (m_Finished) {
         return;
@@ -313,17 +336,112 @@ void Tunnel::failWith(const QString &message)
     emit finished(message);
 }
 
-void Tunnel::finishCleanly()
+void TunnelWorker::finishCleanly()
 {
     if (m_Finished) {
         return;
     }
     if (!m_HandshakeDone) {
-        failWith(tr("The USB tunnel closed before the connection was ready."));
+        failWith(Tunnel::tr("The USB tunnel closed before the connection was ready."));
         return;
     }
     stop();
     emit finished(QString());
 }
 
+class Tunnel::Impl
+{
+public:
+    explicit Impl(TunnelConfig configuration) : config(std::move(configuration)) {}
+
+    TunnelConfig config;
+    QThread ioThread;
+    TunnelWorker *worker = nullptr;
+    quint64 generation = 0;
+};
+
+Tunnel::Tunnel(TunnelConfig config, QObject *parent)
+    : QObject(parent), m_Impl(std::make_unique<Impl>(std::move(config)))
+{
+}
+
+Tunnel::~Tunnel()
+{
+    stop();
+}
+
+bool Tunnel::start(QString *error)
+{
+    if (!m_Impl->config.valid()) {
+        if (error != nullptr) {
+            *error = tr("The USB tunnel configuration is incomplete.");
+        }
+        return false;
+    }
+    if (m_Impl->worker != nullptr) {
+        if (error != nullptr) {
+            *error = tr("The USB tunnel is already running.");
+        }
+        return false;
+    }
+    if (m_Impl->config.pinnedServerCertificate.isNull()) {
+        if (error != nullptr) {
+            *error = tr("Pair with this host before forwarding USB devices.");
+        }
+        return false;
+    }
+
+    auto *worker = new TunnelWorker(m_Impl->config);
+    m_Impl->worker = worker;
+    const quint64 generation = ++m_Impl->generation;
+    worker->moveToThread(&m_Impl->ioThread);
+    connect(&m_Impl->ioThread, &QThread::started, worker, [worker] {
+        QString startError;
+        if (!worker->start(&startError)) {
+            emit worker->finished(startError);
+        }
+    });
+    connect(worker, &TunnelWorker::forwarding, this, [this, generation] {
+        if (m_Impl->worker != nullptr && generation == m_Impl->generation) {
+            emit forwarding();
+        }
+    });
+    connect(worker, &TunnelWorker::finished, this, [this, generation](const QString &message) {
+        if (m_Impl->worker == nullptr || generation != m_Impl->generation) {
+            return;
+        }
+        stop();
+        emit finished(message);
+    });
+    m_Impl->ioThread.start();
+    return true;
+}
+
+void Tunnel::stop() noexcept
+{
+    TunnelWorker *worker = m_Impl->worker;
+    if (worker == nullptr) {
+        return;
+    }
+    m_Impl->worker = nullptr;
+    ++m_Impl->generation;
+    worker->disconnect(this);
+    /* Close sockets on their owning thread before returning, so device
+     * restoration cannot race with a still-open USB/IP connection. This
+     * does not wait for network I/O or any GUI-thread callback. */
+    if (m_Impl->ioThread.isRunning()) {
+        QMetaObject::invokeMethod(
+            worker, [worker] { worker->stop(); }, Qt::BlockingQueuedConnection);
+    } else {
+        worker->stop();
+    }
+    m_Impl->ioThread.quit();
+    m_Impl->ioThread.wait();
+    /* deleteLater posted around thread exit never gets processed on a dead
+     * loop; the owner deletes the worker outright once the thread joined. */
+    delete worker;
+}
+
 } // namespace UsbForwarding
+
+#include "usbforwardingtunnel.moc"

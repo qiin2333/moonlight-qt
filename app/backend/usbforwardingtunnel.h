@@ -8,9 +8,16 @@
  *
  *   local  : TCP to the platform USB/IP server (usbipd-win on 3240 on
  *            Windows; the per-session moonlight-usbd helper on an
- *            ephemeral loopback port on macOS)
+ *            ephemeral loopback port on macOS; the distro usbipd daemon
+ *            on 3240 on Linux)
  *   remote : TLS to Sunshine, authenticated with the paired client
  *            certificate, carrying the configured shared token
+ *
+ * Transport sockets run on a dedicated worker thread with its own event
+ * loop, independent of the Session/GUI loop: a forwarded 1000 Hz mouse
+ * produces a continuous URB stream, and pumping it on the Session loop
+ * starves input processing (measured in #241/#242 — aldobarr's mouse
+ * latency reports). Notifications are relayed back to the owner thread.
  *
  * Session owns the tunnel and closes it when streaming ends. The tunnel uses
  * a separate socket from video/audio/control; its port and token come from
@@ -23,14 +30,12 @@
 #include <QObject>
 #include <QSslConfiguration>
 #include <QString>
-
-class QSslSocket;
-class QTcpSocket;
-class QTimer;
+#include <memory>
 
 namespace UsbForwarding {
 
-struct TunnelConfig {
+struct TunnelConfig
+{
     /* Configured Sunshine USB endpoint. */
     QString host;
     quint16 port = 0;
@@ -60,7 +65,10 @@ public:
 
     Q_DISABLE_COPY(Tunnel)
 
+    // Call on this object's owning thread. Notifications return to that
+    // thread; sockets and timers are serviced by a private worker thread.
     bool start(QString *error = nullptr);
+    // Closes the transport and joins its worker before returning.
     void stop() noexcept;
 
 signals:
@@ -70,19 +78,8 @@ signals:
     void finished(QString message);
 
 private:
-    void handleRemoteReadyRead();
-    void handleLocalReadyRead();
-    void failWith(const QString &message);
-    void finishCleanly();
-
-    TunnelConfig m_Config;
-    QTcpSocket *m_Local = nullptr;
-    QSslSocket *m_Remote = nullptr;
-    QTimer *m_StartupTimer = nullptr;
-    QByteArray m_HandshakeBuffer;
-    bool m_HandshakeDone = false;
-    bool m_PeerVerified = false;
-    bool m_Finished = false;
+    class Impl;
+    std::unique_ptr<Impl> m_Impl;
 };
 
 } // namespace UsbForwarding
