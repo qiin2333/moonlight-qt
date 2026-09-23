@@ -14,7 +14,8 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 |---|---|---|
 | derive_version | scripts/derive-version.py 版本号推导 | Ubuntu(unittest) |
 | cursor_shape_classification | 光标位图 → 形状分类器的判定矩阵 | Windows |
-| clipboard_payload_routing | 剪贴板内联/外带路由阈值与文件引用保护 | Windows |
+| clipboard_payload_routing | 剪贴板状态、复合内容、文件保护、IPC 分帧和本地 TLS 传输回归（offscreen） | Windows |
+| clipboard_helper_lifecycle | helper 异常退出、响应超时和进程管道背压 | Windows |
 | overlay_button_position | 悬浮按钮归一化/还原坐标的跨分辨率往返 | Windows |
 | file_mapping_websocket_framing | 文件映射 WS 帧解析(fin/分片/ping-pong) | Windows |
 | file_mapping_mirror_e2e | 主机文件镜像端到端(FakeRemoteVfs + 挂载提供方) | Windows |
@@ -45,3 +46,5 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
   Linux 二进制毒化 Windows 构建(.qmake.stash 被 MSVC qmake 加载直接报错)。
 - 被测生产代码有平台分支的(如 clipboardsync.cpp 的 macx 段),跨平台跑法在
   .pro 里用条件 SOURCES 处理,别在测试里复制逻辑。
+
+剪贴板 TLS 回归仅访问本机随机端口。`clipboard_payload_routing/fixtures/` 中的证书和私钥是公开测试素材，不能用于实际配对；证书有效期至 2036 年，届时需要更新。测试不会访问用户配对凭据，也不使用系统剪贴板。macOS 的原生复合写入路径仍需实机验证。

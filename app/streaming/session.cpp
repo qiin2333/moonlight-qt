@@ -781,12 +781,30 @@ void Session::clSetHdrMode(bool enabled, void* hdrMetadata)
 void Session::clClipboardData(const char* data, int length)
 {
     Session* session = s_ActiveSession;
-    if (session == nullptr || session->m_ClipboardHelper == nullptr) {
+    if (session == nullptr) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(session->m_ClipboardHelperMutex);
+    if (session->m_ClipboardHelper == nullptr) {
         return;
     }
 
     // Queues internally; safe to call from the recv thread.
     session->m_ClipboardHelper->handleIncomingFrame(data, length);
+}
+
+void Session::stopClipboardHelper()
+{
+    ClipboardHelperClient* helper;
+    {
+        // Detach only after any in-flight receive callback has returned.
+        // Do not hold the lock while waiting for the helper process to exit.
+        std::lock_guard<std::mutex> lock(m_ClipboardHelperMutex);
+        helper = m_ClipboardHelper;
+        m_ClipboardHelper = nullptr;
+    }
+    delete helper;
 }
 
 void Session::clCursorUpdate(const LI_CURSOR_UPDATE* update)
@@ -1302,9 +1320,7 @@ Session::~Session()
     // Use Session::exec() or DeferredSessionCleanupTask instead.
 
     if (m_ClipboardHelper != nullptr) {
-        m_ClipboardHelper->stop();
-        delete m_ClipboardHelper;
-        m_ClipboardHelper = nullptr;
+        stopClipboardHelper();
     }
 
     if (m_UsbTunnel != nullptr) {
@@ -4496,9 +4512,7 @@ void Session::exec()
     // If the connection failed, clean up and abort the connection.
     if (!m_AsyncConnectionSuccess) {
         if (m_ClipboardHelper != nullptr) {
-            m_ClipboardHelper->stop();
-            delete m_ClipboardHelper;
-            m_ClipboardHelper = nullptr;
+            stopClipboardHelper();
         }
         if (m_DualSenseHapticsRenderer != nullptr) {
             m_DualSenseHapticsRenderer->setControllerTarget(-1);
@@ -4634,9 +4648,7 @@ void Session::exec()
                          SDL_GetError());
 
             if (m_ClipboardHelper != nullptr) {
-                m_ClipboardHelper->stop();
-                delete m_ClipboardHelper;
-                m_ClipboardHelper = nullptr;
+                stopClipboardHelper();
             }
             if (m_DualSenseHapticsRenderer != nullptr) {
                 m_DualSenseHapticsRenderer->setControllerTarget(-1);
@@ -5553,9 +5565,7 @@ DispatchDeferredCleanup:
 
     if (m_ClipboardHelper != nullptr) {
         m_ClipboardHelper->processPendingMessages();
-        m_ClipboardHelper->stop();
-        delete m_ClipboardHelper;
-        m_ClipboardHelper = nullptr;
+        stopClipboardHelper();
     }
 
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS

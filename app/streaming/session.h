@@ -429,7 +429,10 @@ private:
     QString m_FileMappingMountPath;
     QString m_FileMappingSessionId;
     Uint32 m_MenuCloseTicks;       // 菜单关闭时间戳（防抖）
-    class ClipboardHelperClient* m_ClipboardHelper; // Bidirectional clipboard sync helper process; nullptr when stream not active
+    void stopClipboardHelper();
+    std::mutex m_ClipboardHelperMutex;
+    class ClipboardHelperClient*
+        m_ClipboardHelper; // Protected from receive callbacks by m_ClipboardHelperMutex
     std::mutex m_CursorUpdateMutex;
     std::shared_ptr<RemoteCursorUpdate> m_PendingCursorUpdate;
     bool m_CursorUpdateEventQueued = false;

@@ -1,9 +1,11 @@
 #include "streaming/clipboardsync.h"
 
-#include <QCoreApplication>
+#include <QGuiApplication>
 #include <QMimeData>
 #include <QTextStream>
 #include <QUrl>
+
+bool runClipboardRegression(QTextStream& err);
 
 namespace {
 bool require(bool condition, const QString& message, QTextStream& err)
@@ -17,7 +19,8 @@ bool require(bool condition, const QString& message, QTextStream& err)
 
 int main(int argc, char* argv[])
 {
-    QCoreApplication app(argc, argv);
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    QGuiApplication app(argc, argv);
     QTextStream out(stdout);
     QTextStream err(stderr);
 
@@ -65,6 +68,8 @@ int main(int argc, char* argv[])
     plainImage.setData(QStringLiteral("image/png"), QByteArrayLiteral("png"));
     ok &= require(!ClipboardSync::hasFileReferences(&plainImage),
                   QStringLiteral("plain image clipboard was misclassified as a file clipboard"), err);
+
+    ok &= runClipboardRegression(err);
 
     if (!ok) {
         return 1;

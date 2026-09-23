@@ -30,6 +30,7 @@ public:
     bool isRunning() const;
 
 private:
+    friend class ClipboardHelperClientTest;
     static constexpr int MAX_QUEUED_HOST_FRAMES = 32;
     static constexpr int MAX_PENDING_STDIN_BYTES = 4 * 1024 * 1024;
     static constexpr int MAX_RESTART_ATTEMPTS = 3;
@@ -66,6 +67,9 @@ private:
     quint32 m_ConfigSequence;
     quint32 m_NextSequence;
     quint32 m_NextRestartTicks;
+    quint32 m_LastResponseTicks = 0;
+    quint32 m_LastPingTicks = 0;
+    quint32 m_ConfigSentTicks = 0;
     int m_RestartAttempts;
     int m_DroppedInboundFrames;
 };
