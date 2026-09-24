@@ -8,6 +8,7 @@
 #include "streaming/audio/dualsensehapticscalibration.h"
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
 #include "streaming/input/stylusreplaytest.h"
+#include "streaming/input/gamepadglyphs.h"
 #endif
 #include "backend/richpresencemanager.h"
 #include "backend/nvhttp.h"
@@ -264,6 +265,49 @@ QRect qtOverlayGeometryForSdlWindow(SDL_Window* window)
 
     return QRect(x, y, width, height);
 #endif
+}
+
+// SDL 事件队列默认容量不小,但满的时候 SDL_PushEvent 会静默失败。这里排队
+// 的事件丢了症状都很隐蔽(震动失灵、传感器停发、重连后画面不恢复等),
+// 所以至少把失败写进日志。
+static void pushEventOrWarn(SDL_Event& event)
+{
+    if (SDL_PushEvent(&event) < 0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to queue SDL event (type=0x%x): %s",
+                    event.type, SDL_GetError());
+    }
+}
+
+// 退出组合键的 glyph 文案,按键名按手柄 UI 风格显示
+// (与 StreamSegue.qml 的 quitComboHintText 保持同一映射)
+static QString gamepadQuitComboGlyphText(GamepadUiStyle style,
+                                         StreamingPreferences::GamepadQuitCombo combo,
+                                         bool swapFaceButtons)
+{
+    QString lb = gamepadLeftShoulderName(style);
+    QString rb = gamepadRightShoulderName(style);
+    // swapFaceButtons 在组合键匹配前交换事件,提示必须显示"要按的那颗物理
+    // 键":逻辑面键取对侧位置(0↔1、2↔3)
+    auto face = [style, swapFaceButtons](int logicalButton) {
+        return gamepadFaceButtonGlyph(style, swapFaceButtons ? (logicalButton ^ 1) : logicalButton);
+    };
+
+    switch (combo) {
+    case StreamingPreferences::GQC_SELECT_L1_R1_Y:
+        return gamepadSelectButtonName(style) + "+" + lb + "+" + rb + "+" + face(3);
+    case StreamingPreferences::GQC_START_L1_R1_A:
+        return gamepadStartButtonName(style) + "+" + lb + "+" + rb + "+" + face(0);
+    case StreamingPreferences::GQC_START_L1_R1_B:
+        return gamepadStartButtonName(style) + "+" + lb + "+" + rb + "+" + face(1);
+    case StreamingPreferences::GQC_L1_R1_X_Y:
+        return lb + "+" + rb + "+" + face(2) + "+" + face(3);
+    case StreamingPreferences::GQC_L1_R1_A_B:
+        return lb + "+" + rb + "+" + face(0) + "+" + face(1);
+    case StreamingPreferences::GQC_DEFAULT:
+    default:
+        return gamepadStartButtonName(style) + "+" + gamepadSelectButtonName(style) + "+" + lb +
+               "+" + rb;
+    }
 }
 
 OverlayMenuPanel::MenuAction menuPlacementActionForPreference(
@@ -575,7 +619,7 @@ void Session::clConnectionTerminated(int errorCode)
         SDL_Event event;
         event.type = SDL_QUIT;
         event.quit.timestamp = SDL_GetTicks();
-        SDL_PushEvent(&event);
+        pushEventOrWarn(event);
         return;
     }
 
@@ -590,7 +634,7 @@ void Session::clConnectionTerminated(int errorCode)
     SDL_Event event;
     event.type = SDL_QUIT;
     event.quit.timestamp = SDL_GetTicks();
-    SDL_PushEvent(&event);
+    pushEventOrWarn(event);
 }
 
 void Session::displayTerminationError(int errorCode)
@@ -685,7 +729,7 @@ void Session::clRumble(unsigned short controllerNumber, unsigned short lowFreqMo
     rumbleEvent.user.code = SDL_CODE_GAMECONTROLLER_RUMBLE;
     rumbleEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
     rumbleEvent.user.data2 = (void*)(uintptr_t)((lowFreqMotor << 16) | highFreqMotor);
-    SDL_PushEvent(&rumbleEvent);
+    pushEventOrWarn(rumbleEvent);
 }
 
 void Session::clConnectionStatusUpdate(int connectionStatus)
@@ -738,12 +782,30 @@ void Session::clSetHdrMode(bool enabled, void* hdrMetadata)
 void Session::clClipboardData(const char* data, int length)
 {
     Session* session = s_ActiveSession;
-    if (session == nullptr || session->m_ClipboardHelper == nullptr) {
+    if (session == nullptr) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(session->m_ClipboardHelperMutex);
+    if (session->m_ClipboardHelper == nullptr) {
         return;
     }
 
     // Queues internally; safe to call from the recv thread.
     session->m_ClipboardHelper->handleIncomingFrame(data, length);
+}
+
+void Session::stopClipboardHelper()
+{
+    ClipboardHelperClient* helper;
+    {
+        // Detach only after any in-flight receive callback has returned.
+        // Do not hold the lock while waiting for the helper process to exit.
+        std::lock_guard<std::mutex> lock(m_ClipboardHelperMutex);
+        helper = m_ClipboardHelper;
+        m_ClipboardHelper = nullptr;
+    }
+    delete helper;
 }
 
 void Session::clCursorUpdate(const LI_CURSOR_UPDATE* update)
@@ -863,7 +925,7 @@ void Session::clRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger, 
     rumbleEvent.user.code = SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS;
     rumbleEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
     rumbleEvent.user.data2 = (void*)(uintptr_t)((leftTrigger << 16) | rightTrigger);
-    SDL_PushEvent(&rumbleEvent);
+    pushEventOrWarn(rumbleEvent);
 }
 
 void Session::clSetMotionEventState(uint16_t controllerNumber, uint8_t motionType, uint16_t reportRateHz)
@@ -876,7 +938,7 @@ void Session::clSetMotionEventState(uint16_t controllerNumber, uint8_t motionTyp
     setMotionEventStateEvent.user.code = SDL_CODE_GAMECONTROLLER_SET_MOTION_EVENT_STATE;
     setMotionEventStateEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
     setMotionEventStateEvent.user.data2 = (void*)(uintptr_t)((motionType << 16) | reportRateHz);
-    SDL_PushEvent(&setMotionEventStateEvent);
+    pushEventOrWarn(setMotionEventStateEvent);
 }
 
 void Session::clSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b)
@@ -889,7 +951,7 @@ void Session::clSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g
     setControllerLEDEvent.user.code = SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED;
     setControllerLEDEvent.user.data1 = (void*)(uintptr_t)controllerNumber;
     setControllerLEDEvent.user.data2 = (void*)(uintptr_t)(r << 16 | g << 8 | b);
-    SDL_PushEvent(&setControllerLEDEvent);
+    pushEventOrWarn(setControllerLEDEvent);
 }
 
 void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlags, uint8_t typeLeft, uint8_t typeRight, uint8_t *left, uint8_t *right){
@@ -1288,9 +1350,7 @@ Session::~Session()
     // Use Session::exec() or DeferredSessionCleanupTask instead.
 
     if (m_ClipboardHelper != nullptr) {
-        m_ClipboardHelper->stop();
-        delete m_ClipboardHelper;
-        m_ClipboardHelper = nullptr;
+        stopClipboardHelper();
     }
 
     if (m_UsbTunnel != nullptr) {
@@ -1335,6 +1395,11 @@ void Session::refreshRemoteUsbDevices()
             const QVariantMap device = entry.toMap();
             if (!device.value(QStringLiteral("isBound")).toBool() ||
                 !device.value(QStringLiteral("isConnected")).toBool()) {
+                continue;
+            }
+            // Linux：共享后端口上被换成另一台设备（busid 相同、身份不符）
+            // 时禁止转发，避免张冠李戴；isReplaced 仅 Linux 后端产生。
+            if (device.value(QStringLiteral("isReplaced")).toBool()) {
                 continue;
             }
             OverlayMenuPanel::RemoteUsbDevice menuDevice;
@@ -2622,7 +2687,13 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
     SDL_FlushEvent(SDL_MOUSEMOTION);
 
     // Rebuild for the current gamepad set before applying dynamic menu state.
-    m_MenuPanel->setHasGamepads(m_InputHandler->getAttachedGamepadMask() != 0);
+    GamepadUiStyle gamepadUiStyle = m_InputHandler->getGamepadUiStyle();
+    m_MenuPanel->setGamepadHints(
+        m_InputHandler->hasConnectedGamepads(), gamepadUiStyle, m_Preferences->swapFaceButtons,
+        m_InputHandler->getGamepadQuitEnabled()
+            ? gamepadQuitComboGlyphText(gamepadUiStyle, m_InputHandler->getGamepadQuitCombo(),
+                                        m_Preferences->swapFaceButtons)
+            : QString());
 
     if (m_Preferences->usbForwardingEnabled &&
         m_RemoteUsbState != OverlayMenuPanel::RemoteUsbState::Opening &&
@@ -3551,7 +3622,12 @@ void Session::notifyMouseEmulationMode(bool enabled)
 
     // We re-use the status update overlay for mouse mode notification
     if (m_MouseEmulationRefCount > 0) {
-        m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate, "Gamepad mouse mode active\nLong press Start to deactivate");
+        m_OverlayManager.updateOverlayText(
+            Overlay::OverlayStatusUpdate,
+            QStringLiteral("Gamepad mouse mode active\nLong press %1 to deactivate")
+                .arg(gamepadStartButtonName(m_InputHandler->getGamepadUiStyle()))
+                .toUtf8()
+                .constData());
         m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
     }
     else {
@@ -3823,7 +3899,7 @@ bool Session::tryReconnect()
         // format. Recreate the decoder through the normal reset path.
         SDL_Event resetEvent = {};
         resetEvent.type = SDL_RENDER_DEVICE_RESET;
-        SDL_PushEvent(&resetEvent);
+        pushEventOrWarn(resetEvent);
 
         // Streaming is healthy again, so a subsequent SDL_QUIT is expected
         // to mean a real termination rather than another reconnect.
@@ -4189,7 +4265,7 @@ void Session::flushWindowEvents()
     SDL_Event flushEvent = {};
     flushEvent.type = SDL_USEREVENT;
     flushEvent.user.code = SDL_CODE_FLUSH_WINDOW_EVENT_BARRIER;
-    SDL_PushEvent(&flushEvent);
+    pushEventOrWarn(flushEvent);
 }
 
 void Session::setShouldExit(bool quitHostApp)
@@ -4272,7 +4348,7 @@ void Session::interrupt()
     SDL_Event event;
     event.type = SDL_QUIT;
     event.quit.timestamp = SDL_GetTicks();
-    SDL_PushEvent(&event);
+    pushEventOrWarn(event);
 }
 
 #ifdef Q_OS_WIN32
@@ -4472,9 +4548,7 @@ void Session::exec()
     // If the connection failed, clean up and abort the connection.
     if (!m_AsyncConnectionSuccess) {
         if (m_ClipboardHelper != nullptr) {
-            m_ClipboardHelper->stop();
-            delete m_ClipboardHelper;
-            m_ClipboardHelper = nullptr;
+            stopClipboardHelper();
         }
         if (m_DualSenseHapticsRenderer != nullptr) {
             m_DualSenseHapticsRenderer->setControllerTarget(-1);
@@ -4610,9 +4684,7 @@ void Session::exec()
                          SDL_GetError());
 
             if (m_ClipboardHelper != nullptr) {
-                m_ClipboardHelper->stop();
-                delete m_ClipboardHelper;
-                m_ClipboardHelper = nullptr;
+                stopClipboardHelper();
             }
             if (m_DualSenseHapticsRenderer != nullptr) {
                 m_DualSenseHapticsRenderer->setControllerTarget(-1);
@@ -4814,7 +4886,7 @@ void Session::exec()
         SDL_Event wakeEvent = {};
         wakeEvent.type = SDL_USEREVENT;
         wakeEvent.user.code = SDL_CODE_PROCESS_QT_OVERLAY_EVENTS;
-        SDL_PushEvent(&wakeEvent);
+        pushEventOrWarn(wakeEvent);
     });
 #endif
     m_MenuButton->setClickCallback([this](const QPoint& globalPosition,
@@ -4844,11 +4916,13 @@ void Session::exec()
         // visibility as active Qt work forces this SDL loop to wake and drain
         // all Qt events every 10 ms even while the button is idle, which can
         // delay input and video processing.
-        // Remote USB 转发的 queued 工作全部投递在本线程（helper spawn 的
-        // worker-finished lambda、tunnel socket I/O、helper stderr 排水），
+        // Remote USB 转发的 queued 工作投递在本线程（helper spawn 的
+        // worker-finished lambda、tunnel 状态通知、helper stderr 排水），
         // 而本循环已取代 app.exec()、只在返回 true 时泵事件：转发存续期间
         // 必须保持泵转，否则 helper 无法启动、日志会写满 stderr 管道把
-        // moonlight-usbd 卡死、转发数据也会停摆。
+        // moonlight-usbd 卡死、tunnel 的 forwarding/finished 通知也收不到。
+        // 隧道的数据面跑在自己的 IO 线程（usbforwardingtunnel.cpp），不依赖
+        // 本泵——1000Hz 鼠标的 URB 洪流不再与输入处理争抢本线程。
         return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
                (m_MenuButton && m_MenuButton->needsEventProcessing()) ||
                (m_Toast && m_Toast->needsEventProcessing()) ||
@@ -5529,9 +5603,7 @@ DispatchDeferredCleanup:
 
     if (m_ClipboardHelper != nullptr) {
         m_ClipboardHelper->processPendingMessages();
-        m_ClipboardHelper->stop();
-        delete m_ClipboardHelper;
-        m_ClipboardHelper = nullptr;
+        stopClipboardHelper();
     }
 
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS

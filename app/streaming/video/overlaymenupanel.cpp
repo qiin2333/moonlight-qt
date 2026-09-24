@@ -22,35 +22,80 @@ const QColor MenuFaint("#7E858E");
 const QColor MenuAccent("#39C5BB");
 const QColor MenuDanger("#FF876F");
 
-// Bitrate scrubber range and granularity — log scale like the settings page
-// slider. The maximum matches Sunshine's /bitrate runtime endpoint cap
-// (800000 Kbps); higher values would be rejected by the host.
+// Piecewise-linear bitrate scale. Values are Kbps.
 constexpr int kBitrateMinKbps = 500;
 constexpr int kBitrateMaxKbps = 800000;
-constexpr int kBitrateLogSteps = 200;
-const double kBitrateLogSpan = qLn(kBitrateMaxKbps / double(kBitrateMinKbps));
+struct BitrateSegment
+{
+    int maxKbps;
+    int stepKbps;
+};
+constexpr BitrateSegment kBitrateSegments[] = {
+    { 5000, 500 },      // 0.5–5 Mbps: 0.5 Mbps
+    { 20000, 1000 },    // 5–20 Mbps: 1 Mbps
+    { 50000, 2000 },    // 20–50 Mbps: 2 Mbps
+    { 100000, 5000 },   // 50–100 Mbps: 5 Mbps
+    { 200000, 10000 },  // 100–200 Mbps: 10 Mbps
+    { 400000, 50000 },  // 200–400 Mbps: 50 Mbps
+    { 800000, 100000 }, // 400–800 Mbps: 100 Mbps
+};
+
+constexpr int bitrateSliderMaximum()
+{
+    int position = 0;
+    int segmentMinKbps = kBitrateMinKbps;
+    for (const auto& segment : kBitrateSegments) {
+        position += (segment.maxKbps - segmentMinKbps) / segment.stepKbps;
+        segmentMinKbps = segment.maxKbps;
+    }
+    return position;
+}
+constexpr int kBitrateSliderMax = bitrateSliderMaximum();
+
+double bitrateToSliderPosition(int bitrateKbps)
+{
+    const int bitrate = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    double position = 0;
+    int segmentMinKbps = kBitrateMinKbps;
+    for (const auto& segment : kBitrateSegments) {
+        if (bitrate <= segment.maxKbps) {
+            return position + (bitrate - segmentMinKbps) / double(segment.stepKbps);
+        }
+        position += (segment.maxKbps - segmentMinKbps) / double(segment.stepKbps);
+        segmentMinKbps = segment.maxKbps;
+    }
+    return position;
+}
+
+int sliderPositionToBitrate(double sliderPosition)
+{
+    const int position = qBound(0, qRound(sliderPosition), kBitrateSliderMax);
+    int segmentStart = 0;
+    int segmentMinKbps = kBitrateMinKbps;
+    for (const auto& segment : kBitrateSegments) {
+        const int segmentSteps = (segment.maxKbps - segmentMinKbps) / segment.stepKbps;
+        if (position <= segmentStart + segmentSteps) {
+            return segmentMinKbps + (position - segmentStart) * segment.stepKbps;
+        }
+        segmentStart += segmentSteps;
+        segmentMinKbps = segment.maxKbps;
+    }
+    return kBitrateMaxKbps;
+}
 // Idle window after the last scrub tick before the change is committed.
 constexpr int kBitrateCommitDelayMs = 450;
+// Bottom hint bar height, shown only while a gamepad is connected
+constexpr int kGamepadHintBarHeight = 30;
 }
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
-    : QRasterWindow(parent),
-      m_CurrentLevel(0),
-      m_HoveredIndex(-1),
-      m_Visible(false),
-      m_HasGamepads(false),
-      m_FileMappingState(FileMappingState::Unknown),
-      m_FileMappingDetail(tr("Checking")),
-      m_RemoteUsbAvailable(false),
-      m_RemoteUsbState(RemoteUsbState::Unavailable),
-      m_RemoteUsbDetail(tr("Unavailable")),
-      m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
-      m_CloseWhenPointerOutside(false),
-      m_ContentOffset(0),
-      m_Closing(false),
-      m_TargetPosition(),
-      m_AnchorMode(AnchorMode::RightEdge),
-      m_TriggerPosition(std::nullopt)
+    : QRasterWindow(parent), m_CurrentLevel(0), m_HoveredIndex(-1), m_Visible(false),
+      m_HasGamepads(false), m_GamepadUiStyle(GamepadUiStyleXbox), m_SwapFaceButtons(false),
+      m_FileMappingState(FileMappingState::Unknown), m_FileMappingDetail(tr("Checking")),
+      m_RemoteUsbAvailable(false), m_RemoteUsbState(RemoteUsbState::Unavailable),
+      m_RemoteUsbDetail(tr("Unavailable")), m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
+      m_CloseWhenPointerOutside(false), m_ContentOffset(0), m_Closing(false), m_TargetPosition(),
+      m_AnchorMode(AnchorMode::RightEdge), m_TriggerPosition(std::nullopt)
 {
     setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
              | Qt::WindowDoesNotAcceptFocus);
@@ -207,8 +252,8 @@ void OverlayMenuPanel::buildMenuLevels()
         top.items.push_back({tr("Gamepad Mouse"), QString(),  MenuItemType::Toggle,
                              MenuAction::ToggleGamepadMouse, 0, true, false, true}); // separator
     }
-    top.items.push_back({tr("Disconnect"),    QString(),  MenuItemType::Action,
-                         MenuAction::Quit, 0, true, false, false});
+    top.items.push_back({ tr("Disconnect"), m_HasGamepads ? m_QuitComboGlyphs : QString(),
+                          MenuItemType::Action, MenuAction::Quit, 0, true, false, false });
     m_MenuLevels.push_back(top);
 
     // === Level 1: Quick Actions (keyboard shortcuts) ===
@@ -216,8 +261,18 @@ void OverlayMenuPanel::buildMenuLevels()
     shortcuts.title = tr("Quick Actions");
     shortcuts.items.push_back({tr("Quit Moonlight"),      "Ctrl+Alt+Shift+E", MenuItemType::Action,
                                MenuAction::QuitAndExit,           0, true, false, true});
-    shortcuts.items.push_back({tr("Performance Stats"),   "Ctrl+Alt+Shift+S", MenuItemType::Action,
-                               MenuAction::ToggleStatsOverlay,    0, true, false, true});
+    QString statsDetail = QStringLiteral("Ctrl+Alt+Shift+S");
+    if (m_HasGamepads) {
+        // 手柄组合键与键盘快捷键并列展示,按键名按实体手柄风格显示;
+        // swapFaceButtons 时同样补偿到实际要按的物理键
+        const int statsFace = m_SwapFaceButtons ? 3 : 2;
+        statsDetail += QString::fromUtf8(" \xc2\xb7 ") + gamepadSelectButtonName(m_GamepadUiStyle) +
+                       QStringLiteral("+") + gamepadLeftShoulderName(m_GamepadUiStyle) +
+                       QStringLiteral("+") + gamepadRightShoulderName(m_GamepadUiStyle) +
+                       QStringLiteral("+") + gamepadFaceButtonGlyph(m_GamepadUiStyle, statsFace);
+    }
+    shortcuts.items.push_back({ tr("Performance Stats"), statsDetail, MenuItemType::Action,
+                                MenuAction::ToggleStatsOverlay, 0, true, false, true });
     shortcuts.items.push_back({tr("Mouse Mode"),          "Ctrl+Alt+Shift+M", MenuItemType::Action,
                                MenuAction::ToggleMouseMode,       0, true, false, false});
     shortcuts.items.push_back({tr("Show/Hide Cursor"),    "Ctrl+Alt+Shift+C", MenuItemType::Action,
@@ -232,7 +287,7 @@ void OverlayMenuPanel::buildMenuLevels()
                                MenuAction::TogglePointerRegionLock, 0, true, false, false});
     m_MenuLevels.push_back(shortcuts);
 
-    // === Level 2: Bitrate (log-scale scrubber row + presets) ===
+    // === Level 2: Bitrate (piecewise-linear scrubber row + presets) ===
     MenuLevel bitrate;
     bitrate.title = tr("Bitrate");
     bitrate.items.push_back({QString(), QString(), MenuItemType::Slider,
@@ -415,22 +470,13 @@ void OverlayMenuPanel::refreshBitrateDetails()
 
 double OverlayMenuPanel::bitrateFraction() const
 {
-    return qBound(0.0, qLn(m_BitrateKbps / double(kBitrateMinKbps)) / kBitrateLogSpan, 1.0);
+    return qBound(0.0, bitrateToSliderPosition(m_BitrateKbps) / kBitrateSliderMax, 1.0);
 }
 
 void OverlayMenuPanel::setBitrateKbps(int bitrateKbps)
 {
     bitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
-    // Round to display-friendly granularity so the label doesn't flicker
-    // while scrubbing (also keeps committed values tidy).
-    if (bitrateKbps < 10000) {
-        bitrateKbps = qRound(bitrateKbps / 50.0) * 50;
-    } else if (bitrateKbps < 100000) {
-        bitrateKbps = qRound(bitrateKbps / 500.0) * 500;
-    } else {
-        bitrateKbps = qRound(bitrateKbps / 5000.0) * 5000;
-    }
-    bitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    bitrateKbps = sliderPositionToBitrate(bitrateToSliderPosition(bitrateKbps));
     if (bitrateKbps == m_BitrateKbps) return;
 
     m_BitrateKbps = bitrateKbps;
@@ -442,13 +488,15 @@ void OverlayMenuPanel::setBitrateKbps(int bitrateKbps)
 void OverlayMenuPanel::setBitrateFromFraction(double fraction)
 {
     fraction = qBound(0.0, fraction, 1.0);
-    setBitrateKbps(qRound(kBitrateMinKbps * qExp(fraction * kBitrateLogSpan)));
+    setBitrateKbps(sliderPositionToBitrate(fraction * kBitrateSliderMax));
 }
 
 void OverlayMenuPanel::adjustBitrateStep(int direction, int multiplier)
 {
-    const double step = (kBitrateLogSpan / kBitrateLogSteps) * qMax(1, multiplier);
-    setBitrateFromFraction(bitrateFraction() + direction * step);
+    const double position = bitrateToSliderPosition(m_BitrateKbps);
+    const int alignedPosition = direction > 0 ? qFloor(position) : qCeil(position);
+    const int nextPosition = alignedPosition + direction * qMax(1, multiplier);
+    setBitrateKbps(sliderPositionToBitrate(nextPosition));
 }
 
 void OverlayMenuPanel::commitBitrateNow()
@@ -784,6 +832,9 @@ void OverlayMenuPanel::repositionWindow()
     int itemCount  = (int)m_MenuLevels[m_CurrentLevel].items.size();
     int titleH     = m_TitleHeight;
     int menuHeight = titleH + itemCount * m_ItemHeight + m_Padding * 2;
+    if (m_HasGamepads) {
+        menuHeight += kGamepadHintBarHeight;
+    }
 
     const QPoint triggerPosition = m_TriggerPosition.value_or(QPoint());
 
@@ -1233,6 +1284,26 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             int sepY = itemY + m_ItemHeight - 1;
             p.drawLine(labelX, sepY, cw - textPad, sepY);
         }
+    }
+
+    // Gamepad hint bar: pad-only players get the menu bindings on screen
+    // instead of having to know them. Faces follow the controller style
+    // (PS: ✕ Select / ○ Back; Nintendo: B Select / A Back), compensated for
+    // swapFaceButtons so the hint names the physical button to press.
+    if (m_HasGamepads) {
+        const int hintTop = ch - m_Padding - kGamepadHintBarHeight;
+        p.setPen(QPen(MenuLine, 1));
+        p.drawLine(textPad, hintTop, cw - textPad, hintTop);
+        p.setFont(m_DetailFont);
+        p.setPen(MenuDim);
+        const QString hint = QStringLiteral("\xe2\x86\x91\xe2\x86\x93 ") + tr("Move") +
+                             QStringLiteral("      ") +
+                             gamepadFaceButtonGlyph(m_GamepadUiStyle, m_SwapFaceButtons ? 1 : 0) +
+                             QStringLiteral(" ") + tr("Select") + QStringLiteral("      ") +
+                             gamepadFaceButtonGlyph(m_GamepadUiStyle, m_SwapFaceButtons ? 0 : 1) +
+                             QStringLiteral(" ") + tr("Back");
+        p.drawText(QRect(textPad, hintTop + 1, cw - textPad * 2, kGamepadHintBarHeight - 1),
+                   Qt::AlignLeft | Qt::AlignVCenter, hint);
     }
 
     p.restore();  // content offset

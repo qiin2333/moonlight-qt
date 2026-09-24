@@ -1,0 +1,5 @@
+<RCC><qresource prefix="/clipboard-test">
+<file alias="server.pem">fixtures/server.pem</file>
+<file alias="server-key.pem">fixtures/server-key.pem</file>
+<file alias="other.pem">fixtures/other.pem</file>
+</qresource></RCC>

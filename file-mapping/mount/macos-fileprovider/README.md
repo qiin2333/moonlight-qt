@@ -60,7 +60,7 @@ M3 implements file content materialization through `RemoteVfs::open/read/close`.
 Signed builds can set:
 
 ```text
-MOONLIGHT_FILE_PROVIDER_APP_GROUP=group.com.moonlight-stream.Moonlight.FileProvider
+MOONLIGHT_FILE_PROVIDER_APP_GROUP=group.com.alkaidlab.vpluspc.FileProvider
 ```
 
 If the variable is missing, the extension is still bundled for CI/test builds, but it is signed without App Group entitlements.

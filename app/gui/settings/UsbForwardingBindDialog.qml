@@ -18,6 +18,7 @@ NavigableDialog {
     id: dialog
 
     readonly property bool isMac: SystemProperties.isDarwin
+    readonly property bool isLinux: SystemProperties.isLinux
 
     title: qsTr("Share USB devices")
     closePolicy: Popup.CloseOnEscape
@@ -41,6 +42,9 @@ NavigableDialog {
     }
 
     function deviceStatusText(d) {
+        if (d.isReplaced !== undefined && d.isReplaced) {
+            return qsTr("Device changed — release and share again")
+        }
         if (d.isOccupied !== undefined && d.isOccupied) {
             return qsTr("In use by macOS")
         }
@@ -57,6 +61,9 @@ NavigableDialog {
     }
 
     function deviceStatusColor(d) {
+        if (d.isReplaced !== undefined && d.isReplaced) {
+            return Theme.danger
+        }
         if (d.isOccupied !== undefined && d.isOccupied) {
             return Theme.danger
         }
@@ -101,7 +108,9 @@ NavigableDialog {
                     Layout.fillWidth: true
                     text: dialog.isMac
                           ? qsTr("To restore a device during a stream, release it from the USB Devices menu in the stream overlay or end the stream. Sharing is remembered by Moonlight and needs no administrator confirmation.")
-                          : qsTr("Stop sharing to restore it. Sharing needs administrator confirmation, once per device.")
+                          : dialog.isLinux
+                            ? qsTr("Stop sharing to restore it locally. Sharing takes over the device and asks for administrator confirmation; the authorization is remembered for a few minutes.")
+                            : qsTr("Stop sharing to restore it. Sharing needs administrator confirmation, once per device.")
                     color: Theme.textDim
                     font.family: Theme.fontSans
                     font.pointSize: Theme.fontCaption

@@ -45,6 +45,21 @@ if defined TESTARGS (set "TESTARGS=%TESTARGS% %CUR%") else set "TESTARGS=%CUR%"
 shift
 goto collect_args
 :run_test
+rem The SDL2 compatibility DLL loads SDL3 dynamically before main(). Do not let
+rem unrelated PATH entries hide missing runtime files in this regression.
+if not "%TARGET_EXE%"=="clipboard_helper_lifecycle" goto run_binary
+if not exist release\SDL2.dll goto missing_lifecycle_runtime
+if not exist release\SDL3.dll goto missing_lifecycle_runtime
+set "LIFECYCLE_QT_BIN="
+for /f "delims=" %%q in ('qmake -query QT_INSTALL_BINS') do set "LIFECYCLE_QT_BIN=%%q"
+if not defined LIFECYCLE_QT_BIN goto missing_lifecycle_runtime
+set "PATH=%LIFECYCLE_QT_BIN%;%SystemRoot%\System32;%SystemRoot%"
+goto run_binary
+:missing_lifecycle_runtime
+echo Missing lifecycle runtime: require local SDL2.dll, SDL3.dll and Qt bin directory
+popd
+exit /b 1
+:run_binary
 setlocal EnableDelayedExpansion
 release\%TARGET_EXE%.exe !TESTARGS!
 endlocal & set "RC=%ERRORLEVEL%"

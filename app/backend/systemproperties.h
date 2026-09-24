@@ -20,6 +20,7 @@ public:
     Q_PROPERTY(bool isRunningXWayland MEMBER isRunningXWayland CONSTANT)
     Q_PROPERTY(bool isWow64 MEMBER isWow64 CONSTANT)
     Q_PROPERTY(bool isDarwin MEMBER isDarwin CONSTANT)
+    Q_PROPERTY(bool isLinux MEMBER isLinux CONSTANT)
     Q_PROPERTY(QString friendlyNativeArchName MEMBER friendlyNativeArchName CONSTANT)
     Q_PROPERTY(bool hasDesktopEnvironment MEMBER hasDesktopEnvironment CONSTANT)
     Q_PROPERTY(bool hasBrowser MEMBER hasBrowser CONSTANT)
@@ -75,6 +76,7 @@ private:
     bool usesMaterial3Theme;
     bool usesFluentTheme;
     bool isDarwin;
+    bool isLinux;
     bool usbForwardingAvailable = false;
 
     // Properties only set if startAsyncLoad() is called

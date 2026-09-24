@@ -81,6 +81,7 @@ bool ClipboardHelperClient::startProcess()
     m_StdoutBuffer.clear();
     m_StderrBuffer.clear();
     m_StdinBuffer.clear();
+    m_ConfigSentTicks = m_LastResponseTicks = m_LastPingTicks = SDL_GetTicks();
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "Clipboard helper started: %s",
                 m_HelperPath.toUtf8().constData());
@@ -154,6 +155,10 @@ void ClipboardHelperClient::processPendingMessages()
     if (m_Process->state() == QProcess::NotRunning) {
         readHelperOutput();
         readHelperErrors();
+        // Invalid trailing output may have already destroyed the process.
+        if (m_Process == nullptr) {
+            return;
+        }
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Clipboard helper exited: exitCode=%d error=%s",
                     m_Process->exitCode(),
@@ -175,6 +180,21 @@ void ClipboardHelperClient::processPendingMessages()
     m_Process->waitForReadyRead(0);
     readHelperOutput();
     readHelperErrors();
+    if (m_Process == nullptr) {
+        return;
+    }
+    const quint32 now = SDL_GetTicks();
+    if (SDL_TICKS_PASSED(now, m_LastResponseTicks + 30000) ||
+        (!m_HelperReady && SDL_TICKS_PASSED(now, m_ConfigSentTicks + 30000))) {
+        restartHelper("helper response timeout");
+        return;
+    }
+    if (SDL_TICKS_PASSED(now, m_LastPingTicks + 5000)) {
+        m_LastPingTicks = now;
+        if (!writeLine(ClipboardIpc::encodePing(nextSequence()))) {
+            return;
+        }
+    }
     if (m_HelperReady) {
         flushQueuedHostFrames();
     }
@@ -283,6 +303,7 @@ bool ClipboardHelperClient::sendCurrentConfig()
 
     m_HelperReady = false;
     m_ConfigSequence = nextSequence();
+    m_ConfigSentTicks = SDL_GetTicks();
     return writeLine(ClipboardIpc::encodeConfigure(m_ConfigSequence, config));
 }
 
@@ -317,20 +338,16 @@ void ClipboardHelperClient::readHelperOutput()
     }
 
     m_StdoutBuffer += m_Process->readAllStandardOutput();
-    if (m_StdoutBuffer.size() > ClipboardIpc::MAX_LINE_BYTES) {
-        handleProtocolError(QStringLiteral("helper stdout line exceeded protocol limit"));
-        m_StdoutBuffer.clear();
-        return;
-    }
-
-    int newlineIndex = -1;
-    while ((newlineIndex = m_StdoutBuffer.indexOf('\n')) >= 0) {
-        QByteArray line = m_StdoutBuffer.left(newlineIndex);
-        m_StdoutBuffer.remove(0, newlineIndex + 1);
-        while (line.endsWith('\r')) {
-            line.chop(1);
-        }
+    QByteArray line;
+    QString error;
+    while (ClipboardIpc::takeLine(m_StdoutBuffer, line, error)) {
         processProtocolLine(line);
+        if (m_Process == nullptr) {
+            return;
+        }
+    }
+    if (!error.isEmpty()) {
+        handleProtocolError(error);
     }
 }
 
@@ -390,6 +407,10 @@ void ClipboardHelperClient::processProtocolLine(const QByteArray& line)
         handleProtocolError(error);
         return;
     }
+    m_LastResponseTicks = SDL_GetTicks();
+    if (message.type == ClipboardIpc::MessageType::Pong) {
+        return;
+    }
 
     if (message.type == ClipboardIpc::MessageType::Ready) {
         if (message.sequence != m_ConfigSequence) {
@@ -404,6 +425,9 @@ void ClipboardHelperClient::processProtocolLine(const QByteArray& line)
     }
 
     if (message.type == ClipboardIpc::MessageType::LocalFrame) {
+        if (!m_HelperReady) {
+            return;
+        }
         int rc = LiSendClipboardData(message.frame.constData(), message.frame.size());
         if (rc != 0) {
             SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
@@ -488,7 +512,7 @@ bool ClipboardHelperClient::writeLine(const QByteArray& line)
 
     QByteArray out = line;
     out.append('\n');
-    if (m_StdinBuffer.size() + out.size() > MAX_PENDING_STDIN_BYTES) {
+    if (m_Process->bytesToWrite() + m_StdinBuffer.size() + out.size() > MAX_PENDING_STDIN_BYTES) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Clipboard helper stdin backlog exceeded protocol limit");
         restartHelper("pipe backlog exceeded");

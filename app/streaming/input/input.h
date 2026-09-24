@@ -1,6 +1,7 @@
 #pragma once
 
 #include "settings/streamingpreferences.h"
+#include "streaming/input/gamepadglyphs.h"
 #include "backend/computermanager.h"
 #include "cursorshapeclassifier.h"
 
@@ -36,6 +37,15 @@ struct GamepadState {
 #endif
 
     SDL_TimerID mouseEmulationTimer;
+    // Copied here when emulation activates: the SDL timer callback is
+    // static and can't reach the handler's m_GamepadDeadzone
+    int mouseEmulationDeadzonePercent;
+    // Mask of emulated mouse buttons this session is holding down
+    int mouseEmulationButtonsHeld;
+    // Combo edge latch: a combo fires once per press and re-arms only after
+    // one of its own buttons is released (extra held buttons don't re-arm)
+    bool quitComboLatched;
+    bool statsComboLatched;
     uint32_t lastStartDownTime;
 
     bool clickpadButtonEmulationEnabled;
@@ -184,6 +194,14 @@ public:
 
     int getNativeDualSenseControllerNumber() const;
 
+    // 提示文案用的手柄 UI 风格：取第一只已连接手柄，未连接回落 Xbox 布局
+    GamepadUiStyle getGamepadUiStyle() const;
+
+    StreamingPreferences::GamepadQuitCombo getGamepadQuitCombo() const
+    {
+        return m_GamepadQuitCombo;
+    }
+
     void handleTouchFingerEvent(SDL_TouchFingerEvent* event);
 
 #ifdef HAVE_WINDOWS_PEN_INPUT
@@ -254,6 +272,21 @@ public:
 
     // Check if any gamepad has mouse emulation currently active
     bool isMouseEmulationActive();
+
+    // Release emulation mouse buttons still held by the host. Emulation can
+    // end (hot-unplug, long-press/menu deactivation) with buttons down, and
+    // the per-button release path only runs while the timer is live.
+    void releaseMouseEmulationButtons(GamepadState* state);
+
+    // Whether any OTHER gamepad's active emulation session still holds flag;
+    // shared host buttons must not be released on behalf of another session
+    bool anotherSessionOwnsEmulatedButton(const GamepadState* state, int flag) const;
+
+    // Actual slot occupancy, unlike getAttachedGamepadMask() which reports
+    // 0x1 in single-controller mode even with no physical gamepad
+    bool hasConnectedGamepads() const;
+
+    bool getGamepadQuitEnabled() const { return m_GamepadQuitEnabled; }
 
     // Update the gamepad mouse setting at runtime
     void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
@@ -390,6 +423,9 @@ private:
     bool m_ReverseScrollDirection;
     bool m_SwapFaceButtons;
     StreamingPreferences::GamepadQuitCombo m_GamepadQuitCombo;
+    // Cached at construction: the opt-out env var doesn't change mid-session
+    bool m_GamepadQuitEnabled;
+    int m_GamepadDeadzone;
 
     bool m_NeedsManualCaptureOnLeave;
     bool m_MouseWasInVideoRegion;

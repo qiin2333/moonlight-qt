@@ -22,6 +22,10 @@ QString typeToString(MessageType type)
         return QStringLiteral("error");
     case MessageType::Stop:
         return QStringLiteral("stop");
+    case MessageType::Ping:
+        return QStringLiteral("ping");
+    case MessageType::Pong:
+        return QStringLiteral("pong");
     case MessageType::Unknown:
         break;
     }
@@ -47,6 +51,12 @@ MessageType stringToType(const QString& type)
     }
     if (type == QStringLiteral("stop")) {
         return MessageType::Stop;
+    }
+    if (type == QStringLiteral("ping")) {
+        return MessageType::Ping;
+    }
+    if (type == QStringLiteral("pong")) {
+        return MessageType::Pong;
     }
     return MessageType::Unknown;
 }
@@ -128,6 +138,35 @@ QByteArray encodeStop(quint32 sequence)
     return encodeObject(baseMessage(MessageType::Stop, sequence));
 }
 
+QByteArray encodePing(quint32 sequence)
+{
+    return encodeObject(baseMessage(MessageType::Ping, sequence));
+}
+
+QByteArray encodePong(quint32 sequence)
+{
+    return encodeObject(baseMessage(MessageType::Pong, sequence));
+}
+
+bool takeLine(QByteArray& buffer, QByteArray& line, QString& error)
+{
+    error.clear();
+    const int end = buffer.indexOf('\n');
+    if ((end < 0 && buffer.size() > MAX_LINE_BYTES) || end > MAX_LINE_BYTES) {
+        error = QStringLiteral("helper stdout line exceeded protocol limit");
+        return false;
+    }
+    if (end < 0) {
+        return false;
+    }
+    line = buffer.left(end);
+    buffer.remove(0, end + 1);
+    while (line.endsWith('\r')) {
+        line.chop(1);
+    }
+    return true;
+}
+
 bool decodeLine(const QByteArray& line, Message& outMessage, QString& outError)
 {
     outMessage = Message();
@@ -191,6 +230,8 @@ bool decodeLine(const QByteArray& line, Message& outMessage, QString& outError)
         return true;
     case MessageType::Ready:
     case MessageType::Stop:
+    case MessageType::Ping:
+    case MessageType::Pong:
         return true;
     case MessageType::Unknown:
         break;

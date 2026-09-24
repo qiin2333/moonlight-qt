@@ -11,8 +11,64 @@ USB 设备 → usbipd-win → Moonlight Tunnel → TLS → Sunshine reverse_tunn
 - Windows 客户端：`UsbForwardingBackend` 管理 usbipd-win 的设备共享与枚举。
 - Windows 主机：`usbip_host_controller` 调用 usbip-win2。
 - macOS 客户端：捆绑 `moonlight-usbd` helper（usbipdcpp v1.0.9 + libusb v1.0.29，`usb-helper/`），详见下文「macOS 客户端」。
-- Android 客户端在 moonlight-vplus 工程中集成独立的 USB/IP 导出后端，使用同一能力接口和隧道协议；本 Qt 工程不提供 Linux 客户端 USB 后端。
+- Linux 客户端：包裹标准 usbip-host 栈（`usbip` 工具 + root `usbipd -D` 守护进程，3240 端口），详见下文「Linux 客户端」。
+- Android 客户端在 moonlight-vplus 工程中集成独立的 USB/IP 导出后端，使用同一能力接口和隧道协议。
 - Linux 主机 controller 当前返回 unsupported。
+
+## Linux 客户端（usbip-host）
+
+Linux 走发行版自带的 usbip-host 内核模块 + usbipd 守护进程，app 不自研 USB/IP
+协议栈（与反向隧道架构的「外挂平台服务器」原则一致；2026-09 spike 在
+Ubuntu 26.04/内核 7.0 上全链路验证通过，含虚拟设备数据面回环）。
+
+行为要点：
+
+- **枚举**：直接读 sysfs（`/sys/bus/usb/devices`，`parseSysfsDevices`），
+  `driver` symlink 指向 `usbip-host` 即已共享；重插后绑定随内核重新枚举
+  丢失，refresh 如实反映。hub（bDeviceClass 09）与根 hub 跳过。
+- **提权**：首次共享时 app 用一次通用 pkexec 把内置 helper 脚本与
+  polkit policy（`org.moonlight.qt.usbforwarding.run`，`auth_admin_keep`，
+  授权记忆约 5 分钟）安装到 `/usr/lib/moonlight-qt/` 与
+  `/usr/share/polkit-1/actions/`；之后的 bind/unbind 都走 app 自己的
+  action。helper 只接受固定动作与数字/点/横线字符集的 busid，加载
+  `usbip_host` 模块、按需拉起 `usbipd -D`，再执行 `usbip bind/unbind`。
+- **绑定语义**：对已被内核驱动（usb-storage 等）认领的设备直接 bind 即可，
+  内核自动让位，无需预解绑；unbind 后补一次 `drivers_probe` 让设备回本机。
+- **替换设备防护（检测 + 预防双层）**：usbip 按 busid 寻址、match_busid 只认
+  端口——共享期间同端口换成另一台设备会被 usbip-host 静默认领。
+  - *预防*：安装时部署 udev 规则（`90-moonlight-usb-forwarding.rules`），
+    共享设备拔出事件触发 helper `auto-release`：清快照并重载 usbip_host
+    模块清掉残留 match（内核只允许设备在位时 del，拔出后只能靠模块重
+    载；`modprobe -r` 在仍有其他共享设备绑定时会自动拒绝，天然安全）。
+    实测：拔出 → match/快照双清 → 重插设备归属本机驱动，不再被认领。
+    已知边界：多设备共享且仅部分拔出时，模块被占用导致未拔端口的残留
+    match 无法清理（其余拔出照常清理），此时回退到检测层兜底。
+  - *检测*：bind 时快照身份（vidPid+serial）记入
+    `/var/lib/moonlight-qt/bindings`，客户端枚举时比对，不符标
+    `isReplaced`：悬浮菜单拒绝转发。bind 还携带身份做 TOCTOU 校验
+    （helper 在 root 下重读 sysfs）。无序列号设备退化为 vidPid 级身份
+    （跨型号替换仍可识别；同型号无序列号孪生不可区分，Linux 无此类
+    设备的跨重插稳定标识）。
+
+## 已知限制与发布前清单
+
+**本地 USB/IP 服务端口暴露**：发行版 usbipd 默认监听 0.0.0.0:3240，同
+局域网设备可绕过 Moonlight 隧道直接 attach 共享中的设备（usbipd-win 同
+样存在）。隧道本身走 TLS+配对证书+token；此敞口的根治依赖 RTSP 会话
+协商逐会话凭据（跨仓库遗留项），短期缓解可在共享期间加防火墙规则限
+loopback，或接受与 usbipd-win 一致的风险水平。
+
+**实机回归清单（发布前）**：
+- [ ] 真实桌面 Linux（Ubuntu 24.04+/Arch/Fedora 至少各一）：环境体检、
+      首次共享提权、串流中转发/释放；
+- [ ] 设备类别：鼠标/键盘（HID）、手柄、U 盘（存储）、蓝牙适配器；
+- [ ] 拔出重插：match_busid 自动清理（udev 钩子）、替换设备拒绝转发；
+- [ ] polkit：首装双弹窗、auth_admin_keep 记忆窗口、无 agent 环境报错；
+- [ ] 串流中长会话（>30 分钟）转发稳定性与输入流畅度（IO 线程验证）。
+- **环境体检**：`usbip` 二进制 + `/sys/module/usbip_host` + 3240 端口
+  连通性三步探测；daemon 不在时绑定过程自动拉起，不阻塞用户。
+- 隧道直连 `127.0.0.1:3240`（`TunnelConfig` 默认值，与 Windows usbipd-win
+  完全对位），Session 层无平台分支。
 
 ## macOS 客户端（moonlight-usbd）
 

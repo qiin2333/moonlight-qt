@@ -62,6 +62,10 @@ public slots:
             QCoreApplication::quit();
             return;
         }
+        if (message.type == ClipboardIpc::MessageType::Ping) {
+            writeProtocolLine(ClipboardIpc::encodePong(message.sequence));
+            return;
+        }
 
         if (message.type == ClipboardIpc::MessageType::Configure) {
             handleConfig(message.sequence, message.config);
@@ -156,9 +160,10 @@ int main(int argc, char* argv[])
 
     ClipboardHelperController controller;
     StdinReaderThread stdinThread;
-    QObject::connect(&stdinThread, &StdinReaderThread::lineReceived,
-                     &controller, &ClipboardHelperController::handleLine,
-                     Qt::QueuedConnection);
+    // Bound the reader to one GUI delivery at a time. Otherwise a blocked
+    // clipboard provider lets the worker enqueue an unbounded number of frames.
+    QObject::connect(&stdinThread, &StdinReaderThread::lineReceived, &controller,
+                     &ClipboardHelperController::handleLine, Qt::BlockingQueuedConnection);
 
     stdinThread.start();
     int rc = app.exec();

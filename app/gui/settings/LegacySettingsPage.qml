@@ -7,6 +7,7 @@ import "../theme"
 import "../Brand.js" as Brand
 
 import StreamingPreferences 1.0
+import SdlGamepadKeyNavigation 1.0
 import ComputerManager 1.0
 import SystemProperties 1.0
 import ImageUtils 1.0
@@ -502,6 +503,44 @@ Column {
             onToggled: function(value) { StreamingPreferences.swapFaceButtons = value }
         }
 
+        SettingsRow {
+            id: stickDeadzoneRow
+            title: qsTr("Joystick deadzone")
+            description: qsTr("Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.")
+
+            Row {
+                width: Math.min(360, Math.max(220, stickDeadzoneRow.width - Theme.spaceMd * 2))
+                height: Math.max(stickDeadzoneSlider.implicitHeight,
+                                 stickDeadzoneValue.implicitHeight)
+                spacing: Theme.spaceSm
+
+                HardSlider {
+                    id: stickDeadzoneSlider
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - stickDeadzoneValue.width - parent.spacing
+                    from: 0
+                    to: 30
+                    stepSize: 1
+                    snapMode: Slider.SnapAlways
+                    value: StreamingPreferences.gamepadDeadzone
+                    Accessible.name: stickDeadzoneRow.title
+                    onMoved: StreamingPreferences.gamepadDeadzone = Math.round(value)
+                }
+
+                Text {
+                    id: stickDeadzoneValue
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 52
+                    text: Math.round(stickDeadzoneSlider.value) + "%"
+                    color: Theme.accent
+                    font.family: Theme.fontMono
+                    font.pointSize: Theme.fontBody
+                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignRight
+                }
+            }
+        }
+
         ToggleRow {
             title: qsTr("Force gamepad #1 always connected")
             description: qsTr("Forces a single gamepad to always stay connected to the host, even if no gamepads are actually connected to this PC.") + " " +
@@ -511,7 +550,8 @@ Column {
         }
 
         ToggleRow {
-            title: qsTr("Enable mouse control with gamepads by holding the 'Start' button")
+            title: qsTr("Enable mouse control with gamepads by holding the '%1' button").arg(SdlGamepadKeyNavigation.startButtonName())
+            description: qsTr("While this is off, holding %1 opens the in-stream overlay menu instead.").arg(SdlGamepadKeyNavigation.startButtonName())
             checked: StreamingPreferences.gamepadMouse
             onToggled: function(value) { StreamingPreferences.gamepadMouse = value }
         }
@@ -529,20 +569,55 @@ Column {
         visible: settingsPage.category === "gamepad" && hasVisibleContent
         title: qsTr("Gamepad quit combo")
 
+        // 按键名按当前连接的手柄风格显示(PS 显示 Options/Share/✕,
+        // Switch 显示 +/−/B/A);swapFaceButtons 时补偿到实际要按的物理键。
+        // 插拔手柄或切进本页时重建
+        function rebuildQuitComboModel() {
+            quitComboModel.clear()
+            var nav = SdlGamepadKeyNavigation
+            var swap = StreamingPreferences.swapFaceButtons
+            var face = function(i) { return nav.faceButtonGlyph(swap ? (i ^ 1) : i) }
+            var lb = nav.leftShoulderName()
+            var rb = nav.rightShoulderName()
+            quitComboModel.append({
+                text: nav.startButtonName() + "+" + nav.selectButtonName() + "+" + lb + "+" + rb + " " + qsTr("(Default)"),
+                val: StreamingPreferences.GQC_DEFAULT
+            })
+            quitComboModel.append({
+                text: nav.selectButtonName() + "+" + lb + "+" + rb + "+" + face(3),
+                val: StreamingPreferences.GQC_SELECT_L1_R1_Y
+            })
+            quitComboModel.append({
+                text: nav.startButtonName() + "+" + lb + "+" + rb + "+" + face(0),
+                val: StreamingPreferences.GQC_START_L1_R1_A
+            })
+            quitComboModel.append({
+                text: nav.startButtonName() + "+" + lb + "+" + rb + "+" + face(1),
+                val: StreamingPreferences.GQC_START_L1_R1_B
+            })
+            quitComboModel.append({
+                text: lb + "+" + rb + "+" + face(2) + "+" + face(3),
+                val: StreamingPreferences.GQC_L1_R1_X_Y
+            })
+            quitComboModel.append({
+                text: lb + "+" + rb + "+" + face(0) + "+" + face(1),
+                val: StreamingPreferences.GQC_L1_R1_A_B
+            })
+            quitComboRow.syncSelection()
+        }
+
+        Component.onCompleted: rebuildQuitComboModel()
+        onVisibleChanged: if (visible) rebuildQuitComboModel()
+
         ChoiceRow {
+            id: quitComboRow
             title: qsTr("Gamepad quit combo")
             description: qsTr("Choose which button combination exits streaming. Use alternatives if the default doesn't work on your device.")
             selectedValue: StreamingPreferences.gamepadQuitCombo
             onValueActivated: function(value) { StreamingPreferences.gamepadQuitCombo = value }
 
             model: ListModel {
-                ListElement { text: qsTr("Start + Select + L1 + R1 (Default)"); val: StreamingPreferences.GQC_DEFAULT }
-                ListElement { text: qsTr("Select + L1 + R1 + X"); val: StreamingPreferences.GQC_SELECT_L1_R1_X }
-                ListElement { text: qsTr("Select + L1 + R1 + Y"); val: StreamingPreferences.GQC_SELECT_L1_R1_Y }
-                ListElement { text: qsTr("Start + L1 + R1 + A"); val: StreamingPreferences.GQC_START_L1_R1_A }
-                ListElement { text: qsTr("Start + L1 + R1 + B"); val: StreamingPreferences.GQC_START_L1_R1_B }
-                ListElement { text: qsTr("L1 + R1 + X + Y"); val: StreamingPreferences.GQC_L1_R1_X_Y }
-                ListElement { text: qsTr("L1 + R1 + A + B"); val: StreamingPreferences.GQC_L1_R1_A_B }
+                id: quitComboModel
             }
         }
     }
@@ -647,7 +722,13 @@ Column {
         ToggleRow {
             title: qsTr("Show performance stats while streaming")
             description: qsTr("Display real-time stream performance information while streaming.") + "\n\n" +
-                         qsTr("You can toggle it at any time while streaming using Ctrl+Alt+Shift+S or Select+L1+R1+X.") + "\n\n" +
+                         qsTr("You can toggle it at any time while streaming using %1 or %2.")
+                             .arg("Ctrl+Alt+Shift+S")
+                             .arg(SdlGamepadKeyNavigation.selectButtonName() + "+" +
+                                  SdlGamepadKeyNavigation.leftShoulderName() + "+" +
+                                  SdlGamepadKeyNavigation.rightShoulderName() + "+" +
+                                  SdlGamepadKeyNavigation.faceButtonGlyph(
+                                      StreamingPreferences.swapFaceButtons ? 3 : 2)) + "\n\n" +
                          qsTr("The performance overlay is not supported on Steam Link or Raspberry Pi.")
             checked: StreamingPreferences.showPerformanceOverlay
             onToggled: function(value) { StreamingPreferences.showPerformanceOverlay = value }
@@ -660,6 +741,7 @@ Column {
 
         ChoiceRow {
             title: qsTr("Overlay menu position")
+            description: qsTr("With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).").arg(SdlGamepadKeyNavigation.startButtonName())
             selectedValue: StreamingPreferences.overlayMenuPosition
             onValueActivated: function(value) { StreamingPreferences.overlayMenuPosition = value }
 
@@ -667,8 +749,8 @@ Column {
                 ListElement { text: qsTr("Top edge"); val: StreamingPreferences.OMP_TOP_EDGE }
                 ListElement { text: qsTr("Right edge"); val: StreamingPreferences.OMP_RIGHT_EDGE }
                 ListElement { text: qsTr("Left edge"); val: StreamingPreferences.OMP_LEFT_EDGE }
-                ListElement { text: qsTr("Floating button"); val: StreamingPreferences.OMP_BUTTON }
-                ListElement { text: qsTr("Disabled (default)"); val: StreamingPreferences.OMP_DISABLED }
+                ListElement { text: qsTr("Floating button (default)"); val: StreamingPreferences.OMP_BUTTON }
+                ListElement { text: qsTr("Disabled"); val: StreamingPreferences.OMP_DISABLED }
             }
         }
     }

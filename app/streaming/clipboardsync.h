@@ -3,8 +3,9 @@
 #include <QObject>
 #include <QByteArray>
 #include <QHash>
-#include <QMutex>
+#include <QElapsedTimer>
 #include <QPair>
+#include <QSet>
 #include <QQueue>
 #include <QSslCertificate>
 #include <QSslKey>
@@ -58,19 +59,9 @@ struct ClipboardSyncHostContext
 // and flip legacy peers' final state to text); the image frame may still
 // use KIND_REF.
 //
-// Echo suppression: when we either write a payload to the local clipboard
-// (because the host pushed it) or send a payload to the host (because we
-// detected a local change), we record a (hash, timestamp_ms) pair into a
-// 16-entry deque with a 5 second TTL. Subsequent QClipboard::dataChanged
-// notifications for the same content are dropped, mirroring the Sunshine
-// GUI agent's logic so the two ends don't ping-pong.
-//
-// Text keys the cache on the payload bytes. Images key a second cache on
-// the decoded pixels: platforms re-encode clipboard image flavors after we
-// write them (macOS synthesizes new PNGf/TIFF data lazily and bumps the
-// pasteboard changeCount again), so the delayed echo hands back a
-// re-encoded copy whose bytes never match the wire payload. Pixels survive
-// those lossless re-encodes, making them the only stable identity.
+// Echo suppression compares the complete current text/image snapshot. A previous
+// clipboard value must not suppress a later intentional A -> B -> A change.
+// Images are compared by decoded pixels to survive platform re-encoding.
 //
 // Threading:
 //   * Construct on the GUI thread.
@@ -90,14 +81,15 @@ public:
 
     static constexpr uint8_t WIRE_VERSION = 1;
     static constexpr int     MAX_PAYLOAD  = 65535 - 10; // wire frame must fit u16 length
+    // Encrypted control length also includes seq (4), GCM tag (16) and the
+    // inner control header (4). Reserve those bytes for outbound inline frames.
+    static constexpr int MAX_INLINE_PAYLOAD = MAX_PAYLOAD - 24;
     // Payload size at/above which we switch from inline KIND_TEXT/KIND_PNG to
     // out-of-band blob transfer (KIND_REF). Leaves headroom under the wire cap.
     static constexpr int     INLINE_THRESHOLD = 60000;
     // Mirrors the cross-client cap (64 MiB) shared with the Android and
     // HarmonyOS clients. The service-side blob store accepts up to this much.
-    static constexpr qint64  MAX_BLOB_BYTES   = 64LL * 1024 * 1024;
-    static constexpr int     ECHO_TTL_MS  = 5000;
-    static constexpr int     ECHO_MAX     = 16;
+    static constexpr qint64 MAX_BLOB_BYTES = 64LL * 1024 * 1024;
     // Mirror the Android client's cap (32 Mpx) so a stray full-screen capture
     // doesn't try to PNG-encode a 100 MB bitmap and stall the GUI thread.
     static constexpr qint64  MAX_IMAGE_PIXELS = 32LL * 1024 * 1024;
@@ -164,6 +156,8 @@ private slots:
     void onIncomingFrame(QByteArray frame);
 
 private:
+    friend class ClipboardSyncTest;
+
     // Aggregation state for one inbound compound burst (frames sharing a
     // non-zero token). Frames are applied as they arrive; the retained text
     // lets the arriving image upgrade the clipboard to one compound write.
@@ -182,16 +176,13 @@ private:
                      quint32& outToken,
                      QByteArray& outPayload) const;
 
-    // Hash + TTL bookkeeping; not thread-safe, only touched from GUI thread.
-    bool seenRecently(uint64_t hash);
-    void recordHash(uint64_t hash);
-
     static uint64_t hashBytes(const QByteArray& bytes);
-
-    // Pixel-level echo bookkeeping for images (see class comment).
-    bool seenImageRecently(uint64_t pixelHash);
-    void recordImageHash(uint64_t pixelHash);
     static uint64_t hashImagePixels(const QImage& image);
+    static bool decodeImage(const QByteArray& bytes, QImage& image, const char* format = nullptr);
+    void rememberClipboard(const QByteArray& text, const QImage& image);
+    void beginClipboardChange(quint32 token = 0);
+    void readBlobReply(QNetworkReply* reply, qint64 limit,
+                       const std::function<void(const QByteArray&, const QString&)>& onFetched);
 
     bool encodeImageAsPng(const QImage& image,
                           QByteArray& outPng,
@@ -200,19 +191,14 @@ private:
                           const QString& sourceDescription,
                           quint32 token = 0);
     // Shared text outbound path for single-flavor changes (token 0) and the
-    // text frame of a compound burst. Applies the size cap, echo checks and
+    // text frame of a compound burst. Applies the size cap and
     // inline-vs-REF choice, then emits.
     void sendTextOutbound(const QByteArray& utf8, quint32 token);
     bool extractClipboardPng(const QMimeData* mime,
                              QByteArray& outPng,
                              QString* outSourceDescription = nullptr) const;
-    bool tryExtractImageBytes(const QMimeData* mime,
-                              const QStringList& preferredFormats,
-                              QByteArray& outPng,
-                              QString* outSourceDescription) const;
-    bool tryExtractImageFromUrls(const QMimeData* mime,
-                                 QByteArray& outPng,
-                                 QString* outSourceDescription) const;
+    bool tryExtractImageBytes(const QMimeData* mime, const QStringList& preferredFormats,
+                              QByteArray& outPng, QString* outSourceDescription) const;
     bool tryExtractImageFromHtml(const QMimeData* mime,
                                  QByteArray& outPng,
                                  QString* outSourceDescription) const;
@@ -240,8 +226,16 @@ private:
     QNetworkAccessManager* m_Nam = nullptr;
 
     bool m_Active = false;
-    QQueue<QPair<uint64_t, qint64>> m_EchoCache;       // (byte hash, timestamp_ms)
-    QQueue<QPair<uint64_t, qint64>> m_ImageEchoCache;  // (pixel hash, timestamp_ms)
+    bool m_HaveClipboardSnapshot = false;
+    uint64_t m_LastTextHash = 0;
+    uint64_t m_LastImageHash = 0;
+    quint64 m_Revision = 0;
+    quint32 m_CurrentToken = 0;
+    quint32 m_OutgoingToken = 0;
+    QByteArray m_LastOutboundRef;
+    QElapsedTimer m_Clock;
+    QQueue<QPair<quint32, qint64>> m_RetiredTokens;
+    QSet<QNetworkReply*> m_BlobReplies;
     QHash<quint32, BurstState> m_PendingBursts;
     quint32 m_NextToken = 1;
 
@@ -249,11 +243,4 @@ private:
     QTimer* m_PasteboardPollTimer = nullptr;
     int m_LastPasteboardChangeCount = -1;
 #endif
-
-    // Counter for self-writes pending QClipboard::dataChanged callbacks.
-    // Some Windows clipboard hooks (e.g. IME composition managers) cause a
-    // single setMimeData() to fire dataChanged twice; a bool latch would
-    // absorb the first echo and leak the second back to the host. Counting
-    // lets multiple pending writes coexist without ping-pong.
-    int m_PendingSelfWrites = 0;
 };

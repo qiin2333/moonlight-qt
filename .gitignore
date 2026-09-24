@@ -4,7 +4,6 @@
 **/.vs/
 **/.vscode/
 build/
-soundio/libsoundio/
 libs/
 config.tests/*/.qmake.stash
 config.tests/*/Makefile
@@ -18,5 +17,10 @@ tests/*/debug/
 tests/*/release/
 
 .claude/
-.codex-build/
-.codex-remote-attachments/
+.codex*/
+.DS_Store
+.qtc_clangd/
+.agents/
+projects/
+__pycache__/
+*.pyc

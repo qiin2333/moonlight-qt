@@ -17,8 +17,10 @@ Column {
     width: parent ? parent.width : 0
     spacing: Theme.spaceLg
 
-    // Windows 走外挂 usbipd-win；macOS 走捆绑的 moonlight-usbd（usbipdcpp）。
+    // Windows 走外挂 usbipd-win；macOS 走捆绑的 moonlight-usbd（usbipdcpp）；
+    // Linux 走标准 usbip-host 栈（usbip 工具 + root usbipd 守护进程）。
     readonly property bool isMac: SystemProperties.isDarwin
+    readonly property bool isLinux: SystemProperties.isLinux
 
     SettingsCard {
         id: usbForwardingCard
@@ -45,7 +47,8 @@ Column {
         SettingsRow {
             id: usbEnvRow
 
-            title: peripheralsPage.isMac ? qsTr("USB sharing service") : "usbipd-win"
+            title: !peripheralsPage.isMac && !peripheralsPage.isLinux
+                   ? "usbipd-win" : qsTr("USB sharing service")
             description: {
                 if (UsbForwardingEnvironment.checking) {
                     return qsTr("Checking environment…")
@@ -54,23 +57,36 @@ Column {
                 case UsbForwardingEnvironment.Checking:
                     return qsTr("Checking environment…")
                 case UsbForwardingEnvironment.DriverStopped:
-                    return qsTr("USB driver not running. Start VBoxUSBMon as administrator, or restart Windows.")
+                    return peripheralsPage.isLinux
+                        ? qsTr("The USB/IP kernel module is not loaded. Moonlight loads it automatically when you share a device.")
+                        : qsTr("USB driver not running. Start VBoxUSBMon as administrator, or restart Windows.")
                 case UsbForwardingEnvironment.CheckFailed:
-                    return peripheralsPage.isMac
-                        ? qsTr("Could not verify the bundled USB sharing service. Reinstall Moonlight.")
+                    if (peripheralsPage.isMac) {
+                        return qsTr("Could not verify the bundled USB sharing service. Reinstall Moonlight.")
+                    }
+                    return peripheralsPage.isLinux
+                        ? qsTr("Could not verify the USB sharing environment. Check the usbip installation.")
                         : qsTr("Could not verify the USB service and driver. Check the usbipd-win installation.")
                 case UsbForwardingEnvironment.Ready:
-                    return peripheralsPage.isMac
-                        ? qsTr("%1 · Ready").arg(UsbForwardingEnvironment.usbipdVersion)
-                        : qsTr("v%1 · Service running")
-                              .arg(UsbForwardingEnvironment.usbipdVersion)
+                    if (peripheralsPage.isMac || peripheralsPage.isLinux) {
+                        return qsTr("%1 · Ready").arg(UsbForwardingEnvironment.usbipdVersion)
+                    }
+                    return qsTr("v%1 · Service running")
+                          .arg(UsbForwardingEnvironment.usbipdVersion)
                 case UsbForwardingEnvironment.ServiceStopped:
+                    if (peripheralsPage.isLinux) {
+                        return qsTr("Installed (v%1). The usbipd daemon is not running; Moonlight starts it when you share a device.")
+                            .arg(UsbForwardingEnvironment.usbipdVersion)
+                    }
                     return qsTr("Installed (v%1). The usbipd service is not running.")
                         .arg(UsbForwardingEnvironment.usbipdVersion)
                 case UsbForwardingEnvironment.NotInstalled:
                 default:
-                    return peripheralsPage.isMac
-                        ? qsTr("The bundled USB sharing service is missing. Reinstall Moonlight.")
+                    if (peripheralsPage.isMac) {
+                        return qsTr("The bundled USB sharing service is missing. Reinstall Moonlight.")
+                    }
+                    return peripheralsPage.isLinux
+                        ? qsTr("Not installed. The usbip tool is required to share USB devices. Install the USB/IP package of your distribution (usbip-utils or linux-tools).")
                         : qsTr("Not installed. usbipd-win is required to share USB devices.")
                 }
             }
@@ -86,7 +102,7 @@ Column {
                 }
 
                 HardLink {
-                    visible: !peripheralsPage.isMac
+                    visible: !peripheralsPage.isMac && !peripheralsPage.isLinux
                     text: qsTr("Install / Repair")
                     onClicked: peripheralsPage.openExternal(usbForwardingCard.usbipdUrl)
                 }
@@ -114,6 +130,13 @@ Column {
             visible: peripheralsPage.isMac
             title: qsTr("Device availability")
             description: qsTr("Devices managed by macOS itself — keyboards, mice, storage, and cameras — are shown as \"In use by macOS\" and cannot be shared without administrator access.")
+        }
+
+        // Linux 平台说明：共享会接管设备，本机暂时不可用；共享需要管理员确认。
+        SettingsRow {
+            visible: peripheralsPage.isLinux
+            title: qsTr("Device availability")
+            description: qsTr("While a device is shared, it is taken over by the USB/IP driver and stops working on this computer until you release it. The first share asks for administrator confirmation; the authorization is remembered for a few minutes.")
         }
 
         SettingsRow {

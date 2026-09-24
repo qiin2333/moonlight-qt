@@ -133,11 +133,11 @@ public:
 
     enum OverlayMenuPosition
     {
-        OMP_DISABLED   = 0,  // Default: do not show the overlay menu
-        OMP_BUTTON     = 1,  // Show a floating button on the streaming window
-        OMP_TOP_EDGE   = 2,  // Show from the top edge of the streaming window
-        OMP_RIGHT_EDGE = 3,  // Show on right edge
-        OMP_LEFT_EDGE  = 4,  // Show on left edge
+        OMP_DISABLED = 0,   // Do not show the overlay menu
+        OMP_BUTTON = 1,     // Show a floating button on the streaming window
+        OMP_TOP_EDGE = 2,   // Show from the top edge of the streaming window
+        OMP_RIGHT_EDGE = 3, // Show on right edge
+        OMP_LEFT_EDGE = 4,  // Show on left edge
     };
     Q_ENUM(OverlayMenuPosition);
 
@@ -179,13 +179,14 @@ public:
 
     enum GamepadQuitCombo
     {
-        GQC_DEFAULT         = 0,  // Start + Select + L1 + R1 (original)
-        GQC_SELECT_L1_R1_X  = 1,  // Select + L1 + R1 + X (avoids Start+Select conflict)
-        GQC_SELECT_L1_R1_Y  = 2,  // Select + L1 + R1 + Y
-        GQC_START_L1_R1_A   = 3,  // Start + L1 + R1 + A (avoids Select conflict)
-        GQC_START_L1_R1_B   = 4,  // Start + L1 + R1 + B (avoids Select conflict)
-        GQC_L1_R1_X_Y       = 5,  // L1 + R1 + X + Y (no Select/Start at all)
-        GQC_L1_R1_A_B       = 6,  // L1 + R1 + A + B (no Select/Start at all)
+        GQC_DEFAULT = 0,        // Start + Select + L1 + R1 (original)
+        GQC_SELECT_L1_R1_X = 1, // Deprecated: same combo as the stats overlay toggle; migrated to
+                                // GQC_SELECT_L1_R1_Y on load
+        GQC_SELECT_L1_R1_Y = 2, // Select + L1 + R1 + Y
+        GQC_START_L1_R1_A = 3,  // Start + L1 + R1 + A (avoids Select conflict)
+        GQC_START_L1_R1_B = 4,  // Start + L1 + R1 + B (avoids Select conflict)
+        GQC_L1_R1_X_Y = 5,      // L1 + R1 + X + Y (no Select/Start at all)
+        GQC_L1_R1_A_B = 6,      // L1 + R1 + A + B (no Select/Start at all)
     };
     Q_ENUM(GamepadQuitCombo);
 
@@ -231,6 +232,7 @@ public:
     Q_PROPERTY(bool configurationWarnings MEMBER configurationWarnings NOTIFY configurationWarningsChanged)
     Q_PROPERTY(bool richPresence MEMBER richPresence NOTIFY richPresenceChanged)
     Q_PROPERTY(bool gamepadMouse MEMBER gamepadMouse NOTIFY gamepadMouseChanged)
+    Q_PROPERTY(int gamepadDeadzone MEMBER gamepadDeadzone NOTIFY gamepadDeadzoneChanged)
     Q_PROPERTY(bool detectNetworkBlocking MEMBER detectNetworkBlocking NOTIFY detectNetworkBlockingChanged)
     Q_PROPERTY(bool showPerformanceOverlay MEMBER showPerformanceOverlay NOTIFY showPerformanceOverlayChanged)
     Q_PROPERTY(AudioConfig audioConfig MEMBER audioConfig NOTIFY audioConfigChanged)
@@ -314,6 +316,9 @@ public:
     bool muteOnFocusLoss;
     bool backgroundGamepad;
     GamepadQuitCombo gamepadQuitCombo;
+
+    // Stick deadzone in percent (0-30); 0 passes stick input through unmodified
+    int gamepadDeadzone;
     bool reverseScrollDirection;
     bool swapFaceButtons;
     bool keepAwake;
@@ -393,6 +398,7 @@ signals:
     void muteOnFocusLossChanged();
     void backgroundGamepadChanged();
     void gamepadQuitComboChanged();
+    void gamepadDeadzoneChanged();
     void reverseScrollDirectionChanged();
     void swapFaceButtonsChanged();
     void captureSysKeysModeChanged();

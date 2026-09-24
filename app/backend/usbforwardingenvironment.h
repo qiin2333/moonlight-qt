@@ -43,6 +43,7 @@ private:
 
     void startVersionProbe(const QString &usbipdExe);
     void startHelperVersionProbe(const QString &helperPath);
+    void startLinuxVersionProbe(const QString &usbipExe);
     void startServiceProbe();
     void finish(State state);
 

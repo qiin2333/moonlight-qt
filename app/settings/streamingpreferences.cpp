@@ -61,6 +61,7 @@
 #define SER_MUTEONFOCUSLOSS "muteonfocusloss"
 #define SER_BACKGROUNDGAMEPAD "backgroundgamepad"
 #define SER_GAMEPADQUITCOMBO "gamepadquitcombo"
+#define SER_GAMEPADDEADZONE "gamepaddeadzone"
 #define SER_REVERSESCROLL "reversescroll"
 #define SER_SWAPFACEBUTTONS "swapfacebuttons"
 #define SER_CAPTURESYSKEYS "capturesyskeys"
@@ -150,7 +151,10 @@ static StreamingPreferences::OverlayMenuPosition loadOverlayMenuPlacement(QSetti
     }
 
     if (!settings.contains(SER_LEGACY_OVERLAYMENUPOS)) {
-        return StreamingPreferences::OMP_DISABLED;
+        // Fresh installs get the floating button: the menu is the hub for
+        // in-stream actions, and a gamepad's long-press Start opens it too.
+        // Disabled stays available (and persists) for anyone who picks it.
+        return StreamingPreferences::OMP_BUTTON;
     }
 
     // Temporary compatibility bridge for versions that stored the old enum
@@ -292,6 +296,13 @@ void StreamingPreferences::reload()
     backgroundGamepad = settings.value(SER_BACKGROUNDGAMEPAD, false).toBool();
     gamepadQuitCombo = static_cast<GamepadQuitCombo>(settings.value(SER_GAMEPADQUITCOMBO,
                                                      static_cast<int>(GamepadQuitCombo::GQC_DEFAULT)).toInt());
+    // GQC_SELECT_L1_R1_X was the same button combo as the stats overlay
+    // toggle and has been removed; keep the nearest alternative so these
+    // users still avoid the default Start+Select conflict.
+    if (gamepadQuitCombo == GamepadQuitCombo::GQC_SELECT_L1_R1_X) {
+        gamepadQuitCombo = GamepadQuitCombo::GQC_SELECT_L1_R1_Y;
+    }
+    gamepadDeadzone = qBound(0, settings.value(SER_GAMEPADDEADZONE, 0).toInt(), 30);
     reverseScrollDirection = settings.value(SER_REVERSESCROLL, false).toBool();
     swapFaceButtons = settings.value(SER_SWAPFACEBUTTONS, false).toBool();
     keepAwake = settings.value(SER_KEEPAWAKE, true).toBool();
@@ -727,6 +738,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_MUTEONFOCUSLOSS, muteOnFocusLoss);
     settings.setValue(SER_BACKGROUNDGAMEPAD, backgroundGamepad);
     settings.setValue(SER_GAMEPADQUITCOMBO, static_cast<int>(gamepadQuitCombo));
+    settings.setValue(SER_GAMEPADDEADZONE, gamepadDeadzone);
     settings.setValue(SER_REVERSESCROLL, reverseScrollDirection);
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);

@@ -18,6 +18,8 @@
 #include <utility>
 #include <vector>
 
+#include "streaming/input/gamepadglyphs.h"
+
 /**
  * OverlayMenuPanel - Multi-level Qt overlay menu for streaming sessions.
  *
@@ -25,9 +27,10 @@
  * D3D11/SDL/EGL video rendering pipeline.
  *
  * Menu structure:
- *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen, Microphone [toggle], Disconnect
+ *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen,
+ *                        Microphone [toggle], Disconnect
  *   Level 1 (Actions):  Quit, Performance Stats, Mouse Mode, Cursor, Minimize, ...
- *   Level 2 (Bitrate):  log-scale scrubber row + 1/2/5/10/20/30/50/100 Mbps presets
+ *   Level 2 (Bitrate):  piecewise-linear scrubber row + 1/2/5/10/20/30/50/100 Mbps presets
  *   Level 3 (Position): Top, Right, Left, Floating button, Disabled
  *   Developer builds may append a function-test panel entry.
  *
@@ -167,10 +170,19 @@ public:
                               std::vector<RemoteUsbDevice> devices,
                               const QString& activeDeviceId,
                               const QString& detail);
-    void setHasGamepads(bool has) {
-        if (m_HasGamepads != has) {
+    // 手柄在位状态、UI 风格、swapFaceButtons 与退出组合键 glyph 文案：菜单
+    // 打开前由 Session 推送，任一变化即重建菜单级（手柄专属条目与按键提示
+    // 跟着变）
+    void setGamepadHints(bool has, GamepadUiStyle style, bool swapFaceButtons,
+                         const QString& quitComboGlyphs)
+    {
+        if (m_HasGamepads != has || m_GamepadUiStyle != style ||
+            m_SwapFaceButtons != swapFaceButtons || m_QuitComboGlyphs != quitComboGlyphs) {
             m_HasGamepads = has;
-            buildMenuLevels();  // rebuild to show/hide gamepad items
+            m_GamepadUiStyle = style;
+            m_SwapFaceButtons = swapFaceButtons;
+            m_QuitComboGlyphs = quitComboGlyphs;
+            buildMenuLevels();
         }
     }
 
@@ -255,7 +267,7 @@ private:
     // --- Bitrate slider row ---
     SliderRowRects sliderRowRects(int contentWidth, int itemY) const;
     SliderZone sliderZoneAt(const QPoint& localPos, int rowIdx) const;
-    double bitrateFraction() const;                 // m_BitrateKbps on the log scale, 0..1
+    double bitrateFraction() const;                 // m_BitrateKbps on the segmented scale, 0..1
     void setBitrateFromFraction(double fraction);   // inverse of bitrateFraction()
     void setBitrateKbps(int bitrateKbps);           // clamp + refresh + schedule commit
     void adjustBitrateStep(int direction, int multiplier);
@@ -268,6 +280,9 @@ private:
     int  m_HoveredIndex;
     bool m_Visible;
     bool m_HasGamepads;
+    GamepadUiStyle m_GamepadUiStyle;
+    bool m_SwapFaceButtons;
+    QString m_QuitComboGlyphs;
     FileMappingState m_FileMappingState;
     QString m_FileMappingDetail;
     bool m_RemoteUsbAvailable;
