@@ -64,9 +64,11 @@ Column {
         pendingUpdateVersion = ""
         updateStatus = qsTr("Checking for updates...")
         if (!AutoUpdateChecker.checkForUpdates()) {
-            updateCheckRequested = false
-            updateCheckInProgress = false
-            updateStatus = qsTr("Unable to check for updates.")
+            if (!AutoUpdateChecker.supportsUpdateCheck()) {
+                updateCheckRequested = false
+                updateCheckInProgress = false
+                updateStatus = qsTr("Unable to check for updates.")
+            }
         }
     }
 
@@ -164,7 +166,8 @@ Column {
                 HardButton {
                     text: aboutPage.updateCheckInProgress ? qsTr("Checking...") : qsTr("Check now")
                     primary: true
-                    enabled: !aboutPage.updateCheckInProgress
+                    enabled: AutoUpdateChecker.supportsUpdateCheck() &&
+                        !aboutPage.updateCheckInProgress
                     icon.source: "qrc:/res/fluent/tb-update.svg"
                     icon.color: Theme.ink
                     icon.width: 16
@@ -173,6 +176,7 @@ Column {
                 }
 
                 Text {
+                    width: parent.width
                     text: aboutPage.updateStatus
                     visible: text !== ""
                     color: Theme.textSettingsSubtitle
