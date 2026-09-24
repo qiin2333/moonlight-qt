@@ -3,10 +3,12 @@ import QtQuick 2.9
 import QtQuick.Controls
 import "."
 import "../theme"
+import AutoUpdateChecker 1.0
 import StreamingPreferences 1.0
+import SystemProperties 1.0
 
-// “关于”只展示社区入口和法律声明。
-// 页面不保存偏好、不请求网络，也不把网页嵌入客户端。
+// “关于”展示社区入口、版本更新和法律声明。
+// 页面不保存偏好、不嵌入网页；更新请求统一交给 AutoUpdateChecker。
 Column {
     id: aboutPage
 
@@ -36,6 +38,10 @@ Column {
     readonly property string licenseUrl: "https://github.com/AlkaidLab/foundation-sunshine/blob/master/LICENSE"
     readonly property string noticeUrl: "https://github.com/AlkaidLab/foundation-sunshine/blob/master/NOTICE"
     readonly property string usbipdcppUrl: "https://github.com/yunsmall/usbipdcpp"
+    property bool updateCheckRequested: false
+    property bool updateCheckInProgress: false
+    property string pendingUpdateVersion: ""
+    property string updateStatus: ""
 
     function openExternal(url) {
         if (!Qt.openUrlExternally(url)) {
@@ -46,6 +52,73 @@ Column {
     function revealLegalNotice() {
         // 让按钮事件完成后再滚动，避免和当前点击的焦点滚动互相覆盖。
         Qt.callLater(function() { aboutPage.scrollToEndRequested() })
+    }
+
+    function requestUpdateCheck() {
+        if (updateCheckInProgress) {
+            return
+        }
+
+        updateCheckRequested = true
+        updateCheckInProgress = true
+        pendingUpdateVersion = ""
+        updateStatus = qsTr("Checking for updates...")
+        if (!AutoUpdateChecker.checkForUpdates()) {
+            if (!AutoUpdateChecker.supportsUpdateCheck()) {
+                updateCheckRequested = false
+                updateCheckInProgress = false
+                updateStatus = qsTr("Unable to check for updates.")
+            }
+        }
+    }
+
+    function handleUpdateCheckStarted() {
+        if (aboutPage.updateCheckRequested) {
+            aboutPage.updateCheckInProgress = true
+            aboutPage.updateStatus = qsTr("Checking for updates...")
+        }
+    }
+
+    function handleUpdateAvailable(version, url) {
+        if (aboutPage.updateCheckRequested) {
+            aboutPage.pendingUpdateVersion = version
+        }
+    }
+
+    function handleUpdateCheckFinished(updateAvailable) {
+        if (!aboutPage.updateCheckRequested) {
+            return
+        }
+
+        aboutPage.updateCheckRequested = false
+        aboutPage.updateCheckInProgress = false
+        aboutPage.updateStatus = updateAvailable && aboutPage.pendingUpdateVersion !== ""
+                ? qsTr("Update available: Version %1").arg(aboutPage.pendingUpdateVersion)
+                : qsTr("You are using the latest version.")
+    }
+
+    function handleUpdateCheckFailed() {
+        if (!aboutPage.updateCheckRequested) {
+            return
+        }
+
+        aboutPage.updateCheckRequested = false
+        aboutPage.updateCheckInProgress = false
+        aboutPage.updateStatus = qsTr("Unable to check for updates.")
+    }
+
+    Component.onCompleted: {
+        AutoUpdateChecker.onUpdateCheckStarted.connect(aboutPage.handleUpdateCheckStarted)
+        AutoUpdateChecker.onUpdateAvailable.connect(aboutPage.handleUpdateAvailable)
+        AutoUpdateChecker.onUpdateCheckFinished.connect(aboutPage.handleUpdateCheckFinished)
+        AutoUpdateChecker.onUpdateCheckFailed.connect(aboutPage.handleUpdateCheckFailed)
+    }
+
+    Component.onDestruction: {
+        AutoUpdateChecker.onUpdateCheckStarted.disconnect(aboutPage.handleUpdateCheckStarted)
+        AutoUpdateChecker.onUpdateAvailable.disconnect(aboutPage.handleUpdateAvailable)
+        AutoUpdateChecker.onUpdateCheckFinished.disconnect(aboutPage.handleUpdateCheckFinished)
+        AutoUpdateChecker.onUpdateCheckFailed.disconnect(aboutPage.handleUpdateCheckFailed)
     }
 
     SettingsCard {
@@ -68,6 +141,49 @@ Column {
                 font.pointSize: Theme.fontSettingsSubtitle + 1
                 font.weight: Font.Medium
                 wrapMode: Text.Wrap
+            }
+
+            Text {
+                text: qsTr("Version %1").arg(SystemProperties.versionString)
+                color: Theme.text
+                font.family: Theme.fontSans
+                font.pointSize: Theme.fontRowTitle
+                font.weight: Font.DemiBold
+            }
+
+            Column {
+                width: parent.width
+                spacing: Theme.spaceSm
+
+                Text {
+                    text: qsTr("Check for updates")
+                    color: Theme.text
+                    font.family: Theme.fontSans
+                    font.pointSize: Theme.fontRowTitle
+                    font.weight: Font.DemiBold
+                }
+
+                HardButton {
+                    text: aboutPage.updateCheckInProgress ? qsTr("Checking...") : qsTr("Check now")
+                    primary: true
+                    enabled: AutoUpdateChecker.supportsUpdateCheck() &&
+                        !aboutPage.updateCheckInProgress
+                    icon.source: "qrc:/res/fluent/tb-update.svg"
+                    icon.color: Theme.ink
+                    icon.width: 16
+                    icon.height: 16
+                    onClicked: aboutPage.requestUpdateCheck()
+                }
+
+                Text {
+                    width: parent.width
+                    text: aboutPage.updateStatus
+                    visible: text !== ""
+                    color: Theme.textSettingsSubtitle
+                    font.family: Theme.fontSans
+                    font.pointSize: Theme.fontSettingsSubtitle
+                    wrapMode: Text.Wrap
+                }
             }
 
         }
