@@ -60,11 +60,13 @@ bool isTopologyBusId(const QString &busId)
 #ifdef Q_OS_LINUX
 // 提权面收口成一个固定 helper：pkexec 只执行这两个固定路径，busid 在
 // helper 里再做一次字符集校验（数字、点、横线），不拼任何用户输入进
-// shell。首次共享时由 app 用一次通用 pkexec 安装这两个文件，之后 bind/
+// shell。首次共享时由 app 用一次通用 pkexec 安装 helper 本体，helper 的
+// install 动作随后写 policy + udev 规则（拔出自动清理钩子），之后 bind/
 // unbind 都走 app 自己的 auth_admin_keep action（一次授权管几分钟）。
 constexpr auto kLinuxHelperPath = "/usr/lib/moonlight-qt/moonlight-usb-helper";
 constexpr auto kLinuxPolicyPath =
     "/usr/share/polkit-1/actions/org.moonlight.qt.usbforwarding.policy";
+constexpr auto kLinuxUdevRulePath = "/usr/lib/udev/rules.d/90-moonlight-usb-forwarding.rules";
 constexpr auto kLinuxBindingsPath = "/var/lib/moonlight-qt/bindings";
 
 constexpr auto kLinuxHelperScript = R"HELPER(#!/bin/sh
@@ -73,12 +75,53 @@ constexpr auto kLinuxHelperScript = R"HELPER(#!/bin/sh
 # NOTE: keep this script ASCII-only. MSVC rejects some non-ASCII punctuation
 # (em dash, CJK ideographs) inside raw string literals (error C3872), so the
 # prose lives in the C++ comment above instead.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
 set -u
 ACTION=${1:-}
 BUSID=${2:-}
 STATE_DIR=/var/lib/moonlight-qt
 STATE_FILE=$STATE_DIR/bindings
-case "$ACTION" in bind|unbind) ;; *) echo "unsupported action" >&2; exit 2;; esac
+POLICY_FILE=/usr/share/polkit-1/actions/org.moonlight.qt.usbforwarding.policy
+UDEV_RULE_FILE=/usr/lib/udev/rules.d/90-moonlight-usb-forwarding.rules
+
+if [ "$ACTION" = "install" ]; then
+    # Both files are written by the helper itself so the elevated surface
+    # stays a single fixed executable; contents are compiled into it.
+    cat > "$POLICY_FILE" <<'POLICY'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <action id="org.moonlight.qt.usbforwarding.run">
+    <description>Run the Moonlight USB forwarding helper</description>
+    <message>Authentication is required to share or release a USB device with Moonlight</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/moonlight-qt/moonlight-usb-helper</annotate>
+  </action>
+</policyconfig>
+POLICY
+    chmod 644 "$POLICY_FILE"
+    cat > "$UDEV_RULE_FILE" <<'RULE'
+# Moonlight USB forwarding: on unplug of a shared device, clear the
+# lingering usbip-host match_busid entry for that port. The kernel only
+# allows match_busid del while the device is present, so after an unplug
+# the entry can only be dropped via a module reload; modprobe -r refuses
+# safely while another shared device is still bound.
+ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/lib/moonlight-qt/moonlight-usb-helper auto-release $kernel"
+RULE
+    chmod 644 "$UDEV_RULE_FILE"
+    udevadm control --reload 2>/dev/null || true
+    echo "installed"
+    exit 0
+fi
+
+case "$ACTION" in bind|unbind|auto-release) ;; *) echo "unsupported action" >&2; exit 2;; esac
 case "$BUSID" in ''|*[!0-9.-]*) echo "invalid busid" >&2; exit 2;; esac
 command -v usbip >/dev/null 2>&1 || { echo "usbip tool not found" >&2; exit 3; }
 if [ ! -d /sys/module/usbip_host ]; then
@@ -141,6 +184,19 @@ if [ "$ACTION" = "bind" ]; then
     fi
     exit $RC
 fi
+if [ "$ACTION" = "auto-release" ]; then
+    # udev remove hook: the shared device was unplugged. The usbip-host
+    # match_busid entry for this port lingers (the kernel only allows del
+    # while the device is present) and would seize a different device
+    # replugged into the same port. A module reload clears it; modprobe -r
+    # refuses safely while another shared device is still bound.
+    awk -F'\t' -v b="$BUSID" '$1 == b { found = 1 } END { exit !found }' \
+        "$STATE_FILE" 2>/dev/null || exit 0
+    modprobe -r usbip_host 2>/dev/null
+    modprobe usbip_host 2>/dev/null
+    forget
+    exit 0
+fi
 OUT=$(usbip unbind -b "$BUSID" 2>&1)
 RC=$?
 echo "$OUT"
@@ -153,23 +209,6 @@ echo "$BUSID" > /sys/bus/usb/drivers_probe 2>/dev/null || true
 forget
 )HELPER";
 
-constexpr auto kLinuxPolicyXml = R"POLICY(<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE policyconfig PUBLIC
- "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
- "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
-<policyconfig>
-  <action id="org.moonlight.qt.usbforwarding.run">
-    <description>Run the Moonlight USB forwarding helper</description>
-    <message>Authentication is required to share or release a USB device with Moonlight</message>
-    <defaults>
-      <allow_any>no</allow_any>
-      <allow_inactive>no</allow_inactive>
-      <allow_active>auth_admin_keep</allow_active>
-    </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/moonlight-qt/moonlight-usb-helper</annotate>
-  </action>
-</policyconfig>
-)POLICY";
 #endif // Q_OS_LINUX
 
 } // namespace
@@ -694,7 +733,8 @@ void UsbForwardingBackend::runPrivileged(const QString &action, const QString &b
     setError(QString());
 
     const bool installed = QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath)) &&
-                           QFileInfo::exists(QString::fromLatin1(kLinuxPolicyPath));
+                           QFileInfo::exists(QString::fromLatin1(kLinuxPolicyPath)) &&
+                           QFileInfo::exists(QString::fromLatin1(kLinuxUdevRulePath));
     if (installed) {
         runHelperAction(action, busId, expectedIdentity);
     } else {
@@ -714,8 +754,6 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
         return false;
     }
     const QString helperTmp = temp->filePath(QStringLiteral("moonlight-usb-helper"));
-    const QString policyTmp =
-        temp->filePath(QStringLiteral("org.moonlight.qt.usbforwarding.policy"));
     {
         QFile helperFile(helperTmp);
         if (!helperFile.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
@@ -727,21 +765,14 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
             return false;
         }
         helperFile.setPermissions(QFile::ExeOwner | QFile::ReadOwner);
-        QFile policyFile(policyTmp);
-        if (!policyFile.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
-            policyFile.write(kLinuxPolicyXml) < 0) {
-            delete temp;
-            setBusy(false);
-            emit operationFinished(false,
-                                   tr("Could not create a temporary file for the USB helper."));
-            return false;
-        }
     }
 
-    // 安装走 pkexec 的默认 admin action（本身也是 auth_admin_keep，首次
-    // 输一次密码）；装好之后 bind/unbind 走 app 自己的固定 action。
-    // pkexec 直接 exec 目标程序、argv 直传不经 shell——任何路径（包括
-    // TMPDIR 里的引号等特字符）都不可能注入命令（CodeRabbit #242, CWE-78）。
+    // 两步提权安装：先把 helper 本体放到位，再以 helper 的 install 动作
+    // 写 policy + udev 规则（内容由 helper 自带）。两步都是 pkexec 直接
+    // exec 固定程序、argv 直传不经 shell——路径再特殊也不可能注入
+    // （CodeRabbit #242, CWE-78）。第一步走 pkexec 默认 admin action
+    // （首次输一次密码）；之后 bind/unbind 走 app 自己的
+    // auth_admin_keep action。
     const QString installTool = QStandardPaths::findExecutable(QStringLiteral("install"));
     if (installTool.isEmpty()) {
         delete temp;
@@ -758,19 +789,19 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
         emit operationFinished(false, message);
     };
 
-    QProcess *policyStep = new QProcess(this);
-    connect(policyStep, &QProcess::errorOccurred, this,
-            [this, policyStep, failInstall](QProcess::ProcessError processError) {
+    QProcess *configStep = new QProcess(this);
+    connect(configStep, &QProcess::errorOccurred, this,
+            [this, configStep, failInstall](QProcess::ProcessError processError) {
                 if (processError != QProcess::FailedToStart) {
                     return;
                 }
-                policyStep->deleteLater();
+                configStep->deleteLater();
                 failInstall(
                     tr("pkexec is not available. A polkit authentication agent is required."));
             });
-    connect(policyStep, &QProcess::finished, this,
-            [this, policyStep, temp, action, busId, expectedIdentity, failInstall](int exitCode) {
-                policyStep->deleteLater();
+    connect(configStep, &QProcess::finished, this,
+            [this, configStep, temp, action, busId, expectedIdentity, failInstall](int exitCode) {
+                configStep->deleteLater();
                 delete temp;
                 if (exitCode != 0 || !QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath))) {
                     failInstall(tr("The elevation was cancelled or failed."));
@@ -790,17 +821,15 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
                     tr("pkexec is not available. A polkit authentication agent is required."));
             });
     connect(helperStep, &QProcess::finished, this,
-            [this, helperStep, policyStep, installTool, policyTmp, failInstall](int exitCode) {
+            [this, helperStep, configStep, failInstall](int exitCode) {
                 helperStep->deleteLater();
                 if (exitCode != 0) {
-                    policyStep->deleteLater();
+                    configStep->deleteLater();
                     failInstall(tr("The elevation was cancelled or failed."));
                     return;
                 }
-                policyStep->start(QStringLiteral("pkexec"),
-                                  { installTool, QStringLiteral("-D"), QStringLiteral("-m"),
-                                    QStringLiteral("644"), policyTmp,
-                                    QString::fromLatin1(kLinuxPolicyPath) });
+                configStep->start(QStringLiteral("pkexec"), { QString::fromLatin1(kLinuxHelperPath),
+                                                              QStringLiteral("install") });
             });
     helperStep->start(QStringLiteral("pkexec"),
                       { installTool, QStringLiteral("-D"), QStringLiteral("-m"),

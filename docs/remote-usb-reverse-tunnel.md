@@ -34,14 +34,19 @@ Ubuntu 26.04/内核 7.0 上全链路验证通过，含虚拟设备数据面回�
   `usbip_host` 模块、按需拉起 `usbipd -D`，再执行 `usbip bind/unbind`。
 - **绑定语义**：对已被内核驱动（usb-storage 等）认领的设备直接 bind 即可，
   内核自动让位，无需预解绑；unbind 后补一次 `drivers_probe` 让设备回本机。
-- **替换设备防护**：usbip 按 busid 寻址、match_busid 只认端口——共享期间
-  同端口换成另一台设备会被 usbip-host 静默认领。helper 在 bind 时把设备
-  身份（vidPid+serial）记入 `/var/lib/moonlight-qt/bindings`，客户端枚举时
-  比对，不符则标 `isReplaced`：悬浮菜单拒绝转发，绑定对话框提示重新共享。
-  bind 还携带用户点选时的身份，helper 在 root 下重读 sysfs 比对、不符拒绝
-  绑定（把 polkit 授权等待造成的 TOCTOU 窗口压到 root 内微秒级）。无序列
-  号设备退化为 vidPid 级身份：跨型号替换仍能识别，同型号孪生不可区分
-  （Linux 上这类设备不存在跨重插稳定的设备级标识）。
+- **替换设备防护（检测 + 预防双层）**：usbip 按 busid 寻址、match_busid 只认
+  端口——共享期间同端口换成另一台设备会被 usbip-host 静默认领。
+  - *预防*：安装时部署 udev 规则（`90-moonlight-usb-forwarding.rules`），
+    共享设备拔出事件触发 helper `auto-release`：清快照并重载 usbip_host
+    模块清掉残留 match（内核只允许设备在位时 del，拔出后只能靠模块重
+    载；`modprobe -r` 在仍有其他共享设备绑定时会自动拒绝，天然安全）。
+    实测：拔出 → match/快照双清 → 重插设备归属本机驱动，不再被认领。
+  - *检测*：bind 时快照身份（vidPid+serial）记入
+    `/var/lib/moonlight-qt/bindings`，客户端枚举时比对，不符标
+    `isReplaced`：悬浮菜单拒绝转发。bind 还携带身份做 TOCTOU 校验
+    （helper 在 root 下重读 sysfs）。无序列号设备退化为 vidPid 级身份
+    （跨型号替换仍可识别；同型号无序列号孪生不可区分，Linux 无此类
+    设备的跨重插稳定标识）。
 - **环境体检**：`usbip` 二进制 + `/sys/module/usbip_host` + 3240 端口
   连通性三步探测；daemon 不在时绑定过程自动拉起，不阻塞用户。
 - 隧道直连 `127.0.0.1:3240`（`TunnelConfig` 默认值，与 Windows usbipd-win
