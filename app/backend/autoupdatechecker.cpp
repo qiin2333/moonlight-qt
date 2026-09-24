@@ -11,6 +11,7 @@
 #include <QNetworkReply>
 #include <QSysInfo>
 #include <QTextStream>
+#include <QTimer>
 
 // GitHub repository for update checks
 #define GITHUB_OWNER "qiin2333"
@@ -49,6 +50,15 @@ bool AutoUpdateChecker::supportsInAppUpdate() const
     return m_PortableUpdateInstaller->supportsInAppUpdate();
 }
 
+bool AutoUpdateChecker::supportsUpdateCheck() const
+{
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || defined(STEAM_LINK) || defined(APP_IMAGE)
+    return true;
+#else
+    return false;
+#endif
+}
+
 void AutoUpdateChecker::installUpdate(QString url)
 {
     const QString expectedDigest = url == m_UpdateDownloadUrl ? m_UpdateAssetDigest : QString();
@@ -57,10 +67,23 @@ void AutoUpdateChecker::installUpdate(QString url)
 
 void AutoUpdateChecker::start()
 {
-    if (!m_Nam) {
-        Q_ASSERT(m_Nam);
-        return;
+    checkForUpdates();
+}
+
+bool AutoUpdateChecker::checkForUpdates()
+{
+    if (!supportsUpdateCheck()) {
+        return false;
     }
+
+    if (m_UpdateCheckInProgress) {
+        // The automatic startup check may still be running. Do not let a
+        // newly opened settings page wait for a signal it cannot observe.
+        return false;
+    }
+
+    m_UpdateCheckInProgress = true;
+    emit onUpdateCheckStarted();
 
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || defined(STEAM_LINK) || defined(APP_IMAGE)
 #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0) && QT_VERSION < QT_VERSION_CHECK(5, 15, 1) && !defined(QT_NO_BEARERMANAGEMENT)
@@ -76,6 +99,12 @@ void AutoUpdateChecker::start()
                  .arg(GITHUB_OWNER, GITHUB_REPO));
     QNetworkRequest request(url);
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    // Keep a manual check from leaving its button busy forever when the
+    // network is unavailable but the connection never closes.
+    request.setTransferTimeout(15000);
+#endif
+
     // GitHub API requires a User-Agent header
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QString("Moonlight/%1").arg(VERSION_STR));
@@ -87,8 +116,30 @@ void AutoUpdateChecker::start()
 #else
     request.setAttribute(QNetworkRequest::HTTP2AllowedAttribute, true);
 #endif
-    m_Nam->get(request);
+    QNetworkReply* reply = m_Nam->get(request);
+    // Some macOS network paths can remain in DNS/connect state without
+    // honoring QNetworkRequest::setTransferTimeout(). Abort explicitly so
+    // the UI always receives a terminal result. Parent the timer to the
+    // reply so it cannot outlive the request or touch a deleted reply.
+    QTimer* timeout = new QTimer(reply);
+    timeout->setSingleShot(true);
+    connect(reply, &QNetworkReply::finished, timeout, &QTimer::stop);
+    connect(timeout, &QTimer::timeout, this, [this, reply]() {
+        if (!reply->isRunning()) {
+            return;
+        }
+
+        qWarning() << "Update check timed out";
+        reply->abort();
+        if (m_UpdateCheckInProgress) {
+            m_UpdateCheckInProgress = false;
+            emit onUpdateCheckFailed();
+        }
+    });
+    timeout->start(15000);
 #endif
+
+    return true;
 }
 
 void AutoUpdateChecker::parseStringToVersionQuad(const QString& string, QVector<int>& version)
@@ -225,10 +276,14 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
 {
     Q_ASSERT(reply->isFinished());
 
-    // Delete the QNetworkAccessManager to free resources and
-    // prevent the bearer plugin from polling in the background.
-    m_Nam->deleteLater();
-    m_Nam = nullptr;
+    auto finish = [this](bool updateAvailable) {
+        m_UpdateCheckInProgress = false;
+        emit onUpdateCheckFinished(updateAvailable);
+    };
+    auto fail = [this]() {
+        m_UpdateCheckInProgress = false;
+        emit onUpdateCheckFailed();
+    };
 
     if (reply->error() == QNetworkReply::NoError) {
         QTextStream stream(reply);
@@ -247,11 +302,13 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
         QJsonDocument jsonDoc = QJsonDocument::fromJson(jsonString.toUtf8(), &error);
         if (jsonDoc.isNull()) {
             qWarning() << "GitHub release response malformed:" << error.errorString();
+            fail();
             return;
         }
 
         if (!jsonDoc.isObject()) {
             qWarning() << "GitHub release response is not a JSON object";
+            fail();
             return;
         }
 
@@ -275,11 +332,13 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
         // Skip pre-releases and drafts
         if (releaseObj["prerelease"].toBool(false) || releaseObj["draft"].toBool(false)) {
             qDebug() << "Latest GitHub release is a pre-release or draft, skipping";
+            finish(false);
             return;
         }
 
         if (!releaseObj.contains("tag_name") || !releaseObj["tag_name"].isString()) {
             qWarning() << "GitHub release missing tag_name";
+            fail();
             return;
         }
 
@@ -289,6 +348,12 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
         // Parse version from tag (strip 'v' prefix if present)
         QVector<int> latestVersionQuad;
         parseStringToVersionQuad(tagName, latestVersionQuad);
+
+        if (latestVersionQuad.isEmpty()) {
+            qWarning() << "GitHub release contains an invalid tag_name:" << tagName;
+            fail();
+            return;
+        }
 
         int res = compareVersion(m_CurrentVersionQuad, latestVersionQuad);
         if (res < 0) {
@@ -375,16 +440,20 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
             m_UpdateAssetDigest = assetDigest;
 
             emit onUpdateAvailable(tagName, downloadUrl);
+            finish(true);
         }
         else if (res > 0) {
             qDebug() << "Current version is newer than latest release";
+            finish(false);
         }
         else {
             qDebug() << "Current version matches latest release";
+            finish(false);
         }
     }
     else {
         qWarning() << "Update checking failed:" << reply->error() << reply->errorString();
         reply->deleteLater();
+        fail();
     }
 }
