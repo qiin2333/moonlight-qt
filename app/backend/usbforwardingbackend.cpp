@@ -158,8 +158,9 @@ forget() {
     awk -F'\t' -v b="$1" '$1 != b' "$STATE_FILE" > "$STATE_FILE.new" &&
         mv "$STATE_FILE.new" "$STATE_FILE"
 }
-# 清扫快照里 busid 已不在位的陈旧条目（模块重载成功后 match 已全部
-# 消失，这些条目的防护对象不复存在）。
+# Sweep snapshot entries whose busid is gone from sysfs. After a
+# successful module reload every lingering match is already cleared, so
+# these entries no longer guard anything.
 sweep_stale() {
     [ -f "$STATE_FILE" ] || return 0
     while IFS="$(printf '\t')" read -r b vidpid serial; do
@@ -211,7 +212,7 @@ if [ "$ACTION" = "auto-release" ]; then
     # while the device is present) and would seize a different device
     # replugged into the same port. A module reload clears it; modprobe -r
     # refuses safely while another shared device is still bound. Keep the
-    # snapshot when the reload fails — without it replacement detection
+    # snapshot when the reload fails; without it replacement detection
     # would skip this port while the lingering match is still live; the
     # sweep retries on later unplug events once unloading becomes possible.
     awk -F'\t' -v b="$BUSID" '$1 == b { found = 1 } END { exit !found }' \
