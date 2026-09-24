@@ -88,7 +88,10 @@ UDEV_RULE_FILE=/usr/lib/udev/rules.d/90-moonlight-usb-forwarding.rules
 if [ "$ACTION" = "install" ]; then
     # Both files are written by the helper itself so the elevated surface
     # stays a single fixed executable; contents are compiled into it.
-    cat > "$POLICY_FILE" <<'POLICY'
+    # Every step is checked: a half-installed state (file present but rule
+    # never activated) is worse than a failed install the user can retry.
+    write_policy() {
+        cat > "$POLICY_FILE" <<'POLICY'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE policyconfig PUBLIC
  "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
@@ -106,8 +109,9 @@ if [ "$ACTION" = "install" ]; then
   </action>
 </policyconfig>
 POLICY
-    chmod 644 "$POLICY_FILE"
-    cat > "$UDEV_RULE_FILE" <<'RULE'
+    }
+    write_rule() {
+        cat > "$UDEV_RULE_FILE" <<'RULE'
 # Moonlight USB forwarding: on unplug of a shared device, clear the
 # lingering usbip-host match_busid entry for that port. The kernel only
 # allows match_busid del while the device is present, so after an unplug
@@ -115,8 +119,16 @@ POLICY
 # safely while another shared device is still bound.
 ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/lib/moonlight-qt/moonlight-usb-helper auto-release $kernel"
 RULE
-    chmod 644 "$UDEV_RULE_FILE"
-    udevadm control --reload 2>/dev/null || true
+    }
+    if ! write_policy || ! chmod 644 "$POLICY_FILE" ||
+       ! write_rule || ! chmod 644 "$UDEV_RULE_FILE"; then
+        echo "config write failed" >&2
+        exit 7
+    fi
+    # A failed reload leaves the rule on disk but invisible to udev events;
+    # surface it so the caller can ask for a retry instead of silently
+    # running without unplug cleanup.
+    udevadm control --reload 2>/dev/null || { echo "udev reload failed" >&2; exit 7; }
     echo "installed"
     exit 0
 fi
@@ -143,12 +155,21 @@ read_identity_attrs() {
 forget() {
     mkdir -p "$STATE_DIR"
     [ -f "$STATE_FILE" ] || return 0
-    awk -F'\t' -v b="$BUSID" '$1 != b' "$STATE_FILE" > "$STATE_FILE.new" &&
+    awk -F'\t' -v b="$1" '$1 != b' "$STATE_FILE" > "$STATE_FILE.new" &&
         mv "$STATE_FILE.new" "$STATE_FILE"
+}
+# 清扫快照里 busid 已不在位的陈旧条目（模块重载成功后 match 已全部
+# 消失，这些条目的防护对象不复存在）。
+sweep_stale() {
+    [ -f "$STATE_FILE" ] || return 0
+    while IFS="$(printf '\t')" read -r b vidpid serial; do
+        [ -n "$b" ] || continue
+        [ -d "/sys/bus/usb/devices/$b" ] || forget "$b"
+    done < "$STATE_FILE"
 }
 record() {
     read_identity_attrs || return 1
-    forget
+    forget "$BUSID"
     # Append failure (read-only /var/lib, full disk) must surface: a bound
     # device without a snapshot silently disables replacement detection.
     printf '%s\t%s:%s\t%s\n' "$BUSID" "$VID" "$PID" "$SERIAL" >> "$STATE_FILE" || return 1
@@ -189,12 +210,16 @@ if [ "$ACTION" = "auto-release" ]; then
     # match_busid entry for this port lingers (the kernel only allows del
     # while the device is present) and would seize a different device
     # replugged into the same port. A module reload clears it; modprobe -r
-    # refuses safely while another shared device is still bound.
+    # refuses safely while another shared device is still bound. Keep the
+    # snapshot when the reload fails — without it replacement detection
+    # would skip this port while the lingering match is still live; the
+    # sweep retries on later unplug events once unloading becomes possible.
     awk -F'\t' -v b="$BUSID" '$1 == b { found = 1 } END { exit !found }' \
         "$STATE_FILE" 2>/dev/null || exit 0
-    modprobe -r usbip_host 2>/dev/null
-    modprobe usbip_host 2>/dev/null
-    forget
+    if modprobe -r usbip_host 2>/dev/null && modprobe usbip_host 2>/dev/null; then
+        forget "$BUSID"
+        sweep_stale
+    fi
     exit 0
 fi
 OUT=$(usbip unbind -b "$BUSID" 2>&1)
@@ -206,7 +231,7 @@ if [ $RC -ne 0 ]; then
     exit $RC
 fi
 echo "$BUSID" > /sys/bus/usb/drivers_probe 2>/dev/null || true
-forget
+forget "$BUSID"
 )HELPER";
 
 #endif // Q_OS_LINUX
@@ -802,11 +827,19 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
     connect(configStep, &QProcess::finished, this,
             [this, configStep, temp, action, busId, expectedIdentity, failInstall](int exitCode) {
                 configStep->deleteLater();
-                delete temp;
+                if (exitCode == 7) {
+                    // helper 的 install 动作明确报告：文件已写但 udev 规则
+                    // 未能激活。绑定未发生，用户修复后可重试。
+                    failInstall(tr("USB sharing setup could not activate the unplug-cleanup "
+                                   "rule. It will be retried on the next share attempt."));
+                    return;
+                }
                 if (exitCode != 0 || !QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath))) {
                     failInstall(tr("The elevation was cancelled or failed."));
                     return;
                 }
+                // 成功路径：failInstall 不会再被调用，这里显式释放。
+                delete temp;
                 runHelperAction(action, busId, expectedIdentity);
             });
 
