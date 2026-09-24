@@ -1367,6 +1367,11 @@ void Session::refreshRemoteUsbDevices()
                 !device.value(QStringLiteral("isConnected")).toBool()) {
                 continue;
             }
+            // Linux：共享后端口上被换成另一台设备（busid 相同、身份不符）
+            // 时禁止转发，避免张冠李戴；isReplaced 仅 Linux 后端产生。
+            if (device.value(QStringLiteral("isReplaced")).toBool()) {
+                continue;
+            }
             OverlayMenuPanel::RemoteUsbDevice menuDevice;
             menuDevice.id = device.value(QStringLiteral("busId")).toString();
             if (menuDevice.id.isEmpty()) {
@@ -4880,11 +4885,13 @@ void Session::exec()
         // visibility as active Qt work forces this SDL loop to wake and drain
         // all Qt events every 10 ms even while the button is idle, which can
         // delay input and video processing.
-        // Remote USB 转发的 queued 工作全部投递在本线程（helper spawn 的
-        // worker-finished lambda、tunnel socket I/O、helper stderr 排水），
+        // Remote USB 转发的 queued 工作投递在本线程（helper spawn 的
+        // worker-finished lambda、tunnel 状态通知、helper stderr 排水），
         // 而本循环已取代 app.exec()、只在返回 true 时泵事件：转发存续期间
         // 必须保持泵转，否则 helper 无法启动、日志会写满 stderr 管道把
-        // moonlight-usbd 卡死、转发数据也会停摆。
+        // moonlight-usbd 卡死、tunnel 的 forwarding/finished 通知也收不到。
+        // 隧道的数据面跑在自己的 IO 线程（usbforwardingtunnel.cpp），不依赖
+        // 本泵——1000Hz 鼠标的 URB 洪流不再与输入处理争抢本线程。
         return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
                (m_MenuButton && m_MenuButton->needsEventProcessing()) ||
                (m_Toast && m_Toast->needsEventProcessing()) ||

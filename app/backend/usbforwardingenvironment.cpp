@@ -3,8 +3,10 @@
 #include "usbforwardinglocalserver.h"
 
 #include <QFileInfo>
+#include <QHostAddress>
 #include <QProcess>
 #include <QStandardPaths>
+#include <QTcpSocket>
 #include <QTimer>
 
 #ifdef Q_OS_WIN32
@@ -66,6 +68,22 @@ void UsbForwardingEnvironment::refresh()
     m_State = Checking;
     emit stateChanged();
     startHelperVersionProbe(helperPath);
+#elif defined(Q_OS_LINUX)
+    // Linux wraps the standard usbip-host stack: the usbip userspace tool
+    // plus the root usbipd daemon on 3240. Module loading and daemon
+    // lifecycle happen through the privileged helper when a device is
+    // shared; the readiness probe is read-only.
+    const QString usbipExe = QStandardPaths::findExecutable(QStringLiteral("usbip"));
+    if (usbipExe.isEmpty()) {
+        m_Version.clear();
+        finish(NotInstalled);
+        return;
+    }
+    m_Checking = true;
+    emit checkingChanged();
+    m_State = Checking;
+    emit stateChanged();
+    startLinuxVersionProbe(usbipExe);
 #else
     m_Version.clear();
     finish(NotInstalled);
@@ -145,6 +163,39 @@ void UsbForwardingEnvironment::startHelperVersionProbe(const QString &helperPath
     probe->start(helperPath, {QStringLiteral("--version")});
 }
 
+void UsbForwardingEnvironment::startLinuxVersionProbe(const QString &usbipExe)
+{
+    QProcess *probe = new QProcess(this);
+    connect(probe, &QProcess::errorOccurred, this,
+            [this, probe](QProcess::ProcessError processError) {
+                if (processError != QProcess::FailedToStart) {
+                    return;
+                }
+                probe->deleteLater();
+                finish(CheckFailed);
+            });
+    connect(probe, &QProcess::finished, this, [this, probe](int exitCode) {
+        probe->deleteLater();
+        if (exitCode != 0) {
+            finish(CheckFailed);
+            return;
+        }
+        const QString output = QString::fromLocal8Bit(probe->readAllStandardOutput());
+        const QString firstLine = output.section(QLatin1Char('\n'), 0, 0).simplified();
+        // "usbip (usbip-utils 2.0)" -> "usbip-utils 2.0"
+        QString version = firstLine;
+        const int openIndex = version.indexOf(QLatin1Char('('));
+        const int closeIndex = version.lastIndexOf(QLatin1Char(')'));
+        if (openIndex >= 0 && closeIndex > openIndex) {
+            version = version.mid(openIndex + 1, closeIndex - openIndex - 1);
+        }
+        m_Version = version.trimmed();
+        startServiceProbe();
+    });
+    QTimer::singleShot(8000, probe, &QProcess::kill);
+    probe->start(usbipExe, { QStringLiteral("version") });
+}
+
 void UsbForwardingEnvironment::startServiceProbe()
 {
     finish(probeServices());
@@ -179,6 +230,20 @@ UsbForwardingEnvironment::State UsbForwardingEnvironment::probeServices()
     // Called synchronously from the session worker: never spawn a process
     // here, just check that the bundled helper is present.
     return UsbForwardingLocalServer::locateHelper().isEmpty() ? NotInstalled : Ready;
+#elif defined(Q_OS_LINUX)
+    // Called synchronously from the session worker and from refresh():
+    // only stat() and one bounded loopback connect, never a process spawn.
+    if (QStandardPaths::findExecutable(QStringLiteral("usbip")).isEmpty()) {
+        return NotInstalled;
+    }
+    if (!QFileInfo::exists(QStringLiteral("/sys/module/usbip_host"))) {
+        return DriverStopped;
+    }
+    QTcpSocket probe;
+    probe.connectToHost(QHostAddress(QHostAddress::LocalHost), 3240);
+    const bool reachable = probe.waitForConnected(300);
+    probe.abort();
+    return reachable ? Ready : ServiceStopped;
 #else
     return NotInstalled;
 #endif
@@ -189,14 +254,30 @@ QString UsbForwardingEnvironment::readinessError(State state)
     switch (state) {
     case Ready: return {};
     case DriverStopped:
+#ifdef Q_OS_LINUX
+        return tr("The USB/IP kernel module (usbip_host) is not loaded. Moonlight loads it "
+                  "automatically when you share a device.");
+#else
         return tr("The USB forwarding driver is not running. Start VBoxUSBMon as administrator, or restart Windows.");
+#endif
     case ServiceStopped:
+#ifdef Q_OS_LINUX
+        return tr("The usbipd daemon is not running. Moonlight starts it automatically when you "
+                  "share a device.");
+#else
         return tr("The usbipd service is not running. Start the service and retry.");
+#endif
 #ifdef Q_OS_DARWIN
     case NotInstalled:
         return tr("The bundled USB sharing component is missing. Reinstall Moonlight.");
     default:
         return tr("Could not verify the bundled USB sharing component. Reinstall Moonlight.");
+#elif defined(Q_OS_LINUX)
+    case NotInstalled:
+        return tr("The usbip tool is not installed. Install the USB/IP package of your "
+                  "distribution (usbip-utils or linux-tools).");
+    default:
+        return tr("Could not verify the USB sharing environment. Check the usbip installation.");
 #else
     default:
         return tr("Could not verify the local USB service and driver. Check the usbipd-win installation.");

@@ -61,11 +61,18 @@ SystemProperties::SystemProperties()
     isDarwin = false;
 #endif
 
-#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
+#ifdef Q_OS_LINUX
+    isLinux = true;
+#else
+    isLinux = false;
+#endif
+
+#if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || defined(Q_OS_LINUX)
     // Windows attaches to an external usbipd-win server; macOS ships the
-    // moonlight-usbd helper (usbipdcpp) inside the app bundle. The Linux
-    // usbip-host backend and the Android service are future work; see the
-    // platform table in docs/remote-usb-reverse-tunnel.md.
+    // moonlight-usbd helper (usbipdcpp) inside the app bundle; Linux wraps
+    // the standard usbip-host kernel stack (usbip + usbipd daemon).
+    // The Android service is future work; see the platform table in
+    // docs/remote-usb-reverse-tunnel.md.
     usbForwardingAvailable = true;
 #endif
 
