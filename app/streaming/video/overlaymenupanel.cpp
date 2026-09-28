@@ -229,14 +229,14 @@ void OverlayMenuPanel::buildMenuLevels()
                          m_FileMappingState == FileMappingState::Open,
                          separatorAfterHostFiles});
     if (m_RemoteUsbAvailable) {
-        top.items.push_back({tr("USB Devices"), m_RemoteUsbNeedsActivation
-                                                ? tr("Activate device") : m_RemoteUsbDetail,
-                             MenuItemType::SubMenu,
-                             MenuAction::MenuActionMax, 4, true, false,
+        top.items.push_back(
+            { tr("USB Devices"),
+              m_RemoteUsbNeedsActivation ? tr("Activate device") : m_RemoteUsbDetail,
+              MenuItemType::SubMenu, MenuAction::MenuActionMax, 4, true, false,
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
-                             false});
+              false });
 #else
-                             true});
+              true });
 #endif
     }
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
@@ -654,8 +654,8 @@ void OverlayMenuPanel::updateRemoteUsbState(
     m_RemoteUsbState = state;
     m_RemoteUsbDevices = std::move(devices);
     m_RemoteUsbActiveDeviceId = activeDeviceId;
-    m_RemoteUsbNeedsActivation = available && state == RemoteUsbState::Available &&
-        activeDeviceId.isEmpty() &&
+    m_RemoteUsbNeedsActivation =
+        available && state == RemoteUsbState::Available && activeDeviceId.isEmpty() &&
         std::any_of(m_RemoteUsbDevices.cbegin(), m_RemoteUsbDevices.cend(),
                     [](const RemoteUsbDevice& device) { return device.supported; });
     m_RemoteUsbDetail = detail;
@@ -1152,9 +1152,9 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             p.drawRect(row.adjusted(0, 0, -1, -1));
             p.fillRect(QRect(4, itemY + 1, 4, m_ItemHeight - 2), MenuAccent);
         }
-        const bool activationPrompt = m_RemoteUsbNeedsActivation &&
-            ((m_CurrentLevel == 0 && item.type == MenuItemType::SubMenu &&
-              item.targetLevel == 4) ||
+        const bool activationPrompt =
+            m_RemoteUsbNeedsActivation &&
+            ((m_CurrentLevel == 0 && item.type == MenuItemType::SubMenu && item.targetLevel == 4) ||
              (m_CurrentLevel == 4 && item.action == MenuAction::SelectRemoteUsbDevice &&
               item.enabled));
         if (activationPrompt) {
