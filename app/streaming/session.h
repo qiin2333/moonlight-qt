@@ -390,6 +390,7 @@ private:
     OpusMSDecoder* m_OpusDecoder;
     IAudioRenderer* m_AudioRenderer;
     DualSenseHapticsRenderer* m_DualSenseHapticsRenderer;
+    Uint32 m_Ds5IrRumbleLastForwardTicks[MAX_GAMEPADS] = {};
     OPUS_MULTISTREAM_CONFIGURATION m_ActiveAudioConfig;
     OPUS_MULTISTREAM_CONFIGURATION m_OriginalAudioConfig;
     int m_AudioSampleCount;

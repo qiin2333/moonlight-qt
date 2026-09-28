@@ -122,6 +122,12 @@ SystemProperties::SystemProperties()
     hasDiscordIntegration = false;
 #endif
 
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    hasPhysicalDualSenseHaptics = true;
+#else
+    hasPhysicalDualSenseHaptics = false;
+#endif
+
     // These will be queried asynchronously to avoid blocking the UI
     hasHardwareAcceleration = true;
     rendererAlwaysFullScreen = false;
