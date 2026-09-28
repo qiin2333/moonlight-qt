@@ -31,7 +31,6 @@ NavigableDialog {
 
     onOpened: {
         statusText = ""
-        pendingShare = false
         UsbForwardingBackend.refresh()
     }
 
