@@ -7,13 +7,26 @@
 class DualSenseHapticsRenderer
 {
 public:
-    DualSenseHapticsRenderer();
+    enum class Mode
+    {
+        Physical, // Authored PCM on the controller's USB audio endpoint
+        Emulated, // Analyzed IR frames
+    };
+
+    enum class Availability
+    {
+        Available,
+        NotFound,
+        MultipleEndpoints, // Refused: the stream's pad can't be told apart
+    };
+
+    explicit DualSenseHapticsRenderer(Mode mode);
     ~DualSenseHapticsRenderer();
 
     DualSenseHapticsRenderer(const DualSenseHapticsRenderer&) = delete;
     DualSenseHapticsRenderer& operator=(const DualSenseHapticsRenderer&) = delete;
 
-    static bool isAvailable();
+    static Availability availability();
     void submit(const LI_DS5_HAPTICS_PCM_FRAME& frame);
     void setControllerTarget(int controllerNumber);
     void reset();

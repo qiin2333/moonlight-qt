@@ -7,14 +7,6 @@
 #include <Limelight.h>
 
 namespace dualsense_haptics {
-// A frame that renders to zero output on every lane: either the stream ended or
-// the host analyzed silence. Both are the frame that stops the motors, so
-// consumers must never drop one.
-inline bool isIrStopFrame(const LI_DS5_HAPTICS_IR_FRAME_V2& frame)
-{
-    return (frame.flags & (LI_DS5_HAPTICS_IR_FLAG_STREAM_END | LI_DS5_HAPTICS_IR_FLAG_SILENT)) != 0;
-}
-
 struct RumbleOutput
 {
     std::uint16_t lowFrequency;
@@ -49,7 +41,8 @@ inline NativeHapticLaneOutput renderNativeLane(const LI_DS5_HAPTICS_IR_LANE_V2& 
 
 inline NativeHapticOutput renderIrV2Native(const LI_DS5_HAPTICS_IR_FRAME_V2& frame)
 {
-    if (isIrStopFrame(frame)) {
+    if (frame.flags & (LI_DS5_HAPTICS_IR_FLAG_STREAM_END |
+                       LI_DS5_HAPTICS_IR_FLAG_SILENT)) {
         return {};
     }
 
@@ -58,7 +51,8 @@ inline NativeHapticOutput renderIrV2Native(const LI_DS5_HAPTICS_IR_FRAME_V2& fra
 
 inline RumbleOutput renderIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2& frame)
 {
-    if (isIrStopFrame(frame)) {
+    if (frame.flags & (LI_DS5_HAPTICS_IR_FLAG_STREAM_END |
+                       LI_DS5_HAPTICS_IR_FLAG_SILENT)) {
         return {0, 0};
     }
 

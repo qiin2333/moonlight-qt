@@ -40,6 +40,7 @@ using Microsoft::WRL::ComPtr;
 #endif
 
 namespace {
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
 constexpr std::size_t MaxQueuedPackets = 32;
 constexpr std::uint32_t PrebufferFrames = 720; // 15 ms at 48 kHz
 
@@ -51,13 +52,11 @@ constexpr std::uint32_t EndpointChannelCount = 4;
 constexpr std::uint32_t HapticsChannelOffset = 2;
 
 // How long to wait before probing for the endpoint again after it failed to
-// open, or failed mid-stream. Without it a device that is enumerable but no
-// longer draining would re-run discovery several times a second.
+// open or stopped draining.
 constexpr auto EndpointProbeBackoff = std::chrono::seconds(2);
 
 // How long a single write may wait for the endpoint to make room before we give
-// up on it. An endpoint that wedges without reporting itself dead would
-// otherwise hold the worker until the session tears down.
+// up on it.
 constexpr auto EndpointWriteTimeout = std::chrono::milliseconds(200);
 
 struct Packet
@@ -69,9 +68,15 @@ struct Packet
     std::vector<std::uint8_t> pcm;
 };
 
-// Both backends match the endpoint by its user-visible name. A DualShock 4 also
-// calls itself "Wireless Controller", but it exposes a two-channel endpoint, so
-// the channel count check on each platform rules it out.
+enum class WriteResult
+{
+    Ok,
+    WouldBlock, // No room right now; retry after the endpoint drains.
+    Failed,     // Gone or wedged; the endpoint must be reopened.
+};
+
+// A DualShock 4 also calls itself "Wireless Controller", but it exposes a
+// two-channel endpoint, so the channel count check rules it out.
 bool isDualSenseName(const QString& name)
 {
     return name.contains(QLatin1String("dualsense"), Qt::CaseInsensitive) ||
@@ -80,8 +85,7 @@ bool isDualSenseName(const QString& name)
 }
 
 // Expand the packet's interleaved 16-bit stereo into an endpoint frame: silence
-// on the headset pair, authored PCM on the haptics pair. This channel layout is
-// the core contract of the feature, so both backends share this one copy of it.
+// on the headset pair, authored PCM on the haptics pair.
 template <typename Sample, typename Convert>
 void spreadToHapticsChannels(Sample* out, const Packet& packet, Convert convert)
 {
@@ -92,57 +96,66 @@ void spreadToHapticsChannels(Sample* out, const Packet& packet, Convert convert)
         out[i * EndpointChannelCount + HapticsChannelOffset + 1] = convert(in[i * 2 + 1]);
     }
 }
+#endif
 
-// Platform sink for haptics PCM. The queueing, stream tracking and prebuffer
-// state machine around it are shared; only endpoint discovery and the actual
-// hand-off to the OS audio stack differ per platform.
-class HapticsEndpoint
+#ifndef HAVE_PHYSICAL_DS5_HAPTICS
+
+DualSenseHapticsRenderer::Availability probeHapticsEndpoint()
+{
+    return DualSenseHapticsRenderer::Availability::NotFound;
+}
+
+#elif defined(Q_OS_WIN32)
+// Call visit() with an audio client for each active render endpoint named like
+// a DualSense, until it accepts one.
+template <typename Visit> bool findDualSenseAudioClient(Visit visit)
+{
+    ComPtr<IMMDeviceEnumerator> enumerator;
+    ComPtr<IMMDeviceCollection> devices;
+    if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                IID_PPV_ARGS(&enumerator))) ||
+        FAILED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices))) {
+        return false;
+    }
+
+    UINT count = 0;
+    devices->GetCount(&count);
+    for (UINT i = 0; i < count; i++) {
+        ComPtr<IMMDevice> device;
+        if (FAILED(devices->Item(i, &device)))
+            continue;
+
+        std::wstring friendlyName;
+        ComPtr<IPropertyStore> properties;
+        if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &properties))) {
+            PROPVARIANT value;
+            PropVariantInit(&value);
+            if (SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &value)) &&
+                value.vt == VT_LPWSTR && value.pwszVal != nullptr) {
+                friendlyName = value.pwszVal;
+            }
+            PropVariantClear(&value);
+        }
+        const QString name = QString::fromStdWString(friendlyName);
+        if (!isDualSenseName(name))
+            continue;
+
+        ComPtr<IAudioClient> client;
+        if (FAILED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
+                                    reinterpret_cast<void**>(client.GetAddressOf())))) {
+            continue;
+        }
+        if (visit(client, name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+class WasapiHapticsEndpoint
 {
 public:
-    enum class WriteResult
-    {
-        Ok,
-        WouldBlock, // No room right now; retry after the endpoint drains.
-        Failed,     // Gone or wedged; the endpoint must be reopened.
-    };
-
-    virtual ~HapticsEndpoint() = default;
-
-    // Called on the worker thread before and after any other method.
-    virtual bool threadInit() { return true; }
-    virtual void threadCleanup() {}
-
-    // Acquire (or release) the DualSense endpoint. open() also publishes
-    // bufferFrames().
-    virtual bool open() = 0;
-    virtual void close() = 0;
-    virtual bool isOpen() const = 0;
-
-    // Hand one packet to the OS buffer without blocking. The caller owns the
-    // retry loop and the give-up policy, so both platforms share one of each.
-    virtual WriteResult tryWrite(const Packet& packet) = 0;
-
-    // Begin playback of whatever has been written so far.
-    virtual bool start() = 0;
-
-    // Stop playback and discard audio that has not been played yet. The
-    // endpoint stays open.
-    virtual void reset() = 0;
-
-    // How many frames may be written before start() must be called. Published
-    // by open(); both backends track it identically.
-    std::uint32_t bufferFrames() const { return m_BufferFrames; }
-
-protected:
-    std::uint32_t m_BufferFrames = 0;
-    bool m_Started = false;
-};
-
-#ifdef Q_OS_WIN32
-class WasapiHapticsEndpoint final : public HapticsEndpoint
-{
-public:
-    ~WasapiHapticsEndpoint() override { close(); }
+    ~WasapiHapticsEndpoint() { close(); }
 
     static bool classifyFormat(const WAVEFORMATEX* format, bool& isFloat, WORD& bits)
     {
@@ -167,7 +180,7 @@ public:
         return isFloat || (subtype == KSDATAFORMAT_SUBTYPE_PCM && (bits == 16 || bits == 32));
     }
 
-    bool threadInit() override
+    bool threadInit()
     {
         const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (FAILED(comResult)) {
@@ -179,51 +192,16 @@ public:
         return true;
     }
 
-    void threadCleanup() override { CoUninitialize(); }
+    void threadCleanup() { CoUninitialize(); }
 
-    bool open() override
+    bool open()
     {
-        ComPtr<IMMDeviceEnumerator> enumerator;
-        if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
-                                    IID_PPV_ARGS(&enumerator)))) {
-            return false;
-        }
-
-        ComPtr<IMMDeviceCollection> devices;
-        if (FAILED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices))) {
-            return false;
-        }
-
-        UINT count = 0;
-        devices->GetCount(&count);
-        for (UINT i = 0; i < count; i++) {
-            ComPtr<IMMDevice> device;
-            if (FAILED(devices->Item(i, &device))) continue;
-
-            std::wstring friendlyName;
-            ComPtr<IPropertyStore> properties;
-            if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &properties))) {
-                PROPVARIANT value;
-                PropVariantInit(&value);
-                if (SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &value)) &&
-                    value.vt == VT_LPWSTR && value.pwszVal != nullptr) {
-                    friendlyName = value.pwszVal;
-                }
-                PropVariantClear(&value);
-            }
-            if (!isDualSenseName(QString::fromStdWString(friendlyName)))
-                continue;
-
-            ComPtr<IAudioClient> candidate;
-            if (FAILED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
-                                        reinterpret_cast<void**>(candidate.GetAddressOf())))) {
-                continue;
-            }
-
+        const bool found = findDualSenseAudioClient([this](const ComPtr<IAudioClient>& candidate,
+                                                           const QString& name) {
             WAVEFORMATEX* mix = nullptr;
             if (FAILED(candidate->GetMixFormat(&mix)) || mix == nullptr) {
                 CoTaskMemFree(mix);
-                continue;
+                return false;
             }
             bool candidateFloat = false;
             WORD candidateBits = 0;
@@ -232,33 +210,34 @@ public:
                     AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_NOPERSIST,
                     500000, 0, mix, nullptr))) {
                 CoTaskMemFree(mix);
-                continue;
+                return false;
             }
             CoTaskMemFree(mix);
 
             ComPtr<IAudioRenderClient> candidateRenderer;
             if (FAILED(candidate->GetService(IID_PPV_ARGS(&candidateRenderer))) ||
                 FAILED(candidate->GetBufferSize(&m_BufferFrames))) {
-                continue;
+                return false;
             }
 
             m_AudioClient = candidate;
             m_RenderClient = candidateRenderer;
             m_FloatSamples = candidateFloat;
             m_BitsPerSample = candidateBits;
-            const QByteArray name = QString::fromStdWString(friendlyName).toUtf8();
             SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
                         "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, %u-bit%s)",
-                        name.constData(), m_BitsPerSample, m_FloatSamples ? " float" : " PCM");
+                        qPrintable(name), m_BitsPerSample, m_FloatSamples ? " float" : " PCM");
             return true;
-        }
+        });
 
-        SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
-                    "No active 48 kHz four-channel DualSense audio endpoint was found");
-        return false;
+        if (!found) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+                        "No active 48 kHz four-channel DualSense audio endpoint was found");
+        }
+        return found;
     }
 
-    void close() override
+    void close()
     {
         reset();
         m_RenderClient.Reset();
@@ -266,9 +245,14 @@ public:
         m_BufferFrames = 0;
     }
 
-    bool isOpen() const override { return m_AudioClient != nullptr; }
+    bool isOpen() const { return m_AudioClient != nullptr; }
+    bool isStarted() const { return m_Started; }
 
-    bool start() override
+    // How many frames may be written before start() must be called.
+    std::uint32_t bufferFrames() const { return m_BufferFrames; }
+    std::uint32_t maxQueuedPackets() const { return 0; }
+
+    bool start()
     {
         if (!m_AudioClient || FAILED(m_AudioClient->Start())) {
             return false;
@@ -277,7 +261,8 @@ public:
         return true;
     }
 
-    void reset() override
+    // Stop playback and discard audio that has not been played yet.
+    void reset()
     {
         if (m_AudioClient) {
             if (m_Started)
@@ -287,7 +272,7 @@ public:
         m_Started = false;
     }
 
-    WriteResult tryWrite(const Packet& packet) override
+    WriteResult tryWrite(const Packet& packet)
     {
         if (!m_AudioClient || !m_RenderClient || packet.frameCount == 0)
             return WriteResult::Ok;
@@ -320,64 +305,40 @@ public:
 private:
     ComPtr<IAudioClient> m_AudioClient;
     ComPtr<IAudioRenderClient> m_RenderClient;
+    UINT32 m_BufferFrames = 0;
     WORD m_BitsPerSample = 0;
     bool m_FloatSamples = false;
+    bool m_Started = false;
 };
 
-bool probeHapticsEndpoint()
+using HapticsEndpoint = WasapiHapticsEndpoint;
+
+DualSenseHapticsRenderer::Availability probeHapticsEndpoint()
 {
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const bool shouldUninitialize = SUCCEEDED(comResult);
     if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE) {
-        return false;
+        return DualSenseHapticsRenderer::Availability::NotFound;
     }
 
-    bool found = false;
-    ComPtr<IMMDeviceEnumerator> enumerator;
-    ComPtr<IMMDeviceCollection> devices;
-    if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
-                                   IID_PPV_ARGS(&enumerator))) &&
-        SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices))) {
-        UINT count = 0;
-        devices->GetCount(&count);
-        for (UINT i = 0; i < count && !found; i++) {
-            ComPtr<IMMDevice> device;
-            if (FAILED(devices->Item(i, &device)))
-                continue;
-
-            std::wstring friendlyName;
-            ComPtr<IPropertyStore> properties;
-            if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &properties))) {
-                PROPVARIANT value;
-                PropVariantInit(&value);
-                if (SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &value)) &&
-                    value.vt == VT_LPWSTR && value.pwszVal != nullptr) {
-                    friendlyName = value.pwszVal;
-                }
-                PropVariantClear(&value);
-            }
-            if (!isDualSenseName(QString::fromStdWString(friendlyName)))
-                continue;
-
-            ComPtr<IAudioClient> candidate;
-            if (FAILED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
-                                        reinterpret_cast<void**>(candidate.GetAddressOf())))) {
-                continue;
-            }
+    const bool found =
+        findDualSenseAudioClient([](const ComPtr<IAudioClient>& candidate, const QString&) {
             WAVEFORMATEX* mix = nullptr;
+            bool supported = false;
             if (SUCCEEDED(candidate->GetMixFormat(&mix)) && mix != nullptr) {
                 bool isFloat = false;
                 WORD bits = 0;
-                found = WasapiHapticsEndpoint::classifyFormat(mix, isFloat, bits);
+                supported = WasapiHapticsEndpoint::classifyFormat(mix, isFloat, bits);
             }
             CoTaskMemFree(mix);
-        }
-    }
+            return supported;
+        });
 
     if (shouldUninitialize) {
         CoUninitialize();
     }
-    return found;
+    return found ? DualSenseHapticsRenderer::Availability::Available
+                 : DualSenseHapticsRenderer::Availability::NotFound;
 }
 
 #elif defined(Q_OS_MACOS)
@@ -387,8 +348,6 @@ constexpr UInt32 EndpointBytesPerFrame = EndpointChannelCount * sizeof(float);
 // Each AudioQueue buffer carries exactly one packet, and submit() never passes
 // on a packet longer than 480 frames.
 constexpr UInt32 QueueBufferFrames = 480;
-// Enough buffers that a stream of short packets reaches MaxQueuedFrames before
-// it runs out of buffers.
 constexpr UInt32 QueueBufferCount = 32;
 // 50 ms, the same as the WASAPI endpoint asks for. This is what bounds the
 // haptics delay a burst of packets can build up.
@@ -405,27 +364,18 @@ bool getDeviceProperty(AudioObjectID object, AudioObjectPropertySelector selecto
     return AudioObjectGetPropertyData(object, &addr, 0, nullptr, &size, &out) == noErr;
 }
 
-bool copyDeviceName(AudioDeviceID device, std::string& out)
+QString deviceName(AudioDeviceID device)
 {
     CFStringRef value = nullptr;
     if (!getDeviceProperty(device, kAudioObjectPropertyName, kAudioObjectPropertyScopeGlobal,
                            value) ||
         value == nullptr) {
-        return false;
+        return QString();
     }
 
-    const CFIndex capacity =
-        CFStringGetMaximumSizeForEncoding(CFStringGetLength(value), kCFStringEncodingUTF8) + 1;
-    std::vector<char> buffer(static_cast<std::size_t>(capacity));
-    const bool converted =
-        CFStringGetCString(value, buffer.data(), capacity, kCFStringEncodingUTF8);
+    const QString name = QString::fromCFString(value);
     CFRelease(value);
-    if (!converted) {
-        return false;
-    }
-
-    out.assign(buffer.data());
-    return true;
+    return name;
 }
 
 std::uint32_t outputChannelCount(AudioDeviceID device)
@@ -469,7 +419,8 @@ bool hasHapticsSampleRate(AudioDeviceID device)
            rate == 48000.0;
 }
 
-bool findEndpointDevice(AudioDeviceID* outDevice, std::string* outName)
+DualSenseHapticsRenderer::Availability findEndpointDevice(AudioDeviceID* outDevice,
+                                                          QString* outName)
 {
     AudioObjectPropertyAddress addr{ kAudioHardwarePropertyDevices, kAudioObjectPropertyScopeGlobal,
                                      kAudioObjectPropertyElementMain };
@@ -477,51 +428,73 @@ bool findEndpointDevice(AudioDeviceID* outDevice, std::string* outName)
     if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &addr, 0, nullptr, &size) !=
             noErr ||
         size == 0) {
-        return false;
+        return DualSenseHapticsRenderer::Availability::NotFound;
     }
 
     std::vector<AudioDeviceID> devices(size / sizeof(AudioDeviceID));
     if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, nullptr, &size,
                                    devices.data()) != noErr) {
-        return false;
+        return DualSenseHapticsRenderer::Availability::NotFound;
     }
 
+    AudioDeviceID found = kAudioObjectUnknown;
+    QString foundName;
     for (AudioDeviceID device : devices) {
-        // Cheapest discriminators first: the name fetch allocates and converts a
-        // CFString, so only reach it for a device that already looks right.
-        if (!isUsbDevice(device))
+        if (!isUsbDevice(device) || outputChannelCount(device) != EndpointChannelCount ||
+            !hasHapticsSampleRate(device)) {
             continue;
-        if (outputChannelCount(device) != EndpointChannelCount)
-            continue;
-        if (!hasHapticsSampleRate(device))
+        }
+
+        const QString name = deviceName(device);
+        if (!isDualSenseName(name))
             continue;
 
-        std::string name;
-        if (!copyDeviceName(device, name) || !isDualSenseName(QString::fromStdString(name)))
-            continue;
-
-        if (outDevice != nullptr)
-            *outDevice = device;
-        if (outName != nullptr)
-            *outName = name;
-        return true;
+        // Nothing ties an audio endpoint back to the controller number the host
+        // addressed, so refuse to guess between several pads.
+        if (found != kAudioObjectUnknown) {
+            return DualSenseHapticsRenderer::Availability::MultipleEndpoints;
+        }
+        found = device;
+        foundName = name;
     }
 
-    return false;
+    if (found == kAudioObjectUnknown) {
+        return DualSenseHapticsRenderer::Availability::NotFound;
+    }
+
+    if (outDevice != nullptr)
+        *outDevice = found;
+    if (outName != nullptr)
+        *outName = foundName;
+    return DualSenseHapticsRenderer::Availability::Available;
 }
 
-class CoreAudioHapticsEndpoint final : public HapticsEndpoint
+class CoreAudioHapticsEndpoint
 {
 public:
-    ~CoreAudioHapticsEndpoint() override { close(); }
+    ~CoreAudioHapticsEndpoint() { close(); }
 
-    bool open() override
+    bool threadInit() { return true; }
+    void threadCleanup() {}
+
+    bool open()
     {
+        // Drop a queue whose device went away while no stream was playing.
+        close();
+
         AudioDeviceID device = kAudioObjectUnknown;
-        std::string name;
-        if (!findEndpointDevice(&device, &name)) {
+        QString name;
+        switch (findEndpointDevice(&device, &name)) {
+        case DualSenseHapticsRenderer::Availability::Available:
+            break;
+        case DualSenseHapticsRenderer::Availability::NotFound:
             SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
                         "No active 48 kHz four-channel DualSense audio endpoint was found");
+            return false;
+        case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
+            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+                        "Multiple DualSense audio endpoints are connected; physical haptics needs "
+                        "exactly one to know which pad a stream belongs to");
             return false;
         }
 
@@ -568,7 +541,6 @@ public:
             }
             m_FreeBuffers.push_back(buffer);
         }
-        m_BufferFrames = MaxQueuedFrames;
 
         m_Device = device;
         m_Alive = true;
@@ -576,11 +548,11 @@ public:
 
         SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
                     "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, 32-bit float)",
-                    name.c_str());
+                    qPrintable(name));
         return true;
     }
 
-    void close() override
+    void close()
     {
         removeAliveListener();
         if (m_Queue != nullptr) {
@@ -593,12 +565,18 @@ public:
         m_QueuedFrames = 0;
         m_Started = false;
         m_Device = kAudioObjectUnknown;
-        m_BufferFrames = 0;
     }
 
-    bool isOpen() const override { return m_Queue != nullptr; }
+    bool isOpen() const { return m_Queue != nullptr && m_Alive.load(std::memory_order_relaxed); }
+    bool isStarted() const { return m_Started; }
 
-    bool start() override
+    // How many frames may be written before start() must be called.
+    std::uint32_t bufferFrames() const { return MaxQueuedFrames; }
+    // One buffer carries one packet, so a prebuffer of short packets can run
+    // out of buffers before it reaches bufferFrames().
+    std::uint32_t maxQueuedPackets() const { return QueueBufferCount; }
+
+    bool start()
     {
         if (m_Queue == nullptr || AudioQueueStart(m_Queue, nullptr) != noErr) {
             return false;
@@ -607,18 +585,21 @@ public:
         return true;
     }
 
-    void reset() override
+    // Stop playback and discard audio that has not been played yet. Pause
+    // rather than stop: we land here on every lost packet, and a synchronous
+    // stop would tear the device I/O down and bring it back up each time.
+    void reset()
     {
-        // A synchronous stop hands every queued buffer back through bufferDone()
-        // before it returns, whether or not the queue was started, so the free
-        // list is whole again afterwards.
         if (m_Queue != nullptr) {
-            AudioQueueStop(m_Queue, true);
+            if (m_Started)
+                AudioQueuePause(m_Queue);
+            // Hands every enqueued buffer back through bufferDone().
+            AudioQueueReset(m_Queue);
         }
         m_Started = false;
     }
 
-    WriteResult tryWrite(const Packet& packet) override
+    WriteResult tryWrite(const Packet& packet)
     {
         if (m_Queue == nullptr || packet.frameCount == 0)
             return WriteResult::Ok;
@@ -638,8 +619,6 @@ public:
         }
         if (buffer == nullptr) {
             // Nothing drains the queue before start(), so waiting would deadlock.
-            // The caller keeps its prebuffer within bufferFrames(), but enough
-            // tiny packets could still use up every buffer first.
             return m_Started ? WriteResult::WouldBlock : WriteResult::Failed;
         }
 
@@ -677,8 +656,8 @@ private:
         UInt32 size = sizeof(alive);
         if (AudioObjectGetPropertyData(device, &addr, 0, nullptr, &size, &alive) != noErr ||
             alive == 0) {
-            // Unplugged. tryWrite() fails, the worker closes us and starts
-            // probing again, so replugging the controller mid-stream recovers.
+            // Unplugged. The worker reopens the endpoint on the next packet, so
+            // replugging the controller recovers.
             self->m_Alive.store(false, std::memory_order_relaxed);
         }
         return noErr;
@@ -707,75 +686,72 @@ private:
     std::mutex m_FreeLock;
     std::vector<AudioQueueBufferRef> m_FreeBuffers;
     std::uint32_t m_QueuedFrames = 0;
+    bool m_Started = false;
     bool m_AliveListenerAdded = false;
     std::atomic_bool m_Alive{ false };
 };
 
-bool probeHapticsEndpoint()
+using HapticsEndpoint = CoreAudioHapticsEndpoint;
+
+DualSenseHapticsRenderer::Availability probeHapticsEndpoint()
 {
     return findEndpointDevice(nullptr, nullptr);
 }
 
-#else
-
-bool probeHapticsEndpoint()
-{
-    return false;
-}
-
 #endif
-
-std::unique_ptr<HapticsEndpoint> createHapticsEndpoint()
-{
-#ifdef Q_OS_WIN32
-    return std::unique_ptr<HapticsEndpoint>(new WasapiHapticsEndpoint());
-#elif defined(Q_OS_MACOS)
-    return std::unique_ptr<HapticsEndpoint>(new CoreAudioHapticsEndpoint());
-#else
-    return nullptr;
-#endif
-}
 }
 
 struct DualSenseHapticsRenderer::Impl
 {
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
     std::mutex mutex;
     std::condition_variable condition;
     std::deque<Packet> queue;
     std::atomic_bool stopping{ false };
-    // Set from the connection thread at a stream boundary; the worker owns the
-    // endpoint, so it performs the actual teardown.
+    // Set from other threads; the worker owns the endpoint, so it performs the
+    // actual teardown.
     bool resetRequested = false;
 
-    std::unique_ptr<HapticsEndpoint> endpoint;
+    HapticsEndpoint endpoint;
     dualsense_haptics::PcmStreamTracker streamTracker;
     std::deque<Packet> prebuffer;
     std::uint32_t prebufferedFrames = 0;
-    bool streamStarted = false;
     std::chrono::steady_clock::time_point nextEndpointProbe{};
+#endif
 
 #ifdef Q_OS_MACOS
-    // The analyzed IR path. Independent of the PCM endpoint above: the host
-    // picks one or the other per controller through LI_CCAP_DS5_HAPTICS_PCM.
+    // The analyzed IR path, used in emulated mode.
     std::unique_ptr<MacDualSenseHapticsRenderer> macRenderer;
 #endif
 
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
     // Keep this last: run() may access every member as soon as the thread starts.
     std::thread worker;
-
-    Impl() : endpoint(createHapticsEndpoint())
-    {
-#ifdef Q_OS_MACOS
-        macRenderer = std::make_unique<MacDualSenseHapticsRenderer>();
 #endif
-        if (endpoint != nullptr) {
+
+    explicit Impl(Mode mode)
+    {
+        Q_UNUSED(mode);
+#ifdef Q_OS_MACOS
+        if (mode == Mode::Emulated) {
+            macRenderer = std::make_unique<MacDualSenseHapticsRenderer>();
+        }
+#endif
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+        if (mode == Mode::Physical) {
             worker = std::thread([this] { run(); });
         }
+#endif
     }
 
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
     ~Impl()
     {
-        stopping = true;
+        {
+            // Under the mutex, or the notify could land before the worker waits.
+            std::lock_guard lock(mutex);
+            stopping = true;
+        }
         condition.notify_all();
         if (worker.joinable()) {
             worker.join();
@@ -784,8 +760,7 @@ struct DualSenseHapticsRenderer::Impl
 
     void resetAudioStream()
     {
-        endpoint->reset();
-        streamStarted = false;
+        endpoint.reset();
         prebuffer.clear();
         prebufferedFrames = 0;
     }
@@ -796,38 +771,34 @@ struct DualSenseHapticsRenderer::Impl
         streamTracker.reset();
     }
 
-    // The endpoint failed mid-stream (device unplugged, format renegotiated,
-    // ...). Drop it so the next packet probes for it again.
+    // The endpoint failed (device unplugged, format renegotiated, ...). Drop it
+    // so the next packet probes for it again.
     void failEndpoint()
     {
-        endpoint->close();
         resetStream();
-        // Back off before probing again. A device that is still enumerable but
-        // has stopped draining fails only after write() burns its deadline, and
-        // without this the next packet would immediately re-run device
-        // enumeration and endpoint setup - several times a second for the rest
-        // of the stream.
-        nextEndpointProbe = std::chrono::steady_clock::now() + EndpointProbeBackoff;
+        endpoint.close();
     }
 
     // Hand one packet to the endpoint, waiting while it simply has no room yet.
-    // The endpoint only reports whether it can take the packet right now, so the
-    // retry loop and the give-up policy live here and both backends share them.
     bool writePacket(const Packet& packet)
     {
         const auto deadline = std::chrono::steady_clock::now() + EndpointWriteTimeout;
         for (;;) {
-            const auto result = endpoint->tryWrite(packet);
-            if (result == HapticsEndpoint::WriteResult::Ok)
+            const auto result = endpoint.tryWrite(packet);
+            if (result == WriteResult::Ok)
                 return true;
-            if (result == HapticsEndpoint::WriteResult::Failed)
+            if (result == WriteResult::Failed)
                 return false;
 
             if (stopping)
                 return false;
-            if (std::chrono::steady_clock::now() >= deadline) {
+            const auto now = std::chrono::steady_clock::now();
+            if (now >= deadline) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
                             "DualSense haptics endpoint stopped draining; reopening it");
+                // A wedged endpoint is likely still enumerable, so don't
+                // reopen it on the very next packet.
+                nextEndpointProbe = now + EndpointProbeBackoff;
                 return false;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -841,10 +812,7 @@ struct DualSenseHapticsRenderer::Impl
         }
         prebuffer.clear();
         prebufferedFrames = 0;
-        if (!endpoint->start())
-            return false;
-        streamStarted = true;
-        return true;
+        return endpoint.start();
     }
 
     void process(Packet packet)
@@ -862,22 +830,25 @@ struct DualSenseHapticsRenderer::Impl
             resetAudioStream();
         }
 
-        if (!endpoint->isOpen()) {
+        if (!endpoint.isOpen()) {
             const auto now = std::chrono::steady_clock::now();
             if (now < nextEndpointProbe) {
                 return;
             }
-            if (!endpoint->open()) {
+            // Drop anything prebuffered for a device that went away.
+            resetAudioStream();
+            if (!endpoint.open()) {
                 nextEndpointProbe = now + EndpointProbeBackoff;
                 return;
             }
         }
-        if (!streamStarted) {
-            if (packet.frameCount > endpoint->bufferFrames()) {
+
+        if (!endpoint.isStarted()) {
+            if (packet.frameCount > endpoint.bufferFrames()) {
                 SDL_LogError(
                     SDL_LOG_CATEGORY_AUDIO,
                     "DualSense haptics packet (%u frames) exceeds the endpoint buffer (%u frames)",
-                    packet.frameCount, endpoint->bufferFrames());
+                    packet.frameCount, endpoint.bufferFrames());
                 failEndpoint();
                 return;
             }
@@ -885,13 +856,11 @@ struct DualSenseHapticsRenderer::Impl
             // A shared-mode endpoint may expose less than our preferred 15 ms
             // jitter buffer. Never queue more than the endpoint can accept before
             // starting it, or the write would wait for a device that is not running.
+            const auto maxPackets = endpoint.maxQueuedPackets();
             if (!prebuffer.empty() &&
-                prebufferedFrames + packet.frameCount > endpoint->bufferFrames()) {
-                if (!startPrebufferedStream()) {
-                    failEndpoint();
-                    return;
-                }
-                if (!writePacket(packet)) {
+                (prebufferedFrames + packet.frameCount > endpoint.bufferFrames() ||
+                 (maxPackets != 0 && prebuffer.size() >= maxPackets))) {
+                if (!startPrebufferedStream() || !writePacket(packet)) {
                     failEndpoint();
                 }
                 return;
@@ -899,22 +868,20 @@ struct DualSenseHapticsRenderer::Impl
 
             prebufferedFrames += packet.frameCount;
             prebuffer.emplace_back(std::move(packet));
-            const auto targetFrames = std::min(PrebufferFrames, endpoint->bufferFrames());
+            const auto targetFrames = std::min(PrebufferFrames, endpoint.bufferFrames());
             if (prebufferedFrames < targetFrames) return;
 
             if (!startPrebufferedStream()) {
                 failEndpoint();
-                return;
             }
-        }
-        else if (!writePacket(packet)) {
+        } else if (!writePacket(packet)) {
             failEndpoint();
         }
     }
 
     void run()
     {
-        if (!endpoint->threadInit()) {
+        if (!endpoint.threadInit()) {
             return;
         }
 
@@ -928,8 +895,8 @@ struct DualSenseHapticsRenderer::Impl
                 if (resetRequested) {
                     resetRequested = false;
                     lock.unlock();
-                    // Silence the coils now: the connection is gone, so no
-                    // stream-end packet is coming to do it for us.
+                    // Silence the coils now: no stream-end packet is coming to
+                    // do it for us.
                     resetStream();
                     continue;
                 }
@@ -940,25 +907,25 @@ struct DualSenseHapticsRenderer::Impl
         }
 
         resetStream();
-        endpoint->close();
-        endpoint->threadCleanup();
+        endpoint.close();
+        endpoint.threadCleanup();
     }
+#endif
 };
 
-DualSenseHapticsRenderer::DualSenseHapticsRenderer() : m_Impl(std::make_unique<Impl>()) {}
+DualSenseHapticsRenderer::DualSenseHapticsRenderer(Mode mode) : m_Impl(std::make_unique<Impl>(mode))
+{
+}
 DualSenseHapticsRenderer::~DualSenseHapticsRenderer() = default;
 
-bool DualSenseHapticsRenderer::isAvailable()
+DualSenseHapticsRenderer::Availability DualSenseHapticsRenderer::availability()
 {
     return probeHapticsEndpoint();
 }
 
 void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
 {
-    if (m_Impl->endpoint == nullptr) {
-        return;
-    }
-
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
     if (frame.sampleRate != 48000 || frame.channelCount != 2 || frame.bitsPerSample != 16 ||
         frame.frameCount > 480 || frame.pcmDataLength != frame.frameCount * 4 ||
         (frame.pcmDataLength != 0 && frame.pcmData == nullptr)) {
@@ -982,6 +949,9 @@ void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
         m_Impl->queue.emplace_back(std::move(packet));
     }
     m_Impl->condition.notify_one();
+#else
+    (void)frame;
+#endif
 }
 
 void DualSenseHapticsRenderer::setControllerTarget(int controllerNumber)
@@ -1003,16 +973,16 @@ void DualSenseHapticsRenderer::reset()
     }
 #endif
 
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
     // Drop anything the host queued before the connection died and ask the
     // worker to tear the endpoint's stream down.
-    if (m_Impl->endpoint != nullptr) {
-        {
-            std::lock_guard lock(m_Impl->mutex);
-            m_Impl->queue.clear();
-            m_Impl->resetRequested = true;
-        }
-        m_Impl->condition.notify_one();
+    {
+        std::lock_guard lock(m_Impl->mutex);
+        m_Impl->queue.clear();
+        m_Impl->resetRequested = true;
     }
+    m_Impl->condition.notify_one();
+#endif
 }
 
 bool DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame,
