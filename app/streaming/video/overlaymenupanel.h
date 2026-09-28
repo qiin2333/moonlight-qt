@@ -286,6 +286,7 @@ private:
     FileMappingState m_FileMappingState;
     QString m_FileMappingDetail;
     bool m_RemoteUsbAvailable;
+    bool m_RemoteUsbNeedsActivation = false;
     RemoteUsbState m_RemoteUsbState;
     std::vector<RemoteUsbDevice> m_RemoteUsbDevices;
     QString m_RemoteUsbActiveDeviceId;
