@@ -2304,6 +2304,25 @@ bool Session::validateLaunch(SDL_Window* testWindow)
         return false;
     }
 
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
+        switch (DualSenseHapticsRenderer::availability()) {
+        case DualSenseHapticsRenderer::Availability::Available:
+            break;
+        case DualSenseHapticsRenderer::Availability::NotFound:
+            emitLaunchWarning(tr(
+                "Physical DualSense haptics was selected, but no active USB DualSense four-channel "
+                "audio endpoint was found yet. Moonlight will keep checking during this stream."));
+            break;
+        case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
+            emitLaunchWarning(
+                tr("Physical DualSense haptics needs exactly one USB DualSense, but several are "
+                   "connected. Moonlight will keep checking during this stream."));
+            break;
+        }
+    }
+#endif
+
     return true;
 }
 
@@ -4278,18 +4297,6 @@ void Session::start()
         if (m_DualSenseHapticsRenderer == nullptr) {
             m_DualSenseHapticsRenderer =
                 new DualSenseHapticsRenderer(DualSenseHapticsRenderer::Mode::Physical);
-        }
-        switch (DualSenseHapticsRenderer::availability()) {
-        case DualSenseHapticsRenderer::Availability::Available:
-            break;
-        case DualSenseHapticsRenderer::Availability::NotFound:
-            emitLaunchWarning(tr("Physical DualSense haptics was selected, but no active USB DualSense four-channel audio endpoint was found yet. Moonlight will keep checking during this stream."));
-            break;
-        case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
-            emitLaunchWarning(
-                tr("Physical DualSense haptics needs exactly one USB DualSense, but several are "
-                   "connected. Moonlight will keep checking during this stream."));
-            break;
         }
 #else
         emitLaunchWarning(tr("Physical DualSense haptics is only available on Windows in this build."));
