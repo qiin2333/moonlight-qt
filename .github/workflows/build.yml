@@ -116,7 +116,7 @@ jobs:
         echo "格式检查基线: $BASE (event=$EVENT_NAME)"
         # git clang-format --diff 只对 diff 触及的行重排并报告结果,不改工作区。
         # 无需格式化时输出 "none" / "no modified files to format" 等固定文案。
-        OUTPUT=$(git clang-format --diff --style file "$BASE" 2>&1)
+        OUTPUT=$(git clang-format --diff --style file --extensions c,cpp,h,mm "$BASE" 2>&1)
         case "$OUTPUT" in
           none|*"no modified files to format"|*"clang-format did not modify any files")
             echo "格式检查通过"

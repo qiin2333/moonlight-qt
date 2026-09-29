@@ -14,10 +14,16 @@ public:
     explicit AutoUpdateChecker(QObject *parent = nullptr);
 
     Q_INVOKABLE void start();
+    Q_INVOKABLE bool supportsUpdateCheck() const;
+    // Returns true only when a new check was started.
+    Q_INVOKABLE bool checkForUpdates();
     Q_INVOKABLE bool supportsInAppUpdate() const;
     Q_INVOKABLE void installUpdate(QString url);
 
 signals:
+    void onUpdateCheckStarted();
+    void onUpdateCheckFinished(bool updateAvailable);
+    void onUpdateCheckFailed();
     void onUpdateAvailable(QString newVersion, QString url);
     void onPortableUpdateStatusChanged(QString message);
     void onPortableUpdateFailed(QString message);
@@ -40,6 +46,7 @@ private:
     QVector<int> m_CurrentVersionQuad;
     QNetworkAccessManager* m_Nam;
     PortableUpdateInstaller* m_PortableUpdateInstaller;
+    bool m_UpdateCheckInProgress = false;
     QString m_UpdateDownloadUrl;
     QString m_UpdateAssetDigest;
 };
