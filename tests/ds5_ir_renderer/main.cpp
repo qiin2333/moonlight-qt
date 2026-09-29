@@ -2,6 +2,9 @@
 #include "streaming/audio/dualsensehapticsrouting.h"
 #include "streaming/audio/dualsensehapticsstream.h"
 
+#include <algorithm>
+#include <cstdint>
+
 #define CHECK(condition) do { if (!(condition)) return __LINE__; } while (false)
 
 int main()
@@ -53,6 +56,14 @@ int main()
     CHECK(dualsense_haptics::selectUniqueLocalDualSense(twoDualSense, 2, true) == -1);
     CHECK(dualsense_haptics::selectUniqueLocalDualSense(nullptr, 0, true) == -1);
 
+    // Physical haptics only needs the DualSense itself to be unique.
+    CHECK(dualsense_haptics::selectUniqueDualSense(mergedControllers, 2) == 0);
+    CHECK(dualsense_haptics::selectUniqueDualSense(mixedControllers, 2) == 1);
+    CHECK(dualsense_haptics::selectUniqueDualSense(twoDualSense, 2) == -1);
+    const Candidate noDualSense[] = { { 0, false } };
+    CHECK(dualsense_haptics::selectUniqueDualSense(noDualSense, 1) == -1);
+    CHECK(dualsense_haptics::selectUniqueDualSense(nullptr, 0) == -1);
+
     CHECK(!dualsense_haptics::canUseNativeController(0, 1, 1));
     CHECK(dualsense_haptics::canUseNativeController(1, 1, 1));
     CHECK(!dualsense_haptics::canUseNativeController(1, -1, 1));
@@ -102,5 +113,33 @@ int main()
 
     // Missing packets still force the jitter buffer to resynchronize.
     CHECK(tracker.observe(0, 0, 103) == Action::ResetAndAccept);
+
+    // Authored left/right PCM goes to channels 3 and 4; the headset pair stays
+    // silent.
+    const std::int16_t stereo[] = { 100, -200, 300, -400 };
+    std::int16_t endpointFrames[8];
+    std::fill_n(endpointFrames, 8, std::int16_t{ 1 });
+    dualsense_haptics::spreadToHapticsChannels(endpointFrames, stereo, 2,
+                                               [](std::int16_t s) { return s; });
+    const std::int16_t expectedFrames[] = { 0, 0, 100, -200, 0, 0, 300, -400 };
+    CHECK(std::equal(endpointFrames, endpointFrames + 8, expectedFrames));
+
+    float floatFrames[4];
+    dualsense_haptics::spreadToHapticsChannels(floatFrames, stereo, 1,
+                                               [](std::int16_t s) { return s / 32768.0f; });
+    CHECK(floatFrames[0] == 0.0f && floatFrames[1] == 0.0f);
+    CHECK(floatFrames[2] == 100 / 32768.0f && floatFrames[3] == -200 / 32768.0f);
+
+    // Prebuffering stops at 15 ms, or earlier when the endpoint holds less.
+    CHECK(!dualsense_haptics::isPrebufferFull(480, 2400));
+    CHECK(dualsense_haptics::isPrebufferFull(720, 2400));
+    CHECK(dualsense_haptics::isPrebufferFull(480, 480));
+
+    // Start before a packet would overflow the endpoint's frames or packets.
+    CHECK(!dualsense_haptics::mustStartBeforePrebuffering(0, 0, 480, 240, 0));
+    CHECK(!dualsense_haptics::mustStartBeforePrebuffering(240, 1, 240, 480, 0));
+    CHECK(dualsense_haptics::mustStartBeforePrebuffering(240, 1, 241, 480, 0));
+    CHECK(!dualsense_haptics::mustStartBeforePrebuffering(31, 31, 1, 2400, 32));
+    CHECK(dualsense_haptics::mustStartBeforePrebuffering(32, 32, 1, 2400, 32));
     return 0;
 }

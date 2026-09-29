@@ -862,11 +862,6 @@ void Session::clDs5HapticsPcm(const LI_DS5_HAPTICS_PCM_FRAME* frame)
     }
 }
 
-// The IR feed arrives far faster than the motors can respond, and every rumble
-// update becomes a HID output report that shares SDL's DS5 output queue with
-// LED and trigger reports.
-static constexpr Uint32 k_Ds5IrRumbleMinIntervalMs = 16;
-
 void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
 {
     if (frame == nullptr) {
@@ -887,19 +882,6 @@ void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
     // common low/high-frequency motor model. Fold both lanes into spectral
     // energy here; device-specific renderers can replace this calibration.
     const auto output = dualsense_haptics::renderIrV2(*frame);
-
-    // Throttle updates per controller, but always forward a stop so the motors
-    // never keep running at a stale amplitude.
-    if (session != nullptr && frame->controllerNumber < MAX_GAMEPADS &&
-        (output.lowFrequency != 0 || output.highFrequency != 0)) {
-        Uint32& lastForward = session->m_Ds5IrRumbleLastForwardTicks[frame->controllerNumber];
-        const Uint32 now = SDL_GetTicks();
-        if (!SDL_TICKS_PASSED(now, lastForward + k_Ds5IrRumbleMinIntervalMs)) {
-            return;
-        }
-        lastForward = now;
-    }
-
     clRumble(frame->controllerNumber, output.lowFrequency, output.highFrequency);
 }
 
@@ -3627,8 +3609,7 @@ void Session::updateDualSenseHapticsControllerTarget()
 {
     if (m_DualSenseHapticsRenderer != nullptr) {
         m_DualSenseHapticsRenderer->setControllerTarget(
-            m_InputHandler != nullptr ?
-                m_InputHandler->getNativeDualSenseControllerNumber() : -1);
+            m_InputHandler != nullptr ? m_InputHandler->getDualSenseHapticsControllerNumber() : -1);
     }
 }
 
