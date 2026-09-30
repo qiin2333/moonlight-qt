@@ -134,9 +134,12 @@ public:
         }
 
         writeFile(modePath, "success\n");
+        const QByteArray logBeforeRetry = readFile(logPath);
         const ProcessResult retry =
             runHelper(helperPath, { QStringLiteral("unbind"), QStringLiteral("1-1") });
-        if (!retry.finished || retry.exitCode != 0) {
+        const QByteArray logAfterRetry = readFile(logPath);
+        if (!retry.finished || retry.exitCode != 0 ||
+            !logAfterRetry.mid(logBeforeRetry.size()).contains("unbind -b 1-1")) {
             qCritical() << "USB/IP operation could not be retried after timeout" << retry.exitCode
                         << retry.standardError;
             return 1;
