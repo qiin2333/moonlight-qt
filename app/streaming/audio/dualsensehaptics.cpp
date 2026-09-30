@@ -237,7 +237,7 @@ public:
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, %u-bit%s; "
                         "latency <= %s: queue <= %.1f ms, stream latency %s, device period %s)",
-                        qPrintable(name), m_BitsPerSample, m_FloatSamples ? " float" : " PCM",
+                        qUtf8Printable(name), m_BitsPerSample, m_FloatSamples ? " float" : " PCM",
                         qPrintable(describeDelay(streamLatencyKnown,
                                                  framesToMs(m_BufferFrames) + streamLatencyMs)),
                         framesToMs(m_BufferFrames),
@@ -583,7 +583,7 @@ public:
                     "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, 32-bit float; "
                     "latency <= %s: queue <= %.1f ms, I/O buffer %s, safety offset %s, "
                     "device %s)",
-                    qPrintable(name),
+                    qUtf8Printable(name),
                     qPrintable(describeDelay(ioBufferKnown && safetyOffsetKnown && latencyKnown,
                                              framesToMs(totalFrames))),
                     framesToMs(MaxQueuedFrames),
