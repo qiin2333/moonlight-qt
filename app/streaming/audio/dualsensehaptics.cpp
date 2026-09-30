@@ -172,7 +172,7 @@ public:
     {
         const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (FAILED(comResult)) {
-            SDL_LogError(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                          "Unable to initialize COM for DualSense haptics: 0x%08lx",
                          static_cast<unsigned long>(comResult));
             return false;
@@ -212,14 +212,14 @@ public:
             m_RenderClient = candidateRenderer;
             m_FloatSamples = candidateFloat;
             m_BitsPerSample = candidateBits;
-            SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, %u-bit%s)",
                         qPrintable(name), m_BitsPerSample, m_FloatSamples ? " float" : " PCM");
             return true;
         });
 
         if (!found) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "No active 48 kHz four-channel DualSense audio endpoint was found");
         }
         return found;
@@ -476,11 +476,11 @@ public:
         case DualSenseHapticsRenderer::Availability::Available:
             break;
         case DualSenseHapticsRenderer::Availability::NotFound:
-            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "No active 48 kHz four-channel DualSense audio endpoint was found");
             return false;
         case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
-            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Multiple DualSense audio endpoints are connected; physical haptics needs "
                         "exactly one to know which pad a stream belongs to");
             return false;
@@ -545,7 +545,7 @@ public:
         getDeviceProperty(device, kAudioDevicePropertyBufferFrameSize,
                           kAudioObjectPropertyScopeGlobal, ioBufferFrames);
 
-        SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, 32-bit float; "
                     "queue <= %u, device latency %u, safety offset %u, I/O buffer %u frames)",
                     qPrintable(name), MaxQueuedFrames, latency, safetyOffset, ioBufferFrames);
@@ -808,7 +808,7 @@ struct DualSenseHapticsRenderer::Impl
                 return false;
             const auto now = std::chrono::steady_clock::now();
             if (now >= deadline) {
-                SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "DualSense haptics endpoint stopped draining; reopening it");
                 // A wedged endpoint is likely still enumerable, so don't
                 // reopen it on the very next packet.
@@ -860,7 +860,7 @@ struct DualSenseHapticsRenderer::Impl
         if (!endpoint.isStarted()) {
             if (packet.frameCount > endpoint.bufferFrames()) {
                 SDL_LogError(
-                    SDL_LOG_CATEGORY_AUDIO,
+                    SDL_LOG_CATEGORY_APPLICATION,
                     "DualSense haptics packet (%u frames) exceeds the endpoint buffer (%u frames)",
                     packet.frameCount, endpoint.bufferFrames());
                 failEndpoint();
