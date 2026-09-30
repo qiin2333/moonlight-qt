@@ -10,6 +10,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRandomGenerator>
+#include <QScopedValueRollback>
 #include <QSslSocket>
 #include <QTimer>
 #include <QUrlQuery>
@@ -64,6 +65,8 @@ FileMappingClient::Capability FileMappingClient::fetchCapability(int timeoutMs)
     }
 
     QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::ManualRedirectPolicy);
     request.setRawHeader("X-File-Mapping-Client-UUID", clientUuid().toUtf8());
     request.setSslConfiguration(sslConfiguration());
 
@@ -87,6 +90,11 @@ FileMappingClient::Capability FileMappingClient::fetchCapability(int timeoutMs)
     }
 
     const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (httpStatus >= 300 && httpStatus < 400) {
+        capability.error = tr("File mapping capability redirects are not allowed");
+        delete reply;
+        return capability;
+    }
     QByteArray responseBody = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
         capability.error = httpStatus > 0 ?
@@ -435,14 +443,26 @@ bool FileMappingClient::sendAndWait(const QJsonObject& message, QJsonObject& out
 FileMappingClient::RpcResult FileMappingClient::sendRpc(QJsonObject message, int timeoutMs)
 {
     RpcResult result;
+    if (m_RpcInFlight) {
+        result.error = tr("A file mapping RPC is already in progress");
+        return result;
+    }
     if (!m_SessionConnected) {
         result.error = tr("File mapping WebSocket session is not connected");
         return result;
     }
 
-    message.insert(QStringLiteral("id"), static_cast<double>(m_NextRequestId++));
+    QScopedValueRollback<bool> inFlight(m_RpcInFlight, true);
+    const QJsonValue requestId(static_cast<double>(m_NextRequestId++));
+    message.insert(QStringLiteral("id"), requestId);
     if (!sendAndWait(message, result.reply, QDeadlineTimer(qMax(0, timeoutMs)), &result.error)) {
         // A partial reply cannot safely be reused as the next RPC's response.
+        closeSession();
+        return result;
+    }
+
+    if (result.reply.value(QStringLiteral("id")) != requestId) {
+        result.error = tr("File mapping RPC response ID does not match the request");
         closeSession();
         return result;
     }

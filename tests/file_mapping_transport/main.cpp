@@ -1,9 +1,11 @@
 #include "backend/identitymanager.h"
 #include "backend/nvcomputer.h"
+#include "backend/pairedcertificate.h"
 #include "streaming/filemappingclient.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
+#include <QEventLoop>
 #include <QFile>
 #include <QJsonDocument>
 #include <QSettings>
@@ -12,6 +14,7 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
+#include <QTimer>
 
 #include <atomic>
 #include <future>
@@ -37,17 +40,75 @@ bool require(bool condition, const QString& message, QTextStream& err)
     return condition;
 }
 
+enum class RpcReplyMode
+{
+    None,
+    Matching,
+    Wrong,
+    Missing,
+    String,
+    Error,
+    Stale
+};
+
+struct ServerState
+{
+    std::atomic<int> requests{ 0 };
+    std::atomic<int> connections{ 0 };
+    std::atomic<bool> invalidUpgrade{ false };
+    std::atomic<bool> keepAlive{ false };
+    std::atomic<quint16> redirectPort{ 0 };
+    std::atomic<bool> redirectPlaintext{ false };
+    std::atomic<int> redirectStatus{ 302 };
+    std::atomic<RpcReplyMode> rpcReplyMode{ RpcReplyMode::None };
+};
+
+QByteArray textFrame(const QJsonObject& message)
+{
+    const QByteArray payload = QJsonDocument(message).toJson(QJsonDocument::Compact);
+    Q_ASSERT(payload.size() < 126);
+    return QByteArray(1, char(0x81)) + QByteArray(1, char(payload.size())) + payload;
+}
+
+// Exercise actual connection reuse with the same SSL configuration as NvHTTP.
+bool get(QNetworkAccessManager& manager, quint16 port)
+{
+    QNetworkRequest request(QUrl(QStringLiteral("https://127.0.0.1:%1/warmup").arg(port)));
+    request.setSslConfiguration(IdentityManager::get()->getSslConfig());
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+    QEventLoop loop;
+    QNetworkReply* reply = manager.get(request);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    QTimer::singleShot(3000, &loop, &QEventLoop::quit);
+    if (!reply->isFinished()) {
+        loop.exec();
+    }
+    const bool ok = reply->isFinished() && reply->error() == QNetworkReply::NoError;
+    reply->abort();
+    delete reply;
+    return ok;
+}
+
+template <typename Request> bool throwsHttpStatus(Request request, int status)
+{
+    try {
+        request();
+    } catch (const GfeHttpResponseException& error) {
+        return error.getStatusCode() == status;
+    } catch (const std::exception&) {
+    }
+    return false;
+}
+
 class TlsServer : public QTcpServer
 {
 public:
-    TlsServer(std::atomic<int>& requests, std::atomic<bool>& invalidUpgrade)
-        : m_Requests(requests), m_InvalidUpgrade(invalidUpgrade)
-    {
-    }
+    explicit TlsServer(ServerState& state) : m_State(state) {}
 
 protected:
     void incomingConnection(qintptr descriptor) override
     {
+        ++m_State.connections;
         auto* socket = new QSslSocket(this);
         socket->setSocketDescriptor(descriptor);
         socket->setLocalCertificate(QSslCertificate(fixture("server.pem")));
@@ -61,9 +122,19 @@ protected:
             if (headerEnd < 0) {
                 return;
             }
-            ++m_Requests;
+            ++m_State.requests;
             const QByteArray headers = buffer->left(headerEnd);
             buffer->clear();
+            if (m_State.redirectPort.load() != 0) {
+                socket->write("HTTP/1.1 " + QByteArray::number(m_State.redirectStatus.load()) +
+                              " Redirect\r\nLocation: " +
+                              (m_State.redirectPlaintext.load() ? "http" : "https") +
+                              "://127.0.0.1:" + QByteArray::number(m_State.redirectPort.load()) +
+                              "/redirect-target?session_token=test-token\r\nContent-Length: 0\r\n"
+                              "Connection: close\r\n\r\n");
+                socket->disconnectFromHost();
+                return;
+            }
             if (headers.startsWith("GET /api/v1/file-mapping/session")) {
                 QByteArray key;
                 for (const QByteArray& line : headers.split('\n')) {
@@ -76,7 +147,7 @@ protected:
                                              QCryptographicHash::Sha1)
                         .toBase64();
                 QByteArray response = "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\n";
-                if (!m_InvalidUpgrade.load()) {
+                if (!m_State.invalidUpgrade.load()) {
                     response += "Upgrade: websocket\r\n";
                 }
                 response += "Sec-WebSocket-Accept: " + accept + "\r\n\r\n";
@@ -85,6 +156,26 @@ protected:
                 response.append(char(0x81));
                 response.append(char(hello.size()));
                 response += hello;
+                // Queue complete replies to exercise unsolicited/stale responses,
+                // independently of the client's request-ID serialization.
+                const auto mode = m_State.rpcReplyMode.load();
+                if (mode != RpcReplyMode::None) {
+                    QJsonObject reply{ { "type", "result" }, { "ok", true }, { "id", 1 } };
+                    if (mode == RpcReplyMode::Wrong)
+                        reply["id"] = 2;
+                    if (mode == RpcReplyMode::Missing)
+                        reply.remove("id");
+                    if (mode == RpcReplyMode::String)
+                        reply["id"] = QStringLiteral("1");
+                    if (mode == RpcReplyMode::Error) {
+                        reply["type"] = QStringLiteral("error");
+                        reply["message"] = QStringLiteral("test error");
+                    }
+                    response += textFrame(reply);
+                    response += textFrame({ { "type", "result" },
+                                            { "ok", true },
+                                            { "id", mode == RpcReplyMode::Stale ? 1 : 2 } });
+                }
                 socket->write(response);
             } else {
                 const QByteArray body =
@@ -96,26 +187,27 @@ protected:
                                                      { "port", int(serverPort()) },
                                                      { "session_token", "test-token" } })
                               .toJson(QJsonDocument::Compact);
+                const bool keepAlive = m_State.keepAlive.load();
                 socket->write(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " +
-                    QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
-                socket->disconnectFromHost();
+                    QByteArray::number(body.size()) +
+                    "\r\nConnection: " + (keepAlive ? "keep-alive" : "close") + "\r\n\r\n" + body);
+                if (!keepAlive)
+                    socket->disconnectFromHost();
             }
         });
         socket->startServerEncryption();
     }
 
 private:
-    std::atomic<int>& m_Requests;
-    std::atomic<bool>& m_InvalidUpgrade;
+    ServerState& m_State;
 };
 
 class ServerThread : public QThread
 {
 public:
     std::promise<quint16> port;
-    std::atomic<int> requests{ 0 };
-    std::atomic<bool> invalidUpgrade{ false };
+    ServerState state;
 
     ~ServerThread() override
     {
@@ -125,7 +217,7 @@ public:
 
     void run() override
     {
-        TlsServer server(requests, invalidUpgrade);
+        TlsServer server(state);
         const bool listening = server.listen(QHostAddress::LocalHost);
         port.set_value(listening ? server.serverPort() : 0);
         if (listening) {
@@ -193,22 +285,135 @@ int main(int argc, char* argv[])
             ok &= require(false, QString::fromUtf8(error.what()), err);
         }
     }
+    for (auto mode : { RpcReplyMode::Matching, RpcReplyMode::Wrong, RpcReplyMode::Missing,
+                       RpcReplyMode::String, RpcReplyMode::Error, RpcReplyMode::Stale }) {
+        server.state.rpcReplyMode = mode;
+        FileMappingClient client(&host);
+        QString error;
+        if (!require(client.connectSession(capability, 3000, &error),
+                     QStringLiteral("RPC test session starts: %1").arg(error), err)) {
+            ok = false;
+            continue;
+        }
+        // A synchronous socket signal can reenter the client while writing.
+        bool nestedRejected = false;
+        const auto nested = QObject::connect(
+            client.findChild<QSslSocket*>(), &QSslSocket::bytesWritten, &client, [&] {
+                nestedRejected =
+                    client.stat("mapping", "path").error.contains("already in progress");
+            });
+        const auto first = client.list("mapping", "path");
+        QObject::disconnect(nested);
+        ok &= require(nestedRejected, QStringLiteral("reentrant RPC cannot consume a reply"), err);
+        if (mode == RpcReplyMode::Matching || mode == RpcReplyMode::Stale) {
+            ok &= require(first.ok, QStringLiteral("matching RPC ID is accepted"), err);
+        } else if (mode == RpcReplyMode::Error) {
+            ok &= require(!first.ok && first.error == QStringLiteral("test error"),
+                          QStringLiteral("matching error ID preserves the host error"), err);
+        } else {
+            ok &= require(!first.ok && first.error.contains("ID"),
+                          QStringLiteral("wrong, missing or string RPC ID is rejected"), err);
+        }
+        const auto second = client.stat("mapping", "path");
+        if (mode == RpcReplyMode::Matching || mode == RpcReplyMode::Error) {
+            ok &= require(second.ok, QStringLiteral("next matching RPC remains usable"), err);
+        } else if (mode == RpcReplyMode::Stale) {
+            ok &= require(!second.ok && second.error.contains("ID") &&
+                              client.stat("mapping", "path").error.contains("not connected"),
+                          QStringLiteral("stale reply closes the session"), err);
+        } else {
+            ok &= require(!second.ok && second.error.contains("not connected"),
+                          QStringLiteral("ID mismatch prevents reuse of queued replies"), err);
+        }
+    }
+    server.state.rpcReplyMode = RpcReplyMode::None;
     {
-        server.invalidUpgrade = true;
+        server.state.invalidUpgrade = true;
         FileMappingClient client(&host);
         QString error;
         ok &= require(!client.connectSession(capability, 3000, &error),
                       QStringLiteral("101 and accept alone cannot complete a WebSocket upgrade"),
                       err);
-        server.invalidUpgrade = false;
+        server.state.invalidUpgrade = false;
     }
 
     const QSslConfiguration previous = QSslConfiguration::defaultConfiguration();
     auto trusted = previous;
     trusted.setCaCertificates({ host.serverCert });
     QSslConfiguration::setDefaultConfiguration(trusted);
+    server.state.keepAlive = true;
+    {
+        QNetworkAccessManager manager;
+        int handshakes = 0;
+        QObject::connect(&manager, &QNetworkAccessManager::encrypted, &app,
+                         [&](QNetworkReply*) { ++handshakes; });
+        auto enforcement = PairedCertificate::enforce(&manager, &app, host.serverCert);
+        const int connections = server.state.connections.load();
+        ok &=
+            require(get(manager, port) && get(manager, port) && handshakes == 1 &&
+                        server.state.connections.load() == connections + 1,
+                    QStringLiteral("same paired identity reuses one verified TLS connection"), err);
+        QObject::disconnect(enforcement);
+        const int requests = server.state.requests.load();
+        enforcement =
+            PairedCertificate::enforce(&manager, &app, QSslCertificate(fixture("other.pem")));
+        ok &= require(
+            !get(manager, port) && server.state.requests.load() == requests,
+            QStringLiteral("changed paired identity cannot send over a cached connection"), err);
+        QObject::disconnect(enforcement);
+    }
+    {
+        QNetworkAccessManager manager;
+        int handshakes = 0;
+        QObject::connect(&manager, &QNetworkAccessManager::encrypted, &app,
+                         [&](QNetworkReply*) { ++handshakes; });
+        ok &= require(get(manager, port) && get(manager, port) && handshakes == 1,
+                      QStringLiteral("injected manager has a live unpinned connection"), err);
+        const int requests = server.state.requests.load();
+        NvHTTP http(host.activeAddress, port, QSslCertificate(fixture("other.pem")), false,
+                    &manager);
+        ok &= require(throwsHttpStatus([&] { http.getUsbForwardingCapability(); }, 401) &&
+                          server.state.requests.load() == requests,
+                      QStringLiteral("NvHTTP adopts an injected manager without leaking a request"),
+                      err);
+    }
+    server.state.keepAlive = false;
+    {
+        ServerThread target;
+        auto targetPort = target.port.get_future();
+        target.start();
+        server.state.redirectPort = targetPort.get();
+        ok &=
+            require(server.state.redirectPort != 0, QStringLiteral("redirect target starts"), err);
+        for (bool plaintext : { false, true }) {
+            server.state.redirectPlaintext = plaintext;
+            for (int status : { 302, 307 }) {
+                server.state.redirectStatus = status;
+                FileMappingClient client(&host);
+                const auto redirected = client.fetchCapability();
+                ok &= require(!redirected.ok && redirected.error.contains("redirect"),
+                              QStringLiteral("capability redirect is rejected"), err);
+                NvHTTP http(host.activeAddress, port, host.serverCert);
+                ok &= require(
+                    throwsHttpStatus([&] { http.getUsbForwardingCapability(); }, status) &&
+                        throwsHttpStatus(
+                            [&] {
+                                http.openConnectionToString(http.m_BaseUrlHttps, "serverinfo", {},
+                                                            3000);
+                            },
+                            status) &&
+                        throwsHttpStatus([&] { http.getAbrCapabilities(nullptr); }, status) &&
+                        throwsHttpStatus([&] { http.configureAbr(false, 0, 0, {}, 3000); }, status),
+                    QStringLiteral("NvHTTP GET/JSON GET/POST redirects are rejected"), err);
+            }
+        }
+        ok &= require(
+            target.state.connections.load() == 0,
+            QStringLiteral("HTTPS and HTTP redirects receive no connection or credentials"), err);
+        server.state.redirectPort = 0;
+    }
     host.serverCert = QSslCertificate(fixture("other.pem"));
-    const int count = server.requests.load();
+    const int count = server.state.requests.load();
     {
         FileMappingClient client(&host);
         ok &= require(!client.fetchCapability().ok,
@@ -233,7 +438,7 @@ int main(int argc, char* argv[])
                     err);
     }
     ok &=
-        require(server.requests.load() == count,
+        require(server.state.requests.load() == count,
                 QStringLiteral("unpaired TLS peers receive no HTTP headers or session token"), err);
     QSslConfiguration::setDefaultConfiguration(previous);
     if (ok) {

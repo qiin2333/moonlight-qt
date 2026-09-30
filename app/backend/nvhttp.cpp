@@ -705,10 +705,9 @@ NvHTTP::openConnection(QUrl baseUrl,
 
     QNetworkRequest request(url);
 
-    if (maxResponseBytes > 0) {
-        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                             QNetworkRequest::ManualRedirectPolicy);
-    }
+    // Host-control endpoints must never forward credentials to another URL.
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::ManualRedirectPolicy);
 
     // Add our client certificate
     request.setSslConfiguration(IdentityManager::get()->getSslConfig());
@@ -804,6 +803,11 @@ NvHTTP::openConnection(QUrl baseUrl,
         }
     }
 
+    const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (httpStatus >= 300 && httpStatus < 400) {
+        delete reply;
+        throw GfeHttpResponseException(httpStatus, "Host API redirects are not allowed");
+    }
     return reply;
 }
 
@@ -844,6 +848,8 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
     url.setPath("/" + command);
 
     QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::ManualRedirectPolicy);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setSslConfiguration(IdentityManager::get()->getSslConfig());
 
@@ -921,6 +927,10 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
     }
 
     int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (httpStatus >= 300 && httpStatus < 400) {
+        delete reply;
+        throw GfeHttpResponseException(httpStatus, "Host API redirects are not allowed");
+    }
     if (httpStatus >= 400) {
         QString errorText = QString::fromUtf8(reply->readAll());
         if (logLevel >= NvLogLevel::NVLL_ERROR) {

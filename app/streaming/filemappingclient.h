@@ -47,6 +47,8 @@ public:
         QJsonObject reply;
     };
 
+    // Use on the owning thread with a stable paired host identity;
+    // each session permits one RPC at a time.
     explicit FileMappingClient(NvComputer* computer, QObject* parent = nullptr);
     ~FileMappingClient() override;
 
@@ -83,4 +85,5 @@ private:
     QJsonObject m_LastHello;
     quint64 m_NextRequestId = 1;
     bool m_SessionConnected = false;
+    bool m_RpcInFlight = false;
 };

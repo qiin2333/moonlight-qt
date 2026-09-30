@@ -5,6 +5,7 @@
 #include <QSslCertificate>
 #include <QSslConfiguration>
 #include <QSslError>
+#include <QVariant>
 
 namespace PairedCertificate {
 
@@ -27,11 +28,21 @@ inline bool canIgnoreErrors(const QSslCertificate& pinned, const QList<QSslError
 }
 
 // A normally trusted peer may produce no sslErrors. Check the pin before
-// HTTP data is sent as well. The manager must be scoped to this paired host,
-// or the returned connection must be disconnected after the request.
+// HTTP data is sent as well. The manager must be used exclusively under this
+// policy, with automatic redirects disabled. Change identities only between
+// requests, disconnecting the old enforcement connection first.
 inline QMetaObject::Connection enforce(QNetworkAccessManager* manager, QObject* context,
                                        const QSslCertificate& pinned)
 {
+    // Reused connections do not emit encrypted(). Discard connections created
+    // before adopting this policy or under a previous paired identity.
+    const char* identityProperty = "_moonlightPairedCertificate";
+    const QByteArray identity = pinned.toDer();
+    const QVariant previous = manager->property(identityProperty);
+    if (!previous.isValid() || previous.toByteArray() != identity) {
+        manager->clearConnectionCache();
+        manager->setProperty(identityProperty, identity);
+    }
     return QObject::connect(manager, &QNetworkAccessManager::encrypted, context,
                             [pinned](QNetworkReply* reply) {
                                 if (!matches(pinned, reply->sslConfiguration().peerCertificate())) {
