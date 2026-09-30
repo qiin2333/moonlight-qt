@@ -140,7 +140,7 @@ if [ "$ACTION" != "auto-release" ]; then
         WATCHDOG_SLEEP_PID=$!
         wait "$WATCHDOG_SLEEP_PID"
         echo "operation_timeout" >&2
-        kill -KILL -- "-$$"
+        kill -s KILL -- "-$$"
     ) &
     WATCHDOG_PID=$!
     stop_watchdog() {
@@ -1028,7 +1028,8 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
                 delete temp;
                 runHelperAction(action, busId, expectedIdentity);
             });
-    installStep->start(QStringLiteral("pkexec"), { helperTmp, QStringLiteral("install") });
+    installStep->start(QStringLiteral("pkexec"),
+                       { QStringLiteral("/bin/sh"), helperTmp, QStringLiteral("install") });
 #endif
     return true;
 }

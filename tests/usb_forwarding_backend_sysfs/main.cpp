@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QProcess>
 #include <QTemporaryDir>
+#include <QThread>
 #include <QVariantMap>
 
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
@@ -126,7 +127,7 @@ public:
             runHelper(helperPath, { QStringLiteral("unbind"), QStringLiteral("1-1") });
         const qint64 timedOutChild = readFile(childPidPath).trimmed().toLongLong();
         if (!timeout.finished || !timeout.standardError.contains("operation_timeout") ||
-            timedOutChild <= 0 || processRunning(timedOutChild)) {
+            timedOutChild <= 0 || !waitForProcessStop(timedOutChild)) {
             qCritical() << "hung USB/IP operation was not terminated by the privileged helper"
                         << timeout.exitCode << timeout.standardError;
             return 1;
@@ -141,20 +142,26 @@ public:
             return 1;
         }
 
+        if (!QFile::setPermissions(helperPath, QFile::ReadOwner)) {
+            qCritical() << "could not make the Linux helper fixture non-executable";
+            return 1;
+        }
         writeFile(modePath, "install-hang\n");
         writeFile(childPidPath, QByteArray());
-        const ProcessResult installTimeout = runHelper(helperPath, { QStringLiteral("install") });
+        const ProcessResult installTimeout =
+            runHelper(helperPath, { QStringLiteral("install") }, true);
         const qint64 timedOutInstall = readFile(childPidPath).trimmed().toLongLong();
         if (!installTimeout.finished ||
             !installTimeout.standardError.contains("operation_timeout") || timedOutInstall <= 0 ||
-            processRunning(timedOutInstall) || QFileInfo::exists(installedHelperPath)) {
+            !waitForProcessStop(timedOutInstall) || QFileInfo::exists(installedHelperPath)) {
             qCritical() << "hung helper installation was not terminated" << installTimeout.exitCode
                         << installTimeout.standardError;
             return 1;
         }
 
         writeFile(modePath, "success\n");
-        const ProcessResult installRetry = runHelper(helperPath, { QStringLiteral("install") });
+        const ProcessResult installRetry =
+            runHelper(helperPath, { QStringLiteral("install") }, true);
         if (!installRetry.finished || installRetry.exitCode != 0 ||
             !QFileInfo::exists(installedHelperPath) || !QFileInfo::exists(policyPath) ||
             !QFileInfo::exists(rulePath)) {
@@ -222,13 +229,19 @@ private:
         script.replace(start, end - start, assignment);
     }
 
-    static ProcessResult runHelper(const QString &path, const QStringList &arguments)
+    static ProcessResult runHelper(const QString &path, QStringList arguments,
+                                   bool invokeThroughShell = false)
     {
         GroupedProcess process;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         process.setChildProcessModifier([] { ::setpgid(0, 0); });
 #endif
-        process.start(path, arguments);
+        QString program = path;
+        if (invokeThroughShell) {
+            program = QStringLiteral("/bin/sh");
+            arguments.prepend(path);
+        }
+        process.start(program, arguments);
         if (!process.waitForStarted(1000)) {
             return { false, -1, process.errorString().toLocal8Bit() };
         }
@@ -258,6 +271,17 @@ private:
         const int stateOffset = processStat.lastIndexOf(") ") + 2;
         return stateOffset < 2 || stateOffset >= processStat.size() ||
                processStat.at(stateOffset) != 'Z';
+    }
+
+    static bool waitForProcessStop(qint64 processId)
+    {
+        for (int attempt = 0; attempt < 100; ++attempt) {
+            if (!processRunning(processId)) {
+                return true;
+            }
+            QThread::msleep(10);
+        }
+        return false;
     }
 };
 #endif
