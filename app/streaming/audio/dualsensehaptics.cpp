@@ -84,6 +84,18 @@ const std::int16_t* pcmSamples(const Packet& packet)
 {
     return reinterpret_cast<const std::int16_t*>(packet.pcm.data());
 }
+
+// Both endpoints only ever run at 48 kHz.
+constexpr double framesToMs(std::uint32_t frames)
+{
+    return frames / 48.0;
+}
+
+// A delay for the endpoint-ready log, or "unknown" if the device did not report it.
+QString describeDelay(bool known, double ms)
+{
+    return known ? QStringLiteral("%1 ms").arg(ms, 0, 'f', 1) : QStringLiteral("unknown");
+}
 #endif
 
 #ifndef HAVE_PHYSICAL_DS5_HAPTICS
@@ -212,9 +224,25 @@ public:
             m_RenderClient = candidateRenderer;
             m_FloatSamples = candidateFloat;
             m_BitsPerSample = candidateBits;
+
+            // What the engine reports on top of our buffer. The device period is
+            // how often the shared-mode engine takes data from it.
+            REFERENCE_TIME streamLatency = 0;
+            REFERENCE_TIME devicePeriod = 0;
+            const bool streamLatencyKnown = SUCCEEDED(candidate->GetStreamLatency(&streamLatency));
+            const bool devicePeriodKnown =
+                SUCCEEDED(candidate->GetDevicePeriod(&devicePeriod, nullptr));
+            const double streamLatencyMs = streamLatency / 10000.0;
+
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, %u-bit%s)",
-                        qPrintable(name), m_BitsPerSample, m_FloatSamples ? " float" : " PCM");
+                        "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, %u-bit%s; "
+                        "latency <= %s: queue <= %.1f ms, stream latency %s, device period %s)",
+                        qPrintable(name), m_BitsPerSample, m_FloatSamples ? " float" : " PCM",
+                        qPrintable(describeDelay(streamLatencyKnown,
+                                                 framesToMs(m_BufferFrames) + streamLatencyMs)),
+                        framesToMs(m_BufferFrames),
+                        qPrintable(describeDelay(streamLatencyKnown, streamLatencyMs)),
+                        qPrintable(describeDelay(devicePeriodKnown, devicePeriod / 10000.0)));
             return true;
         });
 
@@ -534,21 +562,34 @@ public:
         m_Alive = true;
         addAliveListener();
 
-        // The device's own delay on top of our queue, for measuring the total.
-        UInt32 latency = 0;
-        UInt32 safetyOffset = 0;
+        // The device's own delay on top of our queue, read the way the CoreAudio
+        // audio renderer reads it: the I/O buffer and safety offset on the
+        // software side, the device latency on the hardware side.
         UInt32 ioBufferFrames = 0;
-        getDeviceProperty(device, kAudioDevicePropertyLatency, kAudioDevicePropertyScopeOutput,
-                          latency);
-        getDeviceProperty(device, kAudioDevicePropertySafetyOffset, kAudioDevicePropertyScopeOutput,
-                          safetyOffset);
-        getDeviceProperty(device, kAudioDevicePropertyBufferFrameSize,
-                          kAudioObjectPropertyScopeGlobal, ioBufferFrames);
+        UInt32 safetyOffsetFrames = 0;
+        UInt32 latencyFrames = 0;
+        const bool ioBufferKnown =
+            getDeviceProperty(device, kAudioDevicePropertyBufferFrameSize,
+                              kAudioObjectPropertyScopeOutput, ioBufferFrames);
+        const bool safetyOffsetKnown =
+            getDeviceProperty(device, kAudioDevicePropertySafetyOffset,
+                              kAudioObjectPropertyScopeOutput, safetyOffsetFrames);
+        const bool latencyKnown = getDeviceProperty(device, kAudioDevicePropertyLatency,
+                                                    kAudioObjectPropertyScopeOutput, latencyFrames);
+        const std::uint32_t totalFrames =
+            MaxQueuedFrames + ioBufferFrames + safetyOffsetFrames + latencyFrames;
 
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, 32-bit float; "
-                    "queue <= %u, device latency %u, safety offset %u, I/O buffer %u frames)",
-                    qPrintable(name), MaxQueuedFrames, latency, safetyOffset, ioBufferFrames);
+                    "latency <= %s: queue <= %.1f ms, I/O buffer %s, safety offset %s, "
+                    "device %s)",
+                    qPrintable(name),
+                    qPrintable(describeDelay(ioBufferKnown && safetyOffsetKnown && latencyKnown,
+                                             framesToMs(totalFrames))),
+                    framesToMs(MaxQueuedFrames),
+                    qPrintable(describeDelay(ioBufferKnown, framesToMs(ioBufferFrames))),
+                    qPrintable(describeDelay(safetyOffsetKnown, framesToMs(safetyOffsetFrames))),
+                    qPrintable(describeDelay(latencyKnown, framesToMs(latencyFrames))));
         return true;
     }
 
