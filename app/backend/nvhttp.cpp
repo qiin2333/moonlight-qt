@@ -166,7 +166,8 @@ NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
         {
             if (e.getStatusCode() == 401)
             {
-                // Certificate validation error, fallback to HTTP
+                // Only a remote status from the paired TLS peer permits this
+                // recovery. Local TLS failures are QtNetworkReplyException.
                 serverInfo = openConnectionToString(m_BaseUrlHttp,
                                                     "serverinfo",
                                                     nullptr,
@@ -599,7 +600,8 @@ UsbForwarding::Capability NvHTTP::getUsbForwardingCapability()
     // A normally trusted certificate may not emit sslErrors at all. Require
     // the paired leaf certificate even on that path before accepting credentials.
     if (!PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
-        throw GfeHttpResponseException(401, "USB forwarding host certificate mismatch");
+        throw QtNetworkReplyException(QNetworkReply::SslHandshakeFailedError,
+                                      "USB forwarding host certificate mismatch");
     }
     if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() != 200) {
         throw GfeHttpResponseException(400, "USB capability request failed");
@@ -770,7 +772,8 @@ NvHTTP::openConnection(QUrl baseUrl,
          !reply->sslConfiguration().peerCertificate().isNull()) &&
         !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
         delete reply;
-        throw GfeHttpResponseException(401, "Server certificate mismatch");
+        throw QtNetworkReplyException(QNetworkReply::SslHandshakeFailedError,
+                                      "Server certificate mismatch");
     }
 
     // Handle error
@@ -784,19 +787,11 @@ NvHTTP::openConnection(QUrl baseUrl,
             qWarning() << command << "request failed with error:" << reply->error();
         }
 
-        if (reply->error() == QNetworkReply::SslHandshakeFailedError) {
-            // This will trigger falling back to HTTP for the serverinfo query
-            // then pairing again to get the updated certificate.
-            GfeHttpResponseException exception(401, "Server certificate mismatch");
-            delete reply;
-            throw exception;
-        }
-        else if (reply->error() == QNetworkReply::OperationCanceledError) {
+        if (reply->error() == QNetworkReply::OperationCanceledError) {
             QtNetworkReplyException exception(QNetworkReply::TimeoutError, "Request timed out");
             delete reply;
             throw exception;
-        }
-        else {
+        } else {
             QtNetworkReplyException exception(reply->error(), reply->errorString());
             delete reply;
             throw exception;
@@ -900,7 +895,8 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
          !reply->sslConfiguration().peerCertificate().isNull()) &&
         !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
         delete reply;
-        throw GfeHttpResponseException(401, "Server certificate mismatch");
+        throw QtNetworkReplyException(QNetworkReply::SslHandshakeFailedError,
+                                      "Server certificate mismatch");
     }
 
     if (reply->error() != QNetworkReply::NoError)
@@ -909,17 +905,11 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
             qWarning() << command << "JSON request failed with error:" << reply->error();
         }
 
-        if (reply->error() == QNetworkReply::SslHandshakeFailedError) {
-            GfeHttpResponseException exception(401, "Server certificate mismatch");
-            delete reply;
-            throw exception;
-        }
-        else if (reply->error() == QNetworkReply::OperationCanceledError) {
+        if (reply->error() == QNetworkReply::OperationCanceledError) {
             QtNetworkReplyException exception(QNetworkReply::TimeoutError, "Request timed out");
             delete reply;
             throw exception;
-        }
-        else {
+        } else {
             QtNetworkReplyException exception(reply->error(), reply->errorString());
             delete reply;
             throw exception;

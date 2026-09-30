@@ -60,6 +60,9 @@ struct ServerState
     std::atomic<quint16> redirectPort{ 0 };
     std::atomic<bool> redirectPlaintext{ false };
     std::atomic<int> redirectStatus{ 302 };
+    std::atomic<bool> plaintext{ false };
+    std::atomic<int> serverInfoStatus{ 200 };
+    std::atomic<quint16> advertisedHttpsPort{ 0 };
     std::atomic<RpcReplyMode> rpcReplyMode{ RpcReplyMode::None };
 };
 
@@ -95,6 +98,17 @@ template <typename Request> bool throwsHttpStatus(Request request, int status)
         request();
     } catch (const GfeHttpResponseException& error) {
         return error.getStatusCode() == status;
+    } catch (const std::exception&) {
+    }
+    return false;
+}
+
+template <typename Request> bool rejectsCertificate(Request request)
+{
+    try {
+        request();
+    } catch (const QtNetworkReplyException& error) {
+        return error.getError() == QNetworkReply::SslHandshakeFailedError;
     } catch (const std::exception&) {
     }
     return false;
@@ -178,7 +192,7 @@ protected:
                 }
                 socket->write(response);
             } else {
-                const QByteArray body =
+                QByteArray body =
                     headers.startsWith("GET /api/v1/usb-forwarding")
                         ? QByteArray(R"({"version":1,"enabled":false,"available":false})")
                         : QJsonDocument(QJsonObject{ { "ok", true },
@@ -187,6 +201,16 @@ protected:
                                                      { "port", int(serverPort()) },
                                                      { "session_token", "test-token" } })
                               .toJson(QJsonDocument::Compact);
+                if (headers.startsWith("GET /serverinfo?")) {
+                    body = "<root status_code=\"" +
+                           QByteArray::number(m_State.serverInfoStatus.load()) +
+                           "\" status_message=\"test status\"><uniqueid>test-host</uniqueid>"
+                           "<hostname>test host</hostname><PairStatus>0</PairStatus><HttpsPort>" +
+                           QByteArray::number(m_State.advertisedHttpsPort.load() != 0
+                                                  ? m_State.advertisedHttpsPort.load()
+                                                  : serverPort()) +
+                           "</HttpsPort></root>";
+                }
                 const bool keepAlive = m_State.keepAlive.load();
                 socket->write(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " +
@@ -196,7 +220,9 @@ protected:
                     socket->disconnectFromHost();
             }
         });
-        socket->startServerEncryption();
+        if (!m_State.plaintext.load()) {
+            socket->startServerEncryption();
+        }
     }
 
 private:
@@ -372,7 +398,7 @@ int main(int argc, char* argv[])
         const int requests = server.state.requests.load();
         NvHTTP http(host.activeAddress, port, QSslCertificate(fixture("other.pem")), false,
                     &manager);
-        ok &= require(throwsHttpStatus([&] { http.getUsbForwardingCapability(); }, 401) &&
+        ok &= require(rejectsCertificate([&] { http.getUsbForwardingCapability(); }) &&
                           server.state.requests.load() == requests,
                       QStringLiteral("NvHTTP adopts an injected manager without leaking a request"),
                       err);
@@ -412,6 +438,79 @@ int main(int argc, char* argv[])
             QStringLiteral("HTTPS and HTTP redirects receive no connection or credentials"), err);
         server.state.redirectPort = 0;
     }
+    {
+        ServerThread discovery;
+        discovery.state.plaintext = true;
+        discovery.state.advertisedHttpsPort = port;
+        auto discoveryPort = discovery.port.get_future();
+        discovery.start();
+        const quint16 httpPort = discoveryPort.get();
+        if (!require(httpPort != 0, QStringLiteral("plaintext discovery server starts"), err)) {
+            return 1;
+        }
+        const NvAddress address(QStringLiteral("127.0.0.1"), httpPort);
+        const QSslCertificate wrongPin(fixture("other.pem"));
+        for (bool trustedPeer : { false, true }) {
+            QSslConfiguration::setDefaultConfiguration(trustedPeer ? trusted : previous);
+            NvHTTP http(address, port, wrongPin);
+            const int requests = server.state.requests.load();
+            ok &= require(
+                rejectsCertificate([&] { http.getServerInfo(NvHTTP::NVLL_NONE, true); }) &&
+                    rejectsCertificate([&] { http.getAbrCapabilities(nullptr); }) &&
+                    rejectsCertificate([&] { http.configureAbr(false, 0, 0, {}, 3000); }),
+                QStringLiteral("trusted or self-signed wrong peer raises a local TLS error"), err);
+            ok &= require(
+                discovery.state.connections.load() == 0 && server.state.requests.load() == requests,
+                QStringLiteral(
+                    "local certificate rejection sends neither TLS data nor HTTP fallback"),
+                err);
+        }
+        QSslConfiguration::setDefaultConfiguration(trusted);
+        // A remote GFE 401 arrives over correctly pinned TLS, unlike local rejection.
+        server.state.serverInfoStatus = 401;
+        {
+            NvHTTP http(address, port, host.serverCert);
+            try {
+                const QString recovered = http.getServerInfo(NvHTTP::NVLL_NONE, true);
+                ok &= require(NvHTTP::getXmlString(recovered, "uniqueid") == host.uuid &&
+                                  discovery.state.requests.load() == 1,
+                              QStringLiteral("authenticated remote 401 retains recovery behavior"),
+                              err);
+            } catch (const std::exception& error) {
+                ok &= require(false, QString::fromUtf8(error.what()), err);
+            }
+        }
+        server.state.serverInfoStatus = 403;
+        {
+            NvHTTP http(address, port, host.serverCert);
+            ok &= require(
+                throwsHttpStatus([&] { http.getServerInfo(NvHTTP::NVLL_NONE, true); }, 403) &&
+                    discovery.state.requests.load() == 1,
+                QStringLiteral("other remote status errors never use HTTP recovery"), err);
+        }
+        server.state.serverInfoStatus = 200;
+        {
+            NvHTTP http(address, 0, wrongPin);
+            const int requests = discovery.state.requests.load();
+            ok &= require(
+                rejectsCertificate([&] { http.getServerInfo(NvHTTP::NVLL_NONE, true); }) &&
+                    discovery.state.requests.load() == requests + 1 && http.httpsPort() == port,
+                QStringLiteral(
+                    "HTTP port discovery cannot turn a pin rejection into host metadata"),
+                err);
+        }
+        {
+            NvHTTP http(address, 0, QSslCertificate());
+            try {
+                const QString discovered = http.getServerInfo(NvHTTP::NVLL_NONE, true);
+                ok &= require(NvHTTP::getXmlString(discovered, "uniqueid") == host.uuid &&
+                                  http.httpsPort() == port,
+                              QStringLiteral("unpaired discovery remains available"), err);
+            } catch (const std::exception& error) {
+                ok &= require(false, QString::fromUtf8(error.what()), err);
+            }
+        }
+    }
     host.serverCert = QSslCertificate(fixture("other.pem"));
     const int count = server.state.requests.load();
     {
@@ -427,8 +526,8 @@ int main(int argc, char* argv[])
         bool rejected = false;
         try {
             http.getUsbForwardingCapability();
-        } catch (const GfeHttpResponseException& error) {
-            rejected = error.getStatusCode() == 401;
+        } catch (const QtNetworkReplyException& error) {
+            rejected = error.getError() == QNetworkReply::SslHandshakeFailedError;
         } catch (const std::exception&) {
         }
         ok &=
