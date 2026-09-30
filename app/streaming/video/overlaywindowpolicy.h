@@ -15,8 +15,7 @@ inline Qt::WindowFlags flags(OverlayWindowMode mode, bool transparentForInput = 
     Qt::WindowFlags flags = Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus;
     if (mode == OverlayWindowMode::WaylandSubsurface) {
         flags |= Qt::SubWindow;
-    }
-    else {
+    } else {
         flags |= Qt::Tool | Qt::WindowStaysOnTopHint;
     }
     if (transparentForInput) {

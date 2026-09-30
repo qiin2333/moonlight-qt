@@ -24,17 +24,15 @@ struct CoordinateMetrics
 
     bool isValid() const
     {
-        return window.width > 0 && window.height > 0 &&
-               touchNormalization.width > 0 && touchNormalization.height > 0;
+        return window.width > 0 && window.height > 0 && touchNormalization.width > 0 &&
+               touchNormalization.height > 0;
     }
 };
 
 inline Size pixelSize(Size logicalSize, double devicePixelRatio)
 {
-    return {
-        std::max(1, static_cast<int>(std::lround(logicalSize.width * devicePixelRatio))),
-        std::max(1, static_cast<int>(std::lround(logicalSize.height * devicePixelRatio)))
-    };
+    return { std::max(1, static_cast<int>(std::lround(logicalSize.width * devicePixelRatio))),
+             std::max(1, static_cast<int>(std::lround(logicalSize.height * devicePixelRatio))) };
 }
 
 // SDL receives wl_pointer coordinates in Wayland surface coordinates for an
@@ -52,39 +50,32 @@ inline int windowCoordinateForNormalizedTouch(float normalizedCoordinate,
                                               int windowCoordinateExtent,
                                               int waylandNormalizationExtent)
 {
-    const int normalizationExtent = waylandNormalizationExtent > 0
-            ? waylandNormalizationExtent : windowCoordinateExtent;
+    const int normalizationExtent =
+        waylandNormalizationExtent > 0 ? waylandNormalizationExtent : windowCoordinateExtent;
     return static_cast<int>(normalizedCoordinate * normalizationExtent);
 }
 
-inline Point windowPointForNormalizedTouch(float normalizedX,
-                                           float normalizedY,
+inline Point windowPointForNormalizedTouch(float normalizedX, float normalizedY,
                                            const CoordinateMetrics& metrics)
 {
-    return {
-        windowCoordinateForNormalizedTouch(normalizedX,
-                                           metrics.window.width,
-                                           metrics.touchNormalization.width),
-        windowCoordinateForNormalizedTouch(normalizedY,
-                                           metrics.window.height,
-                                           metrics.touchNormalization.height)
-    };
+    return { windowCoordinateForNormalizedTouch(normalizedX, metrics.window.width,
+                                                metrics.touchNormalization.width),
+             windowCoordinateForNormalizedTouch(normalizedY, metrics.window.height,
+                                                metrics.touchNormalization.height) };
 }
 
-inline float logicalNormalizedTouchDistance(float firstX,
-                                            float firstY,
-                                            float secondX,
-                                            float secondY,
-                                            const CoordinateMetrics& metrics)
+inline float logicalNormalizedTouchDistance(float firstX, float firstY, float secondX,
+                                            float secondY, const CoordinateMetrics& metrics)
 {
-    const float xScale = metrics.touchNormalization.width > 0 && metrics.window.width > 0
+    const float xScale =
+        metrics.touchNormalization.width > 0 && metrics.window.width > 0
             ? static_cast<float>(metrics.touchNormalization.width) / metrics.window.width
             : 1.0f;
-    const float yScale = metrics.touchNormalization.height > 0 && metrics.window.height > 0
+    const float yScale =
+        metrics.touchNormalization.height > 0 && metrics.window.height > 0
             ? static_cast<float>(metrics.touchNormalization.height) / metrics.window.height
             : 1.0f;
-    return std::hypot((firstX - secondX) * xScale,
-                      (firstY - secondY) * yScale);
+    return std::hypot((firstX - secondX) * xScale, (firstY - secondY) * yScale);
 }
 
 } // namespace WaylandWindowMetrics

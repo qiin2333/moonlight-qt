@@ -28,8 +28,7 @@ protected:
         quitEvent.type = SDL_QUIT;
         if (SDL_PushEvent(&quitEvent) < 0) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Failed to queue quit for Wayland stream window: %s",
-                        SDL_GetError());
+                        "Failed to queue quit for Wayland stream window: %s", SDL_GetError());
         }
 
         // Keep the wl_surface alive until Session has stopped the renderer and
@@ -43,21 +42,20 @@ protected:
 struct Sdl3PropertyApi
 {
     using PropertiesId = Uint32;
-    using GetGlobalPropertiesFn = PropertiesId (SDLCALL*)();
-    using SetPointerPropertyFn = bool (SDLCALL*)(PropertiesId, const char*, void*);
+    using GetGlobalPropertiesFn = PropertiesId(SDLCALL*)();
+    using SetPointerPropertyFn = bool(SDLCALL*)(PropertiesId, const char*, void*);
 
-    Sdl3PropertyApi()
-        : library(QStringLiteral("SDL3"), 0)
+    Sdl3PropertyApi() : library(QStringLiteral("SDL3"), 0)
     {
         library.setLoadHints(QLibrary::PreventUnloadHint);
         if (!library.load()) {
             return;
         }
 
-        getGlobalProperties = reinterpret_cast<GetGlobalPropertiesFn>(
-                library.resolve("SDL_GetGlobalProperties"));
-        setPointerProperty = reinterpret_cast<SetPointerPropertyFn>(
-                library.resolve("SDL_SetPointerProperty"));
+        getGlobalProperties =
+            reinterpret_cast<GetGlobalPropertiesFn>(library.resolve("SDL_GetGlobalProperties"));
+        setPointerProperty =
+            reinterpret_cast<SetPointerPropertyFn>(library.resolve("SDL_SetPointerProperty"));
     }
 
     bool isAvailable() const
@@ -101,9 +99,7 @@ bool configureSdlVideo()
     // wrapper is sized to the physical buffer. This must override both SDL's
     // default and any environment value, or SDL rescales pointer and window
     // coordinates a second time on high-DPI outputs.
-    if (SDL_SetHintWithPriority(SdlWaylandScaleToDisplayHint,
-                                "0",
-                                SDL_HINT_OVERRIDE) != SDL_TRUE) {
+    if (SDL_SetHintWithPriority(SdlWaylandScaleToDisplayHint, "0", SDL_HINT_OVERRIDE) != SDL_TRUE) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Failed to disable SDL Wayland scale-to-display");
         return false;
@@ -118,38 +114,31 @@ bool configureSdlVideo()
 
     auto* wayland = guiApp->nativeInterface<QNativeInterface::QWaylandApplication>();
     if (wayland == nullptr || wayland->display() == nullptr) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Qt did not expose its native Wayland display");
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Qt did not expose its native Wayland display");
         return false;
     }
 
     Sdl3PropertyApi& api = sdl3PropertyApi();
     if (!api.isAvailable()) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "SDL3 property API is unavailable; native Wayland requires sdl2-compat with SDL3");
+        SDL_LogError(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "SDL3 property API is unavailable; native Wayland requires sdl2-compat with SDL3");
         return false;
     }
 
     const Sdl3PropertyApi::PropertiesId properties = api.getGlobalProperties();
     if (properties == 0 ||
-            !api.setPointerProperty(properties,
-                                    SdlWaylandDisplayProperty,
-                                    wayland->display())) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Failed to import Qt's wl_display into SDL3");
+        !api.setPointerProperty(properties, SdlWaylandDisplayProperty, wayland->display())) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to import Qt's wl_display into SDL3");
         return false;
     }
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Configured SDL to share Qt's Wayland display");
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Configured SDL to share Qt's Wayland display");
     return true;
 }
 
-QWindow* createStreamWindow(const QString& title,
-                            const QRect& geometry,
-                            QScreen* screen,
-                            Qt::WindowStates initialStates,
-                            bool fullScreen)
+QWindow* createStreamWindow(const QString& title, const QRect& geometry, QScreen* screen,
+                            Qt::WindowStates initialStates, bool fullScreen)
 {
     if (!isNativeWayland()) {
         return nullptr;
@@ -167,14 +156,11 @@ QWindow* createStreamWindow(const QString& title,
 
     if (fullScreen) {
         window->showFullScreen();
-    }
-    else if (initialStates.testFlag(Qt::WindowMaximized)) {
+    } else if (initialStates.testFlag(Qt::WindowMaximized)) {
         window->showMaximized();
-    }
-    else if (initialStates.testFlag(Qt::WindowMinimized)) {
+    } else if (initialStates.testFlag(Qt::WindowMinimized)) {
         window->showMinimized();
-    }
-    else {
+    } else {
         window->show();
     }
 
@@ -216,7 +202,7 @@ SDL_Window* wrapStreamWindow(QWindow* window)
 int displayRefreshRate(SDL_Window* window)
 {
     if (window != ImportedSdlWindow || ImportedQtWindow == nullptr ||
-            ImportedQtWindow->screen() == nullptr) {
+        ImportedQtWindow->screen() == nullptr) {
         return 0;
     }
 

@@ -20,11 +20,8 @@ bool isNativeWayland();
 bool configureSdlVideo();
 
 // Create the Qt-owned Wayland toplevel and wrap its wl_surface in an SDL_Window.
-QWindow* createStreamWindow(const QString& title,
-                            const QRect& geometry,
-                            QScreen* screen,
-                            Qt::WindowStates initialStates,
-                            bool fullScreen);
+QWindow* createStreamWindow(const QString& title, const QRect& geometry, QScreen* screen,
+                            Qt::WindowStates initialStates, bool fullScreen);
 SDL_Window* wrapStreamWindow(QWindow* window);
 
 // SDL cannot attach output enter/leave listeners to a Qt-owned wl_surface.

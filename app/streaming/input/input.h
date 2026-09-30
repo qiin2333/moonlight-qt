@@ -300,9 +300,8 @@ public:
 
 private:
     void getWindowCoordinateSize(int* width, int* height) const;
-    WaylandWindowMetrics::Point getTouchWindowPoint(
-            const SDL_TouchFingerEvent* event,
-            WaylandWindowMetrics::Size windowSize) const;
+    WaylandWindowMetrics::Point getTouchWindowPoint(const SDL_TouchFingerEvent* event,
+                                                    WaylandWindowMetrics::Size windowSize) const;
     float getTouchDistance(const SDL_TouchFingerEvent* first,
                            const SDL_TouchFingerEvent* second) const;
 

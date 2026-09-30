@@ -22,8 +22,7 @@
 #endif
 
 namespace {
-QPoint interactionPosition(QMouseEvent* event, const QWindow* window,
-                           OverlayWindowMode windowMode)
+QPoint interactionPosition(QMouseEvent* event, const QWindow* window, OverlayWindowMode windowMode)
 {
     if (OverlayWindowPolicy::usesParentCoordinates(windowMode)) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -178,14 +177,9 @@ struct OverlayMenuButton::NativeEventMonitor
 #endif
 
 OverlayMenuButton::OverlayMenuButton(QWindow* parent, OverlayWindowMode windowMode)
-    : QRasterWindow(parent),
-      m_Hovered(false),
-      m_ButtonVisible(false),
-      m_Dragging(false),
-      m_InputSource(InputSource::None),
-      m_TouchPointId(-1),
-      m_NormalizedPosition(m_PositionStore.load()),
-      m_WindowMode(windowMode)
+    : QRasterWindow(parent), m_Hovered(false), m_ButtonVisible(false), m_Dragging(false),
+      m_InputSource(InputSource::None), m_TouchPointId(-1),
+      m_NormalizedPosition(m_PositionStore.load()), m_WindowMode(windowMode)
 {
     Q_ASSERT(m_WindowMode != OverlayWindowMode::WaylandSubsurface || parent != nullptr);
     setFlags(OverlayWindowPolicy::flags(m_WindowMode));
@@ -506,8 +500,7 @@ void OverlayMenuButton::paintEvent(QPaintEvent*)
 void OverlayMenuButton::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton && m_InputSource == InputSource::None) {
-        beginInteraction(mouseEventComesFromTouch(event) ? InputSource::Touch
-                                                        : InputSource::Mouse,
+        beginInteraction(mouseEventComesFromTouch(event) ? InputSource::Touch : InputSource::Mouse,
                          interactionPosition(event, this, m_WindowMode));
         event->accept();
     }
@@ -568,8 +561,8 @@ void OverlayMenuButton::touchEvent(QTouchEvent* event)
     if (event->type() == QEvent::TouchBegin && m_InputSource == InputSource::None) {
         m_TouchPointId = points.first().id();
         const QPoint position = OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)
-                ? this->position() + points.first().position().toPoint()
-                : points.first().globalPosition().toPoint();
+                                    ? this->position() + points.first().position().toPoint()
+                                    : points.first().globalPosition().toPoint();
         beginInteraction(InputSource::Touch, position);
     }
 
@@ -581,8 +574,8 @@ void OverlayMenuButton::touchEvent(QTouchEvent* event)
 
         foundTrackedPoint = true;
         const QPoint globalPosition = OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)
-                ? position() + point.position().toPoint()
-                : point.globalPosition().toPoint();
+                                          ? position() + point.position().toPoint()
+                                          : point.globalPosition().toPoint();
         if (point.state() == QEventPoint::Released) {
             finishInteraction(globalPosition);
         }
@@ -611,8 +604,8 @@ void OverlayMenuButton::touchEvent(QTouchEvent* event)
     if (event->type() == QEvent::TouchBegin && m_InputSource == InputSource::None) {
         m_TouchPointId = points.first().id();
         const QPoint position = OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)
-                ? this->position() + points.first().pos().toPoint()
-                : points.first().screenPos().toPoint();
+                                    ? this->position() + points.first().pos().toPoint()
+                                    : points.first().screenPos().toPoint();
         beginInteraction(InputSource::Touch, position);
     }
 
@@ -624,8 +617,8 @@ void OverlayMenuButton::touchEvent(QTouchEvent* event)
 
         foundTrackedPoint = true;
         const QPoint globalPosition = OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)
-                ? position() + point.pos().toPoint()
-                : point.screenPos().toPoint();
+                                          ? position() + point.pos().toPoint()
+                                          : point.screenPos().toPoint();
         if (point.state() == Qt::TouchPointReleased) {
             finishInteraction(globalPosition);
         }

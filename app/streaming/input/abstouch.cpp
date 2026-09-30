@@ -41,38 +41,30 @@ bool SdlInputHandler::isPenTouchDevice(SDL_TouchID touchId)
 // How far the finger can move before it can override the double tap deadzone
 #define DOUBLE_TAP_DEAD_ZONE_DELTA 0.025f
 
-WaylandWindowMetrics::Point SdlInputHandler::getTouchWindowPoint(
-        const SDL_TouchFingerEvent* event,
-        WaylandWindowMetrics::Size windowSize) const
+WaylandWindowMetrics::Point
+SdlInputHandler::getTouchWindowPoint(const SDL_TouchFingerEvent* event,
+                                     WaylandWindowMetrics::Size windowSize) const
 {
     WaylandWindowMetrics::CoordinateMetrics metrics = { windowSize, windowSize };
     if (m_WaylandCoordinateMetrics.has_value()) {
         metrics = *m_WaylandCoordinateMetrics;
     }
 
-    return WaylandWindowMetrics::windowPointForNormalizedTouch(event->x,
-                                                                event->y,
-                                                                metrics);
+    return WaylandWindowMetrics::windowPointForNormalizedTouch(event->x, event->y, metrics);
 }
 
-float SdlInputHandler::getTouchDistance(
-        const SDL_TouchFingerEvent* first,
-        const SDL_TouchFingerEvent* second) const
+float SdlInputHandler::getTouchDistance(const SDL_TouchFingerEvent* first,
+                                        const SDL_TouchFingerEvent* second) const
 {
     if (!m_WaylandCoordinateMetrics.has_value()) {
         // Preserve the established calculation exactly on every SDL-owned
         // window path. Only the Qt-owned Wayland wrapper needs correction for
         // SDL's physical touch normalization extent.
-        return qSqrt(qPow(first->x - second->x, 2) +
-                     qPow(first->y - second->y, 2));
+        return qSqrt(qPow(first->x - second->x, 2) + qPow(first->y - second->y, 2));
     }
 
     return WaylandWindowMetrics::logicalNormalizedTouchDistance(
-            first->x,
-            first->y,
-            second->x,
-            second->y,
-            *m_WaylandCoordinateMetrics);
+        first->x, first->y, second->x, second->y, *m_WaylandCoordinateMetrics);
 }
 
 Uint32 SdlInputHandler::longPressTimerCallback(Uint32, void*)
@@ -225,8 +217,7 @@ void SdlInputHandler::emulateAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
     // Use the stream and window sizes to determine the video region
     StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
 
-    if (getTouchDistance(event, &m_LastTouchDownEvent) >
-            LONG_PRESS_ACTIVATION_DELTA) {
+    if (getTouchDistance(event, &m_LastTouchDownEvent) > LONG_PRESS_ACTIVATION_DELTA) {
         // Moved too far since touch down. Cancel the long press timer.
         SDL_RemoveTimer(m_LongPressTimer);
         m_LongPressTimer = 0;
@@ -234,9 +225,8 @@ void SdlInputHandler::emulateAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
 
     // Don't reposition for finger down events within the deadzone. This makes double-clicking easier.
     if (event->type != SDL_FINGERDOWN ||
-            event->timestamp - m_LastTouchUpEvent.timestamp > DOUBLE_TAP_DEAD_ZONE_DELAY ||
-            getTouchDistance(event, &m_LastTouchUpEvent) >
-                    DOUBLE_TAP_DEAD_ZONE_DELTA) {
+        event->timestamp - m_LastTouchUpEvent.timestamp > DOUBLE_TAP_DEAD_ZONE_DELAY ||
+        getTouchDistance(event, &m_LastTouchUpEvent) > DOUBLE_TAP_DEAD_ZONE_DELTA) {
         // Scale window-relative events to be video-relative and clamp to video region
         const WaylandWindowMetrics::Point touchPoint = getTouchWindowPoint(event, windowSize);
         short x = qMin(qMax(touchPoint.x, dst.x), dst.x + dst.w);

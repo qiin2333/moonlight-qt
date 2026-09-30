@@ -21,12 +21,8 @@ const int kAccentBar = 4;                  // Theme.accentBar
 }
 
 OverlayToast::OverlayToast(QWindow* parent, OverlayWindowMode windowMode)
-    : QRasterWindow(parent),
-      m_FadeAnimation(nullptr),
-      m_ToastHeight(40),
-      m_HorizPadding(16),
-      m_VertPadding(10),
-      m_WindowMode(windowMode)
+    : QRasterWindow(parent), m_FadeAnimation(nullptr), m_ToastHeight(40), m_HorizPadding(16),
+      m_VertPadding(10), m_WindowMode(windowMode)
 {
     Q_ASSERT(m_WindowMode != OverlayWindowMode::WaylandSubsurface || parent != nullptr);
     setFlags(OverlayWindowPolicy::flags(m_WindowMode, true));

@@ -331,12 +331,11 @@ void SdlInputHandler::updatePointerRegionLock()
     if (!m_PointerRegionLockToggledByUser) {
         // Lock the pointer in true full-screen mode or in any fullscreen mode when only a single monitor is present
         if (Session* session = Session::get();
-                session != nullptr && session->usesQtWaylandStreamWindow()) {
+            session != nullptr && session->usesQtWaylandStreamWindow()) {
             // Wayland exposes a single compositor-managed fullscreen state;
             // exclusive vs desktop fullscreen is not a meaningful distinction.
             m_PointerRegionLockActive = session->isStreamingWindowFullscreen();
-        }
-        else {
+        } else {
             Uint32 fullscreenFlags = SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
             m_PointerRegionLockActive = (fullscreenFlags == SDL_WINDOW_FULLSCREEN) ||
                                         (fullscreenFlags != 0 && SDL_GetNumVideoDisplays() == 1);

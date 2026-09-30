@@ -41,8 +41,7 @@ bool isStreamWindowFullscreen(SDL_Window* window)
     if (Session* session = Session::get()) {
         return session->isStreamingWindowFullscreen();
     }
-    return window != nullptr &&
-           (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
+    return window != nullptr && (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
 }
 
 bool toSdlSystemCursor(NativeCursorShape shape, SDL_SystemCursor& systemCursor)
@@ -420,12 +419,11 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 }
 
 void SdlInputHandler::setWaylandWindowCoordinateMetrics(
-        WaylandWindowMetrics::CoordinateMetrics metrics)
+    WaylandWindowMetrics::CoordinateMetrics metrics)
 {
     if (metrics.isValid()) {
         m_WaylandCoordinateMetrics = metrics;
-    }
-    else {
+    } else {
         m_WaylandCoordinateMetrics.reset();
     }
 }
@@ -435,8 +433,7 @@ void SdlInputHandler::getWindowCoordinateSize(int* width, int* height) const
     if (m_WaylandCoordinateMetrics.has_value()) {
         *width = m_WaylandCoordinateMetrics->window.width;
         *height = m_WaylandCoordinateMetrics->window.height;
-    }
-    else {
+    } else {
         SDL_GetWindowSize(m_Window, width, height);
     }
 }
@@ -941,7 +938,7 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
     }
 
     if (m_CaptureSystemKeysMode == StreamingPreferences::CSK_FULLSCREEN &&
-            !isStreamWindowFullscreen(m_Window)) {
+        !isStreamWindowFullscreen(m_Window)) {
         return false;
     }
 

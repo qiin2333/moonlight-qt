@@ -94,9 +94,9 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent, OverlayWindowMode windowMode
       m_FileMappingState(FileMappingState::Unknown), m_FileMappingDetail(tr("Checking")),
       m_RemoteUsbAvailable(false), m_RemoteUsbState(RemoteUsbState::Unavailable),
       m_RemoteUsbDetail(tr("Unavailable")), m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
-      m_WindowMode(windowMode),
-      m_CloseWhenPointerOutside(false), m_ContentOffset(0), m_Closing(false), m_TargetPosition(),
-      m_AnchorMode(AnchorMode::RightEdge), m_TriggerPosition(std::nullopt)
+      m_WindowMode(windowMode), m_CloseWhenPointerOutside(false), m_ContentOffset(0),
+      m_Closing(false), m_TargetPosition(), m_AnchorMode(AnchorMode::RightEdge),
+      m_TriggerPosition(std::nullopt)
 {
     Q_ASSERT(m_WindowMode != OverlayWindowMode::WaylandSubsurface || parent != nullptr);
     setFlags(OverlayWindowPolicy::flags(m_WindowMode));
@@ -809,8 +809,7 @@ void OverlayMenuPanel::showInternal()
     m_SlideAnim->start();
     m_OpacityAnim->start();
 
-    if (m_CloseWhenPointerOutside &&
-            !OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
+    if (m_CloseWhenPointerOutside && !OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
         schedulePointerOutsideCheck();
     }
 
@@ -826,11 +825,9 @@ void OverlayMenuPanel::schedulePointerOutsideCheck()
     const qint64 remainingGrace = PointerGracePeriodMs - m_ShowTimer.elapsed();
     if (remainingGrace > 0) {
         m_LeaveTimer.start(static_cast<int>(remainingGrace));
-    }
-    else if (OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
+    } else if (OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
         m_LeaveTimer.start(0);
-    }
-    else {
+    } else {
         m_LeaveTimer.start(PointerCheckIntervalMs);
     }
 }
@@ -949,8 +946,7 @@ void OverlayMenuPanel::dismissOnOutsideClick(const QPoint& parentPosition)
 
 void OverlayMenuPanel::dismissOnOutsidePointerMove(const QPoint& parentPosition)
 {
-    if (!m_Visible || !m_CloseWhenPointerOutside ||
-            m_ShowTimer.elapsed() < PointerGracePeriodMs) {
+    if (!m_Visible || !m_CloseWhenPointerOutside || m_ShowTimer.elapsed() < PointerGracePeriodMs) {
         return;
     }
 
@@ -1629,8 +1625,7 @@ void OverlayMenuPanel::gamepadBack()
 
 bool OverlayMenuPanel::event(QEvent* ev)
 {
-    if (ev->type() == QEvent::Enter &&
-            OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
+    if (ev->type() == QEvent::Enter && OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
         m_LeaveTimer.stop();
     }
     if (ev->type() == QEvent::Leave) {
