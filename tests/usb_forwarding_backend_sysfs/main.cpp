@@ -6,8 +6,15 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProcess>
 #include <QTemporaryDir>
 #include <QVariantMap>
+
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+#include <cerrno>
+#include <signal.h>
+#include <unistd.h>
+#endif
 
 // wm.cpp 拖入 SDL/X11 依赖，这里用桩替代（同 usb_forwarding_backend_list）。
 #include "../../app/utils.h"
@@ -19,6 +26,241 @@ bool WMUtils::isGpuSlow()
 {
     return false;
 }
+
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID) && defined(USB_FORWARDING_BACKEND_TEST)
+class GroupedProcess : public QProcess
+{
+protected:
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    void setupChildProcess() override { ::setpgid(0, 0); }
+#endif
+};
+
+class UsbForwardingBackendLinuxTest
+{
+public:
+    static int helperRecoversStaleExportAndTimesOut()
+    {
+        QTemporaryDir fixture;
+        if (!fixture.isValid()) {
+            qCritical() << "could not create Linux helper fixture";
+            return 1;
+        }
+        const QDir root(fixture.path());
+        if (!root.mkpath(QStringLiteral("commands")) ||
+            !root.mkpath(QStringLiteral("sys/module/usbip_host")) ||
+            !root.mkpath(QStringLiteral("sys/bus/usb/devices/1-1")) ||
+            !root.mkpath(QStringLiteral("state")) || !root.mkpath(QStringLiteral("installed"))) {
+            qCritical() << "could not create Linux helper fixture directories";
+            return 1;
+        }
+
+        const QString commandsPath = root.filePath(QStringLiteral("commands"));
+        const QString modePath = root.filePath(QStringLiteral("mode"));
+        const QString logPath = root.filePath(QStringLiteral("usbip.log"));
+        const QString childPidPath = root.filePath(QStringLiteral("child.pid"));
+        const QString devicePath = root.filePath(QStringLiteral("sys/bus/usb/devices/1-1"));
+        const QString helperPath = root.filePath(QStringLiteral("moonlight-usb-helper"));
+        const QString installedHelperPath = root.filePath(QStringLiteral("installed/helper"));
+        const QString policyPath = root.filePath(QStringLiteral("installed/policy"));
+        const QString rulePath = root.filePath(QStringLiteral("installed/rule"));
+
+        if (!writeExecutable(
+                QDir(commandsPath).filePath(QStringLiteral("cat")),
+                QByteArray("#!/bin/sh\ncase \"$1\" in\n  */usbip_status)\n"
+                           "    D=${1%/*}\n"
+                           "    if [ \"$(/bin/cat \"$D/usbip_sockfd\" 2>/dev/null)\" = -1 ]; "
+                           "then echo 1; exit 0; fi\n"
+                           "    ;;\nesac\nexec /bin/cat \"$@\"\n")) ||
+            !writeExecutable(QDir(commandsPath).filePath(QStringLiteral("usbip")),
+                             QByteArray("#!/bin/sh\necho \"$*\" >> ") + shellQuote(logPath) +
+                                 "\nif [ \"$(/bin/cat " + shellQuote(modePath) +
+                                 ")\" = hang ]; then\n  echo $$ > " + shellQuote(childPidPath) +
+                                 "\n  exec /bin/sleep 30\nfi\nexit 0\n") ||
+            !writeExecutable(QDir(commandsPath).filePath(QStringLiteral("udevadm")),
+                             QByteArray("#!/bin/sh\nif [ \"$(/bin/cat ") + shellQuote(modePath) +
+                                 ")\" = install-hang ]; then\n  echo $$ > " +
+                                 shellQuote(childPidPath) +
+                                 "\n  exec /bin/sleep 30\nfi\nexit 0\n")) {
+            qCritical() << "could not create fake Linux helper commands";
+            return 1;
+        }
+
+        QByteArray script = UsbForwardingBackend::linuxHelperScriptForTest();
+        replaceAssignment(script, "PATH",
+                          commandsPath + QStringLiteral(":/usr/sbin:/usr/bin:/sbin:/bin"));
+        replaceAssignment(script, "OPERATION_TIMEOUT_SECONDS", QStringLiteral("1"), false);
+        replaceAssignment(script, "HELPER_FILE", installedHelperPath);
+        replaceAssignment(script, "STATE_DIR", root.filePath(QStringLiteral("state")));
+        replaceAssignment(script, "POLICY_FILE", policyPath);
+        replaceAssignment(script, "UDEV_RULE_FILE", rulePath);
+        replaceAssignment(script, "SYSFS_USB_DEVICES",
+                          root.filePath(QStringLiteral("sys/bus/usb/devices")));
+        replaceAssignment(script, "SYSFS_USBIP_HOST",
+                          root.filePath(QStringLiteral("sys/module/usbip_host")));
+        replaceAssignment(script, "DRIVERS_PROBE",
+                          root.filePath(QStringLiteral("sys/bus/usb/drivers_probe")));
+        if (!writeExecutable(helperPath, script)) {
+            qCritical() << "could not write Linux helper fixture";
+            return 1;
+        }
+
+        writeFile(modePath, "success\n");
+        writeFile(devicePath + QStringLiteral("/usbip_status"), "2\n");
+        writeFile(devicePath + QStringLiteral("/usbip_sockfd"), "9\n");
+        writeFile(root.filePath(QStringLiteral("sys/bus/usb/drivers_probe")), QByteArray());
+        const ProcessResult staleRelease =
+            runHelper(helperPath, { QStringLiteral("unbind"), QStringLiteral("1-1") });
+        if (!staleRelease.finished || staleRelease.exitCode != 0 ||
+            readFile(devicePath + QStringLiteral("/usbip_sockfd")).trimmed() != "-1" ||
+            !readFile(logPath).contains("unbind -b 1-1")) {
+            qCritical() << "stale USB/IP export was not released before unbind"
+                        << staleRelease.exitCode << staleRelease.standardError;
+            return 1;
+        }
+
+        writeFile(modePath, "hang\n");
+        writeFile(devicePath + QStringLiteral("/usbip_status"), "1\n");
+        writeFile(childPidPath, QByteArray());
+        const ProcessResult timeout =
+            runHelper(helperPath, { QStringLiteral("unbind"), QStringLiteral("1-1") });
+        const qint64 timedOutChild = readFile(childPidPath).trimmed().toLongLong();
+        if (!timeout.finished || !timeout.standardError.contains("operation_timeout") ||
+            timedOutChild <= 0 || processRunning(timedOutChild)) {
+            qCritical() << "hung USB/IP operation was not terminated by the privileged helper"
+                        << timeout.exitCode << timeout.standardError;
+            return 1;
+        }
+
+        writeFile(modePath, "success\n");
+        const ProcessResult retry =
+            runHelper(helperPath, { QStringLiteral("unbind"), QStringLiteral("1-1") });
+        if (!retry.finished || retry.exitCode != 0) {
+            qCritical() << "USB/IP operation could not be retried after timeout" << retry.exitCode
+                        << retry.standardError;
+            return 1;
+        }
+
+        writeFile(modePath, "install-hang\n");
+        writeFile(childPidPath, QByteArray());
+        const ProcessResult installTimeout = runHelper(helperPath, { QStringLiteral("install") });
+        const qint64 timedOutInstall = readFile(childPidPath).trimmed().toLongLong();
+        if (!installTimeout.finished ||
+            !installTimeout.standardError.contains("operation_timeout") || timedOutInstall <= 0 ||
+            processRunning(timedOutInstall) || QFileInfo::exists(installedHelperPath)) {
+            qCritical() << "hung helper installation was not terminated" << installTimeout.exitCode
+                        << installTimeout.standardError;
+            return 1;
+        }
+
+        writeFile(modePath, "success\n");
+        const ProcessResult installRetry = runHelper(helperPath, { QStringLiteral("install") });
+        if (!installRetry.finished || installRetry.exitCode != 0 ||
+            !QFileInfo::exists(installedHelperPath) || !QFileInfo::exists(policyPath) ||
+            !QFileInfo::exists(rulePath)) {
+            qCritical() << "helper installation could not be retried after timeout"
+                        << installRetry.exitCode << installRetry.standardError;
+            return 1;
+        }
+        return 0;
+    }
+
+private:
+    struct ProcessResult
+    {
+        bool finished;
+        int exitCode;
+        QByteArray standardError;
+    };
+
+    static QByteArray shellQuote(const QString &value)
+    {
+        QByteArray quoted = value.toLocal8Bit();
+        quoted.replace("'", "'\"'\"'");
+        return '\'' + quoted + '\'';
+    }
+
+    static bool writeExecutable(const QString &path, const QByteArray &contents)
+    {
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+            file.write(contents) != contents.size()) {
+            return false;
+        }
+        file.close();
+        return file.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    }
+
+    static void writeFile(const QString &path, const QByteArray &contents)
+    {
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+            file.write(contents) != contents.size()) {
+            qFatal("could not write Linux helper fixture file");
+        }
+    }
+
+    static QByteArray readFile(const QString &path)
+    {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            return {};
+        }
+        return file.readAll();
+    }
+
+    static void replaceAssignment(QByteArray &script, const QByteArray &name, const QString &value,
+                                  bool quote = true)
+    {
+        const QByteArray prefix = name + '=';
+        const int start = script.indexOf(prefix);
+        const int end = script.indexOf('\n', start);
+        if (start < 0 || end < 0) {
+            qFatal("missing Linux helper assignment");
+        }
+        const QByteArray assignment = prefix + (quote ? shellQuote(value) : value.toLocal8Bit());
+        script.replace(start, end - start, assignment);
+    }
+
+    static ProcessResult runHelper(const QString &path, const QStringList &arguments)
+    {
+        GroupedProcess process;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        process.setChildProcessModifier([] { ::setpgid(0, 0); });
+#endif
+        process.start(path, arguments);
+        if (!process.waitForStarted(1000)) {
+            return { false, -1, process.errorString().toLocal8Bit() };
+        }
+        const bool finished = process.waitForFinished(4000);
+        if (!finished) {
+            const qint64 processId = process.processId();
+            if (processId > 0) {
+                ::kill(-static_cast<pid_t>(processId), SIGKILL);
+            }
+            process.kill();
+            process.waitForFinished(1000);
+        }
+        return { finished, process.exitCode(), process.readAllStandardError() };
+    }
+
+    static bool processRunning(qint64 processId)
+    {
+        errno = 0;
+        if (::kill(static_cast<pid_t>(processId), 0) != 0 && errno == ESRCH) {
+            return false;
+        }
+        QFile stat(QStringLiteral("/proc/%1/stat").arg(processId));
+        if (!stat.open(QIODevice::ReadOnly)) {
+            return false;
+        }
+        const QByteArray processStat = stat.readAll();
+        const int stateOffset = processStat.lastIndexOf(") ") + 2;
+        return stateOffset < 2 || stateOffset >= processStat.size() ||
+               processStat.at(stateOffset) != 'Z';
+    }
+};
+#endif
 
 static void writeAttr(const QDir &base, const QString &rel, const QByteArray &content)
 {
@@ -172,6 +414,10 @@ int main(int argc, char **argv)
     }
 
 #ifdef Q_OS_LINUX
+#if !defined(Q_OS_ANDROID) && defined(USB_FORWARDING_BACKEND_TEST)
+    failures += UsbForwardingBackendLinuxTest::helperRecoversStaleExportAndTimesOut();
+#endif
+
     // bind() must enforce the privilege boundary itself rather than relying
     // on QML to hide devices that cannot be shared.
     UsbForwardingBackend *backend = UsbForwardingBackend::get();

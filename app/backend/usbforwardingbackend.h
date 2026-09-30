@@ -77,6 +77,10 @@ signals:
     void operationFinished(bool success, const QString &message);
 
 private:
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID) && defined(USB_FORWARDING_BACKEND_TEST)
+    friend class UsbForwardingBackendLinuxTest;
+    static QByteArray linuxHelperScriptForTest();
+#endif
     explicit UsbForwardingBackend(QObject *parent = nullptr);
 
     void setBusy(bool busy);
