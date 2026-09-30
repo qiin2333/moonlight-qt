@@ -862,11 +862,6 @@ void Session::clDs5HapticsPcm(const LI_DS5_HAPTICS_PCM_FRAME* frame)
     }
 }
 
-// The IR feed arrives far faster than the motors can respond, and every rumble
-// update becomes a HID output report that shares SDL's DS5 output queue with
-// LED and trigger reports.
-static constexpr Uint32 k_Ds5IrRumbleMinIntervalMs = 16;
-
 void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
 {
     if (frame == nullptr) {
@@ -887,19 +882,6 @@ void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
     // common low/high-frequency motor model. Fold both lanes into spectral
     // energy here; device-specific renderers can replace this calibration.
     const auto output = dualsense_haptics::renderIrV2(*frame);
-
-    // Throttle updates per controller, but always forward a stop so the motors
-    // never keep running at a stale amplitude.
-    if (session != nullptr && frame->controllerNumber < MAX_GAMEPADS &&
-        (output.lowFrequency != 0 || output.highFrequency != 0)) {
-        Uint32& lastForward = session->m_Ds5IrRumbleLastForwardTicks[frame->controllerNumber];
-        const Uint32 now = SDL_GetTicks();
-        if (!SDL_TICKS_PASSED(now, lastForward + k_Ds5IrRumbleMinIntervalMs)) {
-            return;
-        }
-        lastForward = now;
-    }
-
     clRumble(frame->controllerNumber, output.lowFrequency, output.highFrequency);
 }
 
@@ -2322,6 +2304,25 @@ bool Session::validateLaunch(SDL_Window* testWindow)
         return false;
     }
 
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
+        switch (DualSenseHapticsRenderer::availability()) {
+        case DualSenseHapticsRenderer::Availability::Available:
+            break;
+        case DualSenseHapticsRenderer::Availability::NotFound:
+            emitLaunchWarning(tr(
+                "Physical DualSense haptics was selected, but no active USB DualSense four-channel "
+                "audio endpoint was found yet. Moonlight will keep checking during this stream."));
+            break;
+        case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
+            emitLaunchWarning(
+                tr("Physical DualSense haptics needs exactly one USB DualSense, but several are "
+                   "connected. Moonlight will keep checking during this stream."));
+            break;
+        }
+    }
+#endif
+
     return true;
 }
 
@@ -3627,8 +3628,7 @@ void Session::updateDualSenseHapticsControllerTarget()
 {
     if (m_DualSenseHapticsRenderer != nullptr) {
         m_DualSenseHapticsRenderer->setControllerTarget(
-            m_InputHandler != nullptr ?
-                m_InputHandler->getNativeDualSenseControllerNumber() : -1);
+            m_InputHandler != nullptr ? m_InputHandler->getDualSenseHapticsControllerNumber() : -1);
     }
 }
 
@@ -4297,18 +4297,6 @@ void Session::start()
         if (m_DualSenseHapticsRenderer == nullptr) {
             m_DualSenseHapticsRenderer =
                 new DualSenseHapticsRenderer(DualSenseHapticsRenderer::Mode::Physical);
-        }
-        switch (DualSenseHapticsRenderer::availability()) {
-        case DualSenseHapticsRenderer::Availability::Available:
-            break;
-        case DualSenseHapticsRenderer::Availability::NotFound:
-            emitLaunchWarning(tr("Physical DualSense haptics was selected, but no active USB DualSense four-channel audio endpoint was found yet. Moonlight will keep checking during this stream."));
-            break;
-        case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
-            emitLaunchWarning(
-                tr("Physical DualSense haptics needs exactly one USB DualSense, but several are "
-                   "connected. Moonlight will keep checking during this stream."));
-            break;
         }
 #else
         emitLaunchWarning(tr("Physical DualSense haptics is only available on Windows in this build."));

@@ -249,7 +249,7 @@ void StreamingPreferences::reload()
     showLocalCursor = settings.value(SER_SHOWLOCALCURSOR, false).toBool();
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
     enableNativeTouchpad = settings.value(SER_NATIVETOUCHPAD, false).toBool();
-#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+#ifdef Q_OS_WIN32
     constexpr auto defaultDualSenseHapticsMode = DSHM_PHYSICAL;
 #else
     constexpr auto defaultDualSenseHapticsMode = DSHM_EMULATED;

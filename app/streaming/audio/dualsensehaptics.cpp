@@ -42,14 +42,6 @@ using Microsoft::WRL::ComPtr;
 namespace {
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
 constexpr std::size_t MaxQueuedPackets = 32;
-constexpr std::uint32_t PrebufferFrames = 720; // 15 ms at 48 kHz
-
-// The DualSense exposes a single four-channel USB audio endpoint: channels 1
-// and 2 drive the headset jack, channels 3 and 4 drive the two haptic voice
-// coils. We render silence to the headset pair and the authored PCM to the
-// haptics pair.
-constexpr std::uint32_t EndpointChannelCount = 4;
-constexpr std::uint32_t HapticsChannelOffset = 2;
 
 // How long to wait before probing for the endpoint again after it failed to
 // open or stopped draining.
@@ -84,17 +76,25 @@ bool isDualSenseName(const QString& name)
            name.contains(QLatin1String("hidmaestro"), Qt::CaseInsensitive);
 }
 
-// Expand the packet's interleaved 16-bit stereo into an endpoint frame: silence
-// on the headset pair, authored PCM on the haptics pair.
-template <typename Sample, typename Convert>
-void spreadToHapticsChannels(Sample* out, const Packet& packet, Convert convert)
+using dualsense_haptics::EndpointChannelCount;
+using dualsense_haptics::spreadToHapticsChannels;
+
+// The packet's PCM as interleaved 16-bit stereo.
+const std::int16_t* pcmSamples(const Packet& packet)
 {
-    const auto* in = reinterpret_cast<const std::int16_t*>(packet.pcm.data());
-    std::fill_n(out, static_cast<std::size_t>(packet.frameCount) * EndpointChannelCount, Sample{});
-    for (std::uint16_t i = 0; i < packet.frameCount; i++) {
-        out[i * EndpointChannelCount + HapticsChannelOffset] = convert(in[i * 2]);
-        out[i * EndpointChannelCount + HapticsChannelOffset + 1] = convert(in[i * 2 + 1]);
-    }
+    return reinterpret_cast<const std::int16_t*>(packet.pcm.data());
+}
+
+// Both endpoints only ever run at 48 kHz.
+constexpr double framesToMs(std::uint32_t frames)
+{
+    return frames / 48.0;
+}
+
+// A delay for the endpoint-ready log, or "unknown" if the device did not report it.
+QString describeDelay(bool known, double ms)
+{
+    return known ? QStringLiteral("%1 ms").arg(ms, 0, 'f', 1) : QStringLiteral("unknown");
 }
 #endif
 
@@ -184,7 +184,7 @@ public:
     {
         const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (FAILED(comResult)) {
-            SDL_LogError(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                          "Unable to initialize COM for DualSense haptics: 0x%08lx",
                          static_cast<unsigned long>(comResult));
             return false;
@@ -224,14 +224,30 @@ public:
             m_RenderClient = candidateRenderer;
             m_FloatSamples = candidateFloat;
             m_BitsPerSample = candidateBits;
-            SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
-                        "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, %u-bit%s)",
-                        qPrintable(name), m_BitsPerSample, m_FloatSamples ? " float" : " PCM");
+
+            // What the engine reports on top of our buffer. The device period is
+            // how often the shared-mode engine takes data from it.
+            REFERENCE_TIME streamLatency = 0;
+            REFERENCE_TIME devicePeriod = 0;
+            const bool streamLatencyKnown = SUCCEEDED(candidate->GetStreamLatency(&streamLatency));
+            const bool devicePeriodKnown =
+                SUCCEEDED(candidate->GetDevicePeriod(&devicePeriod, nullptr));
+            const double streamLatencyMs = streamLatency / 10000.0;
+
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, %u-bit%s; "
+                        "latency <= %s: queue <= %.1f ms, stream latency %s, device period %s)",
+                        qUtf8Printable(name), m_BitsPerSample, m_FloatSamples ? " float" : " PCM",
+                        qPrintable(describeDelay(streamLatencyKnown,
+                                                 framesToMs(m_BufferFrames) + streamLatencyMs)),
+                        framesToMs(m_BufferFrames),
+                        qPrintable(describeDelay(streamLatencyKnown, streamLatencyMs)),
+                        qPrintable(describeDelay(devicePeriodKnown, devicePeriod / 10000.0)));
             return true;
         });
 
         if (!found) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "No active 48 kHz four-channel DualSense audio endpoint was found");
         }
         return found;
@@ -288,14 +304,14 @@ public:
             return WriteResult::Failed;
 
         if (m_FloatSamples) {
-            spreadToHapticsChannels(reinterpret_cast<float*>(output), packet,
-                                    [](std::int16_t s) { return s / 32768.0f; });
+            spreadToHapticsChannels(reinterpret_cast<float*>(output), pcmSamples(packet),
+                                    packet.frameCount, [](std::int16_t s) { return s / 32768.0f; });
         } else if (m_BitsPerSample == 16) {
-            spreadToHapticsChannels(reinterpret_cast<std::int16_t*>(output), packet,
-                                    [](std::int16_t s) { return s; });
+            spreadToHapticsChannels(reinterpret_cast<std::int16_t*>(output), pcmSamples(packet),
+                                    packet.frameCount, [](std::int16_t s) { return s; });
         } else {
             spreadToHapticsChannels(
-                reinterpret_cast<std::int32_t*>(output), packet,
+                reinterpret_cast<std::int32_t*>(output), pcmSamples(packet), packet.frameCount,
                 [](std::int16_t s) { return static_cast<std::int32_t>(s) * 65536; });
         }
         return SUCCEEDED(m_RenderClient->ReleaseBuffer(packet.frameCount, 0)) ? WriteResult::Ok
@@ -488,11 +504,11 @@ public:
         case DualSenseHapticsRenderer::Availability::Available:
             break;
         case DualSenseHapticsRenderer::Availability::NotFound:
-            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "No active 48 kHz four-channel DualSense audio endpoint was found");
             return false;
         case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
-            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Multiple DualSense audio endpoints are connected; physical haptics needs "
                         "exactly one to know which pad a stream belongs to");
             return false;
@@ -546,9 +562,34 @@ public:
         m_Alive = true;
         addAliveListener();
 
-        SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
-                    "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, 32-bit float)",
-                    qPrintable(name));
+        // The device's own delay on top of our queue, read the way the CoreAudio
+        // audio renderer reads it: the I/O buffer and safety offset on the
+        // software side, the device latency on the hardware side.
+        UInt32 ioBufferFrames = 0;
+        UInt32 safetyOffsetFrames = 0;
+        UInt32 latencyFrames = 0;
+        const bool ioBufferKnown =
+            getDeviceProperty(device, kAudioDevicePropertyBufferFrameSize,
+                              kAudioObjectPropertyScopeOutput, ioBufferFrames);
+        const bool safetyOffsetKnown =
+            getDeviceProperty(device, kAudioDevicePropertySafetyOffset,
+                              kAudioObjectPropertyScopeOutput, safetyOffsetFrames);
+        const bool latencyKnown = getDeviceProperty(device, kAudioDevicePropertyLatency,
+                                                    kAudioObjectPropertyScopeOutput, latencyFrames);
+        const std::uint32_t totalFrames =
+            MaxQueuedFrames + ioBufferFrames + safetyOffsetFrames + latencyFrames;
+
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "DualSense haptics endpoint ready: %s (48 kHz, 4 ch, 32-bit float; "
+                    "latency <= %s: queue <= %.1f ms, I/O buffer %s, safety offset %s, "
+                    "device %s)",
+                    qUtf8Printable(name),
+                    qPrintable(describeDelay(ioBufferKnown && safetyOffsetKnown && latencyKnown,
+                                             framesToMs(totalFrames))),
+                    framesToMs(MaxQueuedFrames),
+                    qPrintable(describeDelay(ioBufferKnown, framesToMs(ioBufferFrames))),
+                    qPrintable(describeDelay(safetyOffsetKnown, framesToMs(safetyOffsetFrames))),
+                    qPrintable(describeDelay(latencyKnown, framesToMs(latencyFrames))));
         return true;
     }
 
@@ -622,8 +663,8 @@ public:
             return m_Started ? WriteResult::WouldBlock : WriteResult::Failed;
         }
 
-        spreadToHapticsChannels(static_cast<float*>(buffer->mAudioData), packet,
-                                [](std::int16_t s) { return s / 32768.0f; });
+        spreadToHapticsChannels(static_cast<float*>(buffer->mAudioData), pcmSamples(packet),
+                                packet.frameCount, [](std::int16_t s) { return s / 32768.0f; });
         buffer->mAudioDataByteSize = packet.frameCount * EndpointBytesPerFrame;
         if (AudioQueueEnqueueBuffer(m_Queue, buffer, 0, nullptr) != noErr) {
             bufferDone(this, m_Queue, buffer);
@@ -711,6 +752,10 @@ struct DualSenseHapticsRenderer::Impl
     // Set from other threads; the worker owns the endpoint, so it performs the
     // actual teardown.
     bool resetRequested = false;
+    // Nothing ties the audio endpoint to a controller number, so only the pad
+    // the input handler picked is played, and only while it is the only
+    // DualSense connected.
+    std::atomic_int controllerTarget{ -1 };
 
     HapticsEndpoint endpoint;
     dualsense_haptics::PcmStreamTracker streamTracker;
@@ -771,6 +816,16 @@ struct DualSenseHapticsRenderer::Impl
         streamTracker.reset();
     }
 
+    void requestReset()
+    {
+        {
+            std::lock_guard lock(mutex);
+            queue.clear();
+            resetRequested = true;
+        }
+        condition.notify_one();
+    }
+
     // The endpoint failed (device unplugged, format renegotiated, ...). Drop it
     // so the next packet probes for it again.
     void failEndpoint()
@@ -794,7 +849,7 @@ struct DualSenseHapticsRenderer::Impl
                 return false;
             const auto now = std::chrono::steady_clock::now();
             if (now >= deadline) {
-                SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "DualSense haptics endpoint stopped draining; reopening it");
                 // A wedged endpoint is likely still enumerable, so don't
                 // reopen it on the very next packet.
@@ -846,7 +901,7 @@ struct DualSenseHapticsRenderer::Impl
         if (!endpoint.isStarted()) {
             if (packet.frameCount > endpoint.bufferFrames()) {
                 SDL_LogError(
-                    SDL_LOG_CATEGORY_AUDIO,
+                    SDL_LOG_CATEGORY_APPLICATION,
                     "DualSense haptics packet (%u frames) exceeds the endpoint buffer (%u frames)",
                     packet.frameCount, endpoint.bufferFrames());
                 failEndpoint();
@@ -856,10 +911,9 @@ struct DualSenseHapticsRenderer::Impl
             // A shared-mode endpoint may expose less than our preferred 15 ms
             // jitter buffer. Never queue more than the endpoint can accept before
             // starting it, or the write would wait for a device that is not running.
-            const auto maxPackets = endpoint.maxQueuedPackets();
-            if (!prebuffer.empty() &&
-                (prebufferedFrames + packet.frameCount > endpoint.bufferFrames() ||
-                 (maxPackets != 0 && prebuffer.size() >= maxPackets))) {
+            if (dualsense_haptics::mustStartBeforePrebuffering(
+                    prebufferedFrames, prebuffer.size(), packet.frameCount, endpoint.bufferFrames(),
+                    endpoint.maxQueuedPackets())) {
                 if (!startPrebufferedStream() || !writePacket(packet)) {
                     failEndpoint();
                 }
@@ -868,8 +922,8 @@ struct DualSenseHapticsRenderer::Impl
 
             prebufferedFrames += packet.frameCount;
             prebuffer.emplace_back(std::move(packet));
-            const auto targetFrames = std::min(PrebufferFrames, endpoint.bufferFrames());
-            if (prebufferedFrames < targetFrames) return;
+            if (!dualsense_haptics::isPrebufferFull(prebufferedFrames, endpoint.bufferFrames()))
+                return;
 
             if (!startPrebufferedStream()) {
                 failEndpoint();
@@ -896,8 +950,10 @@ struct DualSenseHapticsRenderer::Impl
                     resetRequested = false;
                     lock.unlock();
                     // Silence the coils now: no stream-end packet is coming to
-                    // do it for us.
+                    // do it for us. Reopen on the next packet too, since the
+                    // connected controllers may have changed.
                     resetStream();
+                    endpoint.close();
                     continue;
                 }
                 packet = std::move(queue.front());
@@ -926,6 +982,10 @@ DualSenseHapticsRenderer::Availability DualSenseHapticsRenderer::availability()
 void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
 {
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    if (frame.controllerNumber != m_Impl->controllerTarget) {
+        return;
+    }
+
     if (frame.sampleRate != 48000 || frame.channelCount != 2 || frame.bitsPerSample != 16 ||
         frame.frameCount > 480 || frame.pcmDataLength != frame.frameCount * 4 ||
         (frame.pcmDataLength != 0 && frame.pcmData == nullptr)) {
@@ -956,12 +1016,16 @@ void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
 
 void DualSenseHapticsRenderer::setControllerTarget(int controllerNumber)
 {
+    Q_UNUSED(controllerNumber);
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    if (m_Impl->controllerTarget.exchange(controllerNumber) != controllerNumber) {
+        m_Impl->requestReset();
+    }
+#endif
 #ifdef Q_OS_MACOS
     if (m_Impl->macRenderer != nullptr) {
         m_Impl->macRenderer->setControllerTarget(controllerNumber);
     }
-#else
-    (void)controllerNumber;
 #endif
 }
 
@@ -974,14 +1038,8 @@ void DualSenseHapticsRenderer::reset()
 #endif
 
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
-    // Drop anything the host queued before the connection died and ask the
-    // worker to tear the endpoint's stream down.
-    {
-        std::lock_guard lock(m_Impl->mutex);
-        m_Impl->queue.clear();
-        m_Impl->resetRequested = true;
-    }
-    m_Impl->condition.notify_one();
+    // Drop anything the host queued before the connection died.
+    m_Impl->requestReset();
 #endif
 }
 
