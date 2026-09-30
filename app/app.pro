@@ -355,7 +355,6 @@ HEADERS += \
     streaming/video/overlayeventwakestate.h \
     streaming/video/overlaywindowpolicy.h \
     streaming/video/overlaymenubutton.h \
-    streaming/waylandwindowmetrics.h \
     streaming/video/overlaytoasteventstate.h \
     streaming/video/overlaytoast.h \
     backend/systemproperties.h \
@@ -627,7 +626,9 @@ qt-sdl-wayland-bridge {
 
     DEFINES += HAS_QT_SDL_WAYLAND_BRIDGE
     SOURCES += streaming/waylandqtsdlbridge.cpp
-    HEADERS += streaming/waylandqtsdlbridge.h
+    HEADERS += \
+        streaming/waylandqtsdlbridge.h \
+        streaming/waylandwindowmetrics.h
 }
 
 require-qt-sdl-wayland-bridge:!qt-sdl-wayland-bridge {

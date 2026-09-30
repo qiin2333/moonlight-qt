@@ -236,7 +236,9 @@ private:
     void syncQtOverlayWindowsWithSdlWindowState();
     QRect qtOverlayParentGeometry() const;
     QPoint qtOverlayPositionForSdlPoint(int x, int y) const;
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     void syncWaylandSdlWindowState();
+#endif
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void startRuntimeBitrateWorker();

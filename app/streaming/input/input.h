@@ -2,7 +2,9 @@
 
 #include "settings/streamingpreferences.h"
 #include "streaming/input/gamepadglyphs.h"
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
 #include "streaming/waylandwindowmetrics.h"
+#endif
 #include "backend/computermanager.h"
 #include "cursorshapeclassifier.h"
 
@@ -13,7 +15,9 @@
 #include <QSet>
 
 #include <atomic>
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
 #include <optional>
+#endif
 
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
 #include <memory>
@@ -152,10 +156,9 @@ public:
 
     void setWindow(SDL_Window* window);
 
-    // Only the Qt-owned native Wayland stream path calls this. Pointer and
-    // layout coordinates use the logical size, while SDL normalizes touch
-    // events against the imported window's physical size.
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     void setWaylandWindowCoordinateMetrics(WaylandWindowMetrics::CoordinateMetrics metrics);
+#endif
 
     void handleKeyEvent(SDL_KeyboardEvent* event);
 
@@ -300,10 +303,12 @@ public:
 
 private:
     void getWindowCoordinateSize(int* width, int* height) const;
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     WaylandWindowMetrics::Point getTouchWindowPoint(const SDL_TouchFingerEvent* event,
                                                     WaylandWindowMetrics::Size windowSize) const;
     float getTouchDistance(const SDL_TouchFingerEvent* first,
                            const SDL_TouchFingerEvent* second) const;
+#endif
 
     qreal getRemoteCursorScale() const;
 
@@ -428,7 +433,9 @@ private:
     Uint32 remoteCursorHideTimerCallback(Uint32 interval, void* param);
 
     SDL_Window* m_Window;
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     std::optional<WaylandWindowMetrics::CoordinateMetrics> m_WaylandCoordinateMetrics;
+#endif
     bool m_MultiController;
     bool m_GamepadMouse;
     bool m_EnableDualSenseHaptics;

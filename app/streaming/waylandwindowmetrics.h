@@ -31,8 +31,8 @@ struct CoordinateMetrics
 
 inline Size pixelSize(Size logicalSize, double devicePixelRatio)
 {
-    return { std::max(1, static_cast<int>(std::lround(logicalSize.width * devicePixelRatio))),
-             std::max(1, static_cast<int>(std::lround(logicalSize.height * devicePixelRatio))) };
+    return { (std::max)(1, static_cast<int>(std::lround(logicalSize.width * devicePixelRatio))),
+             (std::max)(1, static_cast<int>(std::lround(logicalSize.height * devicePixelRatio))) };
 }
 
 // SDL receives wl_pointer coordinates in Wayland surface coordinates for an

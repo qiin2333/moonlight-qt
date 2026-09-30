@@ -4,9 +4,9 @@
 #include "filemappingux.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
-#include "streaming/waylandwindowmetrics.h"
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
 #include "streaming/waylandqtsdlbridge.h"
+#include "streaming/waylandwindowmetrics.h"
 #endif
 #include "streaming/audio/dualsensehaptics.h"
 #include "streaming/audio/dualsensehapticscalibration.h"
@@ -2668,10 +2668,10 @@ QPoint Session::qtOverlayPositionForSdlPoint(int x, int y) const
         return QCursor::pos();
     }
 
-    return QPoint(WaylandWindowMetrics::parentCoordinateForPointer(x, parentRect.x()),
-                  WaylandWindowMetrics::parentCoordinateForPointer(y, parentRect.y()));
+    return QPoint(parentRect.x() + x, parentRect.y() + y);
 }
 
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
 void Session::syncWaylandSdlWindowState()
 {
     if (m_WaylandStreamWindow == nullptr || m_Window == nullptr) {
@@ -2741,6 +2741,7 @@ void Session::syncWaylandSdlWindowState()
         }
     }
 }
+#endif
 
 void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
                                 bool closeWhenPointerOutside)
@@ -3105,7 +3106,9 @@ void Session::processQtOverlayEvents()
     }
 #endif
     QCoreApplication::processEvents(QEventLoop::AllEvents);
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     syncWaylandSdlWindowState();
+#endif
 #ifdef Q_OS_DARWIN
     if (m_MacQtEventPumpInputGuard) {
         m_MacQtEventPumpInputGuard->finishEventProcessing();
@@ -4796,7 +4799,9 @@ void Session::exec()
     }
 
     m_InputHandler->setWindow(m_Window);
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     syncWaylandSdlWindowState();
+#endif
 
     QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
     QImage svgImage(ICON_SIZE, ICON_SIZE, QImage::Format_RGBA8888);

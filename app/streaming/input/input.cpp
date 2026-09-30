@@ -418,6 +418,7 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 #endif
 }
 
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
 void SdlInputHandler::setWaylandWindowCoordinateMetrics(
     WaylandWindowMetrics::CoordinateMetrics metrics)
 {
@@ -427,15 +428,18 @@ void SdlInputHandler::setWaylandWindowCoordinateMetrics(
         m_WaylandCoordinateMetrics.reset();
     }
 }
+#endif
 
 void SdlInputHandler::getWindowCoordinateSize(int* width, int* height) const
 {
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     if (m_WaylandCoordinateMetrics.has_value()) {
         *width = m_WaylandCoordinateMetrics->window.width;
         *height = m_WaylandCoordinateMetrics->window.height;
-    } else {
-        SDL_GetWindowSize(m_Window, width, height);
+        return;
     }
+#endif
+    SDL_GetWindowSize(m_Window, width, height);
 }
 
 int SdlInputHandler::getLocalCursorMode() const
