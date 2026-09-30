@@ -3,10 +3,13 @@
 #include <QByteArray>
 #include <QCloseEvent>
 #include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QGuiApplication>
 #include <QLibrary>
 #include <QPointer>
 #include <QScreen>
+#include <QThread>
 #include <QWindow>
 #include <QtGui/qguiapplication_platform.h>
 
@@ -197,6 +200,36 @@ SDL_Window* wrapStreamWindow(QWindow* window)
         ImportedQtWindow = window;
     }
     return sdlWindow;
+}
+
+bool exposeGuiBeforeSdlTeardown(QWindow* guiWindow, QWindow* streamWindow)
+{
+    if (guiWindow == nullptr || streamWindow == nullptr || !isNativeWayland()) {
+        return false;
+    }
+
+    // SDL's OpenGL renderer owns an EGL surface for the Qt-owned stream
+    // wl_surface. Keep the surviving Qt Quick window exposed while that EGL
+    // surface is destroyed, otherwise some EGL implementations leave Qt's
+    // hidden QRhi surface unable to resume after the stream window is gone.
+    // The stream window remains above the GUI throughout this handoff.
+    guiWindow->setVisible(true);
+
+    constexpr qint64 RestoreTimeoutMs = 500;
+    QElapsedTimer timer;
+    timer.start();
+    while (!guiWindow->isExposed() && timer.elapsed() < RestoreTimeoutMs) {
+        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        QCoreApplication::sendPostedEvents();
+        QThread::msleep(1);
+    }
+
+    if (!guiWindow->isExposed()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Qt GUI did not expose before Wayland SDL teardown");
+        return false;
+    }
+    return true;
 }
 
 int displayRefreshRate(SDL_Window* window)

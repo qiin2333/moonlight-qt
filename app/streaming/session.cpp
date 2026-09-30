@@ -2749,6 +2749,14 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
     if (!m_MenuPanel || m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) return;
     if (!isStreamingWindowVisible()) return;
 
+    // A Wayland subsurface cannot be mapped reliably until the parent stream
+    // surface has a renderer and has started receiving video buffers. Edge
+    // activation can otherwise race initial stream setup when the pointer is
+    // already at the configured edge.
+    if (m_WaylandStreamWindow != nullptr && (m_VideoDecoder == nullptr || !m_HasReceivedVideo)) {
+        return;
+    }
+
     // Check if overlay menu is disabled before releasing mouse capture
     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_DISABLED) {
         return; // Do not show
@@ -5867,6 +5875,7 @@ DispatchDeferredCleanup:
     // This must be called after the decoder is deleted, because
     // the renderer may want to interact with the window
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    WaylandQtSdlBridge::exposeGuiBeforeSdlTeardown(m_QtWindow, m_WaylandStreamWindow);
     WaylandQtSdlBridge::forgetStreamWindow(m_Window);
 #endif
     SDL_DestroyWindow(m_Window);

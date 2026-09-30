@@ -5,6 +5,8 @@
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
 
+#include <QGuiApplication>
+
 namespace {
 
 bool isSyntheticPointerMouseEvent(Uint32 deviceId)
@@ -332,9 +334,12 @@ void SdlInputHandler::updatePointerRegionLock()
         // Lock the pointer in true full-screen mode or in any fullscreen mode when only a single monitor is present
         if (Session* session = Session::get();
             session != nullptr && session->usesQtWaylandStreamWindow()) {
-            // Wayland exposes a single compositor-managed fullscreen state;
-            // exclusive vs desktop fullscreen is not a meaningful distinction.
-            m_PointerRegionLockActive = session->isStreamingWindowFullscreen();
+            // Native Wayland has only compositor-managed fullscreen. Preserve
+            // the established borderless policy: confine on a single-display
+            // desktop, but let the pointer cross outputs on multi-display
+            // desktops.
+            m_PointerRegionLockActive =
+                session->isStreamingWindowFullscreen() && QGuiApplication::screens().size() == 1;
         } else {
             Uint32 fullscreenFlags = SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
             m_PointerRegionLockActive = (fullscreenFlags == SDL_WINDOW_FULLSCREEN) ||

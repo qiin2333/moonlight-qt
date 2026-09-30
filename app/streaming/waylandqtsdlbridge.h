@@ -24,6 +24,10 @@ QWindow* createStreamWindow(const QString& title, const QRect& geometry, QScreen
                             Qt::WindowStates initialStates, bool fullScreen);
 SDL_Window* wrapStreamWindow(QWindow* window);
 
+// Re-expose the surviving Qt GUI behind the stream before SDL destroys its
+// EGL surface for the borrowed wl_surface.
+bool exposeGuiBeforeSdlTeardown(QWindow* guiWindow, QWindow* streamWindow);
+
 // SDL cannot attach output enter/leave listeners to a Qt-owned wl_surface.
 // Keep screen/refresh queries on Qt for the imported stream window.
 int displayRefreshRate(SDL_Window* window);
