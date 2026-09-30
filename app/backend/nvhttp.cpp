@@ -1,4 +1,5 @@
 #include "nvcomputer.h"
+#include "pairedcertificate.h"
 #include <Limelight.h>
 
 #include <QHostInfo>
@@ -559,22 +560,7 @@ NvHTTP::getXmlString(QString xml,
 
 void NvHTTP::handleSslErrors(QNetworkReply* reply, const QList<QSslError>& errors)
 {
-    bool ignoreErrors = true;
-
-    if (m_ServerCert.isNull()) {
-        // We should never make an HTTPS request without a cert
-        Q_ASSERT(!m_ServerCert.isNull());
-        return;
-    }
-
-    for (const QSslError& error : errors) {
-        if (m_ServerCert != error.certificate()) {
-            ignoreErrors = false;
-            break;
-        }
-    }
-
-    if (ignoreErrors) {
+    if (PairedCertificate::canIgnoreErrors(m_ServerCert, errors)) {
         reply->ignoreSslErrors(errors);
     }
 }
@@ -612,7 +598,7 @@ UsbForwarding::Capability NvHTTP::getUsbForwardingCapability()
         "api/v1/usb-forwarding", QString(), 5000, NVLL_NONE, 4096));
     // A normally trusted certificate may not emit sslErrors at all. Require
     // the paired leaf certificate even on that path before accepting credentials.
-    if (reply->sslConfiguration().peerCertificate() != m_ServerCert) {
+    if (!PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
         throw GfeHttpResponseException(401, "USB forwarding host certificate mismatch");
     }
     if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() != 200) {
@@ -740,6 +726,7 @@ NvHTTP::openConnection(QUrl baseUrl,
 #endif
 
     auto sslErrorsConnection = connect(m_Nam, &QNetworkAccessManager::sslErrors, this, &NvHTTP::handleSslErrors);
+    auto pinnedConnection = PairedCertificate::enforce(m_Nam, this, m_ServerCert);
     QNetworkReply* reply = m_Nam->get(request);
 
     // Run the request with a timeout if requested
@@ -778,6 +765,13 @@ NvHTTP::openConnection(QUrl baseUrl,
     m_Nam->clearAccessCache();
 #endif
     disconnect(sslErrorsConnection);
+    disconnect(pinnedConnection);
+    if (url.scheme() == QStringLiteral("https") &&
+            (reply->error() == QNetworkReply::NoError || !reply->sslConfiguration().peerCertificate().isNull()) &&
+            !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
+        delete reply;
+        throw GfeHttpResponseException(401, "Server certificate mismatch");
+    }
 
     // Handle error
     if (oversized) {
@@ -865,6 +859,7 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
 #endif
 
     auto sslErrorsConnection = connect(m_Nam, &QNetworkAccessManager::sslErrors, this, &NvHTTP::handleSslErrors);
+    auto pinnedConnection = PairedCertificate::enforce(m_Nam, this, m_ServerCert);
     QNetworkReply* reply = post ?
                 m_Nam->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact)) :
                 m_Nam->get(request);
@@ -892,6 +887,13 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
     m_Nam->clearAccessCache();
 #endif
     disconnect(sslErrorsConnection);
+    disconnect(pinnedConnection);
+    if (url.scheme() == QStringLiteral("https") &&
+            (reply->error() == QNetworkReply::NoError || !reply->sslConfiguration().peerCertificate().isNull()) &&
+            !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
+        delete reply;
+        throw GfeHttpResponseException(401, "Server certificate mismatch");
+    }
 
     if (reply->error() != QNetworkReply::NoError)
     {

@@ -2,6 +2,7 @@
 
 #include "backend/nvcomputer.h"
 
+#include <QDeadlineTimer>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -68,12 +69,11 @@ public:
 private:
     bool buildCapabilityUrl(QUrl& outUrl) const;
     bool buildSessionUrl(const Capability& capability, QUrl& outUrl) const;
-    bool sendAndWait(const QJsonObject& message, QJsonObject& out, int timeoutMs, QString* error = nullptr);
+    bool sendAndWait(const QJsonObject& message, QJsonObject& out, const QDeadlineTimer& deadline, QString* error = nullptr);
     RpcResult sendRpc(QJsonObject message, int timeoutMs);
     void closeSession();
     QNetworkAccessManager* nam();
     QSslConfiguration sslConfiguration() const;
-    bool isPinnedCertificateError(const QList<QSslError>& errors) const;
 
     NvComputer* m_Computer;
     QNetworkAccessManager* m_Nam = nullptr;

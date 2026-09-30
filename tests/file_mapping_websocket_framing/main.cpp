@@ -1,8 +1,15 @@
 #include "streaming/filemappingwebsocket.h"
 
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QList>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTextStream>
+#include <QThread>
+
+#include <future>
+#include <thread>
 
 namespace {
 QByteArray serverFrame(bool fin, quint8 opcode, const QByteArray& payload)
@@ -96,6 +103,70 @@ int main(int argc, char* argv[])
     error = incrementalReader.read(partial, payload, needMore);
     ok &= require(error.isEmpty() && !needMore, QStringLiteral("incremental read failed: %1").arg(error), err);
     ok &= require(payload == R"({"type":"result"})", QStringLiteral("incremental payload mismatch"), err);
+
+    for (int length : { 126, 65536 }) {
+        const QByteArray expected(length, 'x');
+        QByteArray large = serverFrame(true, 0x1, expected);
+        ok &= require(readMessage(large, payload, error) && payload == expected,
+                      QStringLiteral("extended frame length %1").arg(length), err);
+    }
+
+    const QList<QByteArray> invalidFrames {
+        QByteArray::fromHex("8180"), // Servers must not mask their frames.
+        QByteArray::fromHex("c100"), // No extensions were negotiated.
+        QByteArray::fromHex("837f"), // Reserved opcode.
+        QByteArray::fromHex("817e0001"), // Non-minimal 16-bit length.
+        QByteArray::fromHex("817f000000000000007e"), // Non-minimal 64-bit length.
+        QByteArray::fromHex("817f8000000000000000"), // Reserved high length bit.
+        QByteArray::fromHex("817f0000000001000001"), // Above the frame size limit.
+        serverFrame(false, 0x8, {}),
+        serverFrame(true, 0x8, "x"),
+        serverFrame(true, 0x9, QByteArray(126, 'x')),
+        serverFrame(true, 0x0, "orphan"),
+        serverFrame(false, 0x1, "first") + serverFrame(true, 0x1, "second"),
+        serverFrame(true, 0x1, QByteArray::fromHex("c0af")) // Invalid UTF-8.
+    };
+    for (QByteArray invalid : invalidFrames) {
+        readMessage(invalid, payload, error);
+        ok &= require(!error.isEmpty(), QStringLiteral("invalid frame must fail without waiting for its payload"), err);
+    }
+
+    // Continuous partial input must not restart the caller's total timeout.
+    std::promise<quint16> listeningPort;
+    auto port = listeningPort.get_future();
+    std::thread dripServer([&] {
+        QTcpServer server;
+        const bool listening = server.listen(QHostAddress::LocalHost);
+        listeningPort.set_value(listening ? server.serverPort() : 0);
+        if (!listening || !server.waitForNewConnection(2000)) {
+            return;
+        }
+        QTcpSocket* peer = server.nextPendingConnection();
+        const QByteArray frame = serverFrame(true, 0x1, QByteArray(100, 'x'));
+        for (char byte : frame) {
+            if (peer->write(QByteArray(1, byte)) != 1 || !peer->waitForBytesWritten(500)) {
+                break;
+            }
+            QThread::msleep(20);
+        }
+        delete peer;
+    });
+    QSslSocket socket;
+    const quint16 serverPort = port.get();
+    socket.connectToHost(QHostAddress::LocalHost, serverPort);
+    const bool connected = serverPort != 0 && socket.waitForConnected(2000);
+    ok &= require(connected, QStringLiteral("local drip server connects"), err);
+    if (connected) {
+        QElapsedTimer elapsed;
+        elapsed.start();
+        QByteArray buffer;
+        QJsonObject reply;
+        error = FileMappingWebSocket::readJsonText(socket, buffer, reply, QDeadlineTimer(150));
+        ok &= require(!error.isEmpty() && elapsed.elapsed() < 1000,
+                      QStringLiteral("partial frames must respect the total deadline"), err);
+    }
+    socket.abort();
+    dripServer.join();
 
     if (!ok) {
         return 1;

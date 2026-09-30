@@ -1,6 +1,7 @@
 #include "autoupdatechecker.h"
 #include "portableupdateinstaller.h"
 #include "path.h"
+#include "versionutils.h"
 
 #include <QDir>
 #include <QFile>
@@ -34,10 +35,10 @@ AutoUpdateChecker::AutoUpdateChecker(QObject *parent) :
 
     QString currentVersion(VERSION_STR);
     qDebug() << "Current Moonlight version:" << currentVersion;
-    parseStringToVersionQuad(currentVersion, m_CurrentVersionQuad);
+    m_CurrentVersion = VersionUtils::parseRelease(currentVersion);
 
     // Should at least have a 1.0-style version number
-    Q_ASSERT(m_CurrentVersionQuad.count() > 1);
+    Q_ASSERT(m_CurrentVersion.segmentCount() > 1);
 
     connect(m_PortableUpdateInstaller, &PortableUpdateInstaller::onPortableUpdateStatusChanged,
             this, &AutoUpdateChecker::onPortableUpdateStatusChanged);
@@ -142,39 +143,6 @@ bool AutoUpdateChecker::checkForUpdates()
     return true;
 }
 
-void AutoUpdateChecker::parseStringToVersionQuad(const QString& string, QVector<int>& version)
-{
-    version.clear();
-
-    // Strip leading 'v' and ignore SemVer suffixes/build metadata:
-    //   v6.2.82                  -> 6.2.82
-    //   6.2.82+14.g13ca12da.dirty -> 6.2.82
-    //   v6.2.82-14-g13ca12da      -> 6.2.82
-    QString versionStr = string.trimmed();
-    if (versionStr.startsWith('v') || versionStr.startsWith('V')) {
-        versionStr = versionStr.mid(1);
-    }
-
-    int suffixIndex = versionStr.indexOf('+');
-    int prereleaseIndex = versionStr.indexOf('-');
-    if (suffixIndex < 0 || (prereleaseIndex >= 0 && prereleaseIndex < suffixIndex)) {
-        suffixIndex = prereleaseIndex;
-    }
-    if (suffixIndex >= 0) {
-        versionStr = versionStr.left(suffixIndex);
-    }
-
-    QStringList list = versionStr.split('.');
-    for (const QString& component : std::as_const(list)) {
-        bool ok = false;
-        int value = component.toInt(&ok);
-        if (!ok) {
-            break;
-        }
-        version.append(value);
-    }
-}
-
 QString AutoUpdateChecker::getPreferredAssetSuffix() const
 {
 #if defined(Q_OS_DARWIN)
@@ -244,32 +212,6 @@ QString AutoUpdateChecker::getCurrentBuildArch() const
     }
 
     return buildArch.toLower();
-}
-
-int AutoUpdateChecker::compareVersion(const QVector<int>& version1, const QVector<int>& version2) {
-    for (int i = 0;; i++) {
-        int v1Val = 0;
-        int v2Val = 0;
-
-        // Treat missing decimal places as 0
-        if (i < version1.count()) {
-            v1Val = version1[i];
-        }
-        if (i < version2.count()) {
-            v2Val = version2[i];
-        }
-        if (i >= version1.count() && i >= version2.count()) {
-            // Equal versions
-            return 0;
-        }
-
-        if (v1Val < v2Val) {
-            return -1;
-        }
-        else if (v1Val > v2Val) {
-            return 1;
-        }
-    }
 }
 
 void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
@@ -346,16 +288,14 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
         qDebug() << "Latest GitHub release tag:" << tagName;
 
         // Parse version from tag (strip 'v' prefix if present)
-        QVector<int> latestVersionQuad;
-        parseStringToVersionQuad(tagName, latestVersionQuad);
-
-        if (latestVersionQuad.isEmpty()) {
-            qWarning() << "GitHub release contains an invalid tag_name:" << tagName;
+        const QVersionNumber latestVersion = VersionUtils::parseRelease(tagName);
+        if (m_CurrentVersion.segmentCount() < 2 || latestVersion.segmentCount() < 2) {
+            qWarning() << "Invalid release version:" << QStringLiteral(VERSION_STR) << tagName;
             fail();
             return;
         }
 
-        int res = compareVersion(m_CurrentVersionQuad, latestVersionQuad);
+        int res = VersionUtils::compare(m_CurrentVersion, latestVersion);
         if (res < 0) {
             // Current version is older than latest release
             qDebug() << "Update available:" << tagName;

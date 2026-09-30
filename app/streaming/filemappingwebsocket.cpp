@@ -8,17 +8,21 @@
 #include <utility>
 
 namespace {
-bool waitForReadyBytes(QSslSocket& socket, QByteArray& buffer, int timeoutMs)
+bool waitForReadyBytes(QSslSocket& socket, QByteArray& buffer, const QDeadlineTimer& deadline)
 {
-    if (!socket.waitForReadyRead(timeoutMs)) {
+    if (deadline.hasExpired() ||
+            (socket.bytesAvailable() == 0 && !socket.waitForReadyRead(static_cast<int>(deadline.remainingTime())))) {
         return false;
     }
     buffer += socket.readAll();
     return true;
 }
 
-bool writeMaskedFrame(QSslSocket& socket, quint8 opcode, const QByteArray& payload)
+bool writeMaskedFrame(QSslSocket& socket, quint8 opcode, const QByteArray& payload, const QDeadlineTimer& deadline)
 {
+    if (deadline.hasExpired() || static_cast<quint64>(payload.size()) > FileMappingWebSocket::kMaxMessageBytes) {
+        return false;
+    }
     QByteArray frame;
     frame.append(static_cast<char>(0x80 | opcode));
     if (payload.size() < 126) {
@@ -49,7 +53,15 @@ bool writeMaskedFrame(QSslSocket& socket, quint8 opcode, const QByteArray& paylo
         frame.append(static_cast<char>(static_cast<quint8>(payload[i]) ^ static_cast<quint8>(mask[i % 4])));
     }
 
-    return socket.write(frame) == frame.size() && socket.waitForBytesWritten(3000);
+    if (socket.write(frame) != frame.size()) {
+        return false;
+    }
+    while (socket.bytesToWrite() > 0) {
+        if (deadline.hasExpired() || !socket.waitForBytesWritten(static_cast<int>(deadline.remainingTime()))) {
+            return false;
+        }
+    }
+    return true;
 }
 } // namespace
 
@@ -73,6 +85,13 @@ QString takeFrame(QByteArray& buffer, Frame& frame, bool& needMore)
     if ((first & 0x70) != 0) {
         return QObject::tr("Unsupported WebSocket frame flags");
     }
+    if ((second & 0x80) != 0) {
+        return QObject::tr("Masked WebSocket frame received from host");
+    }
+    if (frame.opcode != 0x0 && frame.opcode != 0x1 && frame.opcode != 0x2 &&
+            frame.opcode != 0x8 && frame.opcode != 0x9 && frame.opcode != 0xa) {
+        return QObject::tr("Unexpected WebSocket opcode %1").arg(frame.opcode);
+    }
 
     quint64 length = second & 0x7f;
     if (length == 126) {
@@ -83,6 +102,9 @@ QString takeFrame(QByteArray& buffer, Frame& frame, bool& needMore)
         length = (static_cast<quint8>(buffer[cursor]) << 8) |
                  static_cast<quint8>(buffer[cursor + 1]);
         cursor += 2;
+        if (length < 126) {
+            return QObject::tr("Invalid WebSocket frame length");
+        }
     }
     else if (length == 127) {
         if (buffer.size() < cursor + 8) {
@@ -94,21 +116,17 @@ QString takeFrame(QByteArray& buffer, Frame& frame, bool& needMore)
             length = (length << 8) | static_cast<quint8>(buffer[cursor + i]);
         }
         cursor += 8;
+        if (length <= 0xffff || (length >> 63) != 0) {
+            return QObject::tr("Invalid WebSocket frame length");
+        }
     }
 
     if (length > kMaxMessageBytes) {
         return QObject::tr("WebSocket frame is too large");
     }
 
-    const bool masked = (second & 0x80) != 0;
-    QByteArray mask;
-    if (masked) {
-        if (buffer.size() < cursor + 4) {
-            needMore = true;
-            return {};
-        }
-        mask = buffer.mid(cursor, 4);
-        cursor += 4;
+    if ((frame.opcode & 0x8) != 0 && (!frame.fin || length > 125 || (frame.opcode == 0x8 && length == 1))) {
+        return QObject::tr("Invalid WebSocket control frame");
     }
 
     if (buffer.size() - cursor < static_cast<int>(length)) {
@@ -120,11 +138,6 @@ QString takeFrame(QByteArray& buffer, Frame& frame, bool& needMore)
     cursor += static_cast<int>(length);
     buffer.remove(0, cursor);
 
-    if (masked) {
-        for (int i = 0; i < frame.payload.size(); ++i) {
-            frame.payload[i] = static_cast<char>(static_cast<quint8>(frame.payload[i]) ^ static_cast<quint8>(mask[i % 4]));
-        }
-    }
     return {};
 }
 
@@ -140,21 +153,17 @@ QString TextMessageReader::read(QByteArray& buffer, QByteArray& out, bool& needM
             return frameError;
         }
 
-        if (static_cast<quint64>(m_Payload.size()) + static_cast<quint64>(frame.payload.size()) > kMaxMessageBytes) {
-            return QObject::tr("WebSocket message is too large");
-        }
-
         if (frame.opcode == 0x8) {
             return QObject::tr("WebSocket closed by host");
         }
         if (frame.opcode == 0x9 || frame.opcode == 0xa) {
-            if (!frame.fin || frame.payload.size() > 125) {
-                return QObject::tr("Invalid WebSocket control frame");
-            }
             if (frame.opcode == 0x9 && pongPayloads != nullptr) {
                 pongPayloads->append(frame.payload);
             }
             continue;
+        }
+        if (static_cast<quint64>(m_Payload.size()) + static_cast<quint64>(frame.payload.size()) > kMaxMessageBytes) {
+            return QObject::tr("WebSocket message is too large");
         }
         if (frame.opcode == 0x1) {
             if (m_MessageStarted) {
@@ -174,6 +183,9 @@ QString TextMessageReader::read(QByteArray& buffer, QByteArray& out, bool& needM
         }
 
         if (frame.fin) {
+            if (QString::fromUtf8(m_Payload).toUtf8() != m_Payload) {
+                return QObject::tr("WebSocket text was not valid UTF-8");
+            }
             out = std::move(m_Payload);
             m_Payload.clear();
             m_MessageStarted = false;
@@ -182,11 +194,14 @@ QString TextMessageReader::read(QByteArray& buffer, QByteArray& out, bool& needM
     }
 }
 
-QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, int timeoutMs)
+QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, const QDeadlineTimer& deadline)
 {
     TextMessageReader reader;
     QByteArray payload;
     for (;;) {
+        if (deadline.hasExpired()) {
+            return QObject::tr("Timed out waiting for WebSocket frame");
+        }
         bool needMore = false;
         QList<QByteArray> pongPayloads;
         QString readError = reader.read(buffer, payload, needMore, &pongPayloads);
@@ -194,7 +209,7 @@ QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, i
             return readError;
         }
         for (const QByteArray& pongPayload : pongPayloads) {
-            if (!writePong(socket, pongPayload)) {
+            if (!writePong(socket, pongPayload, deadline)) {
                 const QString socketError = socket.errorString();
                 return socketError.isEmpty()
                         ? QObject::tr("Failed to write WebSocket pong")
@@ -204,7 +219,7 @@ QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, i
         if (!needMore) {
             break;
         }
-        if (!waitForReadyBytes(socket, buffer, timeoutMs)) {
+        if (!waitForReadyBytes(socket, buffer, deadline)) {
             return QObject::tr("Timed out waiting for WebSocket frame");
         }
     }
@@ -218,17 +233,17 @@ QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, i
     return {};
 }
 
-bool writeText(QSslSocket& socket, const QByteArray& payload)
+bool writeText(QSslSocket& socket, const QByteArray& payload, const QDeadlineTimer& deadline)
 {
-    return writeMaskedFrame(socket, 0x1, payload);
+    return writeMaskedFrame(socket, 0x1, payload, deadline);
 }
 
-bool writePong(QSslSocket& socket, const QByteArray& payload)
+bool writePong(QSslSocket& socket, const QByteArray& payload, const QDeadlineTimer& deadline)
 {
     if (payload.size() > 125) {
         return false;
     }
-    return writeMaskedFrame(socket, 0xa, payload);
+    return writeMaskedFrame(socket, 0xa, payload, deadline);
 }
 
 } // namespace FileMappingWebSocket

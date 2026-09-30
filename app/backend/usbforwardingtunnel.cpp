@@ -1,4 +1,5 @@
 #include "usbforwardingtunnel.h"
+#include "pairedcertificate.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -144,7 +145,7 @@ bool TunnelWorker::start(QString *error)
         m_Remote->setSocketOption(QAbstractSocket::LowDelayOption, 1);
     });
     connect(m_Remote, &QSslSocket::encrypted, this, [this] {
-        if (m_Remote->peerCertificate() != m_Config.pinnedServerCertificate) {
+        if (!PairedCertificate::matches(m_Config.pinnedServerCertificate, m_Remote->peerCertificate())) {
             failWith(Tunnel::tr("The host certificate was rejected: unexpected certificate"));
             return;
         }
@@ -178,7 +179,7 @@ bool TunnelWorker::start(QString *error)
             [this](const QList<QSslError> &errors) {
                 // Pairing pins the exact certificate, independent of hostname/CA
                 // validity. Never ignore errors for a different peer certificate.
-                if (m_Remote->peerCertificate() == m_Config.pinnedServerCertificate) {
+                if (PairedCertificate::matches(m_Config.pinnedServerCertificate, m_Remote->peerCertificate())) {
                     m_Remote->ignoreSslErrors(errors);
                     return;
                 }

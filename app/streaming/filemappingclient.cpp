@@ -1,6 +1,7 @@
 #include "filemappingclient.h"
 
 #include "backend/identitymanager.h"
+#include "backend/pairedcertificate.h"
 #include "filemappingwebsocket.h"
 
 #include <QCryptographicHash>
@@ -98,6 +99,11 @@ FileMappingClient::Capability FileMappingClient::fetchCapability(int timeoutMs)
         return capability;
     }
 
+    if (!PairedCertificate::matches(m_Computer->serverCert, reply->sslConfiguration().peerCertificate())) {
+        capability.error = tr("File mapping host certificate mismatch");
+        delete reply;
+        return capability;
+    }
     delete reply;
 
     QJsonParseError parseError {};
@@ -123,6 +129,7 @@ FileMappingClient::Capability FileMappingClient::fetchCapability(int timeoutMs)
 
 bool FileMappingClient::connectSession(const Capability& capability, int timeoutMs, QString* error)
 {
+    const QDeadlineTimer deadline(qMax(0, timeoutMs));
     if (!capability.ok || !capability.enabled || !capability.listening) {
         if (error != nullptr) {
             *error = tr("File mapping capability is unavailable: ok=%1 enabled=%2 listening=%3 port=%4 error=%5")
@@ -146,16 +153,25 @@ bool FileMappingClient::connectSession(const Capability& capability, int timeout
     closeSession();
     m_Socket = new QSslSocket(this);
     m_Socket->setSslConfiguration(sslConfiguration());
+    m_Socket->setReadBufferSize(FileMappingWebSocket::kMaxMessageBytes + 14);
     connect(m_Socket, static_cast<void (QSslSocket::*)(const QList<QSslError>&)>(&QSslSocket::sslErrors), this, [this](const QList<QSslError>& errors) {
-        if (isPinnedCertificateError(errors)) {
+        if (PairedCertificate::canIgnoreErrors(m_Computer ? m_Computer->serverCert : QSslCertificate(), errors)) {
             m_Socket->ignoreSslErrors(errors);
         }
     });
 
     m_Socket->connectToHostEncrypted(sessionUrl.host(), static_cast<quint16>(sessionUrl.port(443)));
-    if (!m_Socket->waitForEncrypted(timeoutMs)) {
+    if (!m_Socket->waitForEncrypted(static_cast<int>(deadline.remainingTime()))) {
         if (error != nullptr) {
             *error = m_Socket->errorString().isEmpty() ? tr("Timed out while opening file mapping TLS connection") : m_Socket->errorString();
+        }
+        closeSession();
+        return false;
+    }
+
+    if (!PairedCertificate::matches(m_Computer ? m_Computer->serverCert : QSslCertificate(), m_Socket->peerCertificate())) {
+        if (error != nullptr) {
+            *error = tr("File mapping host certificate mismatch");
         }
         closeSession();
         return false;
@@ -167,7 +183,7 @@ bool FileMappingClient::connectSession(const Capability& capability, int timeout
     }
     const QByteArray websocketKey = nonce.toBase64();
 
-    QString target = sessionUrl.path().isEmpty() ? QStringLiteral("/") : sessionUrl.path();
+    QString target = sessionUrl.path().isEmpty() ? QStringLiteral("/") : sessionUrl.path(QUrl::FullyEncoded);
     if (!sessionUrl.query().isEmpty()) {
         target += QStringLiteral("?") + sessionUrl.query(QUrl::FullyEncoded);
     }
@@ -189,7 +205,12 @@ bool FileMappingClient::connectSession(const Capability& capability, int timeout
     request += "Sec-WebSocket-Version: 13\r\n";
     request += "\r\n";
 
-    if (m_Socket->write(request) != request.size() || !m_Socket->waitForBytesWritten(timeoutMs)) {
+    bool requestWritten = !deadline.hasExpired() && m_Socket->write(request) == request.size();
+    while (requestWritten && m_Socket->bytesToWrite() > 0) {
+        requestWritten = !deadline.hasExpired() &&
+                m_Socket->waitForBytesWritten(static_cast<int>(deadline.remainingTime()));
+    }
+    if (!requestWritten) {
         if (error != nullptr) {
             *error = m_Socket->errorString().isEmpty() ? tr("Failed to write file mapping WebSocket upgrade request") : m_Socket->errorString();
         }
@@ -206,7 +227,8 @@ bool FileMappingClient::connectSession(const Capability& capability, int timeout
             closeSession();
             return false;
         }
-        if (!m_Socket->waitForReadyRead(timeoutMs)) {
+        if (deadline.hasExpired() ||
+                (m_Socket->bytesAvailable() == 0 && !m_Socket->waitForReadyRead(static_cast<int>(deadline.remainingTime())))) {
             if (error != nullptr) {
                 *error = m_Socket->errorString().isEmpty() ? tr("Timed out waiting for file mapping WebSocket upgrade") : m_Socket->errorString();
             }
@@ -217,13 +239,19 @@ bool FileMappingClient::connectSession(const Capability& capability, int timeout
     }
 
     const int headerEnd = m_WsBuffer.indexOf("\r\n\r\n");
+    if (headerEnd > 64 * 1024) {
+        if (error != nullptr) {
+            *error = tr("File mapping WebSocket upgrade response is too large");
+        }
+        closeSession();
+        return false;
+    }
     const QByteArray headers = m_WsBuffer.left(headerEnd);
     m_WsBuffer.remove(0, headerEnd + 4);
 
     QList<QByteArray> headerLines = headers.split('\n');
-    if (headerLines.isEmpty() ||
-            !(headerLines.first().trimmed().startsWith("HTTP/1.1 101") ||
-              headerLines.first().trimmed().startsWith("HTTP/1.0 101"))) {
+    const QList<QByteArray> status = headerLines.value(0).trimmed().simplified().split(' ');
+    if (status.size() < 2 || status[0] != "HTTP/1.1" || status[1] != "101") {
         if (error != nullptr) {
             *error = tr("File mapping WebSocket upgrade was rejected: %1")
                     .arg(QString::fromUtf8(headerLines.value(0).trimmed()));
@@ -233,15 +261,26 @@ bool FileMappingClient::connectSession(const Capability& capability, int timeout
     }
 
     QByteArray acceptHeader;
+    bool upgraded = false;
+    bool connectionUpgrade = false;
     for (int i = 1; i < headerLines.size(); ++i) {
         const QByteArray line = headerLines[i].trimmed();
         const int colon = line.indexOf(':');
         if (colon <= 0) {
             continue;
         }
-        if (line.left(colon).trimmed().toLower() == "sec-websocket-accept") {
-            acceptHeader = line.mid(colon + 1).trimmed();
-            break;
+        const QByteArray name = line.left(colon).trimmed().toLower();
+        const QByteArray value = line.mid(colon + 1).trimmed();
+        if (name == "sec-websocket-accept") {
+            acceptHeader = value;
+        }
+        else if (name == "upgrade") {
+            upgraded = value.toLower() == "websocket";
+        }
+        else if (name == "connection") {
+            for (const QByteArray& token : value.toLower().split(',')) {
+                connectionUpgrade |= token.trimmed() == "upgrade";
+            }
         }
     }
 
@@ -249,7 +288,7 @@ bool FileMappingClient::connectSession(const Capability& capability, int timeout
                                           websocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
                                           QCryptographicHash::Sha1)
                                           .toBase64();
-    if (acceptHeader != expectedAccept) {
+    if (!upgraded || !connectionUpgrade || acceptHeader != expectedAccept) {
         if (error != nullptr) {
             *error = tr("File mapping WebSocket accept header is invalid");
         }
@@ -265,7 +304,7 @@ bool FileMappingClient::connectSession(const Capability& capability, int timeout
         { QStringLiteral("mappings"), QJsonArray {} }
     };
     QString sendError;
-    if (!sendAndWait(hello, m_LastHello, timeoutMs, &sendError)) {
+    if (!sendAndWait(hello, m_LastHello, deadline, &sendError)) {
         if (error != nullptr) {
             *error = sendError;
         }
@@ -361,7 +400,7 @@ FileMappingClient::SmokeResult FileMappingClient::smokeRead(const QString& mappi
     return result;
 }
 
-bool FileMappingClient::sendAndWait(const QJsonObject& message, QJsonObject& out, int timeoutMs, QString* error)
+bool FileMappingClient::sendAndWait(const QJsonObject& message, QJsonObject& out, const QDeadlineTimer& deadline, QString* error)
 {
     if (m_Socket == nullptr) {
         if (error != nullptr) {
@@ -369,14 +408,14 @@ bool FileMappingClient::sendAndWait(const QJsonObject& message, QJsonObject& out
         }
         return false;
     }
-    if (!FileMappingWebSocket::writeText(*m_Socket, QJsonDocument(message).toJson(QJsonDocument::Compact))) {
+    if (!FileMappingWebSocket::writeText(*m_Socket, QJsonDocument(message).toJson(QJsonDocument::Compact), deadline)) {
         if (error != nullptr) {
             *error = m_Socket->errorString().isEmpty() ? tr("Failed to write file mapping WebSocket message") : m_Socket->errorString();
         }
         return false;
     }
 
-    QString readError = FileMappingWebSocket::readJsonText(*m_Socket, m_WsBuffer, out, timeoutMs);
+    QString readError = FileMappingWebSocket::readJsonText(*m_Socket, m_WsBuffer, out, deadline);
     if (!readError.isEmpty()) {
         if (error != nullptr) {
             *error = readError;
@@ -395,7 +434,9 @@ FileMappingClient::RpcResult FileMappingClient::sendRpc(QJsonObject message, int
     }
 
     message.insert(QStringLiteral("id"), static_cast<double>(m_NextRequestId++));
-    if (!sendAndWait(message, result.reply, timeoutMs, &result.error)) {
+    if (!sendAndWait(message, result.reply, QDeadlineTimer(qMax(0, timeoutMs)), &result.error)) {
+        // A partial reply cannot safely be reused as the next RPC's response.
+        closeSession();
         return result;
     }
 
@@ -489,9 +530,10 @@ QNetworkAccessManager* FileMappingClient::nam()
 {
     if (m_Nam == nullptr) {
         m_Nam = new QNetworkAccessManager(this);
+        PairedCertificate::enforce(m_Nam, this, m_Computer ? m_Computer->serverCert : QSslCertificate());
         connect(m_Nam, &QNetworkAccessManager::sslErrors, this,
                 [this](QNetworkReply* reply, const QList<QSslError>& errors) {
-                    if (isPinnedCertificateError(errors)) {
+                    if (PairedCertificate::canIgnoreErrors(m_Computer ? m_Computer->serverCert : QSslCertificate(), errors)) {
                         reply->ignoreSslErrors(errors);
                     }
                 });
@@ -503,17 +545,4 @@ QSslConfiguration FileMappingClient::sslConfiguration() const
 {
     QSslConfiguration config = IdentityManager::get()->getSslConfig();
     return config;
-}
-
-bool FileMappingClient::isPinnedCertificateError(const QList<QSslError>& errors) const
-{
-    if (m_Computer == nullptr || m_Computer->serverCert.isNull()) {
-        return false;
-    }
-    for (const QSslError& error : errors) {
-        if (error.certificate() != m_Computer->serverCert) {
-            return false;
-        }
-    }
-    return !errors.isEmpty();
 }
