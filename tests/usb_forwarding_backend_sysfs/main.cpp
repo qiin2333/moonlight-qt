@@ -22,10 +22,14 @@ bool WMUtils::isGpuSlow()
 
 static void writeAttr(const QDir &base, const QString &rel, const QByteArray &content)
 {
-    base.mkpath(QFileInfo(base.filePath(rel)).path());
+    if (!base.mkpath(QFileInfo(base.filePath(rel)).path())) {
+        qFatal("could not create fixture directory");
+    }
     QFile file(base.filePath(rel));
-    file.open(QIODevice::WriteOnly | QIODevice::Truncate);
-    file.write(content);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+        file.write(content) != content.size()) {
+        qFatal("could not write fixture attribute");
+    }
 }
 
 static QVariantMap findDevice(const QVariantList &devices, const QString &busId)
@@ -83,6 +87,34 @@ int main(int argc, char **argv)
     writeAttr(root, "2-1.2/idProduct", "0104\n");
     writeAttr(root, "2-1.2/bDeviceClass", "09\n");
 
+    // A regular device beneath a hub remains shareable. Fall back to the
+    // manufacturer when the product name is unavailable.
+    writeAttr(root, "2-1.3/idVendor", "ABCD\n");
+    writeAttr(root, "2-1.3/idProduct", "0001\n");
+    writeAttr(root, "2-1.3/bDeviceClass", "00\n");
+    writeAttr(root, "2-1.3/manufacturer", "Nested Devices\n");
+
+    // An incomplete sysfs entry is not a USB device and must be skipped.
+    writeAttr(root, "4-1/idVendor", "1234\n");
+
+    // A non-topology name must not be passed to the privileged helper even
+    // when the entry otherwise has valid device attributes.
+    writeAttr(root, "1-3;touch/idVendor", "1234\n");
+    writeAttr(root, "1-3;touch/idProduct", "5678\n");
+    writeAttr(root, "1-3;touch/bDeviceClass", "00\n");
+
+#ifdef Q_OS_UNIX
+    // A device imported through vhci_hcd cannot be exported again because
+    // the kernel rejects USB/IP loops.
+    writeAttr(root, "platform-vhci/5-1/idVendor", "1234\n");
+    writeAttr(root, "platform-vhci/5-1/idProduct", "5678\n");
+    writeAttr(root, "platform-vhci/5-1/bDeviceClass", "00\n");
+    if (!QFile::link(root.filePath(QStringLiteral("platform-vhci/5-1")),
+                     root.filePath(QStringLiteral("5-1")))) {
+        qFatal("could not create vhci fixture link");
+    }
+#endif
+
     // 接口目录与根 hub → 跳过。
     writeAttr(root, "1-1:1.0/bInterfaceClass", "08\n");
     writeAttr(root, "usb1/idVendor", "1d6b\n");
@@ -96,11 +128,6 @@ int main(int argc, char **argv)
         qCritical() << "unexpected error:" << error;
         ++failures;
     }
-    if (devices.size() != 3) {
-        qCritical() << "expected 3 devices, got" << devices.size();
-        ++failures;
-    }
-
     const QVariantMap full = findDevice(devices, "1-1");
     if (full.isEmpty() || full.value("description").toString() != "Spike USB Stick" ||
         full.value("vidPid").toString() != "076b:6666" ||
@@ -125,6 +152,50 @@ int main(int argc, char **argv)
         ++failures;
     }
 
+    const QVariantMap nested = findDevice(devices, "2-1.3");
+    if (nested.isEmpty() || nested.value("description").toString() != "Nested Devices" ||
+        nested.value("vidPid").toString() != "abcd:0001" || !nested.value("isSupported").toBool()) {
+        qCritical() << "nested topology device mismatch:" << nested;
+        ++failures;
+    }
+
+    const QVariantMap unsafeBusId = findDevice(devices, "1-3;touch");
+    if (unsafeBusId.isEmpty() || unsafeBusId.value("isSupported").toBool()) {
+        qCritical() << "non-topology busid must not be shareable:" << unsafeBusId;
+        ++failures;
+    }
+    if (!findDevice(devices, "2-1.2").isEmpty() || !findDevice(devices, "1-1:1.0").isEmpty() ||
+        !findDevice(devices, "usb1").isEmpty() || !findDevice(devices, "4-1").isEmpty() ||
+        !findDevice(devices, "5-1").isEmpty()) {
+        qCritical() << "hub, interface, root, incomplete, or vhci devices must be filtered";
+        ++failures;
+    }
+
+#ifdef Q_OS_LINUX
+    // bind() must enforce the privilege boundary itself rather than relying
+    // on QML to hide devices that cannot be shared.
+    UsbForwardingBackend *backend = UsbForwardingBackend::get();
+    int operationCount = 0;
+    bool operationSucceeded = true;
+    const QMetaObject::Connection operationConnection =
+        QObject::connect(backend, &UsbForwardingBackend::operationFinished,
+                         [&operationCount, &operationSucceeded](bool success, const QString &) {
+                             ++operationCount;
+                             operationSucceeded = success;
+                         });
+    backend->bind(QStringLiteral("1-3;touch"));
+    if (operationCount != 1 || operationSucceeded) {
+        qCritical() << "invalid busid must be rejected before elevation";
+        ++failures;
+    }
+    backend->bind(QStringLiteral("9-9"));
+    if (operationCount != 2 || operationSucceeded) {
+        qCritical() << "stale busid must be rejected before elevation";
+        ++failures;
+    }
+    QObject::disconnect(operationConnection);
+#endif
+
     // 不存在的目录 → error 非空 + 空表。
     QString missingError;
     const QVariantList missing =
@@ -146,9 +217,24 @@ int main(int argc, char **argv)
             break;
         }
     }
-    QMap<QString, QString> bindings;
-    bindings.insert(QStringLiteral("1-1"), QStringLiteral("076b:6666:spike0001"));
-    bindings.insert(QStringLiteral("3-1"), QStringLiteral("054c:0ce6:original-serial"));
+    const QMap<QString, QString> bindings =
+        UsbForwardingBackend::parseBindIdentities("1-1\t076B:6666\t spike 0001 \n"
+                                                  "1-2\t9999:0000\tdifferent-device\n"
+                                                  "2-1.3\tABCD:0001\t\n"
+                                                  "3-1\t054c:0ce6\toriginal-serial\n"
+                                                  "usb1\t1d6b:0002\troot-hub\n"
+                                                  "1-1:1.0\t076b:6666\tinterface\n"
+                                                  "../escape\t1234:5678\tunsafe\n"
+                                                  "1-3;touch\t1234:5678\tunsafe\n"
+                                                  "malformed\n");
+    if (!bindings.contains(QStringLiteral("1-1")) || !bindings.contains(QStringLiteral("1-2")) ||
+        !bindings.contains(QStringLiteral("2-1.3")) || !bindings.contains(QStringLiteral("3-1")) ||
+        bindings.contains(QStringLiteral("usb1")) || bindings.contains(QStringLiteral("1-1:1.0")) ||
+        bindings.contains(QStringLiteral("../escape")) ||
+        bindings.contains(QStringLiteral("1-3;touch"))) {
+        qCritical() << "binding parser accepted malformed or unsafe rows:" << bindings;
+        ++failures;
+    }
     UsbForwardingBackend::markReplacedDevices(replaced, bindings);
     const QVariantMap sameIdentity = findDevice(replaced, "1-1");
     if (sameIdentity.value("isReplaced").toBool()) {
@@ -158,6 +244,11 @@ int main(int argc, char **argv)
     const QVariantMap swappedIdentity = findDevice(replaced, "3-1");
     if (!swappedIdentity.value("isReplaced").toBool()) {
         qCritical() << "3-1 identity differs from snapshot, should be replaced";
+        ++failures;
+    }
+    const QVariantMap unboundMismatch = findDevice(replaced, "1-2");
+    if (unboundMismatch.contains("isReplaced")) {
+        qCritical() << "unbound device must not be marked replaced:" << unboundMismatch;
         ++failures;
     }
 
