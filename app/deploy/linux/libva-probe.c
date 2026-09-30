@@ -4,11 +4,11 @@
  * Moonlight and the bundled FFmpeg import libva through symbols carrying
  * VA_API_* ELF version nodes. Whether the libva installed on the host can
  * satisfy those requirements cannot be inferred portably from file names or
- * loader caches, so this program embeds the same DT_NEEDED entries and
- * versioned symbol references as those binaries without ever calling into
- * them: either the dynamic loader resolves everything and main() runs (the
- * host libva is usable), or the exec itself fails and AppRun must fall back
- * to the build-environment libva staged next to this binary.
+ * loader caches, so this program embeds the same versioned symbol references
+ * as those binaries without ever calling into them. It is compiled once for
+ * the core/X11 libraries and again with LIBVA_PROBE_WAYLAND for the Wayland
+ * adapter. This lets AppRun distinguish a missing Wayland adapter from an
+ * incompatible host libva core instead of replacing the whole host stack.
  *
  * scripts/build-appimage.sh verifies at build time that this file references
  * every VA_API_* node required by the binaries shipped in the AppImage, so
@@ -18,8 +18,11 @@
 #include <stddef.h>
 
 #include <va/va.h>
+#ifdef LIBVA_PROBE_WAYLAND
 #include <va/va_wayland.h>
+#else
 #include <va/va_x11.h>
+#endif
 
 /* Address references are enough: they produce relocations against the
  * versioned symbols, which is what makes the loader check the host's
@@ -28,8 +31,11 @@
 static void *volatile requirements[] = {
     (void *)vaCreateSurfaces, /* libva.so.2, VA_API_0.33.0 */
     (void *)vaMapBuffer2,     /* libva.so.2, 2.21+ */
-    (void *)vaGetDisplay,     /* libva-x11.so.2 */
-    (void *)vaGetDisplayWl,   /* libva-wayland.so.2 */
+#ifdef LIBVA_PROBE_WAYLAND
+    (void *)vaGetDisplayWl, /* libva-wayland.so.2 */
+#else
+    (void *)vaGetDisplay, /* libva-x11.so.2 */
+#endif
 };
 
 int main(void)

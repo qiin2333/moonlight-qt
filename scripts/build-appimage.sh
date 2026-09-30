@@ -77,23 +77,29 @@ perl -pi -e 's/__GITHUB_SHA__/$ENV{GITHUB_SHA}/' $DEPLOY_FOLDER/usr/share/metain
 export QML_SOURCES_PATHS=$SOURCE_ROOT/app/gui
 export QMAKE=qmake6
 
-# Stage the build-environment libva in opt/libva-fallback (outside usr/, so linuxdeploy
-# does not scan it, and outside every loader search path), together with a small probe
-# binary that carries the same libva ELF requirements as Moonlight. The AppRun below
-# uses the probe to decide, via the dynamic loader itself, whether the host libva can
-# satisfy Moonlight; when it cannot, the fallback copy is made visible. opt/ is a
-# standard linuxdeploy location for application data that must not be processed.
+# Stage the complete build-environment libva in opt/libva-fallback (outside usr/, so
+# linuxdeploy does not scan it, and outside every loader search path). Also stage a
+# separate directory containing only the Wayland adapter. AppRun can expose that
+# adapter without shadowing a compatible host libva core on X11 systems that do not
+# install libva-wayland. opt/ is a standard linuxdeploy location for application data
+# that must not be processed.
 LIBVA_FALLBACK_DIR=$DEPLOY_FOLDER/opt/libva-fallback
+LIBVA_WAYLAND_FALLBACK_DIR=$DEPLOY_FOLDER/opt/libva-wayland-fallback
 SYSTEM_LIBVA=$(ldconfig -p 2>/dev/null | awk '/libva\.so\.2/{print $NF; exit}')
-mkdir -p $LIBVA_FALLBACK_DIR
+mkdir -p $LIBVA_FALLBACK_DIR $LIBVA_WAYLAND_FALLBACK_DIR
 [ -n "$SYSTEM_LIBVA" ] || fail "Unable to locate build-environment libva for the fallback copy!"
 
 cp -a "$(dirname "$SYSTEM_LIBVA")"/libva*.so* $LIBVA_FALLBACK_DIR/ || fail "Unable to stage libva fallback copy!"
 [ -e "$LIBVA_FALLBACK_DIR/libva-wayland.so.2" ] || fail "The staged libva fallback has no Wayland adapter!"
+cp -a "$LIBVA_FALLBACK_DIR"/libva-wayland.so* $LIBVA_WAYLAND_FALLBACK_DIR/ || \
+  fail "Unable to stage the libva Wayland adapter-only fallback!"
 
-echo Compiling libva-probe
+echo Compiling libva probes
 cc -O2 -L"$(dirname "$SYSTEM_LIBVA")" -Wl,--no-as-needed -o $LIBVA_FALLBACK_DIR/libva-probe \
-  $SOURCE_ROOT/app/deploy/linux/libva-probe.c -lva -lva-x11 -lva-wayland || fail "Unable to compile libva-probe!"
+  $SOURCE_ROOT/app/deploy/linux/libva-probe.c -lva -lva-x11 || fail "Unable to compile libva-probe!"
+cc -O2 -DLIBVA_PROBE_WAYLAND -L"$(dirname "$SYSTEM_LIBVA")" -Wl,--no-as-needed \
+  -o $LIBVA_FALLBACK_DIR/libva-wayland-probe $SOURCE_ROOT/app/deploy/linux/libva-probe.c \
+  -lva -lva-wayland || fail "Unable to compile libva-wayland-probe!"
 
 # Keep the probe honest: it must reference every VA_API_* version node that the
 # binaries shipped in the AppImage require, otherwise a host libva could pass the
@@ -110,7 +116,7 @@ PROBE_NODES=$(va_nodes $LIBVA_FALLBACK_DIR/libva-probe)
 APP_RUN=$BUILD_ROOT/AppRun-libva
 cat > $APP_RUN <<'APPRUN_EOF'
 #!/bin/bash
-# AppRun: prefer the host libva; use the staged copy only if the host cannot run us.
+# AppRun: prefer the host libva; use staged libraries only when the host cannot run us.
 #
 # VA-API driver modules on the host are loaded by libva and export an entrypoint
 # named after the libva version they were built against (__vaDriverInit_1_XX).
@@ -119,17 +125,31 @@ cat > $APP_RUN <<'APPRUN_EOF'
 # Distros keep host libva and host drivers in step, so whenever the host libva
 # can satisfy Moonlight's own ELF version requirements it is the right choice.
 #
-# "Can satisfy" is answered here by libva-probe, a tiny program linked against
-# the same versioned libva symbols as Moonlight and the bundled FFmpeg: if the
-# dynamic loader can start it, the host libva works; if not (no libva installed,
-# or one too old to link), we make the staged build-environment copy visible
-# via LD_LIBRARY_PATH, matching the pre-existing bundled behavior.
+# "Can satisfy" is answered here by tiny probe programs linked against the same
+# versioned libva symbols as Moonlight and the bundled FFmpeg. The core/X11 probe
+# decides whether the complete fallback is necessary. The Wayland probe is kept
+# separate so a missing host Wayland adapter can be supplied without shadowing an
+# otherwise compatible host libva core and its matching GPU drivers.
 APPDIR="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
 LIBVA_FALLBACK="$APPDIR/opt/libva-fallback"
+LIBVA_WAYLAND_FALLBACK="$APPDIR/opt/libva-wayland-fallback"
 
-if [ -d "$LIBVA_FALLBACK" ] && ! "$LIBVA_FALLBACK/libva-probe" 2>/dev/null; then
+use_full_libva_fallback()
+{
     export LD_LIBRARY_PATH="$LIBVA_FALLBACK${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     export VAAPI_USE_FALLBACK_PATHS=1
+}
+
+if [ -d "$LIBVA_FALLBACK" ] && ! "$LIBVA_FALLBACK/libva-probe" 2>/dev/null; then
+    use_full_libva_fallback
+elif [ -d "$LIBVA_FALLBACK" ] && ! "$LIBVA_FALLBACK/libva-wayland-probe" 2>/dev/null; then
+    WAYLAND_LIBRARY_PATH="$LIBVA_WAYLAND_FALLBACK${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    if [ -d "$LIBVA_WAYLAND_FALLBACK" ] && \
+       LD_LIBRARY_PATH="$WAYLAND_LIBRARY_PATH" "$LIBVA_FALLBACK/libva-wayland-probe" 2>/dev/null; then
+        export LD_LIBRARY_PATH="$WAYLAND_LIBRARY_PATH"
+    else
+        use_full_libva_fallback
+    fi
 fi
 
 exec "$APPDIR/usr/bin/moonlight" "$@"
@@ -234,8 +254,12 @@ readelf -d "$EXTRACTED_APPDIR/usr/bin/moonlight" | grep -q 'libwayland-client\.s
   fail "Moonlight was built without native Wayland support!"
 readelf -d "$EXTRACTED_APPDIR/usr/bin/moonlight" | grep -q 'libva-wayland\.so' || \
   fail "Moonlight was built without VA-API Wayland support!"
-[ -e "$EXTRACTED_APPDIR/opt/libva-fallback/libva-wayland.so.2" ] || \
-  fail "AppImage is missing the libva Wayland fallback adapter!"
+[ -e "$EXTRACTED_APPDIR/opt/libva-wayland-fallback/libva-wayland.so.2" ] || \
+  fail "AppImage is missing the libva Wayland adapter-only fallback!"
+[ ! -e "$EXTRACTED_APPDIR/opt/libva-wayland-fallback/libva.so.2" ] || \
+  fail "The libva Wayland adapter-only fallback unexpectedly contains the libva core!"
+[ ! -e "$EXTRACTED_APPDIR/opt/libva-wayland-fallback/libva-x11.so.2" ] || \
+  fail "The libva Wayland adapter-only fallback unexpectedly contains the X11 adapter!"
 
 if find "$EXTRACTED_APPDIR/usr" -name 'libwayland-client.so*' -print -quit | grep -q .; then
   fail "AppImage bundled libwayland-client and may conflict with the host's Mesa/EGL stack!"
