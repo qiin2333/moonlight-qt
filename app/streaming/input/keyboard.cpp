@@ -92,7 +92,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
     case KeyComboToggleMinimize:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected minimize combo");
-        SDL_MinimizeWindow(m_Window);
+        Session::s_ActiveSession->minimizeStreamingWindow();
         break;
 
     case KeyComboPasteText:

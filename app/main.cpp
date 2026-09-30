@@ -91,6 +91,9 @@ static QString getStartupApplicationDir(const char* argv0)
 #include "backend/usbforwardingenvironment.h"
 #include "backend/usbforwardingbackend.h"
 #include "streaming/session.h"
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+#include "streaming/waylandqtsdlbridge.h"
+#endif
 #include "settings/streamingpreferences.h"
 #include "gui/sdlgamepadkeynavigation.h"
 #include "gui/windowplacement.h"
@@ -1133,6 +1136,19 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Moonlight V+ for PC"));
 
+    // The bridge-enabled native Wayland path must import Qt's wl_display
+    // before any SDL video initialization. Other platforms retain their
+    // established driver-selection timing below.
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    if (QGuiApplication::platformName().startsWith("wayland")) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected Wayland");
+        qputenv("SDL_VIDEODRIVER", "wayland");
+        if (!WaylandQtSdlBridge::configureSdlVideo()) {
+            return -1;
+        }
+    }
+#endif
+
 #ifdef Q_OS_DARWIN
     // macOS defaults "Keyboard navigation" to text fields and lists only, which
     // prevents Tab (and the gamepad navigation that synthesizes it) from moving
@@ -1254,8 +1270,10 @@ int main(int argc, char *argv[])
         qputenv("SDL_VIDEODRIVER", "x11");
     }
     else if (QGuiApplication::platformName().startsWith("wayland")) {
+#ifndef HAS_QT_SDL_WAYLAND_BRIDGE
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected Wayland");
         qputenv("SDL_VIDEODRIVER", "wayland");
+#endif
     }
 #ifndef STEAM_LINK
     // Force use of the KMSDRM backend for SDL when using Qt platform plugins

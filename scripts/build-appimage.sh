@@ -26,6 +26,7 @@ command -v qmake6 >/dev/null 2>&1 || fail "Unable to find 'qmake6' in your PATH!
 command -v $LINUXDEPLOY >/dev/null 2>&1 || fail "Unable to find '$LINUXDEPLOY' in your PATH!"
 command -v pkg-config >/dev/null 2>&1 || fail "Unable to find 'pkg-config' in your PATH!"
 pkg-config --exists wayland-client || fail "Wayland client development files are required for AppImage builds!"
+pkg-config --exists libva-x11 || fail "libva X11 development files are required for AppImage builds!"
 pkg-config --exists libva-wayland || fail "libva Wayland development files are required for AppImage builds!"
 
 echo "MOONLIGHT BUILD ENVIRONMENT"
@@ -57,7 +58,9 @@ pushd $BUILD_FOLDER
 # preserves the original EGL compatibility fix without compiling Wayland out.
 #
 # We disable DRM support because linuxdeploy doesn't bundle the appropriate libraries for Qt EGLFS.
-qmake6 $SOURCE_ROOT/moonlight-qt.pro CONFIG+=disable-libdrm PREFIX=$DEPLOY_FOLDER/usr DEFINES+=APP_IMAGE || fail "Qmake failed!"
+qmake6 $SOURCE_ROOT/moonlight-qt.pro CONFIG+=disable-libdrm \
+  CONFIG+=require-qt-sdl-wayland-bridge \
+  PREFIX=$DEPLOY_FOLDER/usr DEFINES+=APP_IMAGE || fail "Qmake failed!"
 popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration

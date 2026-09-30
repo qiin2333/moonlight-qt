@@ -36,6 +36,15 @@ bool nativeCursorSubstitutionEnabled()
     return enabled;
 }
 
+bool isStreamWindowFullscreen(SDL_Window* window)
+{
+    if (Session* session = Session::get()) {
+        return session->isStreamingWindowFullscreen();
+    }
+    return window != nullptr &&
+           (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
 bool toSdlSystemCursor(NativeCursorShape shape, SDL_SystemCursor& systemCursor)
 {
     switch (shape) {
@@ -408,6 +417,28 @@ void SdlInputHandler::setWindow(SDL_Window *window)
         ImmAssociateContext(info.info.win.window, NULL);
     }
 #endif
+}
+
+void SdlInputHandler::setWaylandWindowCoordinateMetrics(
+        WaylandWindowMetrics::CoordinateMetrics metrics)
+{
+    if (metrics.isValid()) {
+        m_WaylandCoordinateMetrics = metrics;
+    }
+    else {
+        m_WaylandCoordinateMetrics.reset();
+    }
+}
+
+void SdlInputHandler::getWindowCoordinateSize(int* width, int* height) const
+{
+    if (m_WaylandCoordinateMetrics.has_value()) {
+        *width = m_WaylandCoordinateMetrics->window.width;
+        *height = m_WaylandCoordinateMetrics->window.height;
+    }
+    else {
+        SDL_GetWindowSize(m_Window, width, height);
+    }
 }
 
 int SdlInputHandler::getLocalCursorMode() const
@@ -840,7 +871,7 @@ void SdlInputHandler::notifyFocusLost()
     // This lets user to interact with our window's title bar and with the buttons in it.
     // Doing this while the window is full-screen breaks the transition out of FS
     // (desktop and exclusive), so we must check for that before releasing mouse capture.
-    if (!(windowFlags & SDL_WINDOW_FULLSCREEN) && !m_AbsoluteMouseMode) {
+    if (!isStreamWindowFullscreen(m_Window) && !m_AbsoluteMouseMode) {
         setCaptureActive(false);
     }
 
@@ -874,9 +905,8 @@ void SdlInputHandler::updateKeyboardGrabState()
 {
     bool shouldGrab = m_CaptureSystemKeysMode != StreamingPreferences::CSK_OFF && isCaptureActive();
     if (shouldGrab) {
-        Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
         if (m_CaptureSystemKeysMode == StreamingPreferences::CSK_FULLSCREEN &&
-            !(windowFlags & SDL_WINDOW_FULLSCREEN)) {
+            !isStreamWindowFullscreen(m_Window)) {
             // Ungrab if it's fullscreen only and we left fullscreen
             shouldGrab = false;
         }
@@ -911,7 +941,7 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
     }
 
     if (m_CaptureSystemKeysMode == StreamingPreferences::CSK_FULLSCREEN &&
-            !(windowFlags & SDL_WINDOW_FULLSCREEN)) {
+            !isStreamWindowFullscreen(m_Window)) {
         return false;
     }
 

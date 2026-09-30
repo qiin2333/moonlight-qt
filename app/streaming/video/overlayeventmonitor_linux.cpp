@@ -23,6 +23,9 @@
 #ifdef USE_XCB_DISPLAY_MONITOR
 #include <xcb/xcb.h>
 #endif
+#ifdef HAS_WAYLAND
+#include <wayland-client-core.h>
+#endif
 
 namespace {
 struct DisplaySource
@@ -46,6 +49,16 @@ DisplaySource qtDisplaySource()
         }
     }
 #endif
+#endif
+#endif
+
+#if defined(HAS_WAYLAND) && QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+#if QT_CONFIG(wayland)
+    if (auto* wayland = guiApp->nativeInterface<QNativeInterface::QWaylandApplication>()) {
+        if (wl_display* display = wayland->display()) {
+            return { wl_display_get_fd(display) };
+        }
+    }
 #endif
 #endif
 

@@ -353,7 +353,9 @@ HEADERS += \
     streaming/video/overlaymenupanel.h \
     streaming/video/overlaybuttonposition.h \
     streaming/video/overlayeventwakestate.h \
+    streaming/video/overlaywindowpolicy.h \
     streaming/video/overlaymenubutton.h \
+    streaming/waylandwindowmetrics.h \
     streaming/video/overlaytoasteventstate.h \
     streaming/video/overlaytoast.h \
     backend/systemproperties.h \
@@ -604,6 +606,32 @@ wayland {
     DEFINES += HAS_WAYLAND
     SOURCES += streaming/video/ffmpeg-renderers/pacer/waylandvsyncsource.cpp
     HEADERS += streaming/video/ffmpeg-renderers/pacer/waylandvsyncsource.h
+}
+
+# Sharing a Qt-owned Wayland surface requires Qt's public Wayland native
+# interface and SDL3's external-display properties. Older Qt and genuine SDL2
+# builds retain the established SDL-owned window path.
+wayland:linux:!android:!config_SL {
+    versionAtLeast(QT_VERSION, 6.5.0) {
+        qtConfig(wayland) {
+            SDL2_PKG_VERSION = $$system(pkg-config --modversion sdl2 2>/dev/null)
+            versionAtLeast(SDL2_PKG_VERSION, 2.32.50) {
+                CONFIG += qt-sdl-wayland-bridge
+            }
+        }
+    }
+}
+
+qt-sdl-wayland-bridge {
+    message(Qt/SDL native Wayland bridge enabled)
+
+    DEFINES += HAS_QT_SDL_WAYLAND_BRIDGE
+    SOURCES += streaming/waylandqtsdlbridge.cpp
+    HEADERS += streaming/waylandqtsdlbridge.h
+}
+
+require-qt-sdl-wayland-bridge:!qt-sdl-wayland-bridge {
+    error("The AppImage requires Linux, Qt 6.5+, Wayland, and sdl2-compat 2.32.50+")
 }
 
 RESOURCES += \

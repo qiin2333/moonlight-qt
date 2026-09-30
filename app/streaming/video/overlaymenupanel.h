@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "streaming/input/gamepadglyphs.h"
+#include "overlaywindowpolicy.h"
 
 /**
  * OverlayMenuPanel - Multi-level Qt overlay menu for streaming sessions.
@@ -116,7 +117,8 @@ public:
     // immediate for preset taps). The value is in kbps.
     using BitrateChangeCallback = std::function<void(int)>;
 
-    explicit OverlayMenuPanel(QWindow* parent = nullptr);
+    explicit OverlayMenuPanel(QWindow* parent = nullptr,
+                              OverlayWindowMode windowMode = OverlayWindowMode::Detached);
     ~OverlayMenuPanel() override;
 
     void setActionCallback(ActionCallback cb) { m_ActionCallback = cb; }
@@ -149,12 +151,13 @@ public:
                        std::optional<QPoint> pointerGlobalPosition = std::nullopt,
                        bool closeWhenPointerOutside = true);
 
-    // Position the panel at a specific Qt global logical position.
+    // Position the panel at a specific point in the parent rect's coordinate space.
     void showAtCursor(int parentX, int parentY, int parentW, int parentH,
                       const QPoint& cursorPosition, bool pointerTriggered = true);
 
     void closeMenu();
-    void dismissOnOutsideClick(const QPoint& globalPosition);
+    void dismissOnOutsideClick(const QPoint& parentPosition);
+    void dismissOnOutsidePointerMove(const QPoint& parentPosition);
     bool isMenuVisible() const { return m_Visible; }
     bool isClosing() const { return m_Closing; }
     bool needsEventProcessing() const { return m_Visible || m_Closing; }
@@ -309,8 +312,10 @@ private:
     QElapsedTimer m_SliderAdjustClock; // gamepad repeat acceleration window
     int m_SliderAdjustStreak = 0;
 
-    // Parent window rect in Qt global logical coordinates for level changes
+    // Parent rect in the panel's coordinate space. This is global for detached
+    // desktop windows and parent-local for native Wayland child surfaces.
     int m_ParentX, m_ParentY, m_ParentW, m_ParentH;
+    OverlayWindowMode m_WindowMode;
 
     // Layout constants (logical units, Qt 6 auto-scales)
     int m_ItemHeight;
@@ -339,7 +344,7 @@ private:
     bool   m_Closing;         // true while close animation is running
     QPoint m_TargetPosition;  // cached final position for show animation
 
-    // Menu anchor mode and pointer position in Qt global logical coordinates.
+    // Menu anchor mode and pointer position in the parent rect's coordinates.
     AnchorMode m_AnchorMode;
     std::optional<QPoint> m_TriggerPosition;
 };

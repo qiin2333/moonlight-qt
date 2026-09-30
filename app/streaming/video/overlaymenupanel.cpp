@@ -88,17 +88,18 @@ constexpr int kBitrateCommitDelayMs = 450;
 constexpr int kGamepadHintBarHeight = 30;
 }
 
-OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
+OverlayMenuPanel::OverlayMenuPanel(QWindow* parent, OverlayWindowMode windowMode)
     : QRasterWindow(parent), m_CurrentLevel(0), m_HoveredIndex(-1), m_Visible(false),
       m_HasGamepads(false), m_GamepadUiStyle(GamepadUiStyleXbox), m_SwapFaceButtons(false),
       m_FileMappingState(FileMappingState::Unknown), m_FileMappingDetail(tr("Checking")),
       m_RemoteUsbAvailable(false), m_RemoteUsbState(RemoteUsbState::Unavailable),
       m_RemoteUsbDetail(tr("Unavailable")), m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
+      m_WindowMode(windowMode),
       m_CloseWhenPointerOutside(false), m_ContentOffset(0), m_Closing(false), m_TargetPosition(),
       m_AnchorMode(AnchorMode::RightEdge), m_TriggerPosition(std::nullopt)
 {
-    setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
-             | Qt::WindowDoesNotAcceptFocus);
+    Q_ASSERT(m_WindowMode != OverlayWindowMode::WaylandSubsurface || parent != nullptr);
+    setFlags(OverlayWindowPolicy::flags(m_WindowMode));
 
     QSurfaceFormat fmt;
     fmt.setAlphaBufferSize(8);
@@ -155,6 +156,14 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent)
     m_LeaveTimer.setSingleShot(true);
     connect(&m_LeaveTimer, &QTimer::timeout, this, [this]() {
         if (!m_Visible || !m_CloseWhenPointerOutside) {
+            return;
+        }
+
+        // A Wayland child surface has reliable enter/leave events but no
+        // compositor-wide cursor position. Re-entry cancels this timer in
+        // event(), so an outstanding timeout means the pointer stayed out.
+        if (OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
+            closeMenu();
             return;
         }
 
@@ -800,7 +809,8 @@ void OverlayMenuPanel::showInternal()
     m_SlideAnim->start();
     m_OpacityAnim->start();
 
-    if (m_CloseWhenPointerOutside) {
+    if (m_CloseWhenPointerOutside &&
+            !OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
         schedulePointerOutsideCheck();
     }
 
@@ -816,6 +826,9 @@ void OverlayMenuPanel::schedulePointerOutsideCheck()
     const qint64 remainingGrace = PointerGracePeriodMs - m_ShowTimer.elapsed();
     if (remainingGrace > 0) {
         m_LeaveTimer.start(static_cast<int>(remainingGrace));
+    }
+    else if (OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
+        m_LeaveTimer.start(0);
     }
     else {
         m_LeaveTimer.start(PointerCheckIntervalMs);
@@ -927,9 +940,21 @@ void OverlayMenuPanel::beginInteraction()
     m_LeaveTimer.stop();
 }
 
-void OverlayMenuPanel::dismissOnOutsideClick(const QPoint& globalPosition)
+void OverlayMenuPanel::dismissOnOutsideClick(const QPoint& parentPosition)
 {
-    if (m_Visible && !geometry().contains(globalPosition)) {
+    if (m_Visible && !geometry().contains(parentPosition)) {
+        closeMenu();
+    }
+}
+
+void OverlayMenuPanel::dismissOnOutsidePointerMove(const QPoint& parentPosition)
+{
+    if (!m_Visible || !m_CloseWhenPointerOutside ||
+            m_ShowTimer.elapsed() < PointerGracePeriodMs) {
+        return;
+    }
+
+    if (!geometry().contains(parentPosition)) {
         closeMenu();
     }
 }
@@ -1604,6 +1629,10 @@ void OverlayMenuPanel::gamepadBack()
 
 bool OverlayMenuPanel::event(QEvent* ev)
 {
+    if (ev->type() == QEvent::Enter &&
+            OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
+        m_LeaveTimer.stop();
+    }
     if (ev->type() == QEvent::Leave) {
         if (m_Visible && m_CloseWhenPointerOutside) {
             // During the grace period, defer the outside check instead of

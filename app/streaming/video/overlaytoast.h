@@ -8,6 +8,7 @@
 #include <QPropertyAnimation>
 
 #include "overlaytoasteventstate.h"
+#include "overlaywindowpolicy.h"
 
 /**
  * OverlayToast - lightweight, auto-dismissing toast notification
@@ -21,12 +22,13 @@ class OverlayToast : public QRasterWindow {
     Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
 
 public:
-    explicit OverlayToast(QWindow* parent = nullptr);
+    explicit OverlayToast(QWindow* parent = nullptr,
+                          OverlayWindowMode windowMode = OverlayWindowMode::Detached);
     ~OverlayToast() override;
 
     /**
      * Show a toast message centered at the bottom of the given parent rect.
-     * @param parentX/Y/W/H  Qt global logical geometry of the streaming window
+     * @param parentX/Y/W/H  Qt logical geometry in this window's coordinate space
      * @param message         Text to display
      * @param durationMs      How long to show before fading out (default 2000ms)
      */
@@ -57,4 +59,5 @@ private:
     int m_ToastHeight;
     int m_HorizPadding;
     int m_VertPadding;
+    OverlayWindowMode m_WindowMode;
 };

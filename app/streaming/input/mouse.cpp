@@ -2,6 +2,7 @@
 
 #include <Limelight.h>
 #include "SDL_compat.h"
+#include "streaming/session.h"
 #include "streaming/streamutils.h"
 
 namespace {
@@ -134,7 +135,7 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
 
     if (m_AbsoluteMouseMode) {
         int windowWidth, windowHeight;
-        SDL_GetWindowSize(m_Window, &windowWidth, &windowHeight);
+        getWindowCoordinateSize(&windowWidth, &windowHeight);
 
         SDL_Rect src, dst;
         bool mouseInVideoRegion;
@@ -299,7 +300,7 @@ bool SdlInputHandler::isMouseInVideoRegion(int mouseX, int mouseY, int windowWid
     SDL_Rect src, dst;
 
     if (windowWidth < 0 || windowHeight < 0) {
-        SDL_GetWindowSize(m_Window, &windowWidth, &windowHeight);
+        getWindowCoordinateSize(&windowWidth, &windowHeight);
     }
 
     src.x = src.y = 0;
@@ -329,9 +330,17 @@ void SdlInputHandler::updatePointerRegionLock()
     // have full control over it and we don't touch it anymore.
     if (!m_PointerRegionLockToggledByUser) {
         // Lock the pointer in true full-screen mode or in any fullscreen mode when only a single monitor is present
-        Uint32 fullscreenFlags = SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
-        m_PointerRegionLockActive = (fullscreenFlags == SDL_WINDOW_FULLSCREEN) ||
-                                    (fullscreenFlags != 0 && SDL_GetNumVideoDisplays() == 1);
+        if (Session* session = Session::get();
+                session != nullptr && session->usesQtWaylandStreamWindow()) {
+            // Wayland exposes a single compositor-managed fullscreen state;
+            // exclusive vs desktop fullscreen is not a meaningful distinction.
+            m_PointerRegionLockActive = session->isStreamingWindowFullscreen();
+        }
+        else {
+            Uint32 fullscreenFlags = SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
+            m_PointerRegionLockActive = (fullscreenFlags == SDL_WINDOW_FULLSCREEN) ||
+                                        (fullscreenFlags != 0 && SDL_GetNumVideoDisplays() == 1);
+        }
     }
 
     // If region lock is enabled, grab the cursor so it can't accidentally leave our window.
@@ -344,7 +353,7 @@ void SdlInputHandler::updatePointerRegionLock()
         src.h = m_StreamHeight;
 
         dst.x = dst.y = 0;
-        SDL_GetWindowSize(m_Window, &dst.w, &dst.h);
+        getWindowCoordinateSize(&dst.w, &dst.h);
 
         // Use the stream and window sizes to determine the video region
         StreamUtils::scaleSourceToDestinationSurface(&src, &dst);

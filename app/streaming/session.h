@@ -31,6 +31,7 @@ struct MountState;
 }
 
 class DualSenseHapticsRenderer;
+class QScreen;
 #ifdef Q_OS_DARWIN
 class MacQtEventPumpInputGuard;
 #endif
@@ -156,6 +157,12 @@ public:
 
     void setShouldExit(bool quitHostApp = false);
 
+    // These route window-state operations through Qt only for the native
+    // Wayland stream window. All other platforms retain SDL's behavior.
+    bool isStreamingWindowFullscreen() const;
+    bool usesQtWaylandStreamWindow() const;
+    void minimizeStreamingWindow();
+
 signals:
     void stageStarting(QString stage);
 
@@ -175,6 +182,17 @@ signals:
     void launchWarningsChanged();
 
 private:
+    struct WaylandWindowSnapshot
+    {
+        QSize size;
+        Qt::WindowStates states = Qt::WindowNoState;
+        bool visible = false;
+        QScreen* screen = nullptr;
+        qreal devicePixelRatio = 0.0;
+        qreal refreshRate = 0.0;
+        bool valid = false;
+    };
+
     void exec();
 
     bool startConnectionAsync();
@@ -216,6 +234,9 @@ private:
     void toggleQtOverlayMenu();
     bool isStreamingWindowVisible() const;
     void syncQtOverlayWindowsWithSdlWindowState();
+    QRect qtOverlayParentGeometry() const;
+    QPoint qtOverlayPositionForSdlPoint(int x, int y) const;
+    void syncWaylandSdlWindowState();
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void startRuntimeBitrateWorker();
@@ -365,6 +386,9 @@ private:
     bool m_AudioMuted;
     Uint32 m_FullScreenFlag;
     QQuickWindow* m_QtWindow;
+    QWindow* m_WaylandStreamWindow;
+    WaylandWindowSnapshot m_WaylandWindowSnapshot;
+    bool m_WaylandOverlayShortcutPressed;
     bool m_UnexpectedTermination;
     SdlInputHandler* m_InputHandler;
     int m_MouseEmulationRefCount;

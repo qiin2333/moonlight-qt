@@ -4,6 +4,10 @@
 #include "filemappingux.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
+#include "streaming/waylandwindowmetrics.h"
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+#include "streaming/waylandqtsdlbridge.h"
+#endif
 #include "streaming/audio/dualsensehaptics.h"
 #include "streaming/audio/dualsensehapticscalibration.h"
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
@@ -124,6 +128,11 @@ QRect qtWindowCreationGeometryForSdl(QWindow* window)
 #ifdef Q_OS_DARWIN
     return client;
 #else
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    if (WaylandQtSdlBridge::isNativeWayland()) {
+        return client;
+    }
+#endif
     const qreal scale = window->devicePixelRatio();
     return QRect(qRound(client.x() * scale),
                  qRound(client.y() * scale),
@@ -1270,6 +1279,8 @@ Session::Session(NvComputer* computer,
       m_DecoderLock(SDL_CreateMutex()),
       m_AudioMuted(false),
       m_QtWindow(nullptr),
+      m_WaylandStreamWindow(nullptr),
+      m_WaylandOverlayShortcutPressed(false),
       m_UnexpectedTermination(true), // Failure prior to streaming is unexpected
       m_InputHandler(nullptr),
       m_MouseEmulationRefCount(0),
@@ -2486,6 +2497,13 @@ void Session::getWindowDimensions(int& x, int& y,
 
 void Session::updateOptimalWindowDisplayMode()
 {
+    // Qt owns output selection and shell state for an imported Wayland
+    // surface. SDL cannot observe wl_surface output enter/leave events for a
+    // surface owned by another toolkit, and modes are compositor-managed.
+    if (m_WaylandStreamWindow != nullptr) {
+        return;
+    }
+
     SDL_DisplayMode desktopMode, bestMode, mode;
     int displayIndex = SDL_GetWindowDisplayIndex(m_Window);
 
@@ -2590,7 +2608,7 @@ void Session::updateOptimalWindowDisplayMode()
 
 void Session::toggleFullscreen()
 {
-    bool fullScreen = !(SDL_GetWindowFlags(m_Window) & m_FullScreenFlag);
+    bool fullScreen = !isStreamingWindowFullscreen();
 
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
     // Destroy the video decoder before toggling full-screen because D3D9 can try
@@ -2607,8 +2625,20 @@ void Session::toggleFullscreen()
     SDL_UnlockMutex(m_DecoderLock);
 #endif
 
-    // Actually enter/leave fullscreen
-    SDL_SetWindowFullscreen(m_Window, fullScreen ? m_FullScreenFlag : 0);
+    // Qt owns the native Wayland toplevel, so only Qt may change its shell
+    // state. SDL continues to own window state everywhere else.
+    if (m_WaylandStreamWindow != nullptr) {
+        if (fullScreen) {
+            m_WaylandStreamWindow->showFullScreen();
+        }
+        else {
+            m_WaylandStreamWindow->showNormal();
+        }
+        processQtOverlayEvents();
+    }
+    else {
+        SDL_SetWindowFullscreen(m_Window, fullScreen ? m_FullScreenFlag : 0);
+    }
 
 #ifdef Q_OS_DARWIN
     // SDL on macOS has a bug that causes the window size to be reset to crazy
@@ -2629,7 +2659,123 @@ void Session::toggleFullscreen()
     m_InputHandler->updatePointerRegionLock();
 }
 
+bool Session::isStreamingWindowFullscreen() const
+{
+    if (m_WaylandStreamWindow != nullptr) {
+        return m_WaylandStreamWindow->windowStates().testFlag(Qt::WindowFullScreen);
+    }
+    return m_Window != nullptr &&
+           (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
+bool Session::usesQtWaylandStreamWindow() const
+{
+    return m_WaylandStreamWindow != nullptr;
+}
+
+void Session::minimizeStreamingWindow()
+{
+    if (m_WaylandStreamWindow != nullptr) {
+        m_WaylandStreamWindow->showMinimized();
+        processQtOverlayEvents();
+    }
+    else if (m_Window != nullptr) {
+        SDL_MinimizeWindow(m_Window);
+    }
+}
+
 // ---- Qt-based overlay menu methods ----
+
+QRect Session::qtOverlayParentGeometry() const
+{
+    if (m_WaylandStreamWindow != nullptr) {
+        return QRect(QPoint(), m_WaylandStreamWindow->size());
+    }
+    return qtOverlayGeometryForSdlWindow(m_Window);
+}
+
+QPoint Session::qtOverlayPositionForSdlPoint(int x, int y) const
+{
+    const QRect parentRect = qtOverlayParentGeometry();
+    if (!parentRect.isValid() || m_Window == nullptr) {
+        return QCursor::pos();
+    }
+
+    return QPoint(WaylandWindowMetrics::parentCoordinateForPointer(x, parentRect.x()),
+                  WaylandWindowMetrics::parentCoordinateForPointer(y, parentRect.y()));
+}
+
+void Session::syncWaylandSdlWindowState()
+{
+    if (m_WaylandStreamWindow == nullptr || m_Window == nullptr) {
+        return;
+    }
+
+    const QSize logicalSize = m_WaylandStreamWindow->size();
+    const qreal scale = m_WaylandStreamWindow->devicePixelRatio();
+    const WaylandWindowMetrics::Size calculatedPixelSize =
+            WaylandWindowMetrics::pixelSize({ logicalSize.width(), logicalSize.height() }, scale);
+    const QSize pixelSize(calculatedPixelSize.width, calculatedPixelSize.height);
+
+    int sdlWidth = 0;
+    int sdlHeight = 0;
+    SDL_GetWindowSize(m_Window, &sdlWidth, &sdlHeight);
+    if (pixelSize != QSize(sdlWidth, sdlHeight)) {
+        // The imported Qt surface owns scaling. SDL is deliberately not marked
+        // high-DPI-aware, so its external-surface size is expressed in pixels.
+        SDL_SetWindowSize(m_Window, pixelSize.width(), pixelSize.height());
+        SDL_GetWindowSize(m_Window, &sdlWidth, &sdlHeight);
+    }
+
+    // wl_pointer coordinates use Qt's logical surface size. SDL touch events
+    // are normalized against the imported SDL window's physical extent, so
+    // retain both sizes to reconstruct the Wayland surface coordinate.
+    if (m_InputHandler != nullptr) {
+        m_InputHandler->setWaylandWindowCoordinateMetrics({
+                { logicalSize.width(), logicalSize.height() },
+                { sdlWidth, sdlHeight }
+        });
+    }
+
+    const Qt::WindowStates states = m_WaylandStreamWindow->windowStates();
+    const bool visible = m_WaylandStreamWindow->isVisible();
+    QScreen* screen = m_WaylandStreamWindow->screen();
+    const qreal refreshRate = screen != nullptr ? screen->refreshRate() : 0.0;
+    const bool outputChanged = m_WaylandWindowSnapshot.valid &&
+            (screen != m_WaylandWindowSnapshot.screen ||
+             !qFuzzyCompare(scale + 1.0, m_WaylandWindowSnapshot.devicePixelRatio + 1.0) ||
+             !qFuzzyCompare(refreshRate + 1.0, m_WaylandWindowSnapshot.refreshRate + 1.0));
+    const bool qtStateChanged = logicalSize != m_WaylandWindowSnapshot.size ||
+                                states != m_WaylandWindowSnapshot.states ||
+                                visible != m_WaylandWindowSnapshot.visible ||
+                                outputChanged;
+    m_WaylandWindowSnapshot.size = logicalSize;
+    m_WaylandWindowSnapshot.states = states;
+    m_WaylandWindowSnapshot.visible = visible;
+    m_WaylandWindowSnapshot.screen = screen;
+    m_WaylandWindowSnapshot.devicePixelRatio = scale;
+    m_WaylandWindowSnapshot.refreshRate = refreshRate;
+    m_WaylandWindowSnapshot.valid = true;
+
+    if (qtStateChanged) {
+        syncQtOverlayWindowsWithSdlWindowState();
+        if (m_InputHandler != nullptr) {
+            m_InputHandler->refreshRemoteCursorScale();
+            m_InputHandler->updateKeyboardGrabState();
+            m_InputHandler->updatePointerRegionLock();
+        }
+    }
+
+    if (outputChanged && m_VideoDecoder != nullptr) {
+        SDL_Event resetEvent = {};
+        resetEvent.type = SDL_RENDER_DEVICE_RESET;
+        if (SDL_PushEvent(&resetEvent) < 0) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Failed to queue renderer reset for Wayland output change: %s",
+                        SDL_GetError());
+        }
+    }
+}
 
 void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
                                 bool closeWhenPointerOutside)
@@ -2642,7 +2788,7 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
         return; // Do not show
     }
 
-    const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+    const QRect parentRect = qtOverlayParentGeometry();
     if (!parentRect.isValid()) {
         return;
     }
@@ -2744,6 +2890,11 @@ void Session::toggleQtOverlayMenu()
 
 bool Session::isStreamingWindowVisible() const
 {
+    if (m_WaylandStreamWindow != nullptr) {
+        return m_WaylandStreamWindow->isVisible() &&
+               !m_WaylandStreamWindow->windowStates().testFlag(Qt::WindowMinimized);
+    }
+
     if (m_Window == nullptr) {
         return false;
     }
@@ -2784,7 +2935,7 @@ void Session::syncQtOverlayWindowsWithSdlWindowState()
         return;
     }
 
-    const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+    const QRect parentRect = qtOverlayParentGeometry();
     if (parentRect.isValid()) {
         m_MenuButton->showButton(parentRect.x(), parentRect.y(),
                                  parentRect.width(), parentRect.height());
@@ -2903,7 +3054,7 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
                 m_WasCapturedBeforeStylusReplayPanel || m_WasCapturedBeforeMenu;
         m_WasCapturedBeforeMenu = false;
         if (m_StylusReplayTest) {
-            const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+            const QRect parentRect = qtOverlayParentGeometry();
             if (parentRect.isValid()) {
                 m_StylusReplayTest->requestShow(parentRect);
             }
@@ -2972,7 +3123,7 @@ void Session::showStreamingToast(const QString& message, int durationMs)
 {
     if (!m_Toast) return;
 
-    const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+    const QRect parentRect = qtOverlayParentGeometry();
     if (!parentRect.isValid()) {
         return;
     }
@@ -2989,6 +3140,7 @@ void Session::processQtOverlayEvents()
     }
 #endif
     QCoreApplication::processEvents(QEventLoop::AllEvents);
+    syncWaylandSdlWindowState();
 #ifdef Q_OS_DARWIN
     if (m_MacQtEventPumpInputGuard) {
         m_MacQtEventPumpInputGuard->finishEventProcessing();
@@ -4625,49 +4777,75 @@ void Session::exec()
     // We use only the computer name on macOS to match Apple conventions where the
     // app name is featured in the menu bar and the document name is in the title bar.
 #ifdef Q_OS_DARWIN
-    std::string windowName = QString(m_Computer->name).toStdString();
+    const QString windowTitle = m_Computer->name;
 #else
-    std::string windowName = QString(m_Computer->name + " - Moonlight").toStdString();
+    const QString windowTitle = m_Computer->name + " - Moonlight";
 #endif
+    const std::string windowName = windowTitle.toStdString();
 
-    m_Window = SDL_CreateWindow(windowName.c_str(),
-                                x,
-                                y,
-                                width,
-                                height,
-                                defaultWindowFlags | StreamUtils::getPlatformWindowFlags());
-    if (!m_Window) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "SDL_CreateWindow() failed with platform flags: %s",
-                    SDL_GetError());
-
+    bool attemptedQtWaylandWindow = false;
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    if (WaylandQtSdlBridge::isNativeWayland() &&
+            strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
+        attemptedQtWaylandWindow = true;
+        const Qt::WindowStates initialStates = m_QtWindow != nullptr
+                ? m_QtWindow->windowStates() : Qt::WindowNoState;
+        m_WaylandStreamWindow = WaylandQtSdlBridge::createStreamWindow(
+                windowTitle,
+                QRect(x, y, width, height),
+                m_QtWindow != nullptr ? m_QtWindow->screen() : nullptr,
+                initialStates,
+                m_IsFullScreen);
+        m_Window = WaylandQtSdlBridge::wrapStreamWindow(m_WaylandStreamWindow);
+    }
+    else
+#endif
+    {
         m_Window = SDL_CreateWindow(windowName.c_str(),
                                     x,
                                     y,
                                     width,
                                     height,
-                                    defaultWindowFlags);
+                                    defaultWindowFlags | StreamUtils::getPlatformWindowFlags());
         if (!m_Window) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                         "SDL_CreateWindow() failed: %s",
-                         SDL_GetError());
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "SDL_CreateWindow() failed with platform flags: %s",
+                        SDL_GetError());
 
-            if (m_ClipboardHelper != nullptr) {
-                stopClipboardHelper();
-            }
-            if (m_DualSenseHapticsRenderer != nullptr) {
-                m_DualSenseHapticsRenderer->setControllerTarget(-1);
-            }
-            stopControllerRumbleAtConnectionBoundary(m_InputHandler);
-            delete m_InputHandler;
-            m_InputHandler = nullptr;
-            SDL_QuitSubSystem(SDL_INIT_VIDEO);
-            QThreadPool::globalInstance()->start(new DeferredSessionCleanupTask(this));
-            return;
+            m_Window = SDL_CreateWindow(windowName.c_str(),
+                                        x,
+                                        y,
+                                        width,
+                                        height,
+                                        defaultWindowFlags);
         }
     }
 
+    if (!m_Window) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "%s failed: %s",
+                     attemptedQtWaylandWindow ? "Wrapping the Qt Wayland stream surface" :
+                                                "SDL_CreateWindow()",
+                     SDL_GetError());
+
+        delete m_WaylandStreamWindow;
+        m_WaylandStreamWindow = nullptr;
+        if (m_ClipboardHelper != nullptr) {
+            stopClipboardHelper();
+        }
+        if (m_DualSenseHapticsRenderer != nullptr) {
+            m_DualSenseHapticsRenderer->setControllerTarget(-1);
+        }
+        stopControllerRumbleAtConnectionBoundary(m_InputHandler);
+        delete m_InputHandler;
+        m_InputHandler = nullptr;
+        SDL_QuitSubSystem(SDL_INIT_VIDEO);
+        QThreadPool::globalInstance()->start(new DeferredSessionCleanupTask(this));
+        return;
+    }
+
     m_InputHandler->setWindow(m_Window);
+    syncWaylandSdlWindowState();
 
     QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
     QImage svgImage(ICON_SIZE, ICON_SIZE, QImage::Format_RGBA8888);
@@ -4696,7 +4874,7 @@ void Session::exec()
 
     // Enter full screen if requested
     bool awaitingFullScreenEntry = false;
-    if (m_IsFullScreen) {
+    if (m_IsFullScreen && m_WaylandStreamWindow == nullptr) {
         if (SDL_SetWindowFullscreen(m_Window, m_FullScreenFlag) == 0) {
             awaitingFullScreenEntry = true;
         }
@@ -4769,7 +4947,8 @@ void Session::exec()
     // sleep precision and more accurate callback timing.
     SDL_SetHint(SDL_HINT_TIMER_RESOLUTION, "1");
 
-    int currentDisplayIndex = SDL_GetWindowDisplayIndex(m_Window);
+    int currentDisplayIndex = m_WaylandStreamWindow != nullptr
+            ? -1 : SDL_GetWindowDisplayIndex(m_Window);
 
     // Now that we're about to stream, any SDL_QUIT event is expected
     // unless it comes from the connection termination callback where
@@ -4786,9 +4965,11 @@ void Session::exec()
     m_WasCapturedBeforeMenu = false;
 
     // Create Qt-based overlay menu panel (rendered by OS compositor, not D3D11)
-    m_MenuPanel = new OverlayMenuPanel();
+    const OverlayWindowMode overlayWindowMode = m_WaylandStreamWindow != nullptr
+            ? OverlayWindowMode::WaylandSubsurface : OverlayWindowMode::Detached;
+    m_MenuPanel = new OverlayMenuPanel(m_WaylandStreamWindow, overlayWindowMode);
     m_MenuButton = nullptr;
-    m_Toast = new OverlayToast();
+    m_Toast = new OverlayToast(m_WaylandStreamWindow, overlayWindowMode);
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
     // Developer-only harness: Session supplies integration callbacks while
     // the test class owns the panel, picker, replay scheduler, and cleanup.
@@ -4848,7 +5029,7 @@ void Session::exec()
     m_MacQtEventPumpInputGuard =
             std::make_unique<MacQtEventPumpInputGuard>(m_Window);
 #endif
-    m_MenuButton = new OverlayMenuButton();
+    m_MenuButton = new OverlayMenuButton(m_WaylandStreamWindow, overlayWindowMode);
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
         defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
     m_MenuButton->setEventWakeCallback([]() {
@@ -4865,7 +5046,7 @@ void Session::exec()
 
     if (m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
         // Show button at initial position
-        const QRect parentRect = qtOverlayGeometryForSdlWindow(m_Window);
+        const QRect parentRect = qtOverlayParentGeometry();
         if (parentRect.isValid()) {
             m_MenuButton->showButton(parentRect.x(), parentRect.y(),
                                      parentRect.width(), parentRect.height());
@@ -4892,7 +5073,10 @@ void Session::exec()
         // moonlight-usbd 卡死、tunnel 的 forwarding/finished 通知也收不到。
         // 隧道的数据面跑在自己的 IO 线程（usbforwardingtunnel.cpp），不依赖
         // 本泵——1000Hz 鼠标的 URB 洪流不再与输入处理争抢本线程。
-        return (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
+        // Qt owns the native Wayland toplevel and must continuously process
+        // configure, input, and close events for the surface imported by SDL.
+        return m_WaylandStreamWindow != nullptr ||
+               (m_MenuPanel && m_MenuPanel->needsEventProcessing()) ||
                (m_MenuButton && m_MenuButton->needsEventProcessing()) ||
                (m_Toast && m_Toast->needsEventProcessing()) ||
                m_UsbCapabilityPending || m_UsbLocalServer != nullptr ||
@@ -5120,6 +5304,7 @@ void Session::exec()
             // Early handling of some events
             switch (event.window.event) {
             case SDL_WINDOWEVENT_FOCUS_LOST:
+                m_WaylandOverlayShortcutPressed = false;
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = true;
                 }
@@ -5217,8 +5402,12 @@ void Session::exec()
                     windowChangeInfo.height = event.window.data2;
                 }
 
-                int newDisplayIndex = SDL_GetWindowDisplayIndex(m_Window);
-                if (newDisplayIndex != currentDisplayIndex) {
+                int newDisplayIndex = currentDisplayIndex;
+                if (m_WaylandStreamWindow == nullptr) {
+                    newDisplayIndex = SDL_GetWindowDisplayIndex(m_Window);
+                }
+                if (m_WaylandStreamWindow == nullptr &&
+                        newDisplayIndex != currentDisplayIndex) {
                     windowChangeInfo.stateChangeFlags |= WINDOW_STATE_CHANGE_DISPLAY;
 
                     windowChangeInfo.displayIndex = newDisplayIndex;
@@ -5277,7 +5466,8 @@ void Session::exec()
 
             // Update the window display mode based on our current monitor
             // NB: Avoid a useless modeset by only doing this if it changed.
-            if (currentDisplayIndex != SDL_GetWindowDisplayIndex(m_Window)) {
+            if (m_WaylandStreamWindow == nullptr &&
+                    currentDisplayIndex != SDL_GetWindowDisplayIndex(m_Window)) {
                 currentDisplayIndex = SDL_GetWindowDisplayIndex(m_Window);
                 updateOptimalWindowDisplayMode();
             }
@@ -5353,6 +5543,7 @@ void Session::exec()
 
         case SDL_KEYUP:
         case SDL_KEYDOWN:
+        {
             presence.runCallbacks();
             // Escape follows the same back/close rule as the controller. Swallow
             // both halves of the key press so it cannot reach the remote app.
@@ -5363,17 +5554,37 @@ void Session::exec()
                 }
                 break;
             }
-            // Ctrl+Alt+Shift+O toggles the Qt overlay menu
-            if (event.key.state == SDL_PRESSED &&
+            // Ctrl+Alt+Shift+O toggles the Qt overlay menu.
+            const bool overlayMenuKey =
+                event.key.keysym.sym == SDLK_o || event.key.keysym.scancode == SDL_SCANCODE_O;
+            const bool overlayMenuShortcut = overlayMenuKey &&
                 (event.key.keysym.mod & KMOD_CTRL) &&
                 (event.key.keysym.mod & KMOD_ALT) &&
-                (event.key.keysym.mod & KMOD_SHIFT) &&
-                (event.key.keysym.sym == SDLK_o || event.key.keysym.scancode == SDL_SCANCODE_O)) {
+                (event.key.keysym.mod & KMOD_SHIFT);
+            if (m_WaylandStreamWindow != nullptr && overlayMenuKey) {
+                if (event.type == SDL_KEYDOWN && overlayMenuShortcut) {
+                    if (!m_WaylandOverlayShortcutPressed && event.key.repeat == 0) {
+                        toggleQtOverlayMenu();
+                    }
+                    m_WaylandOverlayShortcutPressed = true;
+                    break;
+                }
+                if (m_WaylandOverlayShortcutPressed) {
+                    if (event.type == SDL_KEYUP) {
+                        m_WaylandOverlayShortcutPressed = false;
+                    }
+                    break;
+                }
+            }
+            else if (event.key.state == SDL_PRESSED && overlayMenuShortcut) {
+                // Preserve the established repeat and key-up behavior on every
+                // SDL-owned window path.
                 toggleQtOverlayMenu();
                 break;
             }
             m_InputHandler->handleKeyEvent(&event.key);
             break;
+        }
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
         {
@@ -5392,7 +5603,10 @@ void Session::exec()
             // neither a press nor an unmatched release reaches the host.
             if (m_MenuPanel && (m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing())) {
                 if (event.type == SDL_MOUSEBUTTONUP) {
-                    m_MenuPanel->dismissOnOutsideClick(QCursor::pos());
+                    const QPoint pointerPosition = m_WaylandStreamWindow != nullptr
+                            ? qtOverlayPositionForSdlPoint(event.button.x, event.button.y)
+                            : QCursor::pos();
+                    m_MenuPanel->dismissOnOutsideClick(pointerPosition);
                 }
                 break;
             }
@@ -5407,43 +5621,74 @@ void Session::exec()
                 break;
             }
 #endif
+            const bool qtWaylandOverlay = m_WaylandStreamWindow != nullptr;
+            const QPoint overlayPointerPosition = qtWaylandOverlay
+                    ? qtOverlayPositionForSdlPoint(event.motion.x, event.motion.y)
+                    : QPoint();
+
+            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
+                if (qtWaylandOverlay) {
+                    m_MenuPanel->dismissOnOutsidePointerMove(overlayPointerPosition);
+                }
+                break;
+            }
+
             // Qt overlay menu: edge detection with debounce (500ms cooldown after close)
             // Disabled and button modes do not perform per-motion edge checks.
+            // Relative motion carries captured game input rather than a stable
+            // pointer location, so it must never be interpreted as an edge hit.
             if (m_MenuPanel &&
+                (!qtWaylandOverlay || !SDL_GetRelativeMouseMode()) &&
                 !m_MenuPanel->isMenuVisible() &&
                 !m_MenuPanel->isClosing() &&
                 m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_DISABLED &&
                 m_Preferences->overlayMenuPosition != StreamingPreferences::OMP_BUTTON) {
                 Uint32 elapsed = SDL_GetTicks() - m_MenuCloseTicks;
                 if (elapsed > 500) {
-                    int ww, wh;
-                    SDL_GetWindowSize(m_Window, &ww, &wh);
                     bool atEdge = false;
-                    switch (m_Preferences->overlayMenuPosition) {
-                    case StreamingPreferences::OMP_LEFT_EDGE:
-                        atEdge = (event.motion.x <= 5);
-                        break;
-                    case StreamingPreferences::OMP_TOP_EDGE:
-                        atEdge = (event.motion.y <= 5);
-                        break;
-                    case StreamingPreferences::OMP_DISABLED:
-                    case StreamingPreferences::OMP_BUTTON:
-                        break;
-                    case StreamingPreferences::OMP_RIGHT_EDGE:
-                    default:
-                        atEdge = (event.motion.x >= ww - 5);
-                        break;
+                    if (qtWaylandOverlay) {
+                        const QRect parentRect = qtOverlayParentGeometry();
+                        switch (m_Preferences->overlayMenuPosition) {
+                        case StreamingPreferences::OMP_LEFT_EDGE:
+                            atEdge = overlayPointerPosition.x() <= parentRect.left() + 5;
+                            break;
+                        case StreamingPreferences::OMP_TOP_EDGE:
+                            atEdge = overlayPointerPosition.y() <= parentRect.top() + 5;
+                            break;
+                        case StreamingPreferences::OMP_DISABLED:
+                        case StreamingPreferences::OMP_BUTTON:
+                            break;
+                        case StreamingPreferences::OMP_RIGHT_EDGE:
+                        default:
+                            atEdge = overlayPointerPosition.x() >= parentRect.right() - 5;
+                            break;
+                        }
+                    }
+                    else {
+                        int windowWidth = 0;
+                        SDL_GetWindowSize(m_Window, &windowWidth, nullptr);
+                        switch (m_Preferences->overlayMenuPosition) {
+                        case StreamingPreferences::OMP_LEFT_EDGE:
+                            atEdge = event.motion.x <= 5;
+                            break;
+                        case StreamingPreferences::OMP_TOP_EDGE:
+                            atEdge = event.motion.y <= 5;
+                            break;
+                        case StreamingPreferences::OMP_DISABLED:
+                        case StreamingPreferences::OMP_BUTTON:
+                            break;
+                        case StreamingPreferences::OMP_RIGHT_EDGE:
+                        default:
+                            atEdge = event.motion.x >= windowWidth - 5;
+                            break;
+                        }
                     }
                     if (atEdge) {
-                        showQtOverlayMenu(QCursor::pos());
+                        showQtOverlayMenu(qtWaylandOverlay
+                                ? overlayPointerPosition : QCursor::pos());
                         break;
                     }
                 }
-            }
-
-            // When Qt menu is visible, don't forward motion to input handler
-            if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
-                break;
             }
 
             m_InputHandler->handleMouseMotionEvent(&event.motion);
@@ -5650,7 +5895,10 @@ DispatchDeferredCleanup:
     // a large window.
     if (!m_IsFullScreen && m_QtWindow != nullptr && m_Window != nullptr) {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
-        if (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_MINIMIZED) {
+        const bool streamWindowMinimized = m_WaylandStreamWindow != nullptr
+                ? m_WaylandStreamWindow->windowStates().testFlag(Qt::WindowMinimized)
+                : (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_MINIMIZED) != 0;
+        if (streamWindowMinimized) {
             m_QtWindow->setWindowStates(m_QtWindow->windowStates() | Qt::WindowMinimized);
         }
         else if (m_QtWindow->windowStates() & Qt::WindowMinimized) {
@@ -5668,7 +5916,16 @@ DispatchDeferredCleanup:
 
     // This must be called after the decoder is deleted, because
     // the renderer may want to interact with the window
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    WaylandQtSdlBridge::forgetStreamWindow(m_Window);
+#endif
     SDL_DestroyWindow(m_Window);
+    m_Window = nullptr;
+
+    // SDL only borrowed this wl_surface. Destroy the SDL wrapper first, then
+    // release the Qt toplevel and its child overlay surfaces.
+    delete m_WaylandStreamWindow;
+    m_WaylandStreamWindow = nullptr;
 
     if (iconSurface != nullptr) {
         SDL_FreeSurface(iconSurface);

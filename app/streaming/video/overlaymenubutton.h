@@ -13,6 +13,7 @@
 
 #include "overlaybuttonposition.h"
 #include "overlayeventwakestate.h"
+#include "overlaywindowpolicy.h"
 
 #ifdef Q_OS_DARWIN
 class MacOverlayEventMonitor;
@@ -35,11 +36,13 @@ class OverlayMenuButton : public QRasterWindow {
     Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
 
 public:
-    using ClickCallback = std::function<void(const QPoint& globalPosition,
+    // Position is global for detached windows and parent-local for child windows.
+    using ClickCallback = std::function<void(const QPoint& pointerPosition,
                                              bool closeWhenPointerOutside)>;
     using EventWakeCallback = std::function<void()>;
 
-    explicit OverlayMenuButton(QWindow* parent = nullptr);
+    explicit OverlayMenuButton(QWindow* parent = nullptr,
+                               OverlayWindowMode windowMode = OverlayWindowMode::Detached);
     ~OverlayMenuButton() override;
 
     void setClickCallback(ClickCallback cb) { m_ClickCallback = std::move(cb); }
@@ -114,6 +117,7 @@ private:
     QRect m_ParentGeometry;
     OverlayButtonPositionStore m_PositionStore;
     std::optional<QPointF> m_NormalizedPosition;
+    OverlayWindowMode m_WindowMode;
 #ifdef Q_OS_WIN32
     std::unique_ptr<NativeEventMonitor> m_NativeEventMonitor;
 #elif defined(Q_OS_DARWIN)
