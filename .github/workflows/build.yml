@@ -461,7 +461,7 @@ jobs:
         version: '6.11.1'
         host: ${{ matrix.qt_host }}
         arch: ${{ matrix.qt_arch }}
-        modules: 'qtmultimedia qtimageformats'
+        modules: 'qtmultimedia qtimageformats qtwaylandcompositor'
         cache: true
 
     - name: Setup local env and metadata
@@ -635,15 +635,9 @@ jobs:
         cd libva
         ./autogen.sh
 
-        # Configure with conditional Wayland support
-        echo "Configuring libva..."
-        if pkg-config --exists wayland-client; then
-          echo "Configuring libva with Wayland support"
-          ./configure --enable-x11 --enable-wayland
-        else
-          echo "Configuring libva without Wayland support"
-          ./configure --enable-x11 --disable-wayland
-        fi
+        # Native Wayland is a required part of the AppImage, alongside X11 fallback.
+        pkg-config --exists wayland-client
+        ./configure --enable-x11 --enable-wayland
 
         make -j$(nproc)
         sudo make install

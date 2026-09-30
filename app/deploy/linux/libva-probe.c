@@ -18,6 +18,7 @@
 #include <stddef.h>
 
 #include <va/va.h>
+#include <va/va_wayland.h>
 #include <va/va_x11.h>
 
 /* Address references are enough: they produce relocations against the
@@ -28,6 +29,7 @@ static void *volatile requirements[] = {
     (void *)vaCreateSurfaces, /* libva.so.2, VA_API_0.33.0 */
     (void *)vaMapBuffer2,     /* libva.so.2, 2.21+ */
     (void *)vaGetDisplay,     /* libva-x11.so.2 */
+    (void *)vaGetDisplayWl,   /* libva-wayland.so.2 */
 };
 
 int main(void)
