@@ -767,8 +767,9 @@ NvHTTP::openConnection(QUrl baseUrl,
     disconnect(sslErrorsConnection);
     disconnect(pinnedConnection);
     if (url.scheme() == QStringLiteral("https") &&
-            (reply->error() == QNetworkReply::NoError || !reply->sslConfiguration().peerCertificate().isNull()) &&
-            !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
+        (reply->error() == QNetworkReply::NoError ||
+         !reply->sslConfiguration().peerCertificate().isNull()) &&
+        !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
         delete reply;
         throw GfeHttpResponseException(401, "Server certificate mismatch");
     }
@@ -889,8 +890,9 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
     disconnect(sslErrorsConnection);
     disconnect(pinnedConnection);
     if (url.scheme() == QStringLiteral("https") &&
-            (reply->error() == QNetworkReply::NoError || !reply->sslConfiguration().peerCertificate().isNull()) &&
-            !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
+        (reply->error() == QNetworkReply::NoError ||
+         !reply->sslConfiguration().peerCertificate().isNull()) &&
+        !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
         delete reply;
         throw GfeHttpResponseException(401, "Server certificate mismatch");
     }

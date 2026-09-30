@@ -41,7 +41,9 @@ class TlsServer : public QTcpServer
 {
 public:
     TlsServer(std::atomic<int>& requests, std::atomic<bool>& invalidUpgrade)
-        : m_Requests(requests), m_InvalidUpgrade(invalidUpgrade) {}
+        : m_Requests(requests), m_InvalidUpgrade(invalidUpgrade)
+    {
+    }
 
 protected:
     void incomingConnection(qintptr descriptor) override
@@ -69,8 +71,10 @@ protected:
                         key = line.mid(line.indexOf(':') + 1).trimmed();
                     }
                 }
-                const QByteArray accept = QCryptographicHash::hash(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
-                                                                  QCryptographicHash::Sha1).toBase64();
+                const QByteArray accept =
+                    QCryptographicHash::hash(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+                                             QCryptographicHash::Sha1)
+                        .toBase64();
                 QByteArray response = "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\n";
                 if (!m_InvalidUpgrade.load()) {
                     response += "Upgrade: websocket\r\n";
@@ -82,15 +86,19 @@ protected:
                 response.append(char(hello.size()));
                 response += hello;
                 socket->write(response);
-            }
-            else {
-                const QByteArray body = headers.startsWith("GET /api/v1/usb-forwarding")
+            } else {
+                const QByteArray body =
+                    headers.startsWith("GET /api/v1/usb-forwarding")
                         ? QByteArray(R"({"version":1,"enabled":false,"available":false})")
-                        : QJsonDocument(QJsonObject { { "ok", true }, { "enabled", true }, { "listening", true },
-                                                      { "port", int(serverPort()) }, { "session_token", "test-token" } })
-                                  .toJson(QJsonDocument::Compact);
-                socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " +
-                              QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
+                        : QJsonDocument(QJsonObject{ { "ok", true },
+                                                     { "enabled", true },
+                                                     { "listening", true },
+                                                     { "port", int(serverPort()) },
+                                                     { "session_token", "test-token" } })
+                              .toJson(QJsonDocument::Compact);
+                socket->write(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " +
+                    QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
                 socket->disconnectFromHost();
             }
         });
@@ -106,8 +114,8 @@ class ServerThread : public QThread
 {
 public:
     std::promise<quint16> port;
-    std::atomic<int> requests { 0 };
-    std::atomic<bool> invalidUpgrade { false };
+    std::atomic<int> requests{ 0 };
+    std::atomic<bool> invalidUpgrade{ false };
 
     ~ServerThread() override
     {
@@ -132,7 +140,8 @@ int main(int argc, char* argv[])
     QCoreApplication app(argc, argv);
     QTextStream err(stderr);
     QTemporaryDir settingsDirectory;
-    if (!require(settingsDirectory.isValid() && QSslSocket::supportsSsl(), QStringLiteral("local TLS test environment"), err)) {
+    if (!require(settingsDirectory.isValid() && QSslSocket::supportsSsl(),
+                 QStringLiteral("local TLS test environment"), err)) {
         return 1;
     }
     QCoreApplication::setOrganizationName(QStringLiteral("MoonlightTests"));
@@ -163,18 +172,24 @@ int main(int argc, char* argv[])
     {
         FileMappingClient client(&host);
         capability = client.fetchCapability();
-        ok &= require(capability.ok, QStringLiteral("paired self-signed capability request succeeds: %1").arg(capability.error), err);
+        ok &= require(capability.ok,
+                      QStringLiteral("paired self-signed capability request succeeds: %1")
+                          .arg(capability.error),
+                      err);
         QString error;
         const bool connected = client.connectSession(capability, 3000, &error);
-        ok &= require(connected, QStringLiteral("paired WebSocket connects and reads coalesced hello: %1").arg(error), err);
+        ok &= require(
+            connected,
+            QStringLiteral("paired WebSocket connects and reads coalesced hello: %1").arg(error),
+            err);
     }
     {
         NvHTTP http(host.activeAddress, port, host.serverCert);
         try {
             const auto usb = http.getUsbForwardingCapability();
-            ok &= require(!usb.available, QStringLiteral("paired NvHTTP response is accepted"), err);
-        }
-        catch (const std::exception& error) {
+            ok &=
+                require(!usb.available, QStringLiteral("paired NvHTTP response is accepted"), err);
+        } catch (const std::exception& error) {
             ok &= require(false, QString::fromUtf8(error.what()), err);
         }
     }
@@ -183,7 +198,8 @@ int main(int argc, char* argv[])
         FileMappingClient client(&host);
         QString error;
         ok &= require(!client.connectSession(capability, 3000, &error),
-                      QStringLiteral("101 and accept alone cannot complete a WebSocket upgrade"), err);
+                      QStringLiteral("101 and accept alone cannot complete a WebSocket upgrade"),
+                      err);
         server.invalidUpgrade = false;
     }
 
@@ -195,7 +211,8 @@ int main(int argc, char* argv[])
     const int count = server.requests.load();
     {
         FileMappingClient client(&host);
-        ok &= require(!client.fetchCapability().ok, QStringLiteral("trusted but unpaired capability server is rejected"), err);
+        ok &= require(!client.fetchCapability().ok,
+                      QStringLiteral("trusted but unpaired capability server is rejected"), err);
         QString error;
         ok &= require(!client.connectSession(capability, 3000, &error),
                       QStringLiteral("trusted but unpaired WebSocket server is rejected"), err);
@@ -205,14 +222,19 @@ int main(int argc, char* argv[])
         bool rejected = false;
         try {
             http.getUsbForwardingCapability();
-        }
-        catch (const GfeHttpResponseException& error) {
+        } catch (const GfeHttpResponseException& error) {
             rejected = error.getStatusCode() == 401;
+        } catch (const std::exception&) {
         }
-        catch (const std::exception&) {}
-        ok &= require(rejected, QStringLiteral("trusted but unpaired NvHTTP server is rejected as a certificate mismatch"), err);
+        ok &=
+            require(rejected,
+                    QStringLiteral(
+                        "trusted but unpaired NvHTTP server is rejected as a certificate mismatch"),
+                    err);
     }
-    ok &= require(server.requests.load() == count, QStringLiteral("unpaired TLS peers receive no HTTP headers or session token"), err);
+    ok &=
+        require(server.requests.load() == count,
+                QStringLiteral("unpaired TLS peers receive no HTTP headers or session token"), err);
     QSslConfiguration::setDefaultConfiguration(previous);
     if (ok) {
         QTextStream(stdout) << "file_mapping_transport=passed\n";

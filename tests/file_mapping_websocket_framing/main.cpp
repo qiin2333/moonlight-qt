@@ -111,11 +111,11 @@ int main(int argc, char* argv[])
                       QStringLiteral("extended frame length %1").arg(length), err);
     }
 
-    const QList<QByteArray> invalidFrames {
-        QByteArray::fromHex("8180"), // Servers must not mask their frames.
-        QByteArray::fromHex("c100"), // No extensions were negotiated.
-        QByteArray::fromHex("837f"), // Reserved opcode.
-        QByteArray::fromHex("817e0001"), // Non-minimal 16-bit length.
+    const QList<QByteArray> invalidFrames{
+        QByteArray::fromHex("8180"),                 // Servers must not mask their frames.
+        QByteArray::fromHex("c100"),                 // No extensions were negotiated.
+        QByteArray::fromHex("837f"),                 // Reserved opcode.
+        QByteArray::fromHex("817e0001"),             // Non-minimal 16-bit length.
         QByteArray::fromHex("817f000000000000007e"), // Non-minimal 64-bit length.
         QByteArray::fromHex("817f8000000000000000"), // Reserved high length bit.
         QByteArray::fromHex("817f0000000001000001"), // Above the frame size limit.
@@ -128,7 +128,9 @@ int main(int argc, char* argv[])
     };
     for (QByteArray invalid : invalidFrames) {
         readMessage(invalid, payload, error);
-        ok &= require(!error.isEmpty(), QStringLiteral("invalid frame must fail without waiting for its payload"), err);
+        ok &=
+            require(!error.isEmpty(),
+                    QStringLiteral("invalid frame must fail without waiting for its payload"), err);
     }
 
     // Continuous partial input must not restart the caller's total timeout.

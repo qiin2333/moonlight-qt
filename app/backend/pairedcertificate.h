@@ -29,16 +29,15 @@ inline bool canIgnoreErrors(const QSslCertificate& pinned, const QList<QSslError
 // A normally trusted peer may produce no sslErrors. Check the pin before
 // HTTP data is sent as well. The manager must be scoped to this paired host,
 // or the returned connection must be disconnected after the request.
-inline QMetaObject::Connection enforce(QNetworkAccessManager* manager,
-                                       QObject* context,
+inline QMetaObject::Connection enforce(QNetworkAccessManager* manager, QObject* context,
                                        const QSslCertificate& pinned)
 {
     return QObject::connect(manager, &QNetworkAccessManager::encrypted, context,
                             [pinned](QNetworkReply* reply) {
-        if (!matches(pinned, reply->sslConfiguration().peerCertificate())) {
-            reply->abort();
-        }
-    });
+                                if (!matches(pinned, reply->sslConfiguration().peerCertificate())) {
+                                    reply->abort();
+                                }
+                            });
 }
 
 } // namespace PairedCertificate

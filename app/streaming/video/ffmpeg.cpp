@@ -228,26 +228,12 @@ enum AVPixelFormat FFmpegVideoDecoder::ffGetFormat(AVCodecContext* context,
 }
 
 FFmpegVideoDecoder::FFmpegVideoDecoder(bool testOnly)
-    : m_Pkt(av_packet_alloc()),
-      m_VideoDecoderCtx(nullptr),
-      m_RequiredPixelFormat(AV_PIX_FMT_NONE),
-      m_DecodeBuffer(1024 * 1024, 0),
-      m_HwDecodeCfg(nullptr),
-      m_BackendRenderer(nullptr),
-      m_FrontendRenderer(nullptr),
-      m_ConsecutiveFailedDecodes(0),
-      m_Pacer(nullptr),
-      m_FramesIn(0),
-      m_FramesOut(0),
-      m_LastFrameNumber(0),
-      m_StreamFps(0),
-      m_VideoFormat(0),
-      m_NeedsSpsFixup(false),
-      m_NeedsAv1ObuRepack(false),
-      m_LoggedHdr10PlusMetadata(false),
-      m_TestOnly(testOnly),
-      m_CurrentTestMode(TestMode::TestFrameOnly),
-      m_DecoderThread(nullptr),
+    : m_Pkt(av_packet_alloc()), m_VideoDecoderCtx(nullptr), m_RequiredPixelFormat(AV_PIX_FMT_NONE),
+      m_DecodeBuffer(1024 * 1024, 0), m_HwDecodeCfg(nullptr), m_BackendRenderer(nullptr),
+      m_FrontendRenderer(nullptr), m_ConsecutiveFailedDecodes(0), m_Pacer(nullptr), m_FramesIn(0),
+      m_FramesOut(0), m_LastFrameNumber(0), m_StreamFps(0), m_VideoFormat(0),
+      m_NeedsSpsFixup(false), m_NeedsAv1ObuRepack(false), m_LoggedHdr10PlusMetadata(false),
+      m_TestOnly(testOnly), m_CurrentTestMode(TestMode::TestFrameOnly), m_DecoderThread(nullptr),
       m_VideoEnhancement(&VideoEnhancement::getInstance())
 {
     SDL_zero(m_ActiveWndVideoStats);

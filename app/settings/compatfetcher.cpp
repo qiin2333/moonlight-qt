@@ -70,11 +70,13 @@ bool CompatFetcher::isGfeVersionSupported(QString gfeVersion)
     const QVersionNumber latest = VersionUtils::parseNumeric(latestSupportedVersion);
     if (actual.segmentCount() < 2 || latest.segmentCount() < 2) {
         // Keep compatibility checks permissive when the server data is invalid.
-        qWarning() << "Failed to parse GFE compatibility versions:" << gfeVersion << latestSupportedVersion;
+        qWarning() << "Failed to parse GFE compatibility versions:" << gfeVersion
+                   << latestSupportedVersion;
         return true;
     }
     if (VersionUtils::compare(actual, latest) > 0) {
-        qWarning() << "GFE version" << gfeVersion << "is not supported by this version of Moonlight";
+        qWarning() << "GFE version" << gfeVersion
+                   << "is not supported by this version of Moonlight";
         return false;
     }
     return true;

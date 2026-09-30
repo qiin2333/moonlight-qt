@@ -997,12 +997,13 @@ QNetworkAccessManager* ClipboardSync::nam()
         // connections belong to this manager's immutable paired identity.
         const QSslCertificate pinned = m_HostContext.serverCertificate;
         PairedCertificate::enforce(m_Nam, this, pinned);
-        connect(m_Nam, &QNetworkAccessManager::sslErrors, this,
-                [this](QNetworkReply* reply, const QList<QSslError>& errors) {
-                    if (PairedCertificate::canIgnoreErrors(m_HostContext.serverCertificate, errors)) {
-                        reply->ignoreSslErrors(errors);
-                    }
-                });
+        connect(
+            m_Nam, &QNetworkAccessManager::sslErrors, this,
+            [this](QNetworkReply* reply, const QList<QSslError>& errors) {
+                if (PairedCertificate::canIgnoreErrors(m_HostContext.serverCertificate, errors)) {
+                    reply->ignoreSslErrors(errors);
+                }
+            });
     }
     return m_Nam;
 }
