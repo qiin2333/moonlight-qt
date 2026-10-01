@@ -143,7 +143,7 @@ jobs:
             --enable-libdrm --enable-vulkan --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan \
             --enable-libdav1d --enable-decoder=libdav1d \
             --enable-decoder=h264_v4l2m2m --enable-decoder=hevc_v4l2m2m \
-            --enable-pthreads
+            --enable-pthreads --enable-v4l2-m2m
           make -j$(nproc)
           sudo make install
 
