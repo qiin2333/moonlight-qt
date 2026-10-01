@@ -687,7 +687,7 @@ jobs:
     - name: Build FFmpeg
       run: |
         export FFMPEG_REV=n9.0
-        export FFMPEG_CONFIGURE_ARGS="--enable-pic --enable-lto --disable-static --enable-shared --disable-all --disable-autodetect --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-vaapi --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-vdpau --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-vulkan --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d --enable-decoder=h264_v4l2m2m --enable-decoder=hevc_v4l2m2m"
+        export FFMPEG_CONFIGURE_ARGS="--enable-pic --enable-lto --disable-static --enable-shared --disable-all --disable-autodetect --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-vaapi --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-vdpau --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-vulkan --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d --enable-decoder=h264_v4l2m2m --enable-decoder=hevc_v4l2m2m --enable-pthreads"
         git clone https://github.com/FFmpeg/FFmpeg.git FFmpeg
         cd FFmpeg
         git checkout $FFMPEG_REV
