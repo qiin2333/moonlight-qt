@@ -2749,11 +2749,8 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
     if (!m_MenuPanel || m_MenuPanel->isMenuVisible() || m_MenuPanel->isClosing()) return;
     if (!isStreamingWindowVisible()) return;
 
-    // A Wayland subsurface cannot be mapped reliably until the parent stream
-    // surface has a renderer and has started receiving video buffers. Edge
-    // activation can otherwise race initial stream setup when the pointer is
-    // already at the configured edge.
-    if (m_WaylandStreamWindow != nullptr && (m_VideoDecoder == nullptr || !m_HasReceivedVideo)) {
+    // Wait for decoder initialization on Wayland.
+    if (m_WaylandStreamWindow != nullptr && m_VideoDecoder == nullptr) {
         return;
     }
 
