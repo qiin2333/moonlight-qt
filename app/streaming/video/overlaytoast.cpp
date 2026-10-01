@@ -21,8 +21,8 @@ const int kAccentBar = 4;                  // Theme.accentBar
 }
 
 OverlayToast::OverlayToast(QWindow* parent, OverlayWindowMode windowMode)
-    : QRasterWindow(parent), m_FadeAnimation(nullptr), m_ToastHeight(40), m_HorizPadding(16),
-      m_VertPadding(10), m_WindowMode(windowMode)
+    : OverlayRasterWindow(parent, windowMode), m_FadeAnimation(nullptr), m_ToastHeight(40),
+      m_HorizPadding(16), m_VertPadding(10), m_WindowMode(windowMode)
 {
     Q_ASSERT(m_WindowMode != OverlayWindowMode::WaylandSubsurface || parent != nullptr);
     setFlags(OverlayWindowPolicy::flags(m_WindowMode, true));
@@ -150,9 +150,8 @@ void OverlayToast::onFadeFinished()
     setOpacity(1.0);
 }
 
-void OverlayToast::paintEvent(QPaintEvent*)
+void OverlayToast::paintOverlay(QPainter& p)
 {
-    QPainter p(this);
     // 反锯齿只为文字开。方角矩形都落在整数坐标上，开不开都一样，
     // 但这套风格的边必须是硬的，别让抗锯齿在边缘糊出半透明像素。
     p.setRenderHint(QPainter::Antialiasing, false);

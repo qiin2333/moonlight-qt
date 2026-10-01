@@ -303,12 +303,6 @@ public:
 
 private:
     void getWindowCoordinateSize(int* width, int* height) const;
-#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
-    WaylandWindowMetrics::Point getTouchWindowPoint(const SDL_TouchFingerEvent* event,
-                                                    WaylandWindowMetrics::Size windowSize) const;
-    float getTouchDistance(const SDL_TouchFingerEvent* first,
-                           const SDL_TouchFingerEvent* second) const;
-#endif
 
     qreal getRemoteCursorScale() const;
 

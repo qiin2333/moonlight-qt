@@ -177,8 +177,8 @@ struct OverlayMenuButton::NativeEventMonitor
 #endif
 
 OverlayMenuButton::OverlayMenuButton(QWindow* parent, OverlayWindowMode windowMode)
-    : QRasterWindow(parent), m_Hovered(false), m_ButtonVisible(false), m_Dragging(false),
-      m_InputSource(InputSource::None), m_TouchPointId(-1),
+    : OverlayRasterWindow(parent, windowMode), m_Hovered(false), m_ButtonVisible(false),
+      m_Dragging(false), m_InputSource(InputSource::None), m_TouchPointId(-1),
       m_NormalizedPosition(m_PositionStore.load()), m_WindowMode(windowMode)
 {
     Q_ASSERT(m_WindowMode != OverlayWindowMode::WaylandSubsurface || parent != nullptr);
@@ -463,9 +463,8 @@ void OverlayMenuButton::drawCrescentMoon(QPainter& p, qreal cx, qreal cy, qreal 
     p.fillPath(crescent, moonColor);
 }
 
-void OverlayMenuButton::paintEvent(QPaintEvent*)
+void OverlayMenuButton::paintOverlay(QPainter& p)
 {
-    QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
     int w = width();

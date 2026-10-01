@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QRasterWindow>
+#include "overlayrasterwindow.h"
 #include <QPainter>
 #include <QFont>
 #include <QElapsedTimer>
@@ -17,9 +17,9 @@
  * Shows a brief message at the bottom-center of the streaming window,
  * then fades out and hides itself after a configurable duration.
  */
-class OverlayToast : public QRasterWindow {
+class OverlayToast : public OverlayRasterWindow
+{
     Q_OBJECT
-    Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
 
 public:
     explicit OverlayToast(QWindow* parent = nullptr,
@@ -44,7 +44,7 @@ public:
     void dismissImmediately();
 
 protected:
-    void paintEvent(QPaintEvent* event) override;
+    void paintOverlay(QPainter& painter) override;
 
 private slots:
     void startFadeOut();

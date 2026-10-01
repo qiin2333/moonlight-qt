@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QRasterWindow>
+#include "overlayrasterwindow.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QSurfaceFormat>
@@ -31,9 +31,9 @@ class LinuxDisplayEventMonitor;
  * Semi-transparent when idle, fully opaque on hover.
  * Independent of D3D11/SDL rendering pipeline.
  */
-class OverlayMenuButton : public QRasterWindow {
+class OverlayMenuButton : public OverlayRasterWindow
+{
     Q_OBJECT
-    Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
 
 public:
     // Position is global for detached windows and parent-local for child windows.
@@ -75,7 +75,7 @@ public:
     void finishEventProcessing();
 
 protected:
-    void paintEvent(QPaintEvent* event) override;
+    void paintOverlay(QPainter& painter) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;

@@ -89,14 +89,14 @@ constexpr int kGamepadHintBarHeight = 30;
 }
 
 OverlayMenuPanel::OverlayMenuPanel(QWindow* parent, OverlayWindowMode windowMode)
-    : QRasterWindow(parent), m_CurrentLevel(0), m_HoveredIndex(-1), m_Visible(false),
-      m_HasGamepads(false), m_GamepadUiStyle(GamepadUiStyleXbox), m_SwapFaceButtons(false),
-      m_FileMappingState(FileMappingState::Unknown), m_FileMappingDetail(tr("Checking")),
-      m_RemoteUsbAvailable(false), m_RemoteUsbState(RemoteUsbState::Unavailable),
-      m_RemoteUsbDetail(tr("Unavailable")), m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0),
-      m_WindowMode(windowMode), m_CloseWhenPointerOutside(false), m_ContentOffset(0),
-      m_Closing(false), m_TargetPosition(), m_AnchorMode(AnchorMode::RightEdge),
-      m_TriggerPosition(std::nullopt)
+    : OverlayRasterWindow(parent, windowMode), m_CurrentLevel(0), m_HoveredIndex(-1),
+      m_Visible(false), m_HasGamepads(false), m_GamepadUiStyle(GamepadUiStyleXbox),
+      m_SwapFaceButtons(false), m_FileMappingState(FileMappingState::Unknown),
+      m_FileMappingDetail(tr("Checking")), m_RemoteUsbAvailable(false),
+      m_RemoteUsbState(RemoteUsbState::Unavailable), m_RemoteUsbDetail(tr("Unavailable")),
+      m_ParentX(0), m_ParentY(0), m_ParentW(0), m_ParentH(0), m_WindowMode(windowMode),
+      m_CloseWhenPointerOutside(false), m_ContentOffset(0), m_Closing(false), m_TargetPosition(),
+      m_AnchorMode(AnchorMode::RightEdge), m_TriggerPosition(std::nullopt)
 {
     Q_ASSERT(m_WindowMode != OverlayWindowMode::WaylandSubsurface || parent != nullptr);
     setFlags(OverlayWindowPolicy::flags(m_WindowMode));
@@ -1045,9 +1045,8 @@ int OverlayMenuPanel::itemAtPos(const QPoint& pos) const
 // Painting
 // ---------------------------------------------------------------------------
 
-void OverlayMenuPanel::paintEvent(QPaintEvent*)
+void OverlayMenuPanel::paintOverlay(QPainter& p)
 {
-    QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, false);
     p.setRenderHint(QPainter::TextAntialiasing);
 

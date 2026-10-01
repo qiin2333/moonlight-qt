@@ -2703,7 +2703,7 @@ void Session::syncWaylandSdlWindowState()
     }
 
     const Qt::WindowStates states = m_WaylandStreamWindow->windowStates();
-    const bool visible = m_WaylandStreamWindow->isVisible();
+    const bool visible = m_WaylandStreamWindow->isVisible() && !isStreamingWindowMinimized();
     QScreen* screen = m_WaylandStreamWindow->screen();
     const qreal refreshRate = screen != nullptr ? screen->refreshRate() : 0.0;
     const bool outputChanged =
@@ -2865,8 +2865,7 @@ void Session::toggleQtOverlayMenu()
 bool Session::isStreamingWindowVisible() const
 {
     if (m_WaylandStreamWindow != nullptr) {
-        return m_WaylandStreamWindow->isVisible() &&
-               !m_WaylandStreamWindow->windowStates().testFlag(Qt::WindowMinimized);
+        return m_WaylandStreamWindow->isVisible() && !isStreamingWindowMinimized();
     }
 
     if (m_Window == nullptr) {
@@ -2876,6 +2875,16 @@ bool Session::isStreamingWindowVisible() const
     Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
     return (windowFlags & SDL_WINDOW_SHOWN) &&
            !(windowFlags & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED));
+}
+
+bool Session::isStreamingWindowMinimized() const
+{
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    if (m_WaylandStreamWindow != nullptr) {
+        return WaylandQtSdlBridge::isStreamWindowMinimized(m_WaylandStreamWindow);
+    }
+#endif
+    return m_Window != nullptr && (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_MINIMIZED) != 0;
 }
 
 void Session::syncQtOverlayWindowsWithSdlWindowState()
@@ -5851,22 +5860,18 @@ DispatchDeferredCleanup:
     // routinely maximize the streaming window simply to view the stream
     // in a larger window, but they don't necessarily want the UI in such
     // a large window.
+    const bool keepGuiMinimized = !m_IsFullScreen && isStreamingWindowMinimized();
     if (!m_IsFullScreen && m_QtWindow != nullptr && m_Window != nullptr) {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
-        const bool streamWindowMinimized =
-            m_WaylandStreamWindow != nullptr
-                ? m_WaylandStreamWindow->windowStates().testFlag(Qt::WindowMinimized)
-                : (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_MINIMIZED) != 0;
-        if (streamWindowMinimized) {
+        if (keepGuiMinimized) {
             m_QtWindow->setWindowStates(m_QtWindow->windowStates() | Qt::WindowMinimized);
         } else if (m_QtWindow->windowStates() & Qt::WindowMinimized) {
             m_QtWindow->setWindowStates(m_QtWindow->windowStates() & ~Qt::WindowMinimized);
         }
 #else
-        if (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_MINIMIZED) {
+        if (keepGuiMinimized) {
             m_QtWindow->setWindowState(Qt::WindowMinimized);
-        }
-        else if (m_QtWindow->windowState() & Qt::WindowMinimized) {
+        } else if (m_QtWindow->windowState() & Qt::WindowMinimized) {
             m_QtWindow->setWindowState(Qt::WindowNoState);
         }
 #endif
@@ -5875,7 +5880,8 @@ DispatchDeferredCleanup:
     // This must be called after the decoder is deleted, because
     // the renderer may want to interact with the window
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
-    WaylandQtSdlBridge::exposeGuiBeforeSdlTeardown(m_QtWindow, m_WaylandStreamWindow);
+    WaylandQtSdlBridge::exposeGuiBeforeSdlTeardown(m_QtWindow, m_WaylandStreamWindow,
+                                                   keepGuiMinimized);
     WaylandQtSdlBridge::forgetStreamWindow(m_Window);
 #endif
     SDL_DestroyWindow(m_Window);

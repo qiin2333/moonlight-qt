@@ -1137,13 +1137,16 @@ int main(int argc, char *argv[])
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Moonlight V+ for PC"));
 
     // The bridge-enabled native Wayland path must import Qt's wl_display
-    // before any SDL video initialization. Other platforms retain their
-    // established driver-selection timing below.
+    // before any SDL video initialization. Keep SDL's video and EGL references
+    // alive until after the QML engine is destroyed so SDL cannot terminate the
+    // EGLDisplay shared with Qt while Qt Quick is still using it.
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    WaylandQtSdlBridge::SdlVideoLifetime waylandSdlVideoLifetime;
     if (QGuiApplication::platformName().startsWith("wayland")) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected Wayland");
         qputenv("SDL_VIDEODRIVER", "wayland");
-        if (!WaylandQtSdlBridge::configureSdlVideo()) {
+        qputenv("SDL_VIDEO_WAYLAND_WMCLASS", "com.moonlight_stream.Moonlight");
+        if (!waylandSdlVideoLifetime.initialize()) {
             return -1;
         }
     }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QRasterWindow>
+#include "overlayrasterwindow.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -38,7 +38,8 @@
  * Sub-level navigation uses a title bar with back button (◂ Title).
  * Square industrial theme matching Theme.qml, with hard shadows and brand accents.
  */
-class OverlayMenuPanel : public QRasterWindow {
+class OverlayMenuPanel : public OverlayRasterWindow
+{
     Q_OBJECT
 public:
     enum class MenuAction {
@@ -199,7 +200,7 @@ public:
     void gamepadAdjustSlider(int direction);
 
 protected:
-    void paintEvent(QPaintEvent* event) override;
+    void paintOverlay(QPainter& painter) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;

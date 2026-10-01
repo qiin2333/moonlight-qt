@@ -1019,6 +1019,14 @@ void SdlInputHandler::setCaptureActive(bool active)
 
 void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
 {
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    SDL_TouchFingerEvent logicalEvent;
+    if (m_WaylandCoordinateMetrics.has_value()) {
+        logicalEvent = WaylandWindowMetrics::logicalTouchEvent(*event, *m_WaylandCoordinateMetrics);
+        event = &logicalEvent;
+    }
+#endif
+
     // A stylus is a direct pointing device regardless of whether ordinary
     // touchscreen contacts are configured to emulate a trackpad.
     if (isPenTouchDevice(event->touchId)) {

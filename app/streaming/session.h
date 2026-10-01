@@ -233,6 +233,7 @@ private:
     void hideQtOverlayMenu();
     void toggleQtOverlayMenu();
     bool isStreamingWindowVisible() const;
+    bool isStreamingWindowMinimized() const;
     void syncQtOverlayWindowsWithSdlWindowState();
     QRect qtOverlayParentGeometry() const;
     QPoint qtOverlayPositionForSdlPoint(int x, int y) const;
@@ -441,7 +442,7 @@ private:
     std::atomic_int m_PendingRuntimeBitrateKbps { 0 };
     std::atomic_bool m_RuntimeBitrateInFlight { false };
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
-    OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
+    OverlayMenuButton* m_MenuButton = nullptr; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification
 #ifdef Q_OS_DARWIN
     std::unique_ptr<MacQtEventPumpInputGuard> m_MacQtEventPumpInputGuard;

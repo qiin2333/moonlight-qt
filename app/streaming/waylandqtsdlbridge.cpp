@@ -1,17 +1,19 @@
 #include "waylandqtsdlbridge.h"
+#include "waylandstreamwindow.h"
 
 #include <QByteArray>
-#include <QCloseEvent>
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QLibrary>
+#include <QOpenGLContext>
 #include <QPointer>
 #include <QScreen>
 #include <QThread>
 #include <QWindow>
 #include <QtGui/qguiapplication_platform.h>
+#include <qpa/qplatformwindow_p.h>
 
 namespace {
 
@@ -22,25 +24,7 @@ constexpr char SdlWaylandScaleToDisplayHint[] = "SDL_VIDEO_WAYLAND_SCALE_TO_DISP
 SDL_Window* ImportedSdlWindow = nullptr;
 QPointer<QWindow> ImportedQtWindow;
 
-class WaylandStreamWindow final : public QWindow
-{
-protected:
-    void closeEvent(QCloseEvent* event) override
-    {
-        SDL_Event quitEvent = {};
-        quitEvent.type = SDL_QUIT;
-        if (SDL_PushEvent(&quitEvent) < 0) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Failed to queue quit for Wayland stream window: %s", SDL_GetError());
-        }
-
-        // Keep the wl_surface alive until Session has stopped the renderer and
-        // destroyed SDL's borrowed wrapper. Cleanup deletes this QWindow after
-        // SDL_DestroyWindow(), so accepting the close here would leave SDL with
-        // a dangling native surface.
-        event->ignore();
-    }
-};
+std::mutex SurfaceMutex;
 
 struct Sdl3PropertyApi
 {
@@ -80,6 +64,40 @@ Sdl3PropertyApi& sdl3PropertyApi()
 } // namespace
 
 namespace WaylandQtSdlBridge {
+
+SdlVideoLifetime::~SdlVideoLifetime()
+{
+    if (!m_Initialized) {
+        return;
+    }
+
+    SDL_GL_UnloadLibrary();
+    SDL_QuitSubSystem(SDL_INIT_VIDEO);
+}
+
+bool SdlVideoLifetime::initialize()
+{
+    if (m_Initialized) {
+        return true;
+    }
+    if (!configureSdlVideo()) {
+        return false;
+    }
+    if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to retain SDL video for Qt Wayland: %s",
+                     SDL_GetError());
+        return false;
+    }
+    if (SDL_GL_LoadLibrary(nullptr) < 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to retain SDL EGL for Qt Wayland: %s",
+                     SDL_GetError());
+        SDL_QuitSubSystem(SDL_INIT_VIDEO);
+        return false;
+    }
+
+    m_Initialized = true;
+    return true;
+}
 
 bool isNativeWayland()
 {
@@ -147,7 +165,7 @@ QWindow* createStreamWindow(const QString& title, const QRect& geometry, QScreen
         return nullptr;
     }
 
-    auto* window = new WaylandStreamWindow();
+    auto* window = new WaylandStreamWindow(SurfaceMutex);
     window->setTitle(title);
     window->setIcon(QGuiApplication::windowIcon());
     if (screen != nullptr) {
@@ -155,6 +173,12 @@ QWindow* createStreamWindow(const QString& title, const QRect& geometry, QScreen
     }
     if (geometry.isValid()) {
         window->setGeometry(geometry);
+    }
+
+    window->setWindowStates(fullScreen ? Qt::WindowFullScreen : initialStates);
+    if (!window->initializeFrame()) {
+        delete window;
+        return nullptr;
     }
 
     if (fullScreen) {
@@ -179,8 +203,9 @@ SDL_Window* wrapStreamWindow(QWindow* window)
         return nullptr;
     }
 
-    const WId surface = window->winId();
-    if (surface == 0) {
+    auto* native = window->nativeInterface<QNativeInterface::Private::QWaylandWindow>();
+    auto* surface = native != nullptr ? native->surface() : nullptr;
+    if (surface == nullptr) {
         SDL_SetError("Qt failed to create the Wayland stream surface");
         return nullptr;
     }
@@ -193,7 +218,7 @@ SDL_Window* wrapStreamWindow(QWindow* window)
     const bool hadOldHint = oldHintValue != nullptr;
     const QByteArray oldHint = oldHintValue ? QByteArray(oldHintValue) : QByteArray();
     SDL_SetHint(SdlForeignWindowOpenGlHint, "1");
-    SDL_Window* sdlWindow = SDL_CreateWindowFrom(reinterpret_cast<void*>(surface));
+    SDL_Window* sdlWindow = SDL_CreateWindowFrom(surface);
     SDL_SetHint(SdlForeignWindowOpenGlHint, hadOldHint ? oldHint.constData() : nullptr);
     if (sdlWindow != nullptr) {
         ImportedSdlWindow = sdlWindow;
@@ -202,10 +227,34 @@ SDL_Window* wrapStreamWindow(QWindow* window)
     return sdlWindow;
 }
 
-bool exposeGuiBeforeSdlTeardown(QWindow* guiWindow, QWindow* streamWindow)
+bool isStreamWindowMinimized(QWindow* window)
+{
+    auto* streamWindow = dynamic_cast<WaylandStreamWindow*>(window);
+    return streamWindow != nullptr && streamWindow->isMinimized();
+}
+
+bool exposeGuiBeforeSdlTeardown(QWindow* guiWindow, QWindow* streamWindow, bool keepMinimized)
 {
     if (guiWindow == nullptr || streamWindow == nullptr || !isNativeWayland()) {
         return false;
+    }
+
+    // SDL renderer destruction changes the native current context without
+    // updating Qt's thread-local cache. Explicitly rebind through Qt before
+    // QRhi can trust that cache. Rebinding also makes any pending Qt GL
+    // resource cleanup safe; merely calling doneCurrent on a stale cache can
+    // otherwise run that cleanup without the correct native context.
+    if (auto* context = QOpenGLContext::currentContext()) {
+        if (context->surface() != nullptr && !context->makeCurrent(context->surface())) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "Failed to restore Qt's OpenGL context after Wayland SDL teardown");
+            return false;
+        }
+    }
+
+    if (keepMinimized) {
+        guiWindow->showMinimized();
+        return true;
     }
 
     // SDL's OpenGL renderer owns an EGL surface for the Qt-owned stream
@@ -240,6 +289,13 @@ int displayRefreshRate(SDL_Window* window)
     }
 
     return qRound(ImportedQtWindow->screen()->refreshRate());
+}
+
+std::unique_lock<std::mutex> lockSurfaceForRendering(SDL_Window* window)
+{
+    return window != nullptr && window == ImportedSdlWindow
+               ? std::unique_lock<std::mutex>(SurfaceMutex)
+               : std::unique_lock<std::mutex>();
 }
 
 void forgetStreamWindow(SDL_Window* window)
