@@ -96,16 +96,8 @@ QString describeDelay(bool known, double ms)
 {
     return known ? QStringLiteral("%1 ms").arg(ms, 0, 'f', 1) : QStringLiteral("unknown");
 }
-#endif
 
-#ifndef HAVE_PHYSICAL_DS5_HAPTICS
-
-DualSenseHapticsRenderer::Availability probeHapticsEndpoint()
-{
-    return DualSenseHapticsRenderer::Availability::NotFound;
-}
-
-#elif defined(Q_OS_WIN32)
+#ifdef Q_OS_WIN32
 // Call visit() with an audio client for each active render endpoint named like
 // a DualSense, until it accepts one.
 template <typename Visit> bool findDualSenseAudioClient(Visit visit)
@@ -329,12 +321,12 @@ private:
 
 using HapticsEndpoint = WasapiHapticsEndpoint;
 
-DualSenseHapticsRenderer::Availability probeHapticsEndpoint()
+bool probeHapticsEndpoint()
 {
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const bool shouldUninitialize = SUCCEEDED(comResult);
     if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE) {
-        return DualSenseHapticsRenderer::Availability::NotFound;
+        return false;
     }
 
     const bool found =
@@ -353,8 +345,7 @@ DualSenseHapticsRenderer::Availability probeHapticsEndpoint()
     if (shouldUninitialize) {
         CoUninitialize();
     }
-    return found ? DualSenseHapticsRenderer::Availability::Available
-                 : DualSenseHapticsRenderer::Availability::NotFound;
+    return found;
 }
 
 #elif defined(Q_OS_MACOS)
@@ -435,8 +426,7 @@ bool hasHapticsSampleRate(AudioDeviceID device)
            rate == 48000.0;
 }
 
-DualSenseHapticsRenderer::Availability findEndpointDevice(AudioDeviceID* outDevice,
-                                                          QString* outName)
+bool findEndpointDevice(AudioDeviceID* outDevice, QString* outName)
 {
     AudioObjectPropertyAddress addr{ kAudioHardwarePropertyDevices, kAudioObjectPropertyScopeGlobal,
                                      kAudioObjectPropertyElementMain };
@@ -444,17 +434,15 @@ DualSenseHapticsRenderer::Availability findEndpointDevice(AudioDeviceID* outDevi
     if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &addr, 0, nullptr, &size) !=
             noErr ||
         size == 0) {
-        return DualSenseHapticsRenderer::Availability::NotFound;
+        return false;
     }
 
     std::vector<AudioDeviceID> devices(size / sizeof(AudioDeviceID));
     if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, nullptr, &size,
                                    devices.data()) != noErr) {
-        return DualSenseHapticsRenderer::Availability::NotFound;
+        return false;
     }
 
-    AudioDeviceID found = kAudioObjectUnknown;
-    QString foundName;
     for (AudioDeviceID device : devices) {
         if (!isUsbDevice(device) || outputChannelCount(device) != EndpointChannelCount ||
             !hasHapticsSampleRate(device)) {
@@ -465,24 +453,13 @@ DualSenseHapticsRenderer::Availability findEndpointDevice(AudioDeviceID* outDevi
         if (!isDualSenseName(name))
             continue;
 
-        // Nothing ties an audio endpoint back to the controller number the host
-        // addressed, so refuse to guess between several pads.
-        if (found != kAudioObjectUnknown) {
-            return DualSenseHapticsRenderer::Availability::MultipleEndpoints;
-        }
-        found = device;
-        foundName = name;
+        if (outDevice != nullptr)
+            *outDevice = device;
+        if (outName != nullptr)
+            *outName = name;
+        return true;
     }
-
-    if (found == kAudioObjectUnknown) {
-        return DualSenseHapticsRenderer::Availability::NotFound;
-    }
-
-    if (outDevice != nullptr)
-        *outDevice = found;
-    if (outName != nullptr)
-        *outName = foundName;
-    return DualSenseHapticsRenderer::Availability::Available;
+    return false;
 }
 
 class CoreAudioHapticsEndpoint
@@ -500,17 +477,9 @@ public:
 
         AudioDeviceID device = kAudioObjectUnknown;
         QString name;
-        switch (findEndpointDevice(&device, &name)) {
-        case DualSenseHapticsRenderer::Availability::Available:
-            break;
-        case DualSenseHapticsRenderer::Availability::NotFound:
+        if (!findEndpointDevice(&device, &name)) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "No active 48 kHz four-channel DualSense audio endpoint was found");
-            return false;
-        case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Multiple DualSense audio endpoints are connected; physical haptics needs "
-                        "exactly one to know which pad a stream belongs to");
             return false;
         }
 
@@ -734,11 +703,12 @@ private:
 
 using HapticsEndpoint = CoreAudioHapticsEndpoint;
 
-DualSenseHapticsRenderer::Availability probeHapticsEndpoint()
+bool probeHapticsEndpoint()
 {
     return findEndpointDevice(nullptr, nullptr);
 }
 
+#endif
 #endif
 }
 
@@ -974,9 +944,13 @@ DualSenseHapticsRenderer::DualSenseHapticsRenderer(Mode mode) : m_Impl(std::make
 }
 DualSenseHapticsRenderer::~DualSenseHapticsRenderer() = default;
 
-DualSenseHapticsRenderer::Availability DualSenseHapticsRenderer::availability()
+bool DualSenseHapticsRenderer::isAvailable()
 {
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
     return probeHapticsEndpoint();
+#else
+    return false;
+#endif
 }
 
 void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)

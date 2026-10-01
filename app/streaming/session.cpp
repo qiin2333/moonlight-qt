@@ -2306,19 +2306,10 @@ bool Session::validateLaunch(SDL_Window* testWindow)
 
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
     if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
-        switch (DualSenseHapticsRenderer::availability()) {
-        case DualSenseHapticsRenderer::Availability::Available:
-            break;
-        case DualSenseHapticsRenderer::Availability::NotFound:
+        if (!DualSenseHapticsRenderer::isAvailable()) {
             emitLaunchWarning(tr(
                 "Physical DualSense haptics was selected, but no active USB DualSense four-channel "
                 "audio endpoint was found yet. Moonlight will keep checking during this stream."));
-            break;
-        case DualSenseHapticsRenderer::Availability::MultipleEndpoints:
-            emitLaunchWarning(
-                tr("Physical DualSense haptics needs exactly one USB DualSense, but several are "
-                   "connected. Moonlight will keep checking during this stream."));
-            break;
         }
     }
 #endif
