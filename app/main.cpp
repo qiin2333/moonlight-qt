@@ -1136,20 +1136,11 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Moonlight V+ for PC"));
 
-    // The bridge-enabled native Wayland path must import Qt's wl_display
-    // before any SDL video initialization. Keep SDL's video and EGL references
-    // alive until after the QML engine is destroyed so SDL cannot terminate the
-    // EGLDisplay shared with Qt while Qt Quick is still using it.
+    // Declare this before the QML engine so SDL's video and EGL references
+    // outlive Qt Quick, but are released before QGuiApplication. Initialization
+    // is deferred until all command-line parsers that can call exit() return.
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     WaylandQtSdlBridge::SdlVideoLifetime waylandSdlVideoLifetime;
-    if (QGuiApplication::platformName().startsWith("wayland")) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected Wayland");
-        qputenv("SDL_VIDEODRIVER", "wayland");
-        qputenv("SDL_VIDEO_WAYLAND_WMCLASS", "com.moonlight_stream.Moonlight");
-        if (!waylandSdlVideoLifetime.initialize()) {
-            return -1;
-        }
-    }
 #endif
 
 #ifdef Q_OS_DARWIN
@@ -1585,6 +1576,20 @@ int main(int argc, char *argv[])
             break;
         }
     }
+
+    // Help, version, and argument errors (including subcommand parsers above)
+    // exit without unwinding automatic objects. Retain the shared SDL/EGL
+    // resources only after those paths, and before QML can probe SDL video.
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    if (QGuiApplication::platformName().startsWith("wayland")) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected Wayland");
+        qputenv("SDL_VIDEODRIVER", "wayland");
+        qputenv("SDL_VIDEO_WAYLAND_WMCLASS", "com.moonlight_stream.Moonlight");
+        if (!waylandSdlVideoLifetime.initialize()) {
+            return -1;
+        }
+    }
+#endif
 
     if (hasGUI) {
         engine.rootContext()->setContextProperty("initialView", initialView);

@@ -613,7 +613,13 @@ wayland {
 # builds retain the established SDL-owned window path.
 wayland:linux:!android:!config_SL {
     versionAtLeast(QT_VERSION, 6.5.0) {
-        qtConfig(wayland) {
+        # Qt 6.5/6.6 declare QWaylandApplication on Unix unconditionally;
+        # QtGui's Wayland feature flag was introduced in Qt 6.7.
+        QT_WAYLAND_NATIVE_INTERFACE = true
+        versionAtLeast(QT_VERSION, 6.7.0) {
+            !qtConfig(wayland): QT_WAYLAND_NATIVE_INTERFACE = false
+        }
+        equals(QT_WAYLAND_NATIVE_INTERFACE, true) {
             SDL2_PKG_VERSION = $$system(pkg-config --modversion sdl2 2>/dev/null)
             versionAtLeast(SDL2_PKG_VERSION, 2.32.50) {
                 CONFIG += qt-sdl-wayland-bridge
