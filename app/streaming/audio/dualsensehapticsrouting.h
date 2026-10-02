@@ -12,12 +12,12 @@ struct LocalControllerCandidate
     bool dualSense;
 };
 
-inline int selectUniqueLocalDualSense(const LocalControllerCandidate* controllers,
-                                     std::size_t controllerCount,
-                                     bool multiController)
+// The logical number of the only connected DualSense, or -1 if there is not
+// exactly one. Other controllers do not matter.
+inline int selectUniqueDualSense(const LocalControllerCandidate* controllers,
+                                 std::size_t controllerCount)
 {
-    if (controllers == nullptr || controllerCount == 0 ||
-        (!multiController && controllerCount != 1)) {
+    if (controllers == nullptr) {
         return -1;
     }
 
@@ -32,6 +32,15 @@ inline int selectUniqueLocalDualSense(const LocalControllerCandidate* controller
         selected = controllers[i].logicalNumber;
     }
     return selected;
+}
+
+inline int selectUniqueLocalDualSense(const LocalControllerCandidate* controllers,
+                                      std::size_t controllerCount, bool multiController)
+{
+    if (controllerCount == 0 || (!multiController && controllerCount != 1)) {
+        return -1;
+    }
+    return selectUniqueDualSense(controllers, controllerCount);
 }
 
 inline bool canUseNativeController(std::uint16_t controllerNumber,
