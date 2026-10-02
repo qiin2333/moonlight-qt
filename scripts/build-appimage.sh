@@ -58,9 +58,9 @@ pushd $BUILD_FOLDER
 # preserves the original EGL compatibility fix without compiling Wayland out.
 #
 # We disable DRM support because linuxdeploy doesn't bundle the appropriate libraries for Qt EGLFS.
-qmake6 $SOURCE_ROOT/moonlight-qt.pro CONFIG+=disable-libdrm \
+qmake6 "$SOURCE_ROOT/moonlight-qt.pro" CONFIG+=disable-libdrm \
   CONFIG+=require-qt-sdl-wayland-bridge \
-  PREFIX=$DEPLOY_FOLDER/usr DEFINES+=APP_IMAGE || fail "Qmake failed!"
+  "PREFIX=$DEPLOY_FOLDER/usr" DEFINES+=APP_IMAGE || fail "Qmake failed!"
 popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration
