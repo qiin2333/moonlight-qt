@@ -144,6 +144,8 @@ jobs:
             --enable-libdav1d --enable-decoder=libdav1d \
             --enable-decoder=h264_v4l2m2m --enable-decoder=hevc_v4l2m2m \
             --enable-pthreads --enable-v4l2-m2m
+          grep -qxF '#define CONFIG_H264_V4L2M2M_DECODER 1' config_components.h || { echo "H.264 V4L2 M2M decoder is not enabled" >&2; exit 1; }
+          grep -qxF '#define CONFIG_HEVC_V4L2M2M_DECODER 1' config_components.h || { echo "HEVC V4L2 M2M decoder is not enabled" >&2; exit 1; }
           make -j$(nproc)
           sudo make install
 
