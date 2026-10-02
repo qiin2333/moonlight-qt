@@ -7,7 +7,13 @@
 class DualSenseHapticsRenderer
 {
 public:
-    DualSenseHapticsRenderer();
+    enum class Mode
+    {
+        Physical, // Authored PCM on the controller's USB audio endpoint
+        Emulated, // Analyzed IR frames
+    };
+
+    explicit DualSenseHapticsRenderer(Mode mode);
     ~DualSenseHapticsRenderer();
 
     DualSenseHapticsRenderer(const DualSenseHapticsRenderer&) = delete;

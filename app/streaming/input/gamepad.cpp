@@ -35,7 +35,7 @@ const int SdlInputHandler::k_ButtonMap[] = {
     TOUCHPAD_FLAG,
 };
 
-int SdlInputHandler::getNativeDualSenseControllerNumber() const
+int SdlInputHandler::getDualSenseHapticsControllerNumber() const
 {
 #if SDL_VERSION_ATLEAST(2, 0, 14)
     dualsense_haptics::LocalControllerCandidate controllers[MAX_GAMEPADS];
@@ -50,6 +50,12 @@ int SdlInputHandler::getNativeDualSenseControllerNumber() const
         };
     }
 
+    // Physical haptics plays on the DualSense's own audio endpoint, so only the
+    // DualSense count matters. Native IR can't tell which pad controller 0 means
+    // once several are merged into it.
+    if (m_EnableDualSenseHaptics) {
+        return dualsense_haptics::selectUniqueDualSense(controllers, controllerCount);
+    }
     return dualsense_haptics::selectUniqueLocalDualSense(
         controllers, controllerCount, m_MultiController);
 #else
@@ -848,7 +854,7 @@ void SdlInputHandler::handleControllerDeviceEvent(SDL_ControllerDeviceEvent* eve
         if (SDL_GameControllerHasLED(state->controller)) {
             capabilities |= LI_CCAP_RGB_LED;
         }
-#ifdef Q_OS_WIN32
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
         if (m_EnableDualSenseHaptics &&
             SDL_GameControllerGetType(state->controller) == SDL_CONTROLLER_TYPE_PS5) {
             capabilities |= LI_CCAP_DS5_HAPTICS_PCM;

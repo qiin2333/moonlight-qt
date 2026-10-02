@@ -37,8 +37,11 @@ NavigableDialog {
     Connections {
         target: UsbForwardingBackend
         function onOperationFinished(success, message) {
+            const activationHint = dialog.isMac || dialog.isLinux
+                    ? qsTr("In a stream, open USB Devices in the overlay and select this device to activate forwarding.")
+                    : qsTr("If sharing succeeds, open USB Devices in the overlay and select this device to activate forwarding.")
             dialog.statusText = success && dialog.pendingShare
-                    ? message + "\n" + qsTr("In a stream, open USB Devices in the overlay and select this device to activate forwarding.")
+                    ? message + "\n" + activationHint
                     : message
             dialog.statusIsError = !success
             dialog.pendingShare = false

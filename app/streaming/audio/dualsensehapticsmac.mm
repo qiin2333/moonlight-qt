@@ -129,7 +129,7 @@ bool startHandle(GCDeviceHaptics* haptics, GCHapticsLocality locality,
         invalidationToken.invalidated = YES;
     };
     if (engine == nil || ![engine startAndReturnError:&error]) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Unable to start macOS DualSense haptic engine: %s",
                     error.localizedDescription.UTF8String ?: "unknown error");
         return false;
@@ -137,7 +137,7 @@ bool startHandle(GCDeviceHaptics* haptics, GCHapticsLocality locality,
 
     id<CHHapticPatternPlayer> player = createPlayer(engine, &error);
     if (player == nil) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Unable to create macOS DualSense haptic player: %s",
                     error.localizedDescription.UTF8String ?: "unknown error");
         [engine stopWithCompletionHandler:nil];
@@ -185,8 +185,7 @@ MoonlightDualSenseHapticState* createState(GCController* controller,
     state.leftPlayer = leftPlayer;
     state.rightPlayer = rightPlayer;
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO,
-                "macOS native DualSense haptics ready for player %d",
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "macOS native DualSense haptics ready for player %d",
                 static_cast<int>(controllerNumber));
     return state;
 }
@@ -311,7 +310,7 @@ struct MacDualSenseHapticsRenderer::Impl
             }
 
             @autoreleasepool {
-                SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "macOS native DualSense haptics timed out for controller %d",
                             stateController);
                 clearState(false);
@@ -396,7 +395,7 @@ struct MacDualSenseHapticsRenderer::Impl
         NSError* error = nil;
         if (!updatePlayer(frameState.leftPlayer, output.left, &error) ||
             !updatePlayer(frameState.rightPlayer, output.right, &error)) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO,
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Unable to update macOS DualSense haptics: %s",
                         error.localizedDescription.UTF8String ?: "unknown error");
             clearState(true);

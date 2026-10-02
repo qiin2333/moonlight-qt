@@ -2304,6 +2304,16 @@ bool Session::validateLaunch(SDL_Window* testWindow)
         return false;
     }
 
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
+        if (!DualSenseHapticsRenderer::isAvailable()) {
+            emitLaunchWarning(tr(
+                "Physical DualSense haptics was selected, but no active USB DualSense four-channel "
+                "audio endpoint was found yet. Moonlight will keep checking during this stream."));
+        }
+    }
+#endif
+
     return true;
 }
 
@@ -3609,8 +3619,7 @@ void Session::updateDualSenseHapticsControllerTarget()
 {
     if (m_DualSenseHapticsRenderer != nullptr) {
         m_DualSenseHapticsRenderer->setControllerTarget(
-            m_InputHandler != nullptr ?
-                m_InputHandler->getNativeDualSenseControllerNumber() : -1);
+            m_InputHandler != nullptr ? m_InputHandler->getDualSenseHapticsControllerNumber() : -1);
     }
 }
 
@@ -4273,14 +4282,12 @@ void Session::start()
     k_ConnCallbacks.ds5HapticsPcm = nullptr;
     k_ConnCallbacks.ds5HapticsIrV2 = nullptr;
     if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
-#ifdef Q_OS_WIN32
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
         enablePhysicalDualSenseHaptics = true;
         k_ConnCallbacks.ds5HapticsPcm = Session::clDs5HapticsPcm;
         if (m_DualSenseHapticsRenderer == nullptr) {
-            m_DualSenseHapticsRenderer = new DualSenseHapticsRenderer();
-        }
-        if (!DualSenseHapticsRenderer::isAvailable()) {
-            emitLaunchWarning(tr("Physical DualSense haptics was selected, but no active USB DualSense four-channel audio endpoint was found yet. Moonlight will keep checking during this stream."));
+            m_DualSenseHapticsRenderer =
+                new DualSenseHapticsRenderer(DualSenseHapticsRenderer::Mode::Physical);
         }
 #else
         emitLaunchWarning(tr("Physical DualSense haptics is only available on Windows in this build."));
@@ -4289,7 +4296,8 @@ void Session::start()
     else {
 #ifdef Q_OS_MACOS
         if (m_DualSenseHapticsRenderer == nullptr) {
-            m_DualSenseHapticsRenderer = new DualSenseHapticsRenderer();
+            m_DualSenseHapticsRenderer =
+                new DualSenseHapticsRenderer(DualSenseHapticsRenderer::Mode::Emulated);
         }
 #endif
         k_ConnCallbacks.ds5HapticsIrV2 = Session::clDs5HapticsIrV2;

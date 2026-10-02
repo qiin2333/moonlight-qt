@@ -17,7 +17,35 @@
     </message>
     <message>
         <source>Version %1</source>
-        <translation type="vanished">版本 %1</translation>
+        <translation>版本 %1</translation>
+    </message>
+    <message>
+        <source>Check for updates</source>
+        <translation>检查更新</translation>
+    </message>
+    <message>
+        <source>Checking for updates...</source>
+        <translation>正在检查更新……</translation>
+    </message>
+    <message>
+        <source>Checking...</source>
+        <translation>检查中……</translation>
+    </message>
+    <message>
+        <source>Check now</source>
+        <translation>立即检查</translation>
+    </message>
+    <message>
+        <source>Update available: Version %1</source>
+        <translation>发现新版本：%1</translation>
+    </message>
+    <message>
+        <source>You are using the latest version.</source>
+        <translation>当前已是最新版本。</translation>
+    </message>
+    <message>
+        <source>Unable to check for updates.</source>
+        <translation>无法检查更新。</translation>
     </message>
     <message>
         <source>Website</source>
@@ -3484,6 +3512,10 @@
     <message>
         <source>In a stream, open USB Devices in the overlay and select this device to activate forwarding.</source>
         <translation>串流中请打开悬浮菜单的「USB 设备」，选择此设备以激活转发。</translation>
+    </message>
+    <message>
+        <source>If sharing succeeds, open USB Devices in the overlay and select this device to activate forwarding.</source>
+        <translation>如果共享成功，请在串流中打开悬浮菜单的「USB 设备」，选择此设备以激活转发。</translation>
     </message>
     <message>
         <source>Not connected</source>
