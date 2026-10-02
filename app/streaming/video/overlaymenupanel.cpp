@@ -7,6 +7,7 @@
 #include <QCursor>
 #include <QFontMetrics>
 #include <QtMath>
+#include <algorithm>
 #include <memory>
 
 namespace {
@@ -228,13 +229,14 @@ void OverlayMenuPanel::buildMenuLevels()
                          m_FileMappingState == FileMappingState::Open,
                          separatorAfterHostFiles});
     if (m_RemoteUsbAvailable) {
-        top.items.push_back({tr("USB Devices"), m_RemoteUsbDetail,
-                             MenuItemType::SubMenu,
-                             MenuAction::MenuActionMax, 4, true, false,
+        top.items.push_back(
+            { tr("USB Devices"),
+              m_RemoteUsbNeedsActivation ? tr("Activate device") : m_RemoteUsbDetail,
+              MenuItemType::SubMenu, MenuAction::MenuActionMax, 4, true, false,
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
-                             false});
+              false });
 #else
-                             true});
+              true });
 #endif
     }
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
@@ -355,6 +357,12 @@ void OverlayMenuPanel::buildMenuLevels()
                 const bool hasOpenDevice =
                     m_RemoteUsbState == RemoteUsbState::Open &&
                     !m_RemoteUsbActiveDeviceId.isEmpty();
+                if (m_RemoteUsbNeedsActivation && device.supported) {
+                    detail = tr("Select to activate");
+                    if (!device.detail.isEmpty()) {
+                        detail += QStringLiteral(" · ") + device.detail;
+                    }
+                }
                 const bool canRelease = active &&
                     (m_RemoteUsbState == RemoteUsbState::Opening ||
                      m_RemoteUsbState == RemoteUsbState::Open);
@@ -646,6 +654,10 @@ void OverlayMenuPanel::updateRemoteUsbState(
     m_RemoteUsbState = state;
     m_RemoteUsbDevices = std::move(devices);
     m_RemoteUsbActiveDeviceId = activeDeviceId;
+    m_RemoteUsbNeedsActivation =
+        available && state == RemoteUsbState::Available && activeDeviceId.isEmpty() &&
+        std::any_of(m_RemoteUsbDevices.cbegin(), m_RemoteUsbDevices.cend(),
+                    [](const RemoteUsbDevice& device) { return device.supported; });
     m_RemoteUsbDetail = detail;
     const int previousLevel = m_CurrentLevel;
     buildMenuLevels();
@@ -1140,6 +1152,14 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
             p.drawRect(row.adjusted(0, 0, -1, -1));
             p.fillRect(QRect(4, itemY + 1, 4, m_ItemHeight - 2), MenuAccent);
         }
+        const bool activationPrompt =
+            m_RemoteUsbNeedsActivation &&
+            ((m_CurrentLevel == 0 && item.type == MenuItemType::SubMenu && item.targetLevel == 4) ||
+             (m_CurrentLevel == 4 && item.action == MenuAction::SelectRemoteUsbDevice &&
+              item.enabled));
+        if (activationPrompt) {
+            p.fillRect(QRect(4, itemY + 4, 4, m_ItemHeight - 8), MenuAccent);
+        }
 
         if (hasIcons) {
             drawIcon(iconForItem(item),
@@ -1150,14 +1170,14 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
         // --- SubMenu item ---
         if (item.type == MenuItemType::SubMenu) {
             p.setFont(m_LabelFont);
-            p.setPen(item.enabled ? MenuText : MenuFaint);
+            p.setPen(activationPrompt ? MenuAccent : item.enabled ? MenuText : MenuFaint);
             QRect lr(labelX, itemY, cw - labelX - 36, m_ItemHeight);
             p.drawText(lr, Qt::AlignLeft | Qt::AlignVCenter, item.label);
 
             // Detail text (e.g., "20 Mbps")
             if (!item.detail.isEmpty()) {
                 p.setFont(m_DetailFont);
-                p.setPen(MenuDim);
+                p.setPen(activationPrompt ? MenuAccent : MenuDim);
                 QRect dr(cw / 2, itemY, cw / 2 - textPad - 20, m_ItemHeight);
                 p.drawText(dr, Qt::AlignRight | Qt::AlignVCenter, item.detail);
             }
@@ -1244,7 +1264,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
                 p.drawText(lb, Qt::AlignLeft | Qt::AlignBottom, item.label);
 
                 p.setFont(m_DetailFont);
-                p.setPen(MenuDim);
+                p.setPen(activationPrompt ? MenuAccent : MenuDim);
                 QRect sr(labelX, itemY + topH, cw - labelX - textPad, m_ItemHeight - topH);
                 p.drawText(sr, Qt::AlignLeft | Qt::AlignTop, item.detail);
             } else {

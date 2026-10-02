@@ -1931,6 +1931,14 @@
         <translation>USB 设备</translation>
     </message>
     <message>
+        <source>Activate device</source>
+        <translation>激活设备</translation>
+    </message>
+    <message>
+        <source>Select to activate</source>
+        <translation>选择以激活</translation>
+    </message>
+    <message>
         <source>Toggle Fullscreen</source>
         <translation>切换全屏</translation>
     </message>
@@ -3500,6 +3508,14 @@
     <message>
         <source>Share USB devices</source>
         <translation>共享 USB 设备</translation>
+    </message>
+    <message>
+        <source>In a stream, open USB Devices in the overlay and select this device to activate forwarding.</source>
+        <translation>串流中请打开悬浮菜单的「USB 设备」，选择此设备以激活转发。</translation>
+    </message>
+    <message>
+        <source>If sharing succeeds, open USB Devices in the overlay and select this device to activate forwarding.</source>
+        <translation>如果共享成功，请在串流中打开悬浮菜单的「USB 设备」，选择此设备以激活转发。</translation>
     </message>
     <message>
         <source>Not connected</source>

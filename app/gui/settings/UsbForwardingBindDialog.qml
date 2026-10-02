@@ -27,6 +27,7 @@ NavigableDialog {
 
     property string statusText: ""
     property bool statusIsError: false
+    property bool pendingShare: false
 
     onOpened: {
         statusText = ""
@@ -36,8 +37,14 @@ NavigableDialog {
     Connections {
         target: UsbForwardingBackend
         function onOperationFinished(success, message) {
-            dialog.statusText = message
+            const activationHint = dialog.isMac || dialog.isLinux
+                    ? qsTr("In a stream, open USB Devices in the overlay and select this device to activate forwarding.")
+                    : qsTr("If sharing succeeds, open USB Devices in the overlay and select this device to activate forwarding.")
+            dialog.statusText = success && dialog.pendingShare
+                    ? message + "\n" + activationHint
+                    : message
             dialog.statusIsError = !success
+            dialog.pendingShare = false
         }
     }
 
@@ -240,10 +247,12 @@ NavigableDialog {
                                 onClicked: {
                                     dialog.statusText = ""
                                     if (row.modelData.isBound) {
+                                        dialog.pendingShare = false
                                         UsbForwardingBackend.unbind(
                                             row.modelData.busId,
                                             row.modelData.persistedGuid)
                                     } else {
+                                        dialog.pendingShare = true
                                         UsbForwardingBackend.bind(row.modelData.busId)
                                     }
                                 }
