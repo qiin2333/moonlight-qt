@@ -275,8 +275,6 @@ jobs:
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat usb_forwarding_backend_list usb_forwarding_backend_list_test
         if errorlevel 1 exit /b %ERRORLEVEL%
-        call scripts\run-test.bat usb_forwarding_backend_sysfs usb_forwarding_backend_sysfs_test
-        if errorlevel 1 exit /b %ERRORLEVEL%
         rem usb_forwarding_tunnel 是需要真实 USB/IP 会话的手动联调探针,不进 CI,
         rem 用法见 tests/README.md。
 

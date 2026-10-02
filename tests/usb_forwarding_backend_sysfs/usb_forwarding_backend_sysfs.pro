@@ -4,6 +4,7 @@ CONFIG += c++17 console
 CONFIG -= app_bundle
 TEMPLATE = app
 TARGET = usb_forwarding_backend_sysfs_test
+linux:!android:DEFINES += USB_FORWARDING_BACKEND_TEST
 INCLUDEPATH += ../../app
 SOURCES += main.cpp \
     ../../app/backend/usbforwardingbackend.cpp \

@@ -19,6 +19,10 @@
 #include <QTimer>
 #include <QTemporaryDir>
 
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+#include <unistd.h>
+#endif
+
 #ifdef Q_OS_WIN32
 #include <windows.h>
 #include <shellapi.h>
@@ -68,9 +72,41 @@ constexpr auto kLinuxPolicyPath =
     "/usr/share/polkit-1/actions/org.moonlight.qt.usbforwarding.policy";
 constexpr auto kLinuxUdevRulePath = "/usr/lib/udev/rules.d/90-moonlight-usb-forwarding.rules";
 constexpr auto kLinuxBindingsPath = "/var/lib/moonlight-qt/bindings";
+#if !defined(Q_OS_ANDROID)
+constexpr auto kLinuxHelperVersionMarker = "# moonlight-usb-helper-version: 2";
 
-constexpr auto kLinuxHelperScript = R"HELPER(#!/bin/sh
-# Moonlight USB forwarding privileged helper (Linux usbip-host backend).
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+class LinuxGroupedProcess : public QProcess
+{
+public:
+    explicit LinuxGroupedProcess(QObject *parent = nullptr) : QProcess(parent) {}
+
+protected:
+    void setupChildProcess() override { ::setpgid(0, 0); }
+};
+#else
+using LinuxGroupedProcess = QProcess;
+#endif
+
+QProcess *createLinuxGroupedProcess(QObject *parent)
+{
+    QProcess *process = new LinuxGroupedProcess(parent);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    process->setChildProcessModifier([] { ::setpgid(0, 0); });
+#endif
+    return process;
+}
+#endif
+
+QByteArray linuxHelperScript()
+{
+    QByteArray script = R"HELPER(#!/bin/sh
+)HELPER";
+#if !defined(Q_OS_ANDROID)
+    script += kLinuxHelperVersionMarker;
+    script += '\n';
+#endif
+    script += R"HELPER(# Moonlight USB forwarding privileged helper (Linux usbip-host backend).
 # Installed and invoked only via pkexec; validates its own arguments.
 # NOTE: keep this script ASCII-only. MSVC rejects some non-ASCII punctuation
 # (em dash, CJK ideographs) inside raw string literals (error C3872), so the
@@ -80,11 +116,42 @@ export PATH
 set -u
 ACTION=${1:-}
 BUSID=${2:-}
+HELPER_FILE=/usr/lib/moonlight-qt/moonlight-usb-helper
 STATE_DIR=/var/lib/moonlight-qt
 STATE_FILE=$STATE_DIR/bindings
 POLICY_FILE=/usr/share/polkit-1/actions/org.moonlight.qt.usbforwarding.policy
 UDEV_RULE_FILE=/usr/lib/udev/rules.d/90-moonlight-usb-forwarding.rules
+SYSFS_USB_DEVICES=/sys/bus/usb/devices
+SYSFS_USBIP_HOST=/sys/module/usbip_host
+DRIVERS_PROBE=/sys/bus/usb/drivers_probe
 
+case "$ACTION" in install|bind|unbind|auto-release) ;; *) echo "unsupported action" >&2; exit 2;; esac
+if [ "$ACTION" != "install" ]; then
+    case "$BUSID" in ''|*[!0-9.-]*) echo "invalid busid" >&2; exit 2;; esac
+fi
+)HELPER";
+#if !defined(Q_OS_ANDROID)
+    script += R"HELPER(OPERATION_TIMEOUT_SECONDS=30
+if [ "$ACTION" != "auto-release" ]; then
+    (
+        WATCHDOG_SLEEP_PID=
+        trap 'kill "${WATCHDOG_SLEEP_PID:-}" 2>/dev/null || true; exit 0' TERM
+        sleep "$OPERATION_TIMEOUT_SECONDS" &
+        WATCHDOG_SLEEP_PID=$!
+        wait "$WATCHDOG_SLEEP_PID"
+        echo "operation_timeout" >&2
+        kill -s KILL -- "-$$"
+    ) &
+    WATCHDOG_PID=$!
+    stop_watchdog() {
+        kill "$WATCHDOG_PID" 2>/dev/null || true
+        wait "$WATCHDOG_PID" 2>/dev/null || true
+    }
+    trap stop_watchdog EXIT
+fi
+)HELPER";
+#endif
+    script += R"HELPER(
 if [ "$ACTION" = "install" ]; then
     # Both files are written by the helper itself so the elevated surface
     # stays a single fixed executable; contents are compiled into it.
@@ -129,14 +196,25 @@ RULE
     # surface it so the caller can ask for a retry instead of silently
     # running without unplug cleanup.
     udevadm control --reload 2>/dev/null || { echo "udev reload failed" >&2; exit 7; }
+    # Publish the new helper only after its configuration is active. If any
+    # earlier step times out, the app still sees the old version and retries
+    # the complete installation on the next sharing attempt.
+    if [ "$0" != "$HELPER_FILE" ]; then
+        mkdir -p "$(dirname "$HELPER_FILE")" || { echo "config write failed" >&2; exit 7; }
+        HELPER_TMP="$HELPER_FILE.new.$$"
+        if ! cat "$0" > "$HELPER_TMP" || ! chmod 755 "$HELPER_TMP" ||
+           ! mv "$HELPER_TMP" "$HELPER_FILE"; then
+            rm -f "$HELPER_TMP"
+            echo "config write failed" >&2
+            exit 7
+        fi
+    fi
     echo "installed"
     exit 0
 fi
 
-case "$ACTION" in bind|unbind|auto-release) ;; *) echo "unsupported action" >&2; exit 2;; esac
-case "$BUSID" in ''|*[!0-9.-]*) echo "invalid busid" >&2; exit 2;; esac
 command -v usbip >/dev/null 2>&1 || { echo "usbip tool not found" >&2; exit 3; }
-if [ ! -d /sys/module/usbip_host ]; then
+if [ ! -d "$SYSFS_USBIP_HOST" ]; then
     modprobe usbip_host 2>/dev/null || { echo "cannot load usbip_host module" >&2; exit 4; }
 fi
 # identity() snapshots are vidPid + serial: stable across replug. usbip's
@@ -147,9 +225,9 @@ fi
 # are still caught, same-model twins are indistinguishable (there is no
 # replug-stable per-device identity for such devices on Linux).
 read_identity_attrs() {
-    VID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idVendor" 2>/dev/null | tr 'A-F' 'a-f')
-    PID=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/idProduct" 2>/dev/null | tr 'A-F' 'a-f')
-    SERIAL=$(tr -d ' \t\n\r' < "/sys/bus/usb/devices/$BUSID/serial" 2>/dev/null)
+    VID=$(tr -d ' \t\n\r' < "$SYSFS_USB_DEVICES/$BUSID/idVendor" 2>/dev/null | tr 'A-F' 'a-f')
+    PID=$(tr -d ' \t\n\r' < "$SYSFS_USB_DEVICES/$BUSID/idProduct" 2>/dev/null | tr 'A-F' 'a-f')
+    SERIAL=$(tr -d ' \t\n\r' < "$SYSFS_USB_DEVICES/$BUSID/serial" 2>/dev/null)
     [ -n "$VID" ] && [ -n "$PID" ]
 }
 forget() {
@@ -165,7 +243,7 @@ sweep_stale() {
     [ -f "$STATE_FILE" ] || return 0
     while IFS="$(printf '\t')" read -r b vidpid serial; do
         [ -n "$b" ] || continue
-        [ -d "/sys/bus/usb/devices/$b" ] || forget "$b"
+        [ -d "$SYSFS_USB_DEVICES/$b" ] || forget "$b"
     done < "$STATE_FILE"
 }
 record() {
@@ -223,6 +301,32 @@ if [ "$ACTION" = "auto-release" ]; then
     fi
     exit 0
 fi
+)HELPER";
+#if !defined(Q_OS_ANDROID)
+    script += R"HELPER(# usbipd passes the forwarding socket to usbip-host, so restarting the daemon
+# alone does not release a connection left behind by an interrupted client.
+# Ask the kernel to close that device's active export before unbinding it.
+release_active_export() {
+    STATUS_FILE="$SYSFS_USB_DEVICES/$BUSID/usbip_status"
+    SOCKFD_FILE="$SYSFS_USB_DEVICES/$BUSID/usbip_sockfd"
+    [ -r "$STATUS_FILE" ] || return 0
+    [ "$(cat "$STATUS_FILE" 2>/dev/null)" = "2" ] || return 0
+    echo -1 > "$SOCKFD_FILE" 2>/dev/null || return 1
+    ATTEMPT=0
+    while [ "$ATTEMPT" -lt 50 ]; do
+        [ "$(cat "$STATUS_FILE" 2>/dev/null)" != "2" ] && return 0
+        sleep 0.1
+        ATTEMPT=$((ATTEMPT + 1))
+    done
+    return 1
+}
+if ! release_active_export; then
+    echo "active_connection_stuck" >&2
+    exit 8
+fi
+)HELPER";
+#endif
+    script += R"HELPER(
 OUT=$(usbip unbind -b "$BUSID" 2>&1)
 RC=$?
 echo "$OUT"
@@ -231,9 +335,11 @@ if [ $RC -ne 0 ]; then
     # whatever is still bound at this port.
     exit $RC
 fi
-echo "$BUSID" > /sys/bus/usb/drivers_probe 2>/dev/null || true
+echo "$BUSID" > "$DRIVERS_PROBE" 2>/dev/null || true
 forget "$BUSID"
 )HELPER";
+    return script;
+}
 
 #endif // Q_OS_LINUX
 
@@ -246,6 +352,13 @@ UsbForwardingBackend *UsbForwardingBackend::get()
     static UsbForwardingBackend backend;
     return &backend;
 }
+
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID) && defined(USB_FORWARDING_BACKEND_TEST)
+QByteArray UsbForwardingBackend::linuxHelperScriptForTest()
+{
+    return linuxHelperScript();
+}
+#endif
 
 QVariantList UsbForwardingBackend::parseHelperDevices(const QByteArray &helperJson, QString *error)
 {
@@ -758,9 +871,17 @@ void UsbForwardingBackend::runPrivileged(const QString &action, const QString &b
     setBusy(true);
     setError(QString());
 
+#if defined(Q_OS_ANDROID)
     const bool installed = QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath)) &&
                            QFileInfo::exists(QString::fromLatin1(kLinuxPolicyPath)) &&
                            QFileInfo::exists(QString::fromLatin1(kLinuxUdevRulePath));
+#else
+    QFile installedHelper(QString::fromLatin1(kLinuxHelperPath));
+    const bool installed = installedHelper.open(QIODevice::ReadOnly) &&
+                           installedHelper.readAll().contains(kLinuxHelperVersionMarker) &&
+                           QFileInfo::exists(QString::fromLatin1(kLinuxPolicyPath)) &&
+                           QFileInfo::exists(QString::fromLatin1(kLinuxUdevRulePath));
+#endif
     if (installed) {
         runHelperAction(action, busId, expectedIdentity);
     } else {
@@ -783,7 +904,7 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
     {
         QFile helperFile(helperTmp);
         if (!helperFile.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
-            helperFile.write(kLinuxHelperScript) < 0) {
+            helperFile.write(linuxHelperScript()) < 0) {
             delete temp;
             setBusy(false);
             emit operationFinished(false,
@@ -793,6 +914,7 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
         helperFile.setPermissions(QFile::ExeOwner | QFile::ReadOwner);
     }
 
+#if defined(Q_OS_ANDROID)
     // 两步提权安装：先把 helper 本体放到位，再以 helper 的 install 动作
     // 写 policy + udev 规则（内容由 helper 自带）。两步都是 pkexec 直接
     // exec 固定程序、argv 直传不经 shell——路径再特殊也不可能注入
@@ -868,13 +990,58 @@ bool UsbForwardingBackend::installPrivilegedHelper(const QString &action, const 
     helperStep->start(QStringLiteral("pkexec"),
                       { installTool, QStringLiteral("-D"), QStringLiteral("-m"),
                         QStringLiteral("755"), helperTmp, QString::fromLatin1(kLinuxHelperPath) });
+#else
+    const auto failInstall = [this, temp](const QString &message) {
+        delete temp;
+        setBusy(false);
+        emit operationFinished(false, message);
+    };
+
+    QProcess *installStep = createLinuxGroupedProcess(this);
+    connect(installStep, &QProcess::errorOccurred, this,
+            [this, installStep, failInstall](QProcess::ProcessError processError) {
+                if (processError != QProcess::FailedToStart) {
+                    return;
+                }
+                installStep->deleteLater();
+                failInstall(
+                    tr("pkexec is not available. A polkit authentication agent is required."));
+            });
+    connect(installStep, &QProcess::finished, this,
+            [this, installStep, temp, action, busId, expectedIdentity, failInstall](int exitCode) {
+                const QString output = QString::fromLocal8Bit(installStep->readAllStandardError());
+                installStep->deleteLater();
+                if (output.contains(QLatin1String("operation_timeout"))) {
+                    failInstall(tr("USB sharing setup did not finish. Restart the usbipd service "
+                                   "and try again."));
+                    return;
+                }
+                if (exitCode == 7) {
+                    failInstall(tr("USB sharing setup could not activate the unplug-cleanup "
+                                   "rule. It will be retried on the next share attempt."));
+                    return;
+                }
+                if (exitCode != 0 || !QFileInfo::exists(QString::fromLatin1(kLinuxHelperPath))) {
+                    failInstall(tr("The elevation was cancelled or failed."));
+                    return;
+                }
+                delete temp;
+                runHelperAction(action, busId, expectedIdentity);
+            });
+    installStep->start(QStringLiteral("pkexec"),
+                       { QStringLiteral("/bin/sh"), helperTmp, QStringLiteral("install") });
+#endif
     return true;
 }
 
 void UsbForwardingBackend::runHelperAction(const QString &action, const QString &busId,
                                            const QString &expectedIdentity)
 {
+#if defined(Q_OS_ANDROID)
     QProcess *proc = new QProcess(this);
+#else
+    QProcess *proc = createLinuxGroupedProcess(this);
+#endif
     connect(
         proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError processError) {
             if (processError != QProcess::FailedToStart) {
@@ -915,6 +1082,22 @@ void UsbForwardingBackend::runHelperAction(const QString &action, const QString 
             QTimer::singleShot(500, this, [this] { refresh(); });
             return;
         }
+#if !defined(Q_OS_ANDROID)
+        if (combined.contains(QLatin1String("operation_timeout"))) {
+            emit operationFinished(
+                false,
+                tr("The USB sharing operation did not finish. Restart the usbipd service and try "
+                   "again."));
+            return;
+        }
+        if (exitCode == 8 || combined.contains(QLatin1String("active_connection_stuck"))) {
+            emit operationFinished(
+                false,
+                tr("The previous USB forwarding connection could not be released. Restart the "
+                   "usbipd service and reconnect the USB device before trying again."));
+            return;
+        }
+#endif
         // bind 一个已共享的设备是幂等成功（内核态已是目标状态）。
         if (action == QLatin1String("bind") && combined.contains(QLatin1String("already bound"))) {
             emit operationFinished(true, tr("Device is already shared."));
