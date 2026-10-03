@@ -1894,7 +1894,6 @@ void FFmpegVideoDecoder::decoderThreadProc()
                 continue;
             }
 
-            Session::get()->notifyVideoReceived();
             LiCompleteVideoFrame(handle, submitDecodeUnit(du));
         }
 
@@ -1916,6 +1915,7 @@ void FFmpegVideoDecoder::decoderThreadProc()
             do {
                 err = avcodec_receive_frame(m_VideoDecoderCtx, frame);
                 if (err == 0) {
+                    Session::get()->notifyVideoReceived();
                     SDL_assert(m_FrameInfoQueue.size() == m_FramesIn - m_FramesOut);
                     m_FramesOut++;
 
@@ -2101,7 +2101,6 @@ void FFmpegVideoDecoder::decoderThreadProc()
                     // No output data, so let's try to submit more input data,
                     // while we're waiting for this to frame to come back.
                     if (LiPollNextVideoFrame(&handle, &du)) {
-                        Session::get()->notifyVideoReceived();
                         // FIXME: Handle EAGAIN on avcodec_send_packet() properly?
                         LiCompleteVideoFrame(handle, submitDecodeUnit(du));
                     }
