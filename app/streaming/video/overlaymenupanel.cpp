@@ -291,17 +291,65 @@ void OverlayMenuPanel::buildMenuLevels()
 
     // === Level 2: Bitrate (piecewise-linear scrubber row + presets) ===
     MenuLevel bitrate;
-    bitrate.title = tr("Bitrate");
-    bitrate.items.push_back({QString(), QString(), MenuItemType::Slider,
-                             MenuAction::MenuActionMax, 0, true, false, true});
+    bitrate.title = m_TransportControlNegotiated ? tr("Network policy") : tr("Bitrate");
+    if (m_TransportControlNegotiated) {
+        const auto automatic =
+            m_TransportView.status ? m_TransportView.status->accepted.automatic : std::nullopt;
+        bitrate.items.push_back({ tr("Automatic bitrate"),
+                                  {},
+                                  MenuItemType::Toggle,
+                                  MenuAction::ToggleAutomaticBitrate,
+                                  0,
+                                  m_TransportView.canSubmit(),
+                                  automatic && automatic->bitrate,
+                                  false });
+        bitrate.items.push_back({ tr("Automatic FEC"),
+                                  {},
+                                  MenuItemType::Toggle,
+                                  MenuAction::ToggleAutomaticFec,
+                                  0,
+                                  m_TransportView.canSubmit(),
+                                  automatic && automatic->fec,
+                                  true });
+        bitrate.items.push_back({ tr("Current policy"), transportCurrentLabel(),
+                                  MenuItemType::Action, MenuAction::MenuActionMax, 0, false, false,
+                                  false });
+        bitrate.items.push_back({ tr("Last operation"), transportOperationLabel(),
+                                  MenuItemType::Action, MenuAction::MenuActionMax, 0, false, false,
+                                  false });
+        bitrate.items.push_back({ tr("Last SDK policy"), transportEncoderLabel(),
+                                  MenuItemType::Action, MenuAction::MenuActionMax, 0, false, false,
+                                  true });
+        bitrate.items.push_back({ tr("Take manual control"),
+                                  {},
+                                  MenuItemType::Action,
+                                  MenuAction::TakeManualTransportControl,
+                                  0,
+                                  m_TransportView.canSubmit(),
+                                  false,
+                                  true });
+    }
+    bitrate.items.push_back({ QString(), QString(), MenuItemType::Slider, MenuAction::MenuActionMax,
+                              0, !m_TransportControlNegotiated || m_TransportView.canSubmit(),
+                              false, true });
     static const int kBitratePresets[] = {
         1000, 2000, 5000, 10000, 20000, 30000, 50000, 100000
     };
     for (int kbps : kBitratePresets) {
-        bitrate.items.push_back({formatBitrateKbps(kbps), QString(), MenuItemType::Action,
-                                 MenuAction::SetBitrate, 0, true, false, false,
-                                 QString::number(kbps)});
+        // The full slider range remains available; leave room for status rows.
+        if (m_TransportControlNegotiated && kbps != 5000 && kbps != 10000 && kbps != 20000 &&
+            kbps != 50000)
+            continue;
+        bitrate.items.push_back({ formatBitrateKbps(kbps), QString(), MenuItemType::Action,
+                                  MenuAction::SetBitrate, 0,
+                                  !m_TransportControlNegotiated || m_TransportView.canSubmit(),
+                                  false, false, QString::number(kbps) });
     }
+    bitrate.items.push_back({ tr("Raw video packet loss"), rawNetworkLossLabel(),
+                              MenuItemType::Action, MenuAction::MenuActionMax, 0, false, false,
+                              false });
+    bitrate.items.push_back({ tr("Measurement window"), networkSampleLabel(), MenuItemType::Action,
+                              MenuAction::MenuActionMax, 0, false, false, true });
     m_MenuLevels.push_back(bitrate);
 
     // === Level 3: Overlay menu placement ===
@@ -423,16 +471,177 @@ void OverlayMenuPanel::updateBitrateState(int bitrateKbps)
 {
     if (m_MenuLevels.empty()) return;
 
-    if (m_BitrateCommitTimer.isActive()) {
+    if (m_BitrateCommitTimer.isActive() || m_SliderDragging) {
         // A scrub is still pending commit; it will land shortly and update
         // the preference. Don't clobber the slider with the stale value.
         return;
     }
 
-    m_BitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    const int bounded =
+        qBound(m_TransportControlNegotiated ? 1 : kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
+    if (m_BitrateKbps == bounded && m_CommittedBitrateKbps == bounded)
+        return;
+    m_BitrateKbps = bounded;
     m_CommittedBitrateKbps = m_BitrateKbps;
     refreshBitrateDetails();
     forceRepaint();
+}
+
+QString OverlayMenuPanel::transportPhaseLabel(const QString& revision) const
+{
+    if (!m_TransportView.fresh || !m_TransportView.status)
+        return tr("Result unknown");
+    switch (TransportPolicy::receiptPhase(*m_TransportView.status, revision)) {
+    case TransportPolicy::ReceiptPhase::Pending:
+        return tr("Pending");
+    case TransportPolicy::ReceiptPhase::SdkApplied:
+        return tr("SDK applied");
+    case TransportPolicy::ReceiptPhase::FirstSent:
+        return tr("First packet sent");
+    case TransportPolicy::ReceiptPhase::Failed:
+        return tr("Failed");
+    default:
+        return tr("Result unknown");
+    }
+}
+
+QString OverlayMenuPanel::transportCurrentLabel() const
+{
+    if (!m_TransportView.status)
+        return m_TransportView.queryError.isEmpty() ? tr("Querying") : tr("Unavailable");
+    const auto& status = *m_TransportView.status;
+    if (status.stopped)
+        return tr("Stopped");
+    if (!status.liveControlAvailable)
+        return tr("Unavailable");
+    return tr("%1 (r%2)")
+        .arg(transportPhaseLabel(status.accepted.revision), status.accepted.revision);
+}
+
+QString OverlayMenuPanel::transportOperationLabel() const
+{
+    if (m_TransportView.submitting)
+        return tr("Submitting");
+    if (!m_TransportView.requestError.isEmpty())
+        return tr("Result unconfirmed");
+    if (!m_TransportView.requestRevision)
+        return tr("No operation");
+    return tr("%1 (r%2)")
+        .arg(transportPhaseLabel(*m_TransportView.requestRevision),
+             *m_TransportView.requestRevision);
+}
+
+QString OverlayMenuPanel::transportEncoderLabel() const
+{
+    if (!m_TransportView.status || !m_TransportView.status->encoderReady ||
+        !m_TransportView.status->confirmed) {
+        return tr("Unconfirmed");
+    }
+    const auto& policy = *m_TransportView.status->confirmed;
+    return tr("%1; RS %2/%3/%4%")
+        .arg(formatBitrateKbps(policy.encoderKbps))
+        .arg(policy.fecBase)
+        .arg(policy.fecKey)
+        .arg(policy.fecRecovery);
+}
+
+QString OverlayMenuPanel::rawNetworkLossLabel() const
+{
+    const auto statistics = m_TransportView.networkStatistics();
+    if (!statistics)
+        return tr("Unavailable");
+    if (statistics->rawLossPercent)
+        return QString::number(*statistics->rawLossPercent, 'f', 2) + QLatin1Char('%');
+    if (statistics->reason == QStringLiteral("not_negotiated"))
+        return tr("No feedback");
+    if (statistics->reason == QStringLiteral("no_samples"))
+        return tr("No samples");
+    if (statistics->reason == QStringLiteral("feedback_stale"))
+        return tr("Feedback expired");
+    if (statistics->reason == QStringLiteral("history_truncated"))
+        return tr("History truncated");
+    if (statistics->reason == QStringLiteral("coverage_incomplete"))
+        return tr("Incomplete coverage");
+    return tr("Unavailable");
+}
+
+QString OverlayMenuPanel::networkSampleLabel() const
+{
+    const auto statistics = m_TransportView.networkStatistics();
+    if (!statistics || !statistics->windowDurationMs)
+        return tr("Unavailable");
+    return tr("%1 ms; %2 packets")
+        .arg(*statistics->windowDurationMs)
+        .arg(statistics->receivedPackets + statistics->missingPackets + statistics->unknownPackets);
+}
+
+QString OverlayMenuPanel::transportStateFingerprint() const
+{
+    QStringList values{ QString::number(m_TransportControlNegotiated),
+                        QString::number(m_TransportView.canSubmit()),
+                        transportCurrentLabel(),
+                        transportOperationLabel(),
+                        transportEncoderLabel(),
+                        rawNetworkLossLabel(),
+                        networkSampleLabel() };
+    if (m_TransportView.status) {
+        const auto& p = m_TransportView.status->accepted;
+        values << p.revision << p.controlEpoch << QString::number(p.totalKbps);
+        if (p.automatic)
+            values << QString::number(p.automatic->bitrate) << QString::number(p.automatic->fec)
+                   << QString::number(p.automatic->maximumKbps);
+    }
+    return values.join(QLatin1Char('\n'));
+}
+
+void OverlayMenuPanel::updateTransportPolicyState(bool negotiated, TransportPolicy::View view)
+{
+    const QString previous = m_LastTransportFingerprint;
+    m_TransportControlNegotiated = negotiated;
+    m_TransportView = std::move(view);
+    if (negotiated) {
+        if (!m_TransportView.canSubmit()) {
+            m_BitrateCommitTimer.stop();
+            if (m_SliderDragging)
+                setMouseGrabEnabled(false);
+            m_SliderDragging = false;
+            m_SliderPressedZone = SliderZone::None;
+            m_WheelAccum = 0;
+        }
+        if (m_TransportView.status) {
+            const auto& p = m_TransportView.status->accepted;
+            updateBitrateState(p.automatic ? p.automatic->maximumKbps : p.totalKbps);
+        }
+    }
+    m_LastTransportFingerprint = transportStateFingerprint();
+    if (previous == m_LastTransportFingerprint)
+        return;
+    buildMenuLevels();
+    if (m_Visible)
+        repositionWindow();
+    forceRepaint();
+}
+
+bool OverlayMenuPanel::dispatchTransportAction(MenuAction action)
+{
+    if (action != MenuAction::ToggleAutomaticBitrate && action != MenuAction::ToggleAutomaticFec &&
+        action != MenuAction::TakeManualTransportControl)
+        return false;
+    if (!m_TransportControlNegotiated || !m_TransportView.canSubmit() || !m_TransportChangeCallback)
+        return true;
+    const auto automatic = m_TransportView.status->accepted.automatic;
+    bool bitrate = automatic && automatic->bitrate;
+    bool fec = automatic && automatic->fec;
+    if (action == MenuAction::ToggleAutomaticBitrate)
+        bitrate = !bitrate;
+    if (action == MenuAction::ToggleAutomaticFec)
+        fec = !fec;
+    // Fold a pending slider draft into this single explicit operation.
+    m_BitrateCommitTimer.stop();
+    m_CommittedBitrateKbps = m_BitrateKbps;
+    m_TransportChangeCallback(bitrate, fec, m_BitrateKbps,
+                              action == MenuAction::TakeManualTransportControl);
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +668,7 @@ void OverlayMenuPanel::refreshBitrateDetails()
     // Current bitrate as detail text on the Bitrate category (level 0)
     for (auto& item : m_MenuLevels[0].items) {
         if (item.type == MenuItemType::SubMenu && item.targetLevel == 2) {
+            item.label = m_TransportControlNegotiated ? tr("Network budget") : tr("Bitrate");
             item.detail = formatBitrateKbps(m_BitrateKbps);
             break;
         }
@@ -483,6 +693,8 @@ double OverlayMenuPanel::bitrateFraction() const
 
 void OverlayMenuPanel::setBitrateKbps(int bitrateKbps)
 {
+    if (m_TransportControlNegotiated && !m_TransportView.canSubmit())
+        return;
     bitrateKbps = qBound(kBitrateMinKbps, bitrateKbps, kBitrateMaxKbps);
     bitrateKbps = sliderPositionToBitrate(bitrateToSliderPosition(bitrateKbps));
     if (bitrateKbps == m_BitrateKbps) return;
@@ -510,6 +722,8 @@ void OverlayMenuPanel::adjustBitrateStep(int direction, int multiplier)
 void OverlayMenuPanel::commitBitrateNow()
 {
     m_BitrateCommitTimer.stop();
+    if (m_TransportControlNegotiated && !m_TransportView.canSubmit())
+        return;
     if (m_BitrateKbps == m_CommittedBitrateKbps) return;
 
     m_CommittedBitrateKbps = m_BitrateKbps;
@@ -672,6 +886,8 @@ void OverlayMenuPanel::updateRemoteUsbState(
 
 void OverlayMenuPanel::dispatchActionItem(const MenuItem& item)
 {
+    if (dispatchTransportAction(item.action))
+        return;
     // USB callbacks can synchronously rebuild the device list. Own the payload
     // before calling out so a refresh cannot invalidate the selected identity.
     const QString payload = item.payload;
@@ -1039,6 +1255,11 @@ int OverlayMenuPanel::itemAtPos(const QPoint& pos) const
 void OverlayMenuPanel::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
+    paintContents(p);
+}
+
+void OverlayMenuPanel::paintContents(QPainter& p)
+{
     p.setRenderHint(QPainter::Antialiasing, false);
     p.setRenderHint(QPainter::TextAntialiasing);
 
@@ -1210,7 +1431,7 @@ void OverlayMenuPanel::paintEvent(QPaintEvent*)
 
             // Current value in the shared brand accent.
             p.setFont(m_LabelFont);
-            p.setPen(sliderFocused ? MenuAccent : MenuText);
+            p.setPen(!item.enabled ? MenuFaint : sliderFocused ? MenuAccent : MenuText);
             p.drawText(r.value, Qt::AlignLeft | Qt::AlignVCenter,
                        formatBitrateKbps(m_BitrateKbps));
 
@@ -1442,6 +1663,8 @@ void OverlayMenuPanel::mousePressEvent(QMouseEvent* event)
 
     case MenuItemType::Toggle:
     {
+        if (dispatchTransportAction(item.action))
+            break;
         // Toggle visual state and dispatch
         auto& mutableItem = m_MenuLevels[m_CurrentLevel].items[idx];
         mutableItem.toggleState = !mutableItem.toggleState;
@@ -1484,8 +1707,9 @@ void OverlayMenuPanel::wheelEvent(QWheelEvent* event)
     const QPoint pos = event->pos();
 #endif
     const int idx = itemAtPos(pos);
-    if (idx < 0 || idx >= (int)m_MenuLevels[m_CurrentLevel].items.size()
-            || m_MenuLevels[m_CurrentLevel].items[idx].type != MenuItemType::Slider) {
+    if (idx < 0 || idx >= (int)m_MenuLevels[m_CurrentLevel].items.size() ||
+        !m_MenuLevels[m_CurrentLevel].items[idx].enabled ||
+        m_MenuLevels[m_CurrentLevel].items[idx].type != MenuItemType::Slider) {
         // Don't carry a partial notch into a later scrub session.
         m_WheelAccum = 0;
         event->ignore();
@@ -1600,6 +1824,8 @@ void OverlayMenuPanel::gamepadSelect()
         break;
     case MenuItemType::Toggle:
     {
+        if (dispatchTransportAction(item.action))
+            break;
         auto& mutableItem = m_MenuLevels[m_CurrentLevel].items[m_HoveredIndex];
         mutableItem.toggleState = !mutableItem.toggleState;
         forceRepaint();

@@ -199,11 +199,13 @@ win32:!winrt:equals(MOONLIGHT_FUNCTION_TESTS_ENABLED, 1) {
     SOURCES += \
         streaming/input/stylusreplay.cpp \
         streaming/input/stylusreplaytest.cpp \
-        streaming/video/stylusreplaypanel.cpp
+        streaming/video/stylusreplaypanel.cpp \
+        ../tests/transport_policy_session/sessiondriver.cpp
     HEADERS += \
         streaming/input/stylusreplay.h \
         streaming/input/stylusreplaytest.h \
-        streaming/video/stylusreplaypanel.h
+        streaming/video/stylusreplaypanel.h \
+        ../tests/transport_policy_session/sessiondriver.h
 }
 
 macx {
@@ -234,6 +236,9 @@ SOURCES += \
     backend/identitymanager.cpp \
     backend/nvcomputer.cpp \
     backend/nvhttp.cpp \
+    backend/transportpolicy.cpp \
+    backend/transportpolicymirror.cpp \
+    backend/transportpolicycontroller.cpp \
     backend/nvpairingmanager.cpp \
     backend/computermanager.cpp \
     backend/boxartmanager.cpp \
@@ -309,6 +314,10 @@ HEADERS += \
     backend/identitymanager.h \
     backend/nvcomputer.h \
     backend/nvhttp.h \
+    backend/transportpolicy.h \
+    backend/transportpolicymirror.h \
+    backend/transportpolicycontroller.h \
+    backend/legacybitrate.h \
     backend/usbforwardingcapability.h \
     backend/nvpairingmanager.h \
     backend/computermanager.h \

@@ -1,4 +1,6 @@
 #include "nvcomputer.h"
+#include "pairedcertificate.h"
+#include "legacytransportscope.h"
 #include <Limelight.h>
 
 #include <QHostInfo>
@@ -15,6 +17,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QUrlQuery>
+#include <stdexcept>
 #include <memory>
 
 #define FAST_FAIL_TIMEOUT_MS 2000
@@ -222,6 +226,8 @@ NvHTTP::startApp(QString verb,
                  const QString& displayName,
                  RemoteStreamConfig &remoteStreamConfig)
 {
+    m_TransportSessionId.clear();
+    m_TransportConnectionEpoch.clear();
     int riKeyId;
 
     memcpy(&riKeyId, streamConfig->remoteInputAesIv, sizeof(riKeyId));
@@ -257,22 +263,24 @@ NvHTTP::startApp(QString verb,
     }
 
     QString query =
-            "appid="+QString::number(appId)+
-            "&mode="+appWidth+"x"+
-            appHeight+"x"+
-            appFps+
-            "&additionalStates=1&sops="+QString::number(sops ? 1 : 0)+
-            "&rikey="+QByteArray(streamConfig->remoteInputAesKey, sizeof(streamConfig->remoteInputAesKey)).toHex()+
-            "&rikeyid="+QString::number(riKeyId)+
-            ((streamConfig->supportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) ?
-                "&hdrMode="+QString::number(streamConfig->hdrMode)+
-                "&clientHdrCapVersion=0&clientHdrCapSupportedFlagsInUint32=0&clientHdrCapMetaDataId=NV_STATIC_METADATA_TYPE_1&clientHdrCapDisplayData=0x0x0x0x0x0x0x0x0x0x0" :
-                 "")+
-            "&localAudioPlayMode="+QString::number(localAudio ? 1 : 0)+
-            "&surroundAudioInfo="+QString::number(SURROUNDAUDIOINFO_FROM_AUDIO_CONFIGURATION(streamConfig->audioConfiguration))+
-            "&remoteControllersBitmap="+QString::number(gamepadMask)+
-            "&gcmap="+QString::number(gamepadMask)+
-            "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0);
+        "appid=" + QString::number(appId) + "&transportScope=1" + "&mode=" + appWidth + "x" +
+        appHeight + "x" + appFps + "&additionalStates=1&sops=" + QString::number(sops ? 1 : 0) +
+        "&rikey=" +
+        QByteArray(streamConfig->remoteInputAesKey, sizeof(streamConfig->remoteInputAesKey))
+            .toHex() +
+        "&rikeyid=" + QString::number(riKeyId) +
+        ((streamConfig->supportedVideoFormats & VIDEO_FORMAT_MASK_10BIT)
+             ? "&hdrMode=" + QString::number(streamConfig->hdrMode) +
+                   "&clientHdrCapVersion=0&clientHdrCapSupportedFlagsInUint32=0&"
+                   "clientHdrCapMetaDataId=NV_STATIC_METADATA_TYPE_1&clientHdrCapDisplayData="
+                   "0x0x0x0x0x0x0x0x0x0x0"
+             : "") +
+        "&localAudioPlayMode=" + QString::number(localAudio ? 1 : 0) + "&surroundAudioInfo=" +
+        QString::number(
+            SURROUNDAUDIOINFO_FROM_AUDIO_CONFIGURATION(streamConfig->audioConfiguration)) +
+        "&remoteControllersBitmap=" + QString::number(gamepadMask) +
+        "&gcmap=" + QString::number(gamepadMask) +
+        "&gcpersist=" + QString::number(persistGameControllersOnDisconnect ? 1 : 0);
 
     if (screenCombinationMode != -1) {
         query += "&customScreenMode="+QString::number(screenCombinationMode);
@@ -310,6 +318,14 @@ NvHTTP::startApp(QString verb,
     verifyResponseStatus(response);
 
     rtspSessionUrl = getXmlString(response, "sessionUrl0");
+    auto sessionId = getXmlString(response, "transportSessionId");
+    m_TransportSessionId = TransportPolicy::isIdentity(sessionId, QStringLiteral("4294967295"))
+                               ? sessionId
+                               : QString();
+    if (const auto scope = parseLegacyTransportScope(response)) {
+        m_TransportSessionId = scope->sessionId;
+        m_TransportConnectionEpoch = scope->connectionEpoch;
+    }
 }
 
 void
@@ -639,6 +655,14 @@ NvHTTP::getAbrCapabilities(int* hostMaxBitrateKbps)
     return response.value("supported").toBool(false);
 }
 
+void NvHTTP::setLegacyTransportScope(const QString& sessionId, const QString& connectionEpoch)
+{
+    if (!connectionEpoch.isEmpty() && !LegacyTransportScope::valid(sessionId, connectionEpoch))
+        throw std::invalid_argument("Invalid legacy transport scope");
+    m_TransportSessionId = sessionId;
+    m_TransportConnectionEpoch = connectionEpoch;
+}
+
 QJsonObject
 NvHTTP::configureAbr(bool enabled,
                      int minBitrateKbps,
@@ -648,6 +672,8 @@ NvHTTP::configureAbr(bool enabled,
 {
     QJsonObject body;
     body["enabled"] = enabled;
+    if (!m_TransportConnectionEpoch.isEmpty())
+        LegacyTransportScope{ m_TransportSessionId, m_TransportConnectionEpoch }.appendTo(body);
     if (enabled) {
         body["minBitrate"] = minBitrateKbps;
         body["maxBitrate"] = maxBitrateKbps;
@@ -676,6 +702,8 @@ NvHTTP::sendAbrFeedback(double packetLoss,
     body["decodeFps"] = decodeFps;
     body["droppedFrames"] = droppedFrames;
     body["currentBitrate"] = currentBitrateKbps;
+    if (!m_TransportConnectionEpoch.isEmpty())
+        LegacyTransportScope{ m_TransportSessionId, m_TransportConnectionEpoch }.appendTo(body);
 
     return openJsonConnectionToObject(m_BaseUrlHttps,
                                       "api/abr/feedback",
@@ -709,13 +737,17 @@ NvHTTP::openConnection(QUrl baseUrl,
         }
     }
 
+    if (m_ClientNameOverride)
+        clientname = *m_ClientNameOverride;
+
     qInfo() << "clientname:" << clientname;
 
     // Use a placeholder UID for GFE allow them to quit games for each other.
-    url.setQuery("uniqueid=" + (m_UseTrueUid ? IdentityManager::get()->getUniqueId() : "0123456789ABCDEF") +
-                 "&uuid=" + QUuid::createUuid().toRfc4122().toHex() +
-                 "&clientname=" + clientname +
-                 (!arguments.isNull() ? ("&" + arguments) : ""));
+    url.setQuery(
+        "uniqueid=" + (m_UseTrueUid ? IdentityManager::get()->getUniqueId() : "0123456789ABCDEF") +
+        "&uuid=" + QUuid::createUuid().toRfc4122().toHex() +
+        "&clientname=" + QString::fromUtf8(QUrl::toPercentEncoding(clientname)) +
+        (!arguments.isNull() ? ("&" + arguments) : ""));
 
     QNetworkRequest request(url);
 
@@ -812,15 +844,44 @@ NvHTTP::openConnection(QUrl baseUrl,
     return reply;
 }
 
-QJsonObject
-NvHTTP::openJsonConnectionToObject(QUrl baseUrl,
-                                   QString command,
-                                   QJsonObject body,
-                                   bool post,
-                                   int timeoutMs,
-                                   NvLogLevel logLevel)
+TransportPolicy::Status NvHTTP::getTransportPolicy(const QString& sessionId,
+                                                   const QString& connectionEpoch)
+{
+    if (!TransportPolicy::isIdentity(sessionId, QStringLiteral("4294967295")) ||
+        (!connectionEpoch.isEmpty() && !TransportPolicy::isIdentity(connectionEpoch))) {
+        throw std::invalid_argument("Invalid transport identity");
+    }
+    QUrl url(m_BaseUrlHttps);
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("sessionId"), sessionId);
+    if (!connectionEpoch.isEmpty())
+        query.addQueryItem(QStringLiteral("connectionEpoch"), connectionEpoch);
+    url.setQuery(query);
+    return TransportPolicy::parseStatus(openJsonConnectionToObject(
+        url, QStringLiteral("api/v2/transport-policy"), {}, false, 2000, NVLL_ERROR, 200));
+}
+
+TransportPolicy::Submission NvHTTP::postTransportPolicy(const QString& path,
+                                                        const QJsonObject& body)
+{
+    if (path != QStringLiteral("api/v2/transport-control") &&
+        path != QStringLiteral("api/v2/transport-policy")) {
+        throw std::invalid_argument("Invalid transport operation");
+    }
+    return TransportPolicy::parseSubmission(
+        openJsonConnectionToObject(m_BaseUrlHttps, path, body, true, 2000, NVLL_ERROR, 202));
+}
+
+QJsonObject NvHTTP::openJsonConnectionToObject(QUrl baseUrl, QString command, QJsonObject body,
+                                               bool post, int timeoutMs, NvLogLevel logLevel,
+                                               int expectedHttpStatus)
 {
     QNetworkReply* reply = openJsonConnection(baseUrl, command, body, post, timeoutMs, logLevel);
+    const auto httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (expectedHttpStatus != 0 && httpStatus != expectedHttpStatus) {
+        delete reply;
+        throw GfeHttpResponseException(httpStatus, "Unexpected transport API status");
+    }
     QByteArray response = reply->readAll();
     delete reply;
 
@@ -849,6 +910,8 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
     url.setPath("/" + command);
 
     QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::ManualRedirectPolicy);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setSslConfiguration(IdentityManager::get()->getSslConfig());
 
@@ -865,6 +928,7 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
 #endif
 
     auto sslErrorsConnection = connect(m_Nam, &QNetworkAccessManager::sslErrors, this, &NvHTTP::handleSslErrors);
+    auto pinnedConnection = PairedCertificate::enforce(m_Nam, this, m_ServerCert);
     QNetworkReply* reply = post ?
                 m_Nam->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact)) :
                 m_Nam->get(request);
@@ -892,6 +956,15 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
     m_Nam->clearAccessCache();
 #endif
     disconnect(sslErrorsConnection);
+    disconnect(pinnedConnection);
+    if (url.scheme() == QStringLiteral("https") &&
+        (reply->error() == QNetworkReply::NoError ||
+         !reply->sslConfiguration().peerCertificate().isNull()) &&
+        !PairedCertificate::matches(m_ServerCert, reply->sslConfiguration().peerCertificate())) {
+        delete reply;
+        throw QtNetworkReplyException(QNetworkReply::SslHandshakeFailedError,
+                                      "Server certificate mismatch");
+    }
 
     if (reply->error() != QNetworkReply::NoError)
     {
@@ -899,17 +972,11 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
             qWarning() << command << "JSON request failed with error:" << reply->error();
         }
 
-        if (reply->error() == QNetworkReply::SslHandshakeFailedError) {
-            GfeHttpResponseException exception(401, "Server certificate mismatch");
-            delete reply;
-            throw exception;
-        }
-        else if (reply->error() == QNetworkReply::OperationCanceledError) {
+        if (reply->error() == QNetworkReply::OperationCanceledError) {
             QtNetworkReplyException exception(QNetworkReply::TimeoutError, "Request timed out");
             delete reply;
             throw exception;
-        }
-        else {
+        } else {
             QtNetworkReplyException exception(reply->error(), reply->errorString());
             delete reply;
             throw exception;
@@ -917,6 +984,10 @@ NvHTTP::openJsonConnection(QUrl baseUrl,
     }
 
     int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (httpStatus >= 300 && httpStatus < 400) {
+        delete reply;
+        throw GfeHttpResponseException(httpStatus, "Host API redirects are not allowed");
+    }
     if (httpStatus >= 400) {
         QString errorText = QString::fromUtf8(reply->readAll());
         if (logLevel >= NvLogLevel::NVLL_ERROR) {
