@@ -72,3 +72,20 @@ notification limit. Compare query timing against the preceding query end to
 prove an early wake rather than assuming any new state came from a notice.
 This mode does not establish reliable channel fault, resource cost, Android
 device, desktop composition, or QoE acceptance.
+
+For policy request faults, a developer build can set
+`MOONLIGHT_TRANSPORT_FAULT_PROXY_PORT` to a private paired loopback TLS relay.
+The port is used only with a validated Session driver, loopback address and
+pinned host certificate. A policy action can set `"expectRequestError": true`.
+It must observe an actual request error, wait for an actionable paired query,
+then emit the same production menu action again to simulate an explicit retry.
+The result retains `failedRequest` and `reconciledBeforeRetry` separately from
+the retry's request revision and execution receipts. An absent error or a
+second failed attempt fails the step. Production Controller retry behavior is
+unchanged; this sequence belongs to the developer driver.
+
+The private relay must obtain a real host 409 or withhold a real accepted
+response through the HTTP deadline. Independently reconcile the original and
+retry request IDs, expected revisions, immutable host policies and actual
+SDK/first-send receipts. Keep failed fixtures, and do not replace responses or
+receipts with synthetic success.
