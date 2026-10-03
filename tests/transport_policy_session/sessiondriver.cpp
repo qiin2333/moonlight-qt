@@ -101,6 +101,10 @@ TransportPolicySessionDriver::TransportPolicySessionDriver(OverlayMenuPanel& pan
              step.value(QStringLiteral("requestedBudgetKbps")).toInt() > 800000))
             throw std::invalid_argument(
                 "Fault action requires legacy mode and a valid requested target");
+        if (step.contains(QStringLiteral("expectRequestError")) &&
+            (!step.value(QStringLiteral("expectRequestError")).isBool() || m_LegacyMode ||
+             action == QStringLiteral("reconnect") || action == QStringLiteral("fault")))
+            throw std::invalid_argument("Request errors require a policy control action");
     }
     m_Clock.start();
     save();
@@ -164,6 +168,7 @@ QJsonObject TransportPolicySessionDriver::snapshot(const TransportPolicy::View& 
     result.insert(QStringLiteral("readOnly"), view.readOnly);
     result.insert(QStringLiteral("canSubmit"), view.canSubmit());
     result.insert(QStringLiteral("queryError"), view.queryError);
+    result.insert(QStringLiteral("requestError"), view.requestError);
     if (const auto statistics = view.networkStatistics()) {
         QJsonObject display{ { QStringLiteral("reason"), statistics->reason },
                              { QStringLiteral("fresh"), statistics->fresh },
@@ -285,8 +290,15 @@ void TransportPolicySessionDriver::tick(const TransportPolicy::View& view)
         finish(false, QStringLiteral("Session action timeout"));
         return;
     }
-    if (m_Waiting && !view.requestError.isEmpty()) {
-        finish(false, view.requestError);
+    if (m_Waiting && !view.submitting && !view.requestError.isEmpty()) {
+        if (!m_Steps[m_Index].toObject().value(QStringLiteral("expectRequestError")).toBool() ||
+            !m_RequestErrorObservation.isEmpty()) {
+            finish(false, view.requestError);
+            return;
+        }
+        m_RequestErrorObservation = snapshot(view);
+        m_Waiting = false;
+        save();
         return;
     }
     if (!view.canSubmit())
@@ -340,6 +352,8 @@ void TransportPolicySessionDriver::tick(const TransportPolicy::View& view)
     }
     if (m_Clock.elapsed() < 1000)
         return;
+    if (!m_RequestErrorObservation.isEmpty())
+        m_RequestRecoveryObservation = snapshot(view);
     const auto step = m_Steps[m_Index].toObject();
     m_ExpectedBitrate = step.value(QStringLiteral("expectBitrate")).toBool();
     m_ExpectedFec = step.value(QStringLiteral("expectFec")).toBool();
@@ -547,7 +561,17 @@ bool TransportPolicySessionDriver::recordLegacyStep(const LegacySessionObservati
 
 bool TransportPolicySessionDriver::recordStep(const TransportPolicy::View& view, bool reconnected)
 {
+    if (m_Steps[m_Index].toObject().value(QStringLiteral("expectRequestError")).toBool() &&
+        (m_RequestErrorObservation.isEmpty() || m_RequestRecoveryObservation.isEmpty())) {
+        finish(false,
+               QStringLiteral("Expected request error and reconciliation were not observed"));
+        return true;
+    }
     auto result = snapshot(view);
+    if (!m_RequestErrorObservation.isEmpty()) {
+        result.insert(QStringLiteral("failedRequest"), m_RequestErrorObservation);
+        result.insert(QStringLiteral("reconciledBeforeRetry"), m_RequestRecoveryObservation);
+    }
     result.insert(QStringLiteral("step"), m_Index);
     result.insert(QStringLiteral("action"), m_Steps[m_Index].toObject());
     result.insert(QStringLiteral("elapsedMs"), QString::number(m_Clock.elapsed()));
@@ -569,6 +593,7 @@ bool TransportPolicySessionDriver::recordStep(const TransportPolicy::View& view,
                   QStringLiteral("requires review; desktop composition unverified"));
     m_Results.append(result);
     ++m_Index;
+    m_RequestErrorObservation = m_RequestRecoveryObservation = {};
     m_Waiting = m_WaitingReconnect = false;
     save();
     if (m_Index == m_Steps.size()) {

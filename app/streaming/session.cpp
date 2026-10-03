@@ -3622,11 +3622,16 @@ void Session::startTransportPolicy()
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
     const int statisticsProxyPort =
         qEnvironmentVariableIntValue("MOONLIGHT_STATISTICS_FAULT_PROXY_PORT");
-    if (readOnly && m_TransportPolicySessionDriver &&
-        m_TransportPolicySessionDriver->statisticsMode() &&
-        QHostAddress(address.address()).isLoopback() && !certificate.isNull() &&
-        statisticsProxyPort >= 1024 && statisticsProxyPort <= 65535) {
-        port = static_cast<uint16_t>(statisticsProxyPort);
+    const int controlProxyPort =
+        qEnvironmentVariableIntValue("MOONLIGHT_TRANSPORT_FAULT_PROXY_PORT");
+    const int faultProxyPort = readOnly ? statisticsProxyPort : controlProxyPort;
+    const bool faultDriver = m_TransportPolicySessionDriver &&
+                             (readOnly ? m_TransportPolicySessionDriver->statisticsMode()
+                                       : !m_TransportPolicySessionDriver->legacyMode() &&
+                                             !m_TransportPolicySessionDriver->notificationsMode());
+    if (faultDriver && QHostAddress(address.address()).isLoopback() && !certificate.isNull() &&
+        faultProxyPort >= 1024 && faultProxyPort <= 65535) {
+        port = static_cast<uint16_t>(faultProxyPort);
     }
 #endif
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
@@ -5572,8 +5577,12 @@ void Session::exec()
     }
     // Start outside the computer read lock: this joins the old HTTP worker and
     // then takes its own paired-parameter snapshot under that lock.
-    if (m_TransportPolicySessionDriver && (m_TransportPolicySessionDriver->statisticsMode() ||
-                                           m_TransportPolicySessionDriver->notificationsMode()))
+    const int policyFaultProxyPort =
+        qEnvironmentVariableIntValue("MOONLIGHT_TRANSPORT_FAULT_PROXY_PORT");
+    if (m_TransportPolicySessionDriver &&
+        (m_TransportPolicySessionDriver->statisticsMode() ||
+         m_TransportPolicySessionDriver->notificationsMode() ||
+         (policyFaultProxyPort >= 1024 && policyFaultProxyPort <= 65535)))
         startTransportPolicy();
 #endif
 

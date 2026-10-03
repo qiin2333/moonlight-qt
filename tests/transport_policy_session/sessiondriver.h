@@ -57,6 +57,8 @@ private:
     QJsonArray m_Steps;
     QJsonArray m_Results;
     QJsonObject m_FaultInFlightObservation;
+    QJsonObject m_RequestErrorObservation;
+    QJsonObject m_RequestRecoveryObservation;
     int m_Index = 0;
     bool m_Processing = false;
     bool m_Waiting = false;
