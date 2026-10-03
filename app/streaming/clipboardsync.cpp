@@ -1,5 +1,6 @@
 #include "clipboardsync.h"
 #include "clipboardlogging.h"
+#include "backend/pairedcertificate.h"
 
 #include <QBuffer>
 #include <QClipboard>
@@ -995,23 +996,14 @@ QNetworkAccessManager* ClipboardSync::nam()
         // Validate every new TLS connection before HTTP data is sent. Reused
         // connections belong to this manager's immutable paired identity.
         const QSslCertificate pinned = m_HostContext.serverCertificate;
-        connect(m_Nam, &QNetworkAccessManager::encrypted, this, [pinned](QNetworkReply* reply) {
-            if (pinned.isNull() || reply->sslConfiguration().peerCertificate() != pinned) {
-                reply->abort();
-            }
-        });
-        connect(m_Nam, &QNetworkAccessManager::sslErrors, this,
-                [this](QNetworkReply* reply, const QList<QSslError>& errors) {
-                    if (m_HostContext.serverCertificate.isNull()) {
-                        return;
-                    }
-                    for (const QSslError& e : errors) {
-                        if (m_HostContext.serverCertificate != e.certificate()) {
-                            return;
-                        }
-                    }
+        PairedCertificate::enforce(m_Nam, this, pinned);
+        connect(
+            m_Nam, &QNetworkAccessManager::sslErrors, this,
+            [this](QNetworkReply* reply, const QList<QSslError>& errors) {
+                if (PairedCertificate::canIgnoreErrors(m_HostContext.serverCertificate, errors)) {
                     reply->ignoreSslErrors(errors);
-                });
+                }
+            });
     }
     return m_Nam;
 }
@@ -1075,7 +1067,7 @@ void ClipboardSync::readBlobReply(
             }
             const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             if (reply->error() != QNetworkReply::NoError || bytes->size() > limit ||
-                pinned.isNull() || reply->sslConfiguration().peerCertificate() != pinned ||
+                !PairedCertificate::matches(pinned, reply->sslConfiguration().peerCertificate()) ||
                 status < 200 || status >= 300) {
                 ClipboardLog::warn("ClipboardSync: blob transfer failed or exceeded its limits");
                 // Let an explicit repeat copy retry a failed upload.

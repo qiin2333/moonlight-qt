@@ -18,6 +18,8 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | clipboard_helper_lifecycle | helper 异常退出、响应超时和进程管道背压 | Windows |
 | overlay_button_position | 悬浮按钮归一化/还原坐标的跨分辨率往返 | Windows |
 | file_mapping_websocket_framing | 文件映射 WS 帧解析(fin/分片/ping-pong) | Windows |
+| shared_helpers | 配对证书策略、版本比较与 GFE 兼容性回退 | Windows |
+| file_mapping_transport | 本地 TLS 配对/缓存连接身份/重定向校验，WS Upgrade 与 RPC ID/重入回归 | Windows |
 | file_mapping_mirror_e2e | 主机文件镜像端到端(FakeRemoteVfs + 挂载提供方) | Windows |
 | usb_forwarding_capability | helper 能力 JSON 解析(端口/token/畸形输入) | Windows |
 | usb_forwarding_environment | USB 转发就绪态 → 错误文案映射(--require-ready 走活探测) | Windows |
