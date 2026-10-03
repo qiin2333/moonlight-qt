@@ -5288,20 +5288,25 @@ void Session::exec()
 #endif
     const std::string windowName = windowTitle.toStdString();
 
-    bool attemptedQtWaylandWindow = false;
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     if (WaylandQtSdlBridge::isNativeWayland() &&
         strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
-        attemptedQtWaylandWindow = true;
         const Qt::WindowStates initialStates =
             m_QtWindow != nullptr ? m_QtWindow->windowStates() : Qt::WindowNoState;
         m_WaylandStreamWindow = WaylandQtSdlBridge::createStreamWindow(
             windowTitle, QRect(x, y, width, height),
             m_QtWindow != nullptr ? m_QtWindow->screen() : nullptr, initialStates, m_IsFullScreen);
         m_Window = WaylandQtSdlBridge::wrapStreamWindow(m_WaylandStreamWindow);
-    } else
+        if (!m_Window) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Wrapping the Qt Wayland stream surface failed; trying an SDL window: %s",
+                        SDL_GetError());
+            delete m_WaylandStreamWindow;
+            m_WaylandStreamWindow = nullptr;
+        }
+    }
 #endif
-    {
+    if (!m_Window) {
         m_Window = SDL_CreateWindow(windowName.c_str(), x, y, width, height,
                                     defaultWindowFlags | StreamUtils::getPlatformWindowFlags());
         if (!m_Window) {
@@ -5314,10 +5319,7 @@ void Session::exec()
     }
 
     if (!m_Window) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s failed: %s",
-                     attemptedQtWaylandWindow ? "Wrapping the Qt Wayland stream surface"
-                                              : "SDL_CreateWindow()",
-                     SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateWindow() failed: %s", SDL_GetError());
 
         delete m_WaylandStreamWindow;
         m_WaylandStreamWindow = nullptr;
