@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QRasterWindow>
+#include "overlayrasterwindow.h"
 #include <QPainter>
 #include <QFont>
 #include <QElapsedTimer>
@@ -8,6 +8,7 @@
 #include <QPropertyAnimation>
 
 #include "overlaytoasteventstate.h"
+#include "overlaywindowpolicy.h"
 
 /**
  * OverlayToast - lightweight, auto-dismissing toast notification
@@ -16,17 +17,18 @@
  * Shows a brief message at the bottom-center of the streaming window,
  * then fades out and hides itself after a configurable duration.
  */
-class OverlayToast : public QRasterWindow {
+class OverlayToast : public OverlayRasterWindow
+{
     Q_OBJECT
-    Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
 
 public:
-    explicit OverlayToast(QWindow* parent = nullptr);
+    explicit OverlayToast(QWindow* parent = nullptr,
+                          OverlayWindowMode windowMode = OverlayWindowMode::Detached);
     ~OverlayToast() override;
 
     /**
      * Show a toast message centered at the bottom of the given parent rect.
-     * @param parentX/Y/W/H  Qt global logical geometry of the streaming window
+     * @param parentX/Y/W/H  Qt logical geometry in this window's coordinate space
      * @param message         Text to display
      * @param durationMs      How long to show before fading out (default 2000ms)
      */
@@ -42,7 +44,7 @@ public:
     void dismissImmediately();
 
 protected:
-    void paintEvent(QPaintEvent* event) override;
+    void paintOverlay(QPainter& painter) override;
 
 private slots:
     void startFadeOut();
@@ -57,4 +59,5 @@ private:
     int m_ToastHeight;
     int m_HorizPadding;
     int m_VertPadding;
+    OverlayWindowMode m_WindowMode;
 };

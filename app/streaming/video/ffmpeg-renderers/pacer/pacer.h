@@ -56,6 +56,9 @@ private:
 
     void dropFrameForEnqueue(QQueue<AVFrame*>& queue);
 
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    SDL_Window* m_Window = nullptr;
+#endif
     QQueue<AVFrame*> m_RenderQueue;
     QQueue<AVFrame*> m_PacingQueue;
     QQueue<int> m_PacingQueueHistory;

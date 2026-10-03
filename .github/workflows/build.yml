@@ -465,7 +465,7 @@ jobs:
         version: '6.11.1'
         host: ${{ matrix.qt_host }}
         arch: ${{ matrix.qt_arch }}
-        modules: 'qtmultimedia qtimageformats'
+        modules: 'qtmultimedia qtimageformats qtwaylandcompositor'
         cache: true
 
     - name: Setup local env and metadata
@@ -639,15 +639,9 @@ jobs:
         cd libva
         ./autogen.sh
 
-        # Configure with conditional Wayland support
-        echo "Configuring libva..."
-        if pkg-config --exists wayland-client; then
-          echo "Configuring libva with Wayland support"
-          ./configure --enable-x11 --enable-wayland
-        else
-          echo "Configuring libva without Wayland support"
-          ./configure --enable-x11 --disable-wayland
-        fi
+        # Native Wayland is a required part of the AppImage, alongside X11 fallback.
+        pkg-config --exists wayland-client
+        ./configure --enable-x11 --enable-wayland
 
         make -j$(nproc)
         sudo make install
@@ -691,11 +685,13 @@ jobs:
     - name: Build FFmpeg
       run: |
         export FFMPEG_REV=n9.0
-        export FFMPEG_CONFIGURE_ARGS="--enable-pic --enable-lto --disable-static --enable-shared --disable-all --disable-autodetect --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-vaapi --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-vdpau --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-vulkan --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d"
+        export FFMPEG_CONFIGURE_ARGS="--enable-pic --enable-lto --disable-static --enable-shared --disable-all --disable-autodetect --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-vaapi --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-vdpau --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-vulkan --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d --enable-decoder=h264_v4l2m2m --enable-decoder=hevc_v4l2m2m --enable-pthreads --enable-v4l2-m2m"
         git clone https://github.com/FFmpeg/FFmpeg.git FFmpeg
         cd FFmpeg
         git checkout $FFMPEG_REV
         ./configure $FFMPEG_CONFIGURE_ARGS
+        grep -qxF '#define CONFIG_H264_V4L2M2M_DECODER 1' config_components.h || { echo "H.264 V4L2 M2M decoder is not enabled" >&2; exit 1; }
+        grep -qxF '#define CONFIG_HEVC_V4L2M2M_DECODER 1' config_components.h || { echo "HEVC V4L2 M2M decoder is not enabled" >&2; exit 1; }
         make -j$(nproc)
         sudo make install
         sudo ldconfig

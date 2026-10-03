@@ -24,6 +24,10 @@ esac
 
 command -v qmake6 >/dev/null 2>&1 || fail "Unable to find 'qmake6' in your PATH!"
 command -v $LINUXDEPLOY >/dev/null 2>&1 || fail "Unable to find '$LINUXDEPLOY' in your PATH!"
+command -v pkg-config >/dev/null 2>&1 || fail "Unable to find 'pkg-config' in your PATH!"
+pkg-config --exists wayland-client || fail "Wayland client development files are required for AppImage builds!"
+pkg-config --exists libva-x11 || fail "libva X11 development files are required for AppImage builds!"
+pkg-config --exists libva-wayland || fail "libva Wayland development files are required for AppImage builds!"
 
 echo "MOONLIGHT BUILD ENVIRONMENT"
 qmake --version
@@ -48,14 +52,15 @@ export LDFLAGS=-flto=auto
 
 echo Configuring the project
 pushd $BUILD_FOLDER
-# Building with Wayland support will cause linuxdeploy to include libwayland-client.so in the AppImage.
-# Since we always use the host implementation of EGL, this can cause libEGL_mesa.so to fail to load due
-# to missing symbols from the host's version of libwayland-client.so that aren't present in the older
-# version of libwayland-client.so from our AppImage build environment. When this happens, EGL fails to
-# work even in X11. To avoid this, we will disable Wayland support for the AppImage.
+# Build both native Wayland and X11 support. linuxdeploy is told below not to bundle
+# libwayland-client.so, because the build-environment copy can be older than the host
+# copy required by the host's libEGL_mesa.so. Keeping that library host-provided
+# preserves the original EGL compatibility fix without compiling Wayland out.
 #
 # We disable DRM support because linuxdeploy doesn't bundle the appropriate libraries for Qt EGLFS.
-qmake6 $SOURCE_ROOT/moonlight-qt.pro CONFIG+=disable-wayland CONFIG+=disable-libdrm PREFIX=$DEPLOY_FOLDER/usr DEFINES+=APP_IMAGE || fail "Qmake failed!"
+qmake6 "$SOURCE_ROOT/moonlight-qt.pro" CONFIG+=disable-libdrm \
+  CONFIG+=require-qt-sdl-wayland-bridge \
+  "PREFIX=$DEPLOY_FOLDER/usr" DEFINES+=APP_IMAGE || fail "Qmake failed!"
 popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration
@@ -75,39 +80,46 @@ perl -pi -e 's/__GITHUB_SHA__/$ENV{GITHUB_SHA}/' $DEPLOY_FOLDER/usr/share/metain
 export QML_SOURCES_PATHS=$SOURCE_ROOT/app/gui
 export QMAKE=qmake6
 
-# Stage the build-environment libva in opt/libva-fallback (outside usr/, so linuxdeploy
-# does not scan it, and outside every loader search path), together with a small probe
-# binary that carries the same libva ELF requirements as Moonlight. The AppRun below
-# uses the probe to decide, via the dynamic loader itself, whether the host libva can
-# satisfy Moonlight; when it cannot, the fallback copy is made visible. opt/ is a
-# standard linuxdeploy location for application data that must not be processed.
+# Stage the complete build-environment libva in opt/libva-fallback (outside usr/, so
+# linuxdeploy does not scan it, and outside every loader search path). Also stage a
+# separate directory containing only the Wayland adapter. AppRun can expose that
+# adapter without shadowing a compatible host libva core on X11 systems that do not
+# install libva-wayland. opt/ is a standard linuxdeploy location for application data
+# that must not be processed.
 LIBVA_FALLBACK_DIR=$DEPLOY_FOLDER/opt/libva-fallback
+LIBVA_WAYLAND_FALLBACK_DIR=$DEPLOY_FOLDER/opt/libva-wayland-fallback
 SYSTEM_LIBVA=$(ldconfig -p 2>/dev/null | awk '/libva\.so\.2/{print $NF; exit}')
-mkdir -p $LIBVA_FALLBACK_DIR
-if [ -n "$SYSTEM_LIBVA" ]; then
-  cp -a "$(dirname "$SYSTEM_LIBVA")"/libva*.so* $LIBVA_FALLBACK_DIR/ || fail "Unable to stage libva fallback copy!"
+mkdir -p $LIBVA_FALLBACK_DIR $LIBVA_WAYLAND_FALLBACK_DIR
+[ -n "$SYSTEM_LIBVA" ] || fail "Unable to locate build-environment libva for the fallback copy!"
 
-  echo Compiling libva-probe
-  cc -O2 -L"$(dirname "$SYSTEM_LIBVA")" -Wl,--no-as-needed -o $LIBVA_FALLBACK_DIR/libva-probe \
-    $SOURCE_ROOT/app/deploy/linux/libva-probe.c -lva -lva-x11 || fail "Unable to compile libva-probe!"
+cp -a "$(dirname "$SYSTEM_LIBVA")"/libva*.so* $LIBVA_FALLBACK_DIR/ || fail "Unable to stage libva fallback copy!"
+[ -e "$LIBVA_FALLBACK_DIR/libva-wayland.so.2" ] || fail "The staged libva fallback has no Wayland adapter!"
+cp -a "$LIBVA_FALLBACK_DIR"/libva-wayland.so* $LIBVA_WAYLAND_FALLBACK_DIR/ || \
+  fail "Unable to stage the libva Wayland adapter-only fallback!"
 
-  # Keep the probe honest: it must reference every VA_API_* version node that the
-  # binaries shipped in the AppImage require, otherwise a host libva could pass the
-  # probe and still fail to load Moonlight or the bundled FFmpeg.
-  va_nodes() { LC_ALL=C readelf -V "$1" 2>/dev/null | grep -oE 'VA_API_[0-9]+\.[0-9]+\.[0-9]+' | sort -u; }
-  NEEDED_NODES=$(for b in $DEPLOY_FOLDER/usr/bin/moonlight \
-                          /usr/local/lib*/libav*.so* /usr/local/lib*/libsw*.so* \
-                          /usr/lib/x86_64-linux-gnu/libav*.so* /usr/lib/x86_64-linux-gnu/libsw*.so*; do
-                   [ -f "$b" ] && va_nodes "$b"; done | sort -u)
-  PROBE_NODES=$(va_nodes $LIBVA_FALLBACK_DIR/libva-probe)
-  [ -z "$(comm -13 <(echo "$PROBE_NODES") <(echo "$NEEDED_NODES"))" ] || \
-    fail "libva-probe is missing version node(s): $(comm -13 <(echo "$PROBE_NODES") <(echo "$NEEDED_NODES")) - update app/deploy/linux/libva-probe.c!"
-fi
+echo Compiling libva probes
+cc -O2 -L"$(dirname "$SYSTEM_LIBVA")" -Wl,--no-as-needed -o $LIBVA_FALLBACK_DIR/libva-probe \
+  $SOURCE_ROOT/app/deploy/linux/libva-probe.c -lva -lva-x11 || fail "Unable to compile libva-probe!"
+cc -O2 -DLIBVA_PROBE_WAYLAND -L"$(dirname "$SYSTEM_LIBVA")" -Wl,--no-as-needed \
+  -o $LIBVA_FALLBACK_DIR/libva-wayland-probe $SOURCE_ROOT/app/deploy/linux/libva-probe.c \
+  -lva -lva-wayland || fail "Unable to compile libva-wayland-probe!"
+
+# Keep the probe honest: it must reference every VA_API_* version node that the
+# binaries shipped in the AppImage require, otherwise a host libva could pass the
+# probe and still fail to load Moonlight or the bundled FFmpeg.
+va_nodes() { LC_ALL=C readelf -V "$1" 2>/dev/null | grep -oE 'VA_API_[0-9]+\.[0-9]+\.[0-9]+' | sort -u; }
+NEEDED_NODES=$(for b in $DEPLOY_FOLDER/usr/bin/moonlight \
+                        /usr/local/lib*/libav*.so* /usr/local/lib*/libsw*.so* \
+                        /usr/lib/x86_64-linux-gnu/libav*.so* /usr/lib/x86_64-linux-gnu/libsw*.so*; do
+                 [ -f "$b" ] && va_nodes "$b"; done | sort -u)
+PROBE_NODES=$(va_nodes $LIBVA_FALLBACK_DIR/libva-probe)
+[ -z "$(comm -13 <(echo "$PROBE_NODES") <(echo "$NEEDED_NODES"))" ] || \
+  fail "libva-probe is missing version node(s): $(comm -13 <(echo "$PROBE_NODES") <(echo "$NEEDED_NODES")) - update app/deploy/linux/libva-probe.c!"
 
 APP_RUN=$BUILD_ROOT/AppRun-libva
 cat > $APP_RUN <<'APPRUN_EOF'
 #!/bin/bash
-# AppRun: prefer the host libva; use the staged copy only if the host cannot run us.
+# AppRun: prefer the host libva; use staged libraries only when the host cannot run us.
 #
 # VA-API driver modules on the host are loaded by libva and export an entrypoint
 # named after the libva version they were built against (__vaDriverInit_1_XX).
@@ -116,17 +128,31 @@ cat > $APP_RUN <<'APPRUN_EOF'
 # Distros keep host libva and host drivers in step, so whenever the host libva
 # can satisfy Moonlight's own ELF version requirements it is the right choice.
 #
-# "Can satisfy" is answered here by libva-probe, a tiny program linked against
-# the same versioned libva symbols as Moonlight and the bundled FFmpeg: if the
-# dynamic loader can start it, the host libva works; if not (no libva installed,
-# or one too old to link), we make the staged build-environment copy visible
-# via LD_LIBRARY_PATH, matching the pre-existing bundled behavior.
+# "Can satisfy" is answered here by tiny probe programs linked against the same
+# versioned libva symbols as Moonlight and the bundled FFmpeg. The core/X11 probe
+# decides whether the complete fallback is necessary. The Wayland probe is kept
+# separate so a missing host Wayland adapter can be supplied without shadowing an
+# otherwise compatible host libva core and its matching GPU drivers.
 APPDIR="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
 LIBVA_FALLBACK="$APPDIR/opt/libva-fallback"
+LIBVA_WAYLAND_FALLBACK="$APPDIR/opt/libva-wayland-fallback"
 
-if [ -d "$LIBVA_FALLBACK" ] && ! "$LIBVA_FALLBACK/libva-probe" 2>/dev/null; then
+use_full_libva_fallback()
+{
     export LD_LIBRARY_PATH="$LIBVA_FALLBACK${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     export VAAPI_USE_FALLBACK_PATHS=1
+}
+
+if [ -d "$LIBVA_FALLBACK" ] && ! "$LIBVA_FALLBACK/libva-probe" 2>/dev/null; then
+    use_full_libva_fallback
+elif [ -d "$LIBVA_FALLBACK" ] && ! "$LIBVA_FALLBACK/libva-wayland-probe" 2>/dev/null; then
+    WAYLAND_LIBRARY_PATH="$LIBVA_WAYLAND_FALLBACK${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    if [ -d "$LIBVA_WAYLAND_FALLBACK" ] && \
+       LD_LIBRARY_PATH="$WAYLAND_LIBRARY_PATH" "$LIBVA_FALLBACK/libva-wayland-probe" 2>/dev/null; then
+        export LD_LIBRARY_PATH="$WAYLAND_LIBRARY_PATH"
+    else
+        use_full_libva_fallback
+    fi
 fi
 
 exec "$APPDIR/usr/bin/moonlight" "$@"
@@ -137,6 +163,22 @@ echo Creating AppImage
 # Remove SQL driver plugins that depend on unavailable system libraries
 # (e.g. libqsqlmimer.so -> libmimerapi.so) to prevent linuxdeploy/plugin failures
 QT_PLUGIN_PATH=$(qmake6 -query QT_INSTALL_PLUGINS 2>/dev/null)
+[ -d "$QT_PLUGIN_PATH/platforms" ] || fail "Unable to locate the Qt platform plugin directory!"
+
+# Qt 6.11 uses a single libqwayland.so plugin, while older Qt 6 releases use
+# libqwayland-egl.so and libqwayland-generic.so. Discover the installed names
+# so the packaging policy remains explicit without silently omitting Wayland.
+WAYLAND_PLATFORM_PLUGINS=
+for plugin_path in "$QT_PLUGIN_PATH"/platforms/libqwayland*.so; do
+  [ -e "$plugin_path" ] || continue
+  plugin_name=$(basename "$plugin_path")
+  WAYLAND_PLATFORM_PLUGINS="${WAYLAND_PLATFORM_PLUGINS:+$WAYLAND_PLATFORM_PLUGINS;}$plugin_name"
+done
+[ -n "$WAYLAND_PLATFORM_PLUGINS" ] || fail "Qt Wayland platform plugins are not installed!"
+
+export EXTRA_QT_MODULES="${EXTRA_QT_MODULES:+$EXTRA_QT_MODULES;}waylandcompositor"
+export EXTRA_PLATFORM_PLUGINS="${EXTRA_PLATFORM_PLUGINS:+$EXTRA_PLATFORM_PLUGINS;}$WAYLAND_PLATFORM_PLUGINS"
+
 if [ -n "$QT_PLUGIN_PATH" ] && [ -d "$QT_PLUGIN_PATH/sqldrivers" ]; then
   echo "Removing problematic SQL driver plugins..."
   rm -f "$QT_PLUGIN_PATH/sqldrivers/libqsqlmimer.so"
@@ -159,7 +201,18 @@ pushd "$INSTALLER_FOLDER" || fail "Unable to enter install folder: $INSTALLER_FO
 # dlopen GPU drivers compiled against a newer libva, so VAAPI silently fell back to
 # software decoding on up-to-date hosts. Exclude it and let the AppRun shim above
 # decide between host libva and the staged opt/libva-fallback last-resort copy.
-LDAI_UPDATE_INFORMATION="$APPIMAGE_UPDATE_INFORMATION" LDAI_OUTPUT="$APPIMAGE_PATH"   VERSION="$VERSION" "$LINUXDEPLOY" --appdir "$DEPLOY_FOLDER"   --library=/usr/local/lib/libSDL3.so.0   --exclude-library=libva.so*   --exclude-library=libva-drm.so*   --exclude-library=libva-wayland.so*   --exclude-library=libva-x11.so*   --custom-apprun "$APP_RUN"   --plugin qt --output appimage || fail "linuxdeploy failed!"
+LDAI_UPDATE_INFORMATION="$APPIMAGE_UPDATE_INFORMATION" \
+LDAI_OUTPUT="$APPIMAGE_PATH" \
+VERSION="$VERSION" \
+"$LINUXDEPLOY" --appdir "$DEPLOY_FOLDER" \
+  --library=/usr/local/lib/libSDL3.so.0 \
+  --exclude-library=libva.so* \
+  --exclude-library=libva-drm.so* \
+  --exclude-library=libva-wayland.so* \
+  --exclude-library=libva-x11.so* \
+  --exclude-library=libwayland-client.so* \
+  --custom-apprun "$APP_RUN" \
+  --plugin qt --output appimage || fail "linuxdeploy failed!"
 popd || fail "Unable to leave install folder"
 
 echo Verifying AppImage update metadata
@@ -179,5 +232,42 @@ grep -Fqx "Filename: $APPIMAGE_FILENAME" "$ZSYNC_PATH" || \
   fail "zsync Filename does not match $APPIMAGE_FILENAME"
 grep -Fqx "URL: $APPIMAGE_FILENAME" "$ZSYNC_PATH" || \
   fail "zsync URL does not match $APPIMAGE_FILENAME"
+
+echo Verifying native Wayland and X11 fallback payload
+VERIFY_ROOT=$(mktemp -d "$BUILD_ROOT/appimage-verify.XXXXXX") || fail "Unable to create AppImage verification directory!"
+(
+  cd "$VERIFY_ROOT" || exit 1
+  env -u APPIMAGE_EXTRACT_AND_RUN "$APPIMAGE_PATH" --appimage-extract >/dev/null
+) || fail "Unable to extract AppImage for verification!"
+EXTRACTED_APPDIR=$VERIFY_ROOT/squashfs-root
+
+[ -e "$EXTRACTED_APPDIR/usr/plugins/platforms/libqxcb.so" ] || \
+  fail "AppImage is missing the Qt XCB platform plugin!"
+find "$EXTRACTED_APPDIR/usr/plugins/platforms" -maxdepth 1 -name 'libqwayland*.so' -print -quit | grep -q . || \
+  fail "AppImage is missing the Qt Wayland platform plugin!"
+find "$EXTRACTED_APPDIR/usr" -name 'libQt6WaylandClient.so*' -print -quit | grep -q . || \
+  fail "AppImage is missing the Qt Wayland client library!"
+
+for plugin_dir in wayland-decoration-client wayland-graphics-integration-client wayland-shell-integration; do
+  find "$EXTRACTED_APPDIR/usr/plugins/$plugin_dir" -maxdepth 1 -type f -print -quit 2>/dev/null | grep -q . || \
+    fail "AppImage is missing Qt's $plugin_dir plugins!"
+done
+
+readelf -d "$EXTRACTED_APPDIR/usr/bin/moonlight" | grep -q 'libwayland-client\.so' || \
+  fail "Moonlight was built without native Wayland support!"
+readelf -d "$EXTRACTED_APPDIR/usr/bin/moonlight" | grep -q 'libva-wayland\.so' || \
+  fail "Moonlight was built without VA-API Wayland support!"
+[ -e "$EXTRACTED_APPDIR/opt/libva-wayland-fallback/libva-wayland.so.2" ] || \
+  fail "AppImage is missing the libva Wayland adapter-only fallback!"
+[ ! -e "$EXTRACTED_APPDIR/opt/libva-wayland-fallback/libva.so.2" ] || \
+  fail "The libva Wayland adapter-only fallback unexpectedly contains the libva core!"
+[ ! -e "$EXTRACTED_APPDIR/opt/libva-wayland-fallback/libva-x11.so.2" ] || \
+  fail "The libva Wayland adapter-only fallback unexpectedly contains the X11 adapter!"
+
+if find "$EXTRACTED_APPDIR/usr" -name 'libwayland-client.so*' -print -quit | grep -q .; then
+  fail "AppImage bundled libwayland-client and may conflict with the host's Mesa/EGL stack!"
+fi
+
+rm -rf "$VERIFY_ROOT"
 
 echo Build successful

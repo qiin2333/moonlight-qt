@@ -20,15 +20,12 @@ const int kAccentBar = 4;                  // Theme.accentBar
 
 }
 
-OverlayToast::OverlayToast(QWindow* parent)
-    : QRasterWindow(parent),
-      m_FadeAnimation(nullptr),
-      m_ToastHeight(40),
-      m_HorizPadding(16),
-      m_VertPadding(10)
+OverlayToast::OverlayToast(QWindow* parent, OverlayWindowMode windowMode)
+    : OverlayRasterWindow(parent, windowMode), m_FadeAnimation(nullptr), m_ToastHeight(40),
+      m_HorizPadding(16), m_VertPadding(10), m_WindowMode(windowMode)
 {
-    setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
-             | Qt::WindowDoesNotAcceptFocus | Qt::WindowTransparentForInput);
+    Q_ASSERT(m_WindowMode != OverlayWindowMode::WaylandSubsurface || parent != nullptr);
+    setFlags(OverlayWindowPolicy::flags(m_WindowMode, true));
 
     QSurfaceFormat fmt;
     fmt.setAlphaBufferSize(8);
@@ -92,15 +89,17 @@ void OverlayToast::showToast(int parentX, int parentY, int parentW, int parentH,
 {
     m_Message = message;
 
-    // This is an independent top-level window, so make its font/rendering
-    // context follow the stream window's monitor before measuring text.
-    const QPoint parentCenter(parentX + parentW / 2, parentY + parentH / 2);
-    QScreen* targetScreen = QGuiApplication::screenAt(parentCenter);
-    if (targetScreen == nullptr) {
-        targetScreen = QGuiApplication::primaryScreen();
-    }
-    if (targetScreen != nullptr && screen() != targetScreen) {
-        setScreen(targetScreen);
+    // Detached windows must explicitly follow the stream monitor. A native
+    // Wayland child inherits its parent's screen and uses parent-local geometry.
+    if (!OverlayWindowPolicy::usesParentCoordinates(m_WindowMode)) {
+        const QPoint parentCenter(parentX + parentW / 2, parentY + parentH / 2);
+        QScreen* targetScreen = QGuiApplication::screenAt(parentCenter);
+        if (targetScreen == nullptr) {
+            targetScreen = QGuiApplication::primaryScreen();
+        }
+        if (targetScreen != nullptr && screen() != targetScreen) {
+            setScreen(targetScreen);
+        }
     }
 
     // Stop any ongoing fade before replacing the toast. The state deadline is
@@ -151,9 +150,8 @@ void OverlayToast::onFadeFinished()
     setOpacity(1.0);
 }
 
-void OverlayToast::paintEvent(QPaintEvent*)
+void OverlayToast::paintOverlay(QPainter& p)
 {
-    QPainter p(this);
     // 反锯齿只为文字开。方角矩形都落在整数坐标上，开不开都一样，
     // 但这套风格的边必须是硬的，别让抗锯齿在边缘糊出半透明像素。
     p.setRenderHint(QPainter::Antialiasing, false);

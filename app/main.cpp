@@ -91,6 +91,9 @@ static QString getStartupApplicationDir(const char* argv0)
 #include "backend/usbforwardingenvironment.h"
 #include "backend/usbforwardingbackend.h"
 #include "streaming/session.h"
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+#include "streaming/waylandqtsdlbridge.h"
+#endif
 #include "settings/streamingpreferences.h"
 #include "gui/sdlgamepadkeynavigation.h"
 #include "gui/windowplacement.h"
@@ -1133,6 +1136,13 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Moonlight V+ for PC"));
 
+    // Declare this before the QML engine so SDL's video and EGL references
+    // outlive Qt Quick, but are released before QGuiApplication. Initialization
+    // is deferred until all command-line parsers that can call exit() return.
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    WaylandQtSdlBridge::SdlVideoLifetime waylandSdlVideoLifetime;
+#endif
+
 #ifdef Q_OS_DARWIN
     // macOS defaults "Keyboard navigation" to text fields and lists only, which
     // prevents Tab (and the gamepad navigation that synthesizes it) from moving
@@ -1254,8 +1264,10 @@ int main(int argc, char *argv[])
         qputenv("SDL_VIDEODRIVER", "x11");
     }
     else if (QGuiApplication::platformName().startsWith("wayland")) {
+#ifndef HAS_QT_SDL_WAYLAND_BRIDGE
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected Wayland");
         qputenv("SDL_VIDEODRIVER", "wayland");
+#endif
     }
 #ifndef STEAM_LINK
     // Force use of the KMSDRM backend for SDL when using Qt platform plugins
@@ -1564,6 +1576,20 @@ int main(int argc, char *argv[])
             break;
         }
     }
+
+    // Help, version, and argument errors (including subcommand parsers above)
+    // exit without unwinding automatic objects. Retain the shared SDL/EGL
+    // resources only after those paths, and before QML can probe SDL video.
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    if (QGuiApplication::platformName().startsWith("wayland")) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected Wayland");
+        qputenv("SDL_VIDEODRIVER", "wayland");
+        qputenv("SDL_VIDEO_WAYLAND_WMCLASS", "com.moonlight_stream.Moonlight");
+        if (!waylandSdlVideoLifetime.initialize()) {
+            return -1;
+        }
+    }
+#endif
 
     if (hasGUI) {
         engine.rootContext()->setContextProperty("initialView", initialView);

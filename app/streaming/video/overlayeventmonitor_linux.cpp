@@ -23,6 +23,9 @@
 #ifdef USE_XCB_DISPLAY_MONITOR
 #include <xcb/xcb.h>
 #endif
+#ifdef HAS_WAYLAND
+#include <wayland-client-core.h>
+#endif
 
 namespace {
 struct DisplaySource
@@ -46,6 +49,18 @@ DisplaySource qtDisplaySource()
         }
     }
 #endif
+#endif
+#endif
+
+#if defined(HAS_WAYLAND) && QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+// Qt 6.5/6.6 expose this interface on Unix without a Wayland feature flag.
+// Qt 6.7+ declare it only when the feature is enabled.
+#if !defined(QT_FEATURE_wayland) || QT_FEATURE_wayland == 1
+    if (auto* wayland = guiApp->nativeInterface<QNativeInterface::QWaylandApplication>()) {
+        if (wl_display* display = wayland->display()) {
+            return { wl_display_get_fd(display) };
+        }
+    }
 #endif
 #endif
 

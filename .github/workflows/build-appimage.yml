@@ -23,16 +23,25 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 1
 
+      - name: Install Qt 6.11.1
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: linux
+          arch: linux_gcc_64
+          modules: 'qtmultimedia qtimageformats qtwaylandcompositor'
+          cache: true
+
       - name: Setup environment
         run: |
           wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.4.313-jammy.list https://packages.lunarg.com/vulkan/1.4.313/lunarg-vulkan-1.4.313-jammy.list
           sudo apt update
-          sudo apt install -y qt6-base-dev qt6-declarative-dev libqt6svg6-dev qml6-module-qtquick-controls qml6-module-qtquick-templates qml6-module-qtquick-layouts \
-            qml6-module-qtqml-workerscript qml6-module-qtquick-window qml6-module-qtquick python3-pip nasm libgbm-dev libdrm-dev libfreetype-dev libasound2-dev \
+          sudo apt install -y python3-pip nasm libgbm-dev libdrm-dev libfreetype-dev libasound2-dev \
             libdbus-1-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev \
             libxext-dev libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev \
-            libxfixes-dev libxtst-dev wayland-protocols libopus-dev libvdpau-dev libgl-dev libpipewire-0.3-dev liburing-dev vulkan-sdk cmake
+            libxfixes-dev libxtst-dev libwayland-dev wayland-protocols libopus-dev libvdpau-dev libgl-dev libpipewire-0.3-dev liburing-dev vulkan-sdk cmake \
+            libxcb-cursor0 libxcb-keysyms1 libxcb-image0 libxcb-icccm4 libxcb-xkb1 libxcb-render-util0 libxcb-xinerama0 libxkbcommon-x11-0
           sudo pip3 install meson
           mkdir -p dep_root/{bin,include,lib}
           echo "DEP_ROOT=$PWD/dep_root" >> "${GITHUB_ENV}"
@@ -93,7 +102,7 @@ jobs:
         working-directory: deps/libva
         run: |
           ./autogen.sh
-          ./configure --enable-x11=yes --enable-glx=no --enable-drm=no --enable-wayland=no
+          ./configure --enable-x11=yes --enable-glx=no --enable-drm=no --enable-wayland=yes
           make -j$(nproc)
           sudo make install
 
@@ -141,7 +150,11 @@ jobs:
             --enable-vaapi --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi \
             --enable-vdpau --enable-hwaccel=h264_vdpau  --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau \
             --enable-libdrm --enable-vulkan --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan \
-            --enable-libdav1d --enable-decoder=libdav1d
+            --enable-libdav1d --enable-decoder=libdav1d \
+            --enable-decoder=h264_v4l2m2m --enable-decoder=hevc_v4l2m2m \
+            --enable-pthreads --enable-v4l2-m2m
+          grep -qxF '#define CONFIG_H264_V4L2M2M_DECODER 1' config_components.h || { echo "H.264 V4L2 M2M decoder is not enabled" >&2; exit 1; }
+          grep -qxF '#define CONFIG_HEVC_V4L2M2M_DECODER 1' config_components.h || { echo "HEVC V4L2 M2M decoder is not enabled" >&2; exit 1; }
           make -j$(nproc)
           sudo make install
 

@@ -31,6 +31,7 @@ struct MountState;
 }
 
 class DualSenseHapticsRenderer;
+class QScreen;
 #ifdef Q_OS_DARWIN
 class MacQtEventPumpInputGuard;
 #endif
@@ -160,6 +161,12 @@ public:
 
     void setShouldExit(bool quitHostApp = false);
 
+    // These route window-state operations through Qt only for the native
+    // Wayland stream window. All other platforms retain SDL's behavior.
+    bool isStreamingWindowFullscreen() const;
+    bool usesQtWaylandStreamWindow() const;
+    void minimizeStreamingWindow();
+
 signals:
     void stageStarting(QString stage);
 
@@ -179,6 +186,17 @@ signals:
     void launchWarningsChanged();
 
 private:
+    struct WaylandWindowSnapshot
+    {
+        QSize size;
+        Qt::WindowStates states = Qt::WindowNoState;
+        bool visible = false;
+        QScreen* screen = nullptr;
+        qreal devicePixelRatio = 0.0;
+        qreal refreshRate = 0.0;
+        bool valid = false;
+    };
+
     void exec();
 
     bool startConnectionAsync();
@@ -219,7 +237,13 @@ private:
     void hideQtOverlayMenu();
     void toggleQtOverlayMenu();
     bool isStreamingWindowVisible() const;
+    bool isStreamingWindowMinimized() const;
     void syncQtOverlayWindowsWithSdlWindowState();
+    QRect qtOverlayParentGeometry() const;
+    QPoint qtOverlayPositionForSdlPoint(int x, int y) const;
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    void syncWaylandSdlWindowState();
+#endif
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
     void startTransportPolicy();
@@ -375,6 +399,9 @@ private:
     bool m_AudioMuted;
     Uint32 m_FullScreenFlag;
     QQuickWindow* m_QtWindow;
+    QWindow* m_WaylandStreamWindow;
+    WaylandWindowSnapshot m_WaylandWindowSnapshot;
+    bool m_WaylandOverlayShortcutPressed;
     bool m_UnexpectedTermination;
     SdlInputHandler* m_InputHandler;
     int m_MouseEmulationRefCount;
@@ -441,7 +468,7 @@ private:
     std::shared_ptr<std::atomic_int> m_RuntimeAcceptedBitrateKbps;
     quint64 m_RuntimeBitrateGeneration = 0;
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
-    OverlayMenuButton* m_MenuButton; // Qt-based floating menu button
+    OverlayMenuButton* m_MenuButton = nullptr; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification
 #ifdef Q_OS_DARWIN
     std::unique_ptr<MacQtEventPumpInputGuard> m_MacQtEventPumpInputGuard;

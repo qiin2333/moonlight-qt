@@ -2,6 +2,9 @@
 
 #include "settings/streamingpreferences.h"
 #include "streaming/input/gamepadglyphs.h"
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+#include "streaming/waylandwindowmetrics.h"
+#endif
 #include "backend/computermanager.h"
 #include "cursorshapeclassifier.h"
 
@@ -12,6 +15,9 @@
 #include <QSet>
 
 #include <atomic>
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+#include <optional>
+#endif
 
 #ifdef HAVE_WINDOWS_RAW_TOUCHPAD
 #include <memory>
@@ -149,6 +155,10 @@ public:
     ~SdlInputHandler();
 
     void setWindow(SDL_Window* window);
+
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    void setWaylandWindowCoordinateMetrics(WaylandWindowMetrics::CoordinateMetrics metrics);
+#endif
 
     void handleKeyEvent(SDL_KeyboardEvent* event);
 
@@ -292,6 +302,8 @@ public:
     void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
 
 private:
+    void getWindowCoordinateSize(int* width, int* height) const;
+
     qreal getRemoteCursorScale() const;
 
     GamepadState*
@@ -415,6 +427,9 @@ private:
     Uint32 remoteCursorHideTimerCallback(Uint32 interval, void* param);
 
     SDL_Window* m_Window;
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    std::optional<WaylandWindowMetrics::CoordinateMetrics> m_WaylandCoordinateMetrics;
+#endif
     bool m_MultiController;
     bool m_GamepadMouse;
     bool m_EnableDualSenseHaptics;

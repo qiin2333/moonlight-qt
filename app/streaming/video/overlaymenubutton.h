@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QRasterWindow>
+#include "overlayrasterwindow.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QSurfaceFormat>
@@ -13,6 +13,7 @@
 
 #include "overlaybuttonposition.h"
 #include "overlayeventwakestate.h"
+#include "overlaywindowpolicy.h"
 
 #ifdef Q_OS_DARWIN
 class MacOverlayEventMonitor;
@@ -30,16 +31,18 @@ class LinuxDisplayEventMonitor;
  * Semi-transparent when idle, fully opaque on hover.
  * Independent of D3D11/SDL rendering pipeline.
  */
-class OverlayMenuButton : public QRasterWindow {
+class OverlayMenuButton : public OverlayRasterWindow
+{
     Q_OBJECT
-    Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
 
 public:
-    using ClickCallback = std::function<void(const QPoint& globalPosition,
-                                             bool closeWhenPointerOutside)>;
+    // Position is global for detached windows and parent-local for child windows.
+    using ClickCallback =
+        std::function<void(const QPoint& pointerPosition, bool closeWhenPointerOutside)>;
     using EventWakeCallback = std::function<void()>;
 
-    explicit OverlayMenuButton(QWindow* parent = nullptr);
+    explicit OverlayMenuButton(QWindow* parent = nullptr,
+                               OverlayWindowMode windowMode = OverlayWindowMode::Detached);
     ~OverlayMenuButton() override;
 
     void setClickCallback(ClickCallback cb) { m_ClickCallback = std::move(cb); }
@@ -72,7 +75,7 @@ public:
     void finishEventProcessing();
 
 protected:
-    void paintEvent(QPaintEvent* event) override;
+    void paintOverlay(QPainter& painter) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -114,6 +117,7 @@ private:
     QRect m_ParentGeometry;
     OverlayButtonPositionStore m_PositionStore;
     std::optional<QPointF> m_NormalizedPosition;
+    OverlayWindowMode m_WindowMode;
 #ifdef Q_OS_WIN32
     std::unique_ptr<NativeEventMonitor> m_NativeEventMonitor;
 #elif defined(Q_OS_DARWIN)
