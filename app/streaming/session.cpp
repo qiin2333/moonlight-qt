@@ -12,10 +12,15 @@
 #include "streaming/audio/dualsensehapticscalibration.h"
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
 #include "streaming/input/stylusreplaytest.h"
+#include "../../tests/transport_policy_session/sessiondriver.h"
 #include "streaming/input/gamepadglyphs.h"
+#include <QCryptographicHash>
+#include <QSaveFile>
 #endif
 #include "backend/richpresencemanager.h"
 #include "backend/nvhttp.h"
+#include "backend/legacybitrate.h"
+#include "backend/legacytransportscope.h"
 #include "backend/identitymanager.h"
 #include "backend/usbforwardingbackend.h"
 #include "backend/usbforwardingenvironment.h"
@@ -28,6 +33,8 @@
 #include "utils.h"
 #include <QCoreApplication>
 #include <QHostInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QThread>
 
 #ifdef HAVE_FFMPEG
@@ -93,6 +100,59 @@
 #include <vector>
 
 namespace {
+
+class PairedTransportPolicy final : public TransportPolicy::Transport
+{
+public:
+    PairedTransportPolicy(NvAddress address, uint16_t port, QSslCertificate certificate,
+                          QString uuid)
+        : m_Http(std::move(address), port, std::move(certificate), true, nullptr, std::move(uuid))
+    {
+    }
+    TransportPolicy::Status query(const QString& sessionId, const QString& epoch) override
+    {
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+        recordTransportNotificationEvent(
+            m_NotificationOutput, { { QStringLiteral("event"), QStringLiteral("query_begin") },
+                                    { QStringLiteral("sessionId"), sessionId },
+                                    { QStringLiteral("connectionEpoch"),
+                                      epoch } });
+        try {
+            auto reply = m_Http.getTransportPolicy(sessionId, epoch);
+            recordTransportNotificationEvent(
+                m_NotificationOutput,
+                { { QStringLiteral("event"), QStringLiteral("query_end") },
+                  { QStringLiteral("sessionId"), reply.sessionId },
+                  { QStringLiteral("connectionEpoch"), reply.connectionEpoch },
+                  { QStringLiteral("acceptedRevision"), reply.accepted.revision },
+                  { QStringLiteral("controlEpoch"), reply.controlEpoch },
+                  { QStringLiteral("totalKbps"),
+                    reply.accepted.totalKbps } });
+            return reply;
+        } catch (...) {
+            recordTransportNotificationEvent(m_NotificationOutput,
+                                             { { QStringLiteral("event"),
+                                                 QStringLiteral("query_error") } });
+            throw;
+        }
+#else
+        return m_Http.getTransportPolicy(sessionId, epoch);
+#endif
+    }
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    void setNotificationOutput(QString directory) { m_NotificationOutput = std::move(directory); }
+#endif
+    TransportPolicy::Submission submit(const QString& path, const QJsonObject& body) override
+    {
+        return m_Http.postTransportPolicy(path, body);
+    }
+
+private:
+    NvHTTP m_Http;
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    QString m_NotificationOutput;
+#endif
+};
 
 int SDLCALL keepNonRumbleEvent(void*, SDL_Event* event)
 {
@@ -402,26 +462,14 @@ QSemaphore Session::s_ActiveSessionSemaphore(1);
 class AbrFeedbackTask : public QRunnable
 {
 public:
-    AbrFeedbackTask(NvAddress address,
-                    uint16_t httpsPort,
-                    QSslCertificate serverCert,
-                    QString uuid,
-                    double packetLoss,
-                    double rttMs,
-                    double decodeFps,
-                    int droppedFrames,
-                    std::shared_ptr<std::atomic_bool> inFlight,
+    AbrFeedbackTask(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert, QString uuid,
+                    QString sessionId, QString connectionEpoch, double packetLoss, double rttMs,
+                    double decodeFps, int droppedFrames, std::shared_ptr<std::atomic_bool> inFlight,
                     std::shared_ptr<std::atomic_int> currentBitrateKbps)
-        : m_Address(address),
-          m_HttpsPort(httpsPort),
-          m_ServerCert(serverCert),
-          m_Uuid(uuid),
-          m_PacketLoss(packetLoss),
-          m_RttMs(rttMs),
-          m_DecodeFps(decodeFps),
-          m_DroppedFrames(droppedFrames),
-          m_InFlight(inFlight),
-          m_CurrentBitrateKbps(currentBitrateKbps)
+        : m_Address(address), m_HttpsPort(httpsPort), m_ServerCert(serverCert), m_Uuid(uuid),
+          m_SessionId(sessionId), m_ConnectionEpoch(connectionEpoch), m_PacketLoss(packetLoss),
+          m_RttMs(rttMs), m_DecodeFps(decodeFps), m_DroppedFrames(droppedFrames),
+          m_InFlight(inFlight), m_CurrentBitrateKbps(currentBitrateKbps)
     {
     }
 
@@ -429,6 +477,7 @@ public:
     {
         try {
             NvHTTP http(m_Address, m_HttpsPort, m_ServerCert, true, nullptr, m_Uuid);
+            http.setLegacyTransportScope(m_SessionId, m_ConnectionEpoch);
             QJsonObject response = http.sendAbrFeedback(m_PacketLoss,
                                                         m_RttMs,
                                                         m_DecodeFps,
@@ -454,6 +503,8 @@ private:
     uint16_t m_HttpsPort;
     QSslCertificate m_ServerCert;
     QString m_Uuid;
+    QString m_SessionId;
+    QString m_ConnectionEpoch;
     double m_PacketLoss;
     double m_RttMs;
     double m_DecodeFps;
@@ -611,10 +662,8 @@ void Session::clConnectionTerminated(int errorCode)
     // to quit. A window alone is not enough here: startup failures can create the
     // SDL window, then terminate before the first frame and otherwise loop forever
     // behind a black screen.
-    if (recoverable &&
-        s_ActiveSession->m_HasReceivedVideo &&
-        !s_ActiveSession->m_ShouldExit &&
-        !s_ActiveSession->m_ConnectionInterrupted) {
+    if (recoverable && s_ActiveSession->m_HasReceivedVideo.load(std::memory_order_relaxed) &&
+        !s_ActiveSession->m_ShouldExit && !s_ActiveSession->m_ConnectionInterrupted) {
 
         s_ActiveSession->m_LastTerminationErrorCode = errorCode;
         s_ActiveSession->m_ConnectionInterrupted = true;
@@ -1056,7 +1105,7 @@ int Session::drSetup(int videoFormat, int width, int height, int frameRate, void
 
 int Session::drSubmitDecodeUnit(PDECODE_UNIT du)
 {
-    s_ActiveSession->m_HasReceivedVideo = true;
+    s_ActiveSession->notifyVideoReceived();
 
     // Use a lock since we'll be yanking this decoder out
     // from underneath the session when we initiate destruction.
@@ -1298,6 +1347,8 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences* prefere
 
 Session::~Session()
 {
+    stopRuntimeBitrateWorker();
+    stopTransportPolicy();
     // NB: This may not get destroyed for a long time! Don't put any non-trivial cleanup here.
     // Use Session::exec() or DeferredSessionCleanupTask instead.
 
@@ -1604,6 +1655,15 @@ void Session::teardownUsbTunnel()
 
 bool Session::initialize(QQuickWindow* qtWindow)
 {
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    const bool traceSessionInitialization =
+        qEnvironmentVariableIsSet("MOONLIGHT_TRANSPORT_SESSION_TEST");
+    auto traceInitialization = [traceSessionInitialization](const char* stage) {
+        if (traceSessionInitialization)
+            qInfo() << "Transport Session initialization:" << stage;
+    };
+    traceInitialization("begin");
+#endif
     m_QtWindow = qtWindow;
 #ifdef Q_OS_WIN32
     // Capture this on the Qt thread. The launch request is assembled later on
@@ -1667,6 +1727,9 @@ bool Session::initialize(QQuickWindow* qtWindow)
                      SDL_GetError());
         return false;
     }
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    traceInitialization("SDL video ready");
+#endif
 
     // Stop text input. SDL enables it by default
     // when we initialize the video subsystem, but this
@@ -1689,9 +1752,15 @@ bool Session::initialize(QQuickWindow* qtWindow)
 
     int x, y, width, height;
     getWindowDimensions(x, y, width, height);
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    traceInitialization("window dimensions ready");
+#endif
 
     // Create a hidden window to use for decoder initialization tests
     SDL_Window* testWindow = StreamUtils::createTestWindow();
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    traceInitialization("test window returned");
+#endif
     if (!testWindow) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Failed to create window for hardware decode test: %s",
@@ -1725,12 +1794,6 @@ bool Session::initialize(QQuickWindow* qtWindow)
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "Video bitrate: %d kbps",
                 m_StreamConfig.bitrate);
-
-    RAND_bytes(reinterpret_cast<unsigned char*>(m_StreamConfig.remoteInputAesKey),
-               sizeof(m_StreamConfig.remoteInputAesKey));
-
-    // Only the first 4 bytes are populated in the RI key IV
-    RAND_bytes(reinterpret_cast<unsigned char*>(m_StreamConfig.remoteInputAesIv), 4);
 
     switch (m_Preferences->audioConfig)
     {
@@ -2338,7 +2401,14 @@ private:
         SDL_assert(m_Session->m_VideoDecoder == nullptr);
 
         // Finish cleanup of the connection state
-        QMetaObject::invokeMethod(m_Session, &Session::stopMicrophone, Qt::BlockingQueuedConnection);
+        QMetaObject::invokeMethod(
+            m_Session,
+            [session = m_Session] {
+                session->stopRuntimeBitrateWorker();
+                session->stopTransportPolicy();
+                session->stopMicrophone();
+            },
+            Qt::BlockingQueuedConnection);
         if (m_Session->m_DualSenseHapticsRenderer != nullptr) {
             m_Session->m_DualSenseHapticsRenderer->setControllerTarget(-1);
         }
@@ -2801,7 +2871,9 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
 
     // Update dynamic state before showing
     m_MenuPanel->updateMicrophoneState(m_MicStream != nullptr);
-    m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
+    if (!m_TransportControlNegotiated.load())
+        m_MenuPanel->updateBitrateState(m_Preferences->bitrateKbps);
+    processTransportPolicyResult(true);
     m_MenuPanel->updateGamepadMouseState(m_InputHandler->isMouseEmulationActive());
     m_MenuPanel->updateMenuPositionState(
             menuPlacementActionForPreference(m_Preferences->overlayMenuPosition));
@@ -3224,6 +3296,14 @@ bool Session::openFileMappingMountPath()
 
 void Session::requestRuntimeBitrateChange(int bitrateKbps)
 {
+    if (m_TransportControlNegotiated.load()) {
+        const auto view = m_TransportPolicy ? m_TransportPolicy->view() : TransportPolicy::View{};
+        const auto automatic = view.status ? view.status->accepted.automatic : std::nullopt;
+        const bool bitrate = automatic && automatic->bitrate;
+        const bool fec = automatic && automatic->fec;
+        submitTransportPolicy(bitrate, fec, bitrateKbps, !bitrate && !fec);
+        return;
+    }
     if (!m_Computer) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Cannot change runtime bitrate: no m_Computer");
@@ -3242,6 +3322,11 @@ void Session::requestRuntimeBitrateChange(int bitrateKbps)
 
 void Session::startRuntimeBitrateWorker()
 {
+    if (m_TransportControlNegotiated.load()) {
+        m_PendingRuntimeBitrateKbps.store(0);
+        m_RuntimeBitrateInFlight.store(false);
+        return;
+    }
     // Snapshot the connection under lock; the worker never touches Session
     // or NvComputer (same pattern as startRemoteUsb()).
     NvAddress address;
@@ -3257,6 +3342,15 @@ void Session::startRuntimeBitrateWorker()
     }
 
     // Build clientname the same way as openConnection() does for /launch
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    // A private paired TLS forwarding endpoint can delay/drop actual host replies.
+    // This override is excluded from ordinary builds and affects only this worker.
+    const int faultProxyPort = qEnvironmentVariableIntValue("MOONLIGHT_LEGACY_FAULT_PROXY_PORT");
+    if (m_TransportPolicySessionDriver && QHostAddress(address.address()).isLoopback() &&
+        faultProxyPort >= 1024 && faultProxyPort <= 65535) {
+        httpsPort = static_cast<uint16_t>(faultProxyPort);
+    }
+#endif
     QString clientname = QHostInfo::localHostName();
     if (!uuid.isEmpty()) {
         QString pairname = NvComputer::getPairname(uuid);
@@ -3268,20 +3362,30 @@ void Session::startRuntimeBitrateWorker()
     auto bitrateToApply = std::make_shared<int>(
         m_PendingRuntimeBitrateKbps.exchange(0, std::memory_order_acq_rel));
     auto appliedBitrate = std::make_shared<std::atomic_int>(-1);
+    m_RuntimeAcceptedBitrateKbps = appliedBitrate;
 
-    auto worker = QThread::create([bitrateToApply, appliedBitrate, address, httpsPort,
-                                   uuid, certificate, clientname] {
+    const QString sessionId = m_TransportSessionId;
+    const QString connectionEpoch = m_TransportConnectionEpoch;
+    auto worker = QThread::create([bitrateToApply, appliedBitrate, address, httpsPort, uuid,
+                                   certificate, clientname, sessionId, connectionEpoch] {
         try {
             NvHTTP http(address, httpsPort, certificate, true, nullptr, uuid);
-            QString args = QString("bitrate=%1&clientname=%2")
-                               .arg(*bitrateToApply)
-                               .arg(clientname);
+            http.setClientNameOverride(clientname);
+            // NvHTTP appends the captured name exactly once with URL encoding.
+            QString args = QStringLiteral("bitrate=%1").arg(*bitrateToApply);
+            if (!connectionEpoch.isEmpty())
+                args += LegacyTransportScope{ sessionId, connectionEpoch }.querySuffix();
             QString response = http.openConnectionToString(
                 http.m_BaseUrlHttps,
                 "bitrate",
                 args,
                 5000,
                 NvHTTP::NVLL_VERBOSE);
+            NvHTTP::verifyResponseStatus(response);
+            if (!acceptedLegacyBitrate(response, *bitrateToApply)) {
+                throw GfeHttpResponseException(
+                    400, QStringLiteral("Host did not acknowledge the bitrate target"));
+            }
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "Runtime bitrate change to %d kbps: %s",
                         *bitrateToApply,
@@ -3303,9 +3407,24 @@ void Session::startRuntimeBitrateWorker()
                          "Runtime bitrate change failed: unknown error");
         }
     });
-    connect(worker, &QThread::finished, this, [this, appliedBitrate]() {
+    m_RuntimeBitrateWorker = worker;
+    const auto generation = m_RuntimeBitrateGeneration;
+    connect(worker, &QThread::finished, this, [this, appliedBitrate, worker, generation]() {
+        if (generation != m_RuntimeBitrateGeneration)
+            return;
+        if (m_RuntimeBitrateWorker == worker)
+            m_RuntimeBitrateWorker = nullptr;
+        if (m_TransportControlNegotiated.load()) {
+            m_PendingRuntimeBitrateKbps.store(0);
+            m_RuntimeBitrateInFlight.store(false);
+            return;
+        }
         const int applied = appliedBitrate->load();
         if (applied > 0) {
+            // This legacy acknowledgement supersedes the previous v2 handshake budget.
+            // It confirms an old-API target, not SDK application or a wire-budget bound.
+            m_TransportReconnectBudgetKbps.reset();
+            m_StreamConfig.bitrate = applied;
             m_AbrCurrentBitrateKbps->store(applied);
             showStreamingToast(tr("Bitrate: %1").arg(
                     OverlayMenuPanel::formatBitrateKbps(applied)));
@@ -3323,6 +3442,73 @@ void Session::startRuntimeBitrateWorker()
     worker->start();
 }
 
+void Session::stopRuntimeBitrateWorker()
+{
+    // Requests snapshot the compatibility scope negotiated by this connection.
+    // Drain its worker before replacing it, then reject queued old outcomes.
+    ++m_RuntimeBitrateGeneration;
+    m_PendingRuntimeBitrateKbps.store(0);
+    auto worker = m_RuntimeBitrateWorker;
+    m_RuntimeBitrateWorker = nullptr;
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    const bool traceDrain =
+        worker && qEnvironmentVariableIntValue("MOONLIGHT_LEGACY_FAULT_PROXY_PORT") != 0;
+    const auto drainStart = SDL_GetTicks();
+    auto saveDrainObservation = [this, traceDrain](bool finished, Uint32 elapsedMs) {
+        if (!traceDrain)
+            return;
+        const QString output = qEnvironmentVariable("MOONLIGHT_TRANSPORT_SESSION_TEST");
+        QSaveFile file(QDir(output).filePath(QStringLiteral("legacy-worker-drain.json")));
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write(
+                QJsonDocument(
+                    QJsonObject{
+                        { QStringLiteral("connectionEpoch"), m_TransportConnectionEpoch },
+                        { QStringLiteral("finished"), finished },
+                        { QStringLiteral("elapsedMs"), static_cast<int>(elapsedMs) },
+                        { QStringLiteral("requestInFlight"), m_RuntimeBitrateInFlight.load() },
+                        { QStringLiteral("acknowledgedKbps"),
+                          m_RuntimeAcceptedBitrateKbps ? m_RuntimeAcceptedBitrateKbps->load()
+                                                       : -1 },
+                        { QStringLiteral("configuredKbps"), m_StreamConfig.bitrate } })
+                    .toJson());
+            file.commit();
+        }
+    };
+    saveDrainObservation(false, 0);
+    if (traceDrain) {
+        SDL_LogInfo(
+            SDL_LOG_CATEGORY_APPLICATION, "Legacy fault worker drain begin: epoch=%s inFlight=%d",
+            m_TransportConnectionEpoch.toUtf8().constData(), m_RuntimeBitrateInFlight.load());
+    }
+#endif
+    if (worker)
+        worker->wait(); // The legacy HTTP request has a 5-second timeout.
+    // The UI completion can still be queued when teardown starts. Keep an actual
+    // successful acknowledgement, even though its old-generation UI is revoked.
+    if (!m_TransportControlNegotiated.load() && m_RuntimeAcceptedBitrateKbps) {
+        const int applied = m_RuntimeAcceptedBitrateKbps->load();
+        if (applied > 0) {
+            m_TransportReconnectBudgetKbps.reset();
+            m_StreamConfig.bitrate = applied;
+            m_AbrCurrentBitrateKbps->store(applied);
+        }
+    }
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    if (traceDrain) {
+        saveDrainObservation(true, SDL_GetTicks() - drainStart);
+        SDL_LogInfo(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Legacy fault worker drain end: epoch=%s elapsedMs=%u acknowledged=%d configured=%d",
+            m_TransportConnectionEpoch.toUtf8().constData(), SDL_GetTicks() - drainStart,
+            m_RuntimeAcceptedBitrateKbps ? m_RuntimeAcceptedBitrateKbps->load() : -1,
+            m_StreamConfig.bitrate);
+    }
+#endif
+    m_RuntimeAcceptedBitrateKbps.reset();
+    m_RuntimeBitrateInFlight.store(false);
+}
+
 void Session::startSunshineAbr()
 {
     m_SunshineAbrEnabled = false;
@@ -3335,6 +3521,7 @@ void Session::startSunshineAbr()
         NvHTTP http(m_Computer);
 
         int hostMaxBitrate = 0;
+        http.setLegacyTransportScope(m_TransportSessionId, m_TransportConnectionEpoch);
         if (!http.getAbrCapabilities(&hostMaxBitrate)) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "Host does not advertise Sunshine ABR support");
@@ -3395,6 +3582,7 @@ void Session::stopSunshineAbr()
 
     try {
         NvHTTP http(m_Computer);
+        http.setLegacyTransportScope(m_TransportSessionId, m_TransportConnectionEpoch);
         http.configureAbr(false, 0, 0, "balanced", 1000);
     }
     catch (const std::exception& e) {
@@ -3406,6 +3594,217 @@ void Session::stopSunshineAbr()
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Sunshine ABR disable failed: unknown error");
     }
+}
+
+void Session::startTransportPolicy()
+{
+    stopTransportPolicy();
+    if (!m_TransportControlNegotiated.load() && !m_NetworkObservationEnabled)
+        return;
+    if (!m_Computer ||
+        !TransportPolicy::isIdentity(m_TransportSessionId, QStringLiteral("4294967295"))) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Live network policy unavailable: no paired session identity");
+        return;
+    }
+    NvAddress address;
+    uint16_t port;
+    QSslCertificate certificate;
+    QString uuid;
+    {
+        QReadLocker locker(&m_Computer->lock);
+        address = m_Computer->activeAddress;
+        port = m_Computer->activeHttpsPort;
+        certificate = m_Computer->serverCert;
+        uuid = m_Computer->uuid;
+    }
+    const bool readOnly = !m_TransportControlNegotiated.load();
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    const int statisticsProxyPort =
+        qEnvironmentVariableIntValue("MOONLIGHT_STATISTICS_FAULT_PROXY_PORT");
+    const int controlProxyPort =
+        qEnvironmentVariableIntValue("MOONLIGHT_TRANSPORT_FAULT_PROXY_PORT");
+    const int faultProxyPort = readOnly ? statisticsProxyPort : controlProxyPort;
+    const bool faultDriver = m_TransportPolicySessionDriver &&
+                             (readOnly ? m_TransportPolicySessionDriver->statisticsMode()
+                                       : !m_TransportPolicySessionDriver->legacyMode() &&
+                                             !m_TransportPolicySessionDriver->notificationsMode());
+    if (faultDriver && QHostAddress(address.address()).isLoopback() && !certificate.isNull() &&
+        faultProxyPort >= 1024 && faultProxyPort <= 65535) {
+        port = static_cast<uint16_t>(faultProxyPort);
+    }
+#endif
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    const QString notificationOutput = m_TransportPolicySessionDriver &&
+                                               QHostAddress(address.address()).isLoopback() &&
+                                               !certificate.isNull()
+                                           ? m_TransportPolicySessionDriver->notificationOutput()
+                                           : QString();
+#endif
+    auto controller = std::make_unique<TransportPolicy::Controller>(
+        m_TransportSessionId,
+        [address, port, certificate, uuid
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+         ,
+         notificationOutput
+#endif
+    ]() -> std::unique_ptr<TransportPolicy::Transport> {
+            auto transport =
+                std::make_unique<PairedTransportPolicy>(address, port, certificate, uuid);
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+            transport->setNotificationOutput(notificationOutput);
+#endif
+            return transport;
+        },
+        1000, readOnly, m_TransportConnectionEpoch);
+    if (readOnly)
+        m_TransportStatistics = std::move(controller);
+    else
+        m_TransportPolicy = std::move(controller);
+    m_LastTransportPolicyTicks = 0;
+}
+
+void Session::stopTransportPolicy()
+{
+    m_TransportStatistics.reset();
+    // Close and join the bounded HTTP worker before ending the old connection.
+    // No worker owns Session/NvComputer or a callback into the overlay.
+    if (m_TransportPolicy) {
+        const auto view = m_TransportPolicy->view();
+        if (view.status)
+            m_TransportReconnectBudgetKbps = view.status->accepted.totalKbps;
+        m_TransportPolicy.reset();
+    }
+}
+
+void Session::processTransportPolicyResult(bool force)
+{
+    const Uint32 now = SDL_GetTicks();
+    if (!force && now - m_LastTransportPolicyTicks < 100)
+        return;
+    m_LastTransportPolicyTicks = now;
+    auto controller = m_TransportPolicy ? m_TransportPolicy.get() : m_TransportStatistics.get();
+    TPS_STATUS_NOTICE native{};
+    if (controller && LiGetTransportPolicyStatusNotice(&native)) {
+        const char* sources[] = { "legacy", "manual", "googcc", "local" };
+        const char* failures[] = { "none", "unsupported", "backend_failure", "superseded",
+                                   "stopped" };
+        if (native.controlSource < 4 && native.failure < 5) {
+            TransportPolicy::Notification notification;
+            notification.sessionId = QString::number(native.sessionId);
+            notification.connectionEpoch =
+                QString::number(static_cast<qulonglong>(native.connectionEpoch));
+            notification.sequence = QString::number(static_cast<qulonglong>(native.noticeSequence));
+            notification.controlEpoch =
+                QString::number(static_cast<qulonglong>(native.controlEpoch));
+            notification.acceptedRevision =
+                QString::number(static_cast<qulonglong>(native.acceptedRevision));
+            if (native.flags & TPS_APPLIED_KNOWN)
+                notification.appliedRevision =
+                    QString::number(static_cast<qulonglong>(native.encoderAppliedRevision));
+            if (native.flags & TPS_FIRST_SENT_KNOWN) {
+                notification.firstSentRevision =
+                    QString::number(static_cast<qulonglong>(native.firstSentRevision));
+                notification.firstSentFrame =
+                    QString::number(static_cast<qulonglong>(native.firstSentFrame));
+            }
+            notification.source = QString::fromLatin1(sources[native.controlSource]);
+            notification.failure = QString::fromLatin1(failures[native.failure]);
+            notification.flags = native.flags;
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+            const auto observedUs = std::chrono::duration_cast<std::chrono::microseconds>(
+                                        std::chrono::steady_clock::now().time_since_epoch())
+                                        .count();
+#endif
+            const bool received = controller->receiveNotification(notification);
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+            if (received && m_TransportPolicySessionDriver) {
+                recordTransportNotificationEvent(
+                    m_TransportPolicySessionDriver->notificationOutput(),
+                    { { QStringLiteral("event"), QStringLiteral("native_notice_accepted") },
+                      { QStringLiteral("observedSteadyUs"), QString::number(observedUs) },
+                      { QStringLiteral("sessionId"), notification.sessionId },
+                      { QStringLiteral("connectionEpoch"), notification.connectionEpoch },
+                      { QStringLiteral("noticeSequence"), notification.sequence },
+                      { QStringLiteral("acceptedRevision"), notification.acceptedRevision },
+                      { QStringLiteral("controlEpoch"), notification.controlEpoch },
+                      { QStringLiteral("appliedRevision"),
+                        notification.appliedRevision.value_or(QString()) },
+                      { QStringLiteral("firstSentRevision"),
+                        notification.firstSentRevision.value_or(QString()) },
+                      { QStringLiteral("firstSentFrame"),
+                        notification.firstSentFrame.value_or(QString()) },
+                      { QStringLiteral("flags"), notification.flags } });
+            }
+#else
+            Q_UNUSED(received);
+#endif
+        }
+    }
+    if (!m_MenuPanel)
+        return;
+    auto view = m_TransportPolicy       ? m_TransportPolicy->view()
+                : m_TransportStatistics ? m_TransportStatistics->view()
+                                        : TransportPolicy::View{};
+    if (m_TransportControlNegotiated.load() && !m_TransportPolicy)
+        view.queryError = QStringLiteral("Session unavailable");
+    m_MenuPanel->updateTransportPolicyState(m_TransportControlNegotiated.load(), std::move(view));
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    if (m_TransportPolicySessionDriver) {
+        if (m_TransportPolicySessionDriver->notificationsMode()) {
+            m_TransportPolicySessionDriver->tickNotifications(
+                m_TransportStatistics ? m_TransportStatistics->view() : TransportPolicy::View{},
+                { m_TransportSessionId, m_TransportConnectionEpoch, m_StreamConfig.bitrate,
+                  m_RuntimeAcceptedBitrateKbps ? m_RuntimeAcceptedBitrateKbps->load() : 0,
+                  m_RuntimeBitrateInFlight.load(), m_HasReceivedVideo.load() });
+        } else if (m_TransportPolicySessionDriver->statisticsMode()) {
+            m_TransportPolicySessionDriver->tickStatistics(
+                m_TransportStatistics ? m_TransportStatistics->view() : TransportPolicy::View{},
+                { m_TransportSessionId, m_TransportConnectionEpoch, m_StreamConfig.bitrate,
+                  m_RuntimeAcceptedBitrateKbps ? m_RuntimeAcceptedBitrateKbps->load() : 0,
+                  m_RuntimeBitrateInFlight.load(), m_HasReceivedVideo.load() });
+        } else if (m_TransportPolicySessionDriver->legacyMode()) {
+            if (m_TransportControlNegotiated.load()) {
+                m_TransportPolicySessionDriver->tick(m_TransportPolicy ? m_TransportPolicy->view()
+                                                                       : TransportPolicy::View{});
+            } else {
+                m_TransportPolicySessionDriver->tickLegacy(
+                    { m_TransportSessionId, m_TransportConnectionEpoch, m_StreamConfig.bitrate,
+                      m_RuntimeAcceptedBitrateKbps ? m_RuntimeAcceptedBitrateKbps->load() : 0,
+                      m_RuntimeBitrateInFlight.load(), m_HasReceivedVideo.load() });
+            }
+        } else {
+            m_TransportPolicySessionDriver->tick(m_TransportPolicy ? m_TransportPolicy->view()
+                                                                   : TransportPolicy::View{});
+        }
+        if (m_TransportPolicySessionDriver->takeOwnerReconnectRequest() &&
+            m_HasReceivedVideo.load() && !m_ShouldExit && !m_ConnectionInterrupted) {
+            // Explicit local fault injection; transport/reply outcomes remain real.
+            m_LastTerminationErrorCode = ML_ERROR_UNEXPECTED_EARLY_TERMINATION;
+            m_ConnectionInterrupted = true;
+            SDL_Event event = {};
+            event.type = SDL_QUIT;
+            event.quit.timestamp = SDL_GetTicks();
+            pushEventOrWarn(event);
+        }
+        if (m_TransportPolicySessionDriver->takeExitRequest()) {
+            setShouldExit();
+            SDL_Event quit = {};
+            quit.type = SDL_QUIT;
+            pushEventOrWarn(quit);
+        }
+    }
+#endif
+}
+
+void Session::submitTransportPolicy(bool bitrate, bool fec, int totalKbps, bool manual)
+{
+    const bool submitted = m_TransportControlNegotiated.load() && m_TransportPolicy &&
+                           (manual ? m_TransportPolicy->setManualBudget(totalKbps)
+                                   : m_TransportPolicy->setModes(bitrate, fec, totalKbps));
+    if (!submitted)
+        showStreamingToast(tr("Network policy unavailable"));
+    processTransportPolicyResult(true);
 }
 
 void Session::startFileMappingUxProbe()
@@ -3717,16 +4116,52 @@ void Session::sendSunshineAbrFeedback()
     uint32_t rttVariance = 0;
     LiGetEstimatedRttInfo(&rtt, &rttVariance);
 
-    QThreadPool::globalInstance()->start(new AbrFeedbackTask(m_Computer->activeAddress,
-                                                             m_Computer->activeHttpsPort,
-                                                             m_Computer->serverCert,
-                                                             m_Computer->uuid,
-                                                             packetLoss,
-                                                             rtt,
-                                                             m_ActiveVideoFrameRate,
-                                                             droppedFrames,
-                                                             m_AbrFeedbackInFlight,
-                                                             m_AbrCurrentBitrateKbps));
+    QThreadPool::globalInstance()->start(new AbrFeedbackTask(
+        m_Computer->activeAddress, m_Computer->activeHttpsPort, m_Computer->serverCert,
+        m_Computer->uuid, m_TransportSessionId, m_TransportConnectionEpoch, packetLoss, rtt,
+        m_ActiveVideoFrameRate, droppedFrames, m_AbrFeedbackInFlight, m_AbrCurrentBitrateKbps));
+}
+
+void Session::logVideoNetworkSnapshot()
+{
+    if (!m_NetworkObservationEnabled) {
+        return;
+    }
+    const Uint32 now = SDL_GetTicks();
+    if (now - m_LastNetworkSnapshotTicks < 1000) {
+        return;
+    }
+    m_LastNetworkSnapshotTicks = now;
+    LI_VIDEO_NETWORK_SNAPSHOT snapshot;
+    if (!LiGetVideoNetworkSnapshot(&snapshot)) {
+        return;
+    }
+    // Preserve 64-bit counters exactly, even when external tools parse JSON
+    // numbers as doubles. These diagnostics do not enter the legacy ABR API.
+    const QJsonObject observation{
+        { "version", static_cast<int>(snapshot.version) },
+        { "connectionEpoch", QString::number(snapshot.connectionEpoch) },
+        { "sequenceEpoch", QString::number(snapshot.sequenceEpoch) },
+        { "sampleTimeUs", QString::number(snapshot.sampleTimeUs) },
+        { "durationUs", QString::number(snapshot.observationDurationUs) },
+        { "uniquePackets", QString::number(snapshot.uniquePackets) },
+        { "uniqueUdpBytes", QString::number(snapshot.uniqueUdpBytes) },
+        { "missingCandidates", QString::number(snapshot.missingCandidates) },
+        { "latePackets", QString::number(snapshot.latePackets) },
+        { "unknownCandidates", QString::number(snapshot.unknownCandidates) },
+        { "coverageResets", QString::number(snapshot.coverageResets) },
+        { "duplicatePackets", QString::number(snapshot.duplicatePackets) },
+        { "reorderedPackets", QString::number(snapshot.reorderedPackets) },
+        { "authenticationFailures", QString::number(snapshot.authenticationFailures) },
+        { "invalidPackets", QString::number(snapshot.invalidPackets) },
+        { "completedBlocks", QString::number(snapshot.completedBlocks) },
+        { "failedObservedBlocks", QString::number(snapshot.failedObservedBlocks) },
+        { "recoveredDataPackets", QString::number(snapshot.recoveredDataPackets) },
+        { "completedFrames", QString::number(snapshot.completedFrames) },
+        { "hasSequence", snapshot.hasSequence },
+    };
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Video network observation: %s",
+                QJsonDocument(observation).toJson(QJsonDocument::Compact).constData());
 }
 
 void Session::notifyMouseEmulationMode(bool enabled)
@@ -3865,6 +4300,9 @@ bool Session::tryReconnect()
     SDL_UnlockMutex(m_DecoderLock);
 
     // Stop ABR feedback (startConnectionAsync() restarts it) and the dead connection
+    stopRuntimeBitrateWorker();
+    stopTransportPolicy();
+    processTransportPolicyResult(true);
     stopSunshineAbr();
     stopControllerRumbleAtConnectionBoundary(m_InputHandler);
     if (m_DualSenseHapticsRenderer != nullptr) {
@@ -3936,7 +4374,7 @@ bool Session::tryReconnect()
 
         // Run the connection start on a worker thread and pump events while we wait
         m_AsyncConnectionSuccess = false;
-        m_HasReceivedVideo = false;
+        m_HasReceivedVideo.store(false, std::memory_order_relaxed);
         updateDualSenseHapticsControllerTarget();
         AsyncConnectionStartThread thread(this);
         thread.start();
@@ -3962,6 +4400,8 @@ bool Session::tryReconnect()
         }
 
         if (m_AsyncConnectionSuccess) {
+            startTransportPolicy();
+            processTransportPolicyResult(true);
             reconnected = true;
             if (m_ClipboardHelper != nullptr) {
                 m_ClipboardHelper->updateHostContext();
@@ -4144,11 +4584,32 @@ void prepareServerInformation(const HostConnectionInfoSnapshot& snapshot,
 // Called in a non-main thread
 bool Session::startConnectionAsync()
 {
-    // The UI should have ensured the old game was already quit
-    // if we decide to stream a different game.
-    Q_ASSERT(m_Computer->currentGameId == 0 ||
-             m_Computer->currentGameId == m_App.id);
-
+    m_TransportControlNegotiated.store(false);
+    m_TransportSessionId.clear();
+    m_TransportConnectionEpoch.clear();
+    if (m_TransportReconnectBudgetKbps)
+        m_StreamConfig.bitrate = *m_TransportReconnectBudgetKbps;
+    // Every native connection resets GCM counters. A reconnect must therefore
+    // use a fresh key, including retries of the same Session object.
+    memset(m_StreamConfig.remoteInputAesIv, 0, sizeof(m_StreamConfig.remoteInputAesIv));
+    if (RAND_bytes(reinterpret_cast<unsigned char*>(m_StreamConfig.remoteInputAesKey),
+                   sizeof(m_StreamConfig.remoteInputAesKey)) != 1 ||
+        RAND_bytes(reinterpret_cast<unsigned char*>(m_StreamConfig.remoteInputAesIv), 4) != 1) {
+        memset(m_StreamConfig.remoteInputAesKey, 0, sizeof(m_StreamConfig.remoteInputAesKey));
+        memset(m_StreamConfig.remoteInputAesIv, 0, sizeof(m_StreamConfig.remoteInputAesIv));
+        emit displayLaunchError(tr("Could not generate stream encryption keys."));
+        return false;
+    }
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    if (qEnvironmentVariableIsSet("MOONLIGHT_TRANSPORT_SESSION_TEST")) {
+        // Only a one-way key fingerprint is retained by the private fixture.
+        const QByteArray key(m_StreamConfig.remoteInputAesKey,
+                             sizeof(m_StreamConfig.remoteInputAesKey));
+        qInfo() << "Transport Session connection key fingerprint:"
+                << QCryptographicHash::hash(key, QCryptographicHash::Sha256).toHex()
+                << "startup network budget:" << m_StreamConfig.bitrate;
+    }
+#endif
     bool enableGameOptimizations;
     if (m_Computer->isNvidiaServerSoftware) {
         // GFE will set all settings to 720p60 if it doesn't recognize
@@ -4173,7 +4634,6 @@ bool Session::startConnectionAsync()
     }
 
     HostConnectionInfoSnapshot hostConnectionInfo = captureHostConnectionInfoSnapshot(m_Computer);
-    const bool resumingSession = hostConnectionInfo.currentGameId != 0;
 
     QString rtspSessionUrl;
 
@@ -4222,6 +4682,19 @@ bool Session::startConnectionAsync()
 
     try {
         NvHTTP http(m_Computer);
+        // Host restarts invalidate the UI's cached running app. Choose launch
+        // or resume from authenticated current state on every attempt.
+        updateHostConnectionInfoFromServerInfo(http.getServerInfo(NvHTTP::NVLL_NONE, true),
+                                               m_Computer, &hostConnectionInfo,
+                                               hostConnectionInfo.currentGameId != 0);
+        if (hostConnectionInfo.currentGameId != 0 && hostConnectionInfo.currentGameId != m_App.id) {
+            if (!m_SuppressConnectionErrorDialog) {
+                emit displayLaunchError(
+                    tr("Another app is running on the host. Stop it before starting this stream."));
+            }
+            return false;
+        }
+        const bool resumingSession = hostConnectionInfo.currentGameId != 0;
         RemoteStreamConfig remoteStreamConfig(
             m_Preferences->remoteResolution,
             m_Preferences->remoteResolutionWidth,
@@ -4248,6 +4721,8 @@ bool Session::startConnectionAsync()
                       m_LaunchUseVdd,
                       m_LaunchDisplayName,
                       remoteStreamConfig);
+        m_TransportSessionId = http.transportSessionId();
+        m_TransportConnectionEpoch = http.transportConnectionEpoch();
 
         try {
             updateHostConnectionInfoFromServerInfo(http.getServerInfo(NvHTTP::NVLL_NONE, true),
@@ -4332,14 +4807,48 @@ bool Session::startConnectionAsync()
                                                                          false);
     }
 
-    int err = LiStartConnection(&preparedHostInfo.info, &m_StreamConfig, &k_ConnCallbacks,
-                                &m_VideoCallbacks, &m_AudioCallbacks,
-                                NULL, 0, NULL, 0);
+    const bool packetControlRequested =
+        !m_StreamConfig.controlOnly &&
+        qEnvironmentVariableIntValue("MOONLIGHT_VIDEO_PACKET_CONTROL") == 1;
+    const bool packetFeedbackRequested =
+        packetControlRequested ||
+        qEnvironmentVariableIntValue("MOONLIGHT_VIDEO_PACKET_FEEDBACK") == 1;
+    if (!LiSetVideoPacketControlEnabled(packetControlRequested)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Could not configure video packet control before connection");
+        return false;
+    }
+    if (!LiSetVideoPacketFeedbackEnabled(packetFeedbackRequested)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Could not configure video packet feedback");
+        return false;
+    }
+    m_NetworkObservationEnabled =
+        packetFeedbackRequested ||
+        qEnvironmentVariableIntValue("MOONLIGHT_VIDEO_NETWORK_OBSERVATION") == 1;
+    if (!LiSetVideoNetworkObservationEnabled(m_NetworkObservationEnabled)) {
+        m_NetworkObservationEnabled = false;
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Could not configure video network observation");
+    }
+
+    // common-c fills missing callbacks in the supplied structures. Keep those
+    // mutations local to this attempt, especially the pull renderer's required
+    // null submit callback, which must remain null for the next connection.
+    auto connectionCallbacks = k_ConnCallbacks;
+    auto videoCallbacks = m_VideoCallbacks;
+    auto audioCallbacks = m_AudioCallbacks;
+    int err = LiStartConnection(&preparedHostInfo.info, &m_StreamConfig, &connectionCallbacks,
+                                &videoCallbacks, &audioCallbacks, NULL, 0, NULL, 0);
     if (err != 0) {
         // We already displayed an error dialog in the stage failure
         // listener.
         return false;
     }
+
+    const bool packetControlNegotiated = LiGetVideoPacketControlNegotiated();
+    m_TransportControlNegotiated.store(packetControlNegotiated);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Video packet control requested=%d negotiated=%d; feedback requested=%d",
+                packetControlRequested, packetControlNegotiated, packetFeedbackRequested);
 
     if (m_InputHandler != nullptr) {
         const int cursorResult =
@@ -4353,7 +4862,12 @@ bool Session::startConnectionAsync()
     }
 
     emit connectionStarted();
-    startSunshineAbr();
+    if (!packetControlNegotiated) {
+        startSunshineAbr();
+    } else {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Legacy ABR not started: packet control was negotiated with the host");
+    }
     startFileMappingUxProbe();
     startFileMappingSmokeProbe();
     if (m_Preferences->enableMicrophone) {
@@ -4674,6 +5188,7 @@ void Session::exec()
         return;
     }
 
+    startTransportPolicy();
     if (m_ClipboardHelper != nullptr) {
         m_ClipboardHelper->updateHostContext();
     }
@@ -4773,20 +5288,25 @@ void Session::exec()
 #endif
     const std::string windowName = windowTitle.toStdString();
 
-    bool attemptedQtWaylandWindow = false;
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     if (WaylandQtSdlBridge::isNativeWayland() &&
         strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
-        attemptedQtWaylandWindow = true;
         const Qt::WindowStates initialStates =
             m_QtWindow != nullptr ? m_QtWindow->windowStates() : Qt::WindowNoState;
         m_WaylandStreamWindow = WaylandQtSdlBridge::createStreamWindow(
             windowTitle, QRect(x, y, width, height),
             m_QtWindow != nullptr ? m_QtWindow->screen() : nullptr, initialStates, m_IsFullScreen);
         m_Window = WaylandQtSdlBridge::wrapStreamWindow(m_WaylandStreamWindow);
-    } else
+        if (!m_Window) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Wrapping the Qt Wayland stream surface failed; trying an SDL window: %s",
+                        SDL_GetError());
+            delete m_WaylandStreamWindow;
+            m_WaylandStreamWindow = nullptr;
+        }
+    }
 #endif
-    {
+    if (!m_Window) {
         m_Window = SDL_CreateWindow(windowName.c_str(), x, y, width, height,
                                     defaultWindowFlags | StreamUtils::getPlatformWindowFlags());
         if (!m_Window) {
@@ -4799,10 +5319,7 @@ void Session::exec()
     }
 
     if (!m_Window) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s failed: %s",
-                     attemptedQtWaylandWindow ? "Wrapping the Qt Wayland stream surface"
-                                              : "SDL_CreateWindow()",
-                     SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateWindow() failed: %s", SDL_GetError());
 
         delete m_WaylandStreamWindow;
         m_WaylandStreamWindow = nullptr;
@@ -4971,6 +5488,10 @@ void Session::exec()
         stopRemoteUsb();
     });
     m_MenuPanel->setBitrateChangeCallback([this](int bitrateKbps) {
+        if (m_TransportControlNegotiated.load()) {
+            requestRuntimeBitrateChange(bitrateKbps);
+            return;
+        }
         // Manual adjustment takes over from the settings page auto-recompute.
         m_Preferences->autoAdjustBitrate = false;
         m_Preferences->bitrateKbps = bitrateKbps;
@@ -4979,6 +5500,11 @@ void Session::exec()
         // actually accepted (see startRuntimeBitrateWorker()).
         requestRuntimeBitrateChange(bitrateKbps);
     });
+    m_MenuPanel->setTransportChangeCallback(
+        [this](bool bitrate, bool fec, int totalKbps, bool manual) {
+            submitTransportPolicy(bitrate, fec, totalKbps, manual);
+        });
+    processTransportPolicyResult(true);
     updateRemoteUsbMenuState();
     m_MenuPanel->setCloseCallback([this]() {
         // Record close timestamp for edge-trigger debounce
@@ -5031,6 +5557,36 @@ void Session::exec()
                                      parentRect.width(), parentRect.height());
         }
     }
+
+#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
+    const QString transportTestOutput = qEnvironmentVariable("MOONLIGHT_TRANSPORT_SESSION_TEST");
+    if (!transportTestOutput.isEmpty()) {
+        QReadLocker locker(&m_Computer->lock);
+        if (QHostAddress(m_Computer->activeAddress.address()).isLoopback() &&
+            !m_Computer->serverCert.isNull()) {
+            try {
+                m_TransportPolicySessionDriver = std::make_unique<TransportPolicySessionDriver>(
+                    *m_MenuPanel, transportTestOutput,
+                    [this] { showQtOverlayMenu(std::nullopt, false); });
+            } catch (const std::exception& error) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Session integration refused: %s",
+                             error.what());
+            }
+        } else {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "Session integration refused: loopback paired host required");
+        }
+    }
+    // Start outside the computer read lock: this joins the old HTTP worker and
+    // then takes its own paired-parameter snapshot under that lock.
+    const int policyFaultProxyPort =
+        qEnvironmentVariableIntValue("MOONLIGHT_TRANSPORT_FAULT_PROXY_PORT");
+    if (m_TransportPolicySessionDriver &&
+        (m_TransportPolicySessionDriver->statisticsMode() ||
+         m_TransportPolicySessionDriver->notificationsMode() ||
+         (policyFaultProxyPort >= 1024 && policyFaultProxyPort <= 65535)))
+        startTransportPolicy();
+#endif
 
     // Switch to async logging mode when we enter the SDL loop
     StreamUtils::enterAsyncLoggingMode();
@@ -5098,6 +5654,8 @@ void Session::exec()
 
     constexpr Uint32 ABR_FEEDBACK_INTERVAL_MS = 3000;
     auto processSunshineAbrFeedback = [this]() {
+        processTransportPolicyResult();
+        logVideoNetworkSnapshot();
         if (!m_SunshineAbrEnabled) {
             return;
         }
@@ -5795,6 +6353,7 @@ DispatchDeferredCleanup:
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
     m_WasCapturedBeforeStylusReplayPanel = false;
     m_StylusReplayTest.reset();
+    m_TransportPolicySessionDriver.reset();
 #endif
 
     cleanupFileMappingMount();
@@ -5852,6 +6411,8 @@ DispatchDeferredCleanup:
     // Destroy the decoder, since this must be done on the main thread
     // NB: This must happen before LiStopConnection() for pull-based
     // decoders.
+    stopRuntimeBitrateWorker();
+    stopTransportPolicy();
     stopSunshineAbr();
     SDL_LockMutex(m_DecoderLock);
     delete m_VideoDecoder;

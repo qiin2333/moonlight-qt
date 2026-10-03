@@ -37,6 +37,7 @@ class MacQtEventPumpInputGuard;
 #endif
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
 class StylusReplayTest;
+class TransportPolicySessionDriver;
 #endif
 
 class SupportedVideoFormatList : public QList<int>
@@ -148,6 +149,9 @@ public:
         return s_ActiveSession;
     }
 
+    // Called after a real decode unit is obtained, on either decoder path.
+    void notifyVideoReceived() { m_HasReceivedVideo.store(true, std::memory_order_relaxed); }
+
     Overlay::OverlayManager& getOverlayManager()
     {
         return m_OverlayManager;
@@ -242,7 +246,12 @@ private:
 #endif
     void dispatchQtMenuAction(OverlayMenuPanel::MenuAction action);
     void requestRuntimeBitrateChange(int bitrateKbps);
+    void startTransportPolicy();
+    void stopTransportPolicy();
+    void processTransportPolicyResult(bool force = false);
+    void submitTransportPolicy(bool bitrate, bool fec, int totalKbps, bool manual);
     void startRuntimeBitrateWorker();
+    void stopRuntimeBitrateWorker();
     void showStreamingToast(const QString& message, int durationMs = 2000);
     void processQtOverlayEvents();
     void updateFileMappingMenuState();
@@ -355,6 +364,7 @@ private:
     void startSunshineAbr();
     void stopSunshineAbr();
     void sendSunshineAbrFeedback();
+    void logVideoNetworkSnapshot();
     void startFileMappingUxProbe();
     void processFileMappingUxProbeResult();
     void startFileMappingMount();
@@ -402,7 +412,8 @@ private:
     // Graceful reconnect state
     bool m_ConnectionInterrupted;        // set by clConnectionTerminated for recoverable errors
     bool m_SuppressConnectionErrorDialog; // suppress error dialogs during reconnect attempts
-    bool m_HasReceivedVideo;             // true after the first decode unit of the current connection
+    std::atomic<bool>
+        m_HasReceivedVideo; // true after the first decode unit of the current connection
     int m_LastTerminationErrorCode;      // stored to show final error if reconnect gives up
 
     bool m_AsyncConnectionSuccess;
@@ -430,9 +441,21 @@ private:
     // Developer-only test harness. All replay/UI behavior lives behind this
     // boundary so production Session code keeps only integration hooks.
     std::unique_ptr<StylusReplayTest> m_StylusReplayTest;
+    std::unique_ptr<TransportPolicySessionDriver> m_TransportPolicySessionDriver;
     bool m_WasCapturedBeforeStylusReplayPanel;
 #endif
     bool m_SunshineAbrEnabled;
+    QString m_TransportSessionId;
+    QString m_TransportConnectionEpoch;
+    std::atomic_bool m_TransportControlNegotiated{ false };
+    std::unique_ptr<TransportPolicy::Controller> m_TransportPolicy;
+    std::unique_ptr<TransportPolicy::Controller> m_TransportStatistics;
+    // Last authoritative network budget, carried into a new handshake without
+    // restoring the old control epoch or automatic authority.
+    std::optional<int> m_TransportReconnectBudgetKbps;
+    Uint32 m_LastTransportPolicyTicks = 0;
+    bool m_NetworkObservationEnabled = false;
+    Uint32 m_LastNetworkSnapshotTicks = 0;
     Uint32 m_LastAbrFeedbackTicks;
     RTP_VIDEO_STATS m_LastAbrVideoStats;
     std::shared_ptr<std::atomic_bool> m_AbrFeedbackInFlight;
@@ -441,6 +464,9 @@ private:
     // applies the newest value so HTTP never blocks the stream loop.
     std::atomic_int m_PendingRuntimeBitrateKbps { 0 };
     std::atomic_bool m_RuntimeBitrateInFlight { false };
+    QThread* m_RuntimeBitrateWorker = nullptr;
+    std::shared_ptr<std::atomic_int> m_RuntimeAcceptedBitrateKbps;
+    quint64 m_RuntimeBitrateGeneration = 0;
     OverlayMenuPanel* m_MenuPanel; // Qt-based overlay menu window
     OverlayMenuButton* m_MenuButton = nullptr; // Qt-based floating menu button
     OverlayToast* m_Toast;           // Qt-based toast notification

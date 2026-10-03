@@ -235,6 +235,12 @@ jobs:
         if errorlevel 1 exit /b %ERRORLEVEL%
         rem overlay_menu_navigation 用 QTest 合成鼠标事件,CI 无桌面会话,必须 offscreen
         set QT_QPA_PLATFORM=offscreen
+        call scripts\run-test.bat transport_policy transport_policy
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat transport_policy_menu transport_policy_menu
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat legacy_bitrate legacy_bitrate
+        if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat overlay_menu_navigation overlay_menu_navigation
         if errorlevel 1 exit /b %ERRORLEVEL%
 
