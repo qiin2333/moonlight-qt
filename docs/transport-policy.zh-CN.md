@@ -14,6 +14,8 @@
 
 ## PC 配置与复验
 
+`9a220f05` 修复 Wayland 串流窗口包装失败后的启动路径：先删除未包装成功的 Qt 窗口，再尝试既有 SDL 窗口创建及平台标志重试。普通与开发 Windows Qt/MSVC 完整构建通过；Windows 不包含原生 Wayland 分支，Linux 构建及实际 Wayland 包装失败场景分别验证，不以 Windows 构建证明其运行结果。
+
 普通构建支持显式环境选项 `MOONLIGHT_VIDEO_PACKET_FEEDBACK=1` 和 `MOONLIGHT_VIDEO_PACKET_CONTROL=1`，请求控制会同时请求反馈；未获主机协商确认时保持原路径。`MOONLIGHT_VIDEO_NETWORK_OBSERVATION=1` 仅请求观测。控制专用会话不请求视频控制。
 
 策略工作线程独立持有 HTTP 与状态镜像，UI/串流线程读取副本。JSON 主机接口强制配对证书、禁止重定向，查询/提交有两秒超时。生产菜单由主机回执驱动，不按一次点击假定编码器已应用。
