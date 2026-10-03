@@ -1,5 +1,9 @@
 #include "streamutils.h"
 
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+#include "waylandqtsdlbridge.h"
+#endif
+
 #include <Qt>
 #include <QDir>
 
@@ -158,6 +162,13 @@ void StreamUtils::screenSpaceToNormalizedDeviceCoords(SDL_Rect* src, SDL_FRect* 
 
 int StreamUtils::getDisplayRefreshRate(SDL_Window* window)
 {
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    const int qtWaylandRefreshRate = WaylandQtSdlBridge::displayRefreshRate(window);
+    if (qtWaylandRefreshRate > 0) {
+        return qtWaylandRefreshRate;
+    }
+#endif
+
     int displayIndex = SDL_GetWindowDisplayIndex(window);
     if (displayIndex < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,

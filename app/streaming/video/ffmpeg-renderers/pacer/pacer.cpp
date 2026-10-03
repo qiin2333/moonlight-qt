@@ -1,6 +1,10 @@
 #include "pacer.h"
 #include "streaming/streamutils.h"
 
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+#include "streaming/waylandqtsdlbridge.h"
+#endif
+
 #ifdef Q_OS_WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -261,6 +265,9 @@ void Pacer::handleVsync(int timeUntilNextVsyncMillis)
 
 bool Pacer::initialize(SDL_Window* window, int maxVideoFps, bool enablePacing)
 {
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+    m_Window = window;
+#endif
     m_MaxVideoFps = maxVideoFps;
     m_DisplayFps = StreamUtils::getDisplayRefreshRate(window);
     m_RendererAttributes = m_VsyncRenderer->getRendererAttributes();
@@ -336,7 +343,12 @@ void Pacer::renderFrame(AVFrame* frame)
     m_VideoStats->totalPacerTimeUs += (beforeRender - (uint64_t)frame->pkt_dts);
 
     // Render it
-    m_VsyncRenderer->renderFrame(frame);
+    {
+#ifdef HAS_QT_SDL_WAYLAND_BRIDGE
+        auto surfaceLock = WaylandQtSdlBridge::lockSurfaceForRendering(m_Window);
+#endif
+        m_VsyncRenderer->renderFrame(frame);
+    }
     uint64_t afterRender = LiGetMicroseconds();
 
     m_VideoStats->totalRenderTimeUs += (afterRender - beforeRender);

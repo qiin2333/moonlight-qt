@@ -34,6 +34,7 @@ HEADERS += \
     ../../app/settings/devicelocalsettings.h \
     ../../app/streaming/video/overlaybuttonposition.h \
     ../../app/streaming/video/overlayeventwakestate.h \
+    ../../app/streaming/video/overlayrasterwindow.h \
     ../../app/streaming/video/overlaymenubutton.h
 
 macx: HEADERS += ../../app/streaming/video/overlayeventmonitor_mac.h

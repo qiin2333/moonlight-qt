@@ -85,7 +85,7 @@ void SdlInputHandler::handleAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
     SDL_Rect src, dst;
     int windowWidth, windowHeight;
 
-    SDL_GetWindowSize(m_Window, &windowWidth, &windowHeight);
+    getWindowCoordinateSize(&windowWidth, &windowHeight);
 
     src.x = src.y = 0;
     src.w = m_StreamWidth;
@@ -174,7 +174,7 @@ void SdlInputHandler::emulateAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
     SDL_Rect src, dst;
     int windowWidth, windowHeight;
 
-    SDL_GetWindowSize(m_Window, &windowWidth, &windowHeight);
+    getWindowCoordinateSize(&windowWidth, &windowHeight);
 
     src.x = src.y = 0;
     src.w = m_StreamWidth;
@@ -187,7 +187,8 @@ void SdlInputHandler::emulateAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
     // Use the stream and window sizes to determine the video region
     StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
 
-    if (qSqrt(qPow(event->x - m_LastTouchDownEvent.x, 2) + qPow(event->y - m_LastTouchDownEvent.y, 2)) > LONG_PRESS_ACTIVATION_DELTA) {
+    if (qSqrt(qPow(event->x - m_LastTouchDownEvent.x, 2) +
+              qPow(event->y - m_LastTouchDownEvent.y, 2)) > LONG_PRESS_ACTIVATION_DELTA) {
         // Moved too far since touch down. Cancel the long press timer.
         SDL_RemoveTimer(m_LongPressTimer);
         m_LongPressTimer = 0;
@@ -195,8 +196,9 @@ void SdlInputHandler::emulateAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
 
     // Don't reposition for finger down events within the deadzone. This makes double-clicking easier.
     if (event->type != SDL_FINGERDOWN ||
-            event->timestamp - m_LastTouchUpEvent.timestamp > DOUBLE_TAP_DEAD_ZONE_DELAY ||
-            qSqrt(qPow(event->x - m_LastTouchUpEvent.x, 2) + qPow(event->y - m_LastTouchUpEvent.y, 2)) > DOUBLE_TAP_DEAD_ZONE_DELTA) {
+        event->timestamp - m_LastTouchUpEvent.timestamp > DOUBLE_TAP_DEAD_ZONE_DELAY ||
+        qSqrt(qPow(event->x - m_LastTouchUpEvent.x, 2) + qPow(event->y - m_LastTouchUpEvent.y, 2)) >
+            DOUBLE_TAP_DEAD_ZONE_DELTA) {
         // Scale window-relative events to be video-relative and clamp to video region
         short x = qMin(qMax((int)(event->x * windowWidth), dst.x), dst.x + dst.w);
         short y = qMin(qMax((int)(event->y * windowHeight), dst.y), dst.y + dst.h);
