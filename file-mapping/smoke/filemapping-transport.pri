@@ -34,6 +34,7 @@ SOURCES += \
     $$PWD/../../app/backend/nvaddress.cpp \
     $$PWD/../../app/backend/nvcomputer.cpp \
     $$PWD/../../app/backend/nvhttp.cpp \
+    $$PWD/../../app/backend/transportpolicy.cpp \
     $$PWD/../../app/backend/nvpairingmanager.cpp \
     $$PWD/../../app/settings/compatfetcher.cpp \
     $$PWD/../../app/streaming/filemappingclient.cpp \
@@ -47,6 +48,8 @@ HEADERS += \
     $$PWD/../../app/backend/nvaddress.h \
     $$PWD/../../app/backend/nvcomputer.h \
     $$PWD/../../app/backend/nvhttp.h \
+    $$PWD/../../app/backend/transportpolicy.h \
+    $$PWD/../../app/backend/legacytransportscope.h \
     $$PWD/../../app/backend/nvpairingmanager.h \
     $$PWD/../../app/settings/compatfetcher.h \
     $$PWD/../../app/streaming/filemappingclient.h \
