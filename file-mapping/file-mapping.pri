@@ -16,6 +16,7 @@ SOURCES += \
     $$PWD/mount/windows_explorer_mirror_provider.cpp
 
 HEADERS += \
+    $$PWD/mount/filenameutils.h \
     $$PWD/protocol/file_mapping_client.h \
     $$PWD/protocol/file_mapping_errors.h \
     $$PWD/protocol/file_mapping_messages.h \

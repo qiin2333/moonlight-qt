@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QDeadlineTimer>
 #include <QJsonObject>
 #include <QList>
 #include <QSslSocket>
@@ -27,8 +28,11 @@ private:
 };
 
 QString takeFrame(QByteArray& buffer, Frame& frame, bool& needMore);
-QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out, int timeoutMs);
-bool writeText(QSslSocket& socket, const QByteArray& payload);
-bool writePong(QSslSocket& socket, const QByteArray& payload);
+// Keep the transport usable with the existing Network-only Qt/Steam Link SDKs.
+// Reads, control replies, and writes share the caller's total deadline.
+QString readJsonText(QSslSocket& socket, QByteArray& buffer, QJsonObject& out,
+                     const QDeadlineTimer& deadline);
+bool writeText(QSslSocket& socket, const QByteArray& payload, const QDeadlineTimer& deadline);
+bool writePong(QSslSocket& socket, const QByteArray& payload, const QDeadlineTimer& deadline);
 
 } // namespace FileMappingWebSocket

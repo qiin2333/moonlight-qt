@@ -2,7 +2,7 @@
 
 #include <QObject>
 #include <QNetworkAccessManager>
-#include <QVector>
+#include <QVersionNumber>
 
 class QNetworkReply;
 class PortableUpdateInstaller;
@@ -32,10 +32,6 @@ private slots:
     void handleUpdateCheckRequestFinished(QNetworkReply* reply);
 
 private:
-    void parseStringToVersionQuad(const QString& string, QVector<int>& version);
-
-    int compareVersion(const QVector<int>& version1, const QVector<int>& version2);
-
     bool isPortableInstall() const;
     QString getExpectedAssetPrefix() const;
     QString getExpectedAssetSuffix() const;
@@ -43,7 +39,7 @@ private:
     QString getPreferredAssetSuffix() const;
     QString getCurrentBuildArch() const;
 
-    QVector<int> m_CurrentVersionQuad;
+    QVersionNumber m_CurrentVersion;
     QNetworkAccessManager* m_Nam;
     PortableUpdateInstaller* m_PortableUpdateInstaller;
     bool m_UpdateCheckInProgress = false;

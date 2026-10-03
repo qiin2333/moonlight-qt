@@ -117,6 +117,8 @@ public:
         NVLL_VERBOSE
     };
 
+    // An injected manager is exclusive to sequential NvHTTP requests on its
+    // owning thread. Changing the paired identity discards cached connections.
     explicit NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert, bool useTrueUid = false, QNetworkAccessManager* nam = nullptr, QString uuid = "");
 
     explicit NvHTTP(NvComputer* computer, QNetworkAccessManager* nam = nullptr);
