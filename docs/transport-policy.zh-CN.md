@@ -18,6 +18,10 @@
 
 `9c9fc7cd` 的普通与开发 Qt/MSVC 完整构建、62 项 Qt 回归及导航检查通过；与 `6e179e966` 主机的实际配对 Session 分别验证真实 409 冲突和接受后回复丢失，两次均经重新查询及菜单重试完成 13 项操作。独立审计各 27 个不可变策略版本及实际 SDK/首包回执，详见主机[联合验证记录](https://github.com/AlkaidLab/foundation-sunshine/blob/codex/adaptive-fec-control/docs/adaptive-fec-validation.zh-CN.md)。默认功能开关保持关闭，完整控制/通知故障矩阵、设备生命周期、共享预算/公平性、参考链与期限、同预算画质/冻结/延迟及资源成本仍需逐项验收。
 
+`70173f17` 修复 1 FPS 时渲染历史窗口为零而从空队列取值的崩溃，两个窗口各保留至少一项；普通/开发 Qt/MSVC 在全新目录完整构建通过，后续低 FPS 会话正常退出。1 FPS 会触发 CLI 的推荐范围警告，其 SDK 场景目标未通过，不能作为整体支持范围扩大。
+
+1280×720 H.264、60 FPS、显式 AMF CBR、手动 FEC 0 的独立会话验证了真实 SDK 越界拒绝、属性回滚与编码器重建。配对兼容请求 800000 Kbps 的 revision 2 保持 backend_failure、未应用且无首包；随后 6000 Kbps 的 revision 3 实际应用并提交首包。PC 只读查询保留同一失败历史，83 份主机采样及三个不可变版本独立对账，客户端解码/渲染并正常退出。此前夹具失败和最终检查器的空 QString/布尔解析、提交资格假设错误均保留；只读查询不授予控制权，不证明活动新控制的 SDK 故障交互或失败时重连。详细证据见主机[验证记录](https://github.com/AlkaidLab/foundation-sunshine/blob/codex/adaptive-fec-control/docs/adaptive-fec-validation.zh-CN.md)。
+
 ## PC 配置与复验
 
 `9a220f05` 修复 Wayland 串流窗口包装失败后的启动路径：先删除未包装成功的 Qt 窗口，再尝试既有 SDL 窗口创建及平台标志重试。普通与开发 Windows Qt/MSVC 完整构建通过；Windows 不包含原生 Wayland 分支，Linux 构建及实际 Wayland 包装失败场景分别验证，不以 Windows 构建证明其运行结果。
