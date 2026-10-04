@@ -16,12 +16,16 @@ Place `transport-session-script.json` in that directory:
 {
   "steps": [
     {"action": "manual", "budgetKbps": 8000, "expectBitrate": false, "expectFec": false},
-    {"action": "fec", "budgetKbps": 8000, "expectBitrate": false, "expectFec": true},
-    {"action": "bitrate", "budgetKbps": 8000, "expectBitrate": true, "expectFec": true},
-    {"action": "budget", "budgetKbps": 6000, "expectBitrate": true, "expectFec": true}
+    {"action": "bitrate", "budgetKbps": 8000, "expectBitrate": true, "expectFec": false},
+    {"action": "budget", "budgetKbps": 6000, "expectBitrate": true, "expectFec": false},
+    {"action": "manual", "budgetKbps": 6000, "expectBitrate": false, "expectFec": false}
   ]
 }
 ```
+
+The current paired host advertises automatic FEC as unavailable. Verify its
+disabled menu state and rejection of enable requests separately; a `fec` action
+requires explicit host capability and cannot complete against this host.
 
 The driver submits actual slider/gamepad menu events and records policy,
 request revision, receipt phases, and menu state. A step requires the confirmed
