@@ -3300,7 +3300,8 @@ void Session::requestRuntimeBitrateChange(int bitrateKbps)
         const auto view = m_TransportPolicy ? m_TransportPolicy->view() : TransportPolicy::View{};
         const auto automatic = view.status ? view.status->accepted.automatic : std::nullopt;
         const bool bitrate = automatic && automatic->bitrate;
-        const bool fec = automatic && automatic->fec;
+        const bool fec =
+            view.status && view.status->automaticFecAvailable && automatic && automatic->fec;
         submitTransportPolicy(bitrate, fec, bitrateKbps, !bitrate && !fec);
         return;
     }

@@ -465,6 +465,7 @@ private slots:
     void fourCombinationsHaveExactFields()
     {
         auto s = TransportPolicy::parseStatus(sample("samples/policy-initial.json"));
+        s.automaticFecAvailable = true;
         for (bool bitrate : { false, true })
             for (bool fec : { false, true }) {
                 auto j = TransportPolicy::controlRequest(s, "pc-001", bitrate, fec, 7000);
@@ -479,6 +480,24 @@ private slots:
                 QVERIFY(!j.contains("activationEpoch"));
             }
     }
+    void unavailableAutomaticFecFailsClosedWithoutDisablingBitrate()
+    {
+        auto j = sample("samples/policy-initial.json");
+        QVERIFY(!TransportPolicy::parseStatus(j).automaticFecAvailable);
+        for (const QJsonValue capability :
+             { QJsonValue(false), QJsonValue("true"), QJsonValue(1) }) {
+            j["experimentalAutomaticFecAvailable"] = capability;
+            auto s = TransportPolicy::parseStatus(j);
+            QVERIFY(!s.automaticFecAvailable);
+            EXPECT_INVALID(TransportPolicy::controlRequest(s, "pc-1", false, true, 7000));
+            QVERIFY(TransportPolicy::controlRequest(s, "pc-2", true, false, 7000)
+                        .value("automaticBitrate")
+                        .toBool());
+        }
+        j["experimentalAutomaticFecAvailable"] = true;
+        QVERIFY(TransportPolicy::parseStatus(j).automaticFecAvailable);
+    }
+
     void manualPreservesProtectionAndReserves()
     {
         auto s = TransportPolicy::parseStatus(sample("samples/policy-final.json"));
@@ -636,6 +655,7 @@ private slots:
     {
         auto state = std::make_shared<FakeState>();
         state->status = TransportPolicy::parseStatus(sample("samples/policy-initial.json"));
+        state->status.automaticFecAvailable = true;
         TransportPolicy::Controller controller(
             state->status.sessionId, [state] { return std::make_unique<FakeTransport>(state); },
             15);

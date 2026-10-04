@@ -131,6 +131,7 @@ private slots:
                 auto view = sample();
                 view.status->accepted.automatic =
                     TransportPolicy::AutomaticControl{ bitrate, fec, 12000 };
+                view.status->automaticFecAvailable = true;
                 panel.updateTransportPolicyState(true, view);
                 openPolicy(panel);
                 int calls = 0;
@@ -195,6 +196,36 @@ private slots:
         panel.updateTransportPolicyState(true, view);
         QVERIFY(panel.transportOperationLabel().contains(QStringLiteral("Result unknown")));
     }
+    void unavailableAutomaticFecCannotBeActivatedAndCapabilityChangesRebuildMenu()
+    {
+        OverlayMenuPanel panel;
+        auto view = sample();
+        view.status->accepted.automatic = TransportPolicy::AutomaticControl{ false, false, 12000 };
+        panel.updateTransportPolicyState(true, view);
+        openPolicy(panel);
+        int calls = 0;
+        panel.setTransportChangeCallback([&](bool, bool fec, int, bool) {
+            QVERIFY(!fec);
+            ++calls;
+        });
+        QVERIFY(!panel.m_MenuLevels[2].items[1].enabled);
+        view.status->accepted.automatic->fec = true;
+        panel.updateTransportPolicyState(true, view);
+        QVERIFY(
+            panel.dispatchTransportAction(OverlayMenuPanel::MenuAction::ToggleAutomaticBitrate));
+        QCOMPARE(calls, 1);
+        click(panel, OverlayMenuPanel::MenuAction::ToggleAutomaticFec);
+        QVERIFY(panel.dispatchTransportAction(OverlayMenuPanel::MenuAction::ToggleAutomaticFec));
+        QCOMPARE(calls, 1);
+        QVERIFY(panel.m_MenuLevels[2].items[0].enabled);
+        view.status->automaticFecAvailable = true;
+        panel.updateTransportPolicyState(true, view);
+        QVERIFY(panel.m_MenuLevels[2].items[1].enabled);
+        view.status->automaticFecAvailable = false;
+        panel.updateTransportPolicyState(true, view);
+        QVERIFY(!panel.m_MenuLevels[2].items[1].enabled);
+    }
+
     void unavailableBusyAndStaleDisableEveryWriteAndCancelDrafts()
     {
         for (int reason = 0; reason < 5; ++reason) {

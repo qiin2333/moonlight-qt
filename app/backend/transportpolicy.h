@@ -71,6 +71,7 @@ struct Status
     bool liveControlAvailable;
     QVector<Receipt> receipts;
     std::optional<NetworkStatistics> networkStatistics;
+    bool automaticFecAvailable = false;
 };
 struct Submission
 {

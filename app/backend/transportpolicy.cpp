@@ -284,6 +284,8 @@ Status parseStatus(const QJsonObject& j)
                    boolean(j, "stopped"),
                    boolean(j, "experimentalLiveControlAvailable"),
                    std::move(receipts) };
+    const auto fecCapability = j.value(QStringLiteral("experimentalAutomaticFecAvailable"));
+    result.automaticFecAvailable = fecCapability.isBool() && fecCapability.toBool();
     // Invalid/unsupported optional statistics cannot invalidate a valid control
     // receipt, and can never become a numeric zero loss in the application.
     if (j.value(QStringLiteral("networkStatistics")).isObject()) {
@@ -309,6 +311,7 @@ QJsonObject controlRequest(const Status& s, const QString& id, bool bitrate, boo
                            int maximumKbps)
 {
     require(maximumKbps >= 1 && maximumKbps <= 800000, "Invalid total budget limit");
+    require(!fec || s.automaticFecAvailable, "Automatic FEC unavailable");
     auto request = requestBase(s, id);
     request.insert(QStringLiteral("automaticBitrate"), bitrate);
     request.insert(QStringLiteral("automaticFec"), fec);

@@ -251,6 +251,8 @@ bool Controller::submit(Command command)
         std::lock_guard<std::mutex> lock(m_Shared->mutex);
         if (m_Shared->stopped || m_Shared->command || !m_Shared->view.canSubmit())
             return false;
+        if (command.fec && !m_Shared->view.status->automaticFecAvailable)
+            return false;
         m_Shared->command = command;
         m_Shared->view.submitting = true;
     }

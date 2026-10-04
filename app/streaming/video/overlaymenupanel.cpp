@@ -312,14 +312,15 @@ void OverlayMenuPanel::buildMenuLevels()
                                   m_TransportView.canSubmit(),
                                   automatic && automatic->bitrate,
                                   false });
-        bitrate.items.push_back({ tr("Automatic FEC"),
-                                  {},
-                                  MenuItemType::Toggle,
-                                  MenuAction::ToggleAutomaticFec,
-                                  0,
-                                  m_TransportView.canSubmit(),
-                                  automatic && automatic->fec,
-                                  true });
+        bitrate.items.push_back(
+            { tr("Automatic FEC"),
+              {},
+              MenuItemType::Toggle,
+              MenuAction::ToggleAutomaticFec,
+              0,
+              m_TransportView.canSubmit() && m_TransportView.status->automaticFecAvailable,
+              automatic && automatic->fec,
+              true });
         bitrate.items.push_back({ tr("Current policy"), transportCurrentLabel(),
                                   MenuItemType::Action, MenuAction::MenuActionMax, 0, false, false,
                                   false });
@@ -595,7 +596,8 @@ QString OverlayMenuPanel::transportStateFingerprint() const
                         networkSampleLabel() };
     if (m_TransportView.status) {
         const auto& p = m_TransportView.status->accepted;
-        values << p.revision << p.controlEpoch << QString::number(p.totalKbps);
+        values << p.revision << p.controlEpoch << QString::number(p.totalKbps)
+               << QString::number(m_TransportView.status->automaticFecAvailable);
         if (p.automatic)
             values << QString::number(p.automatic->bitrate) << QString::number(p.automatic->fec)
                    << QString::number(p.automatic->maximumKbps);
@@ -638,9 +640,11 @@ bool OverlayMenuPanel::dispatchTransportAction(MenuAction action)
         return false;
     if (!m_TransportControlNegotiated || !m_TransportView.canSubmit() || !m_TransportChangeCallback)
         return true;
+    if (action == MenuAction::ToggleAutomaticFec && !m_TransportView.status->automaticFecAvailable)
+        return true;
     const auto automatic = m_TransportView.status->accepted.automatic;
     bool bitrate = automatic && automatic->bitrate;
-    bool fec = automatic && automatic->fec;
+    bool fec = m_TransportView.status->automaticFecAvailable && automatic && automatic->fec;
     if (action == MenuAction::ToggleAutomaticBitrate)
         bitrate = !bitrate;
     if (action == MenuAction::ToggleAutomaticFec)
