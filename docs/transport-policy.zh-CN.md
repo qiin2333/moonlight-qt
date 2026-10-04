@@ -22,6 +22,10 @@
 
 1280×720 H.264、60 FPS、显式 AMF CBR、手动 FEC 0 的独立会话验证了真实 SDK 越界拒绝、属性回滚与编码器重建。配对兼容请求 800000 Kbps 的 revision 2 保持 backend_failure、未应用且无首包；随后 6000 Kbps 的 revision 3 实际应用并提交首包。PC 只读查询保留同一失败历史，83 份主机采样及三个不可变版本独立对账，客户端解码/渲染并正常退出。此前夹具失败和最终检查器的空 QString/布尔解析、提交资格假设错误均保留；只读查询不授予控制权，不证明活动新控制的 SDK 故障交互或失败时重连。详细证据见主机[验证记录](https://github.com/AlkaidLab/foundation-sunshine/blob/codex/adaptive-fec-control/docs/adaptive-fec-validation.zh-CN.md)。
 
+`f79613f1` 的全新完整开发构建另完成活动新控制的七次生产菜单操作：800000 Kbps 请求的 revision 5 得到真实 AMF backend_failure，未应用、未首发，随后菜单提交 6000 Kbps 的 revision 6 实际应用并首发，再调整自动码率/上限和手动接管。164 份独立 HTTPS 采样、13 个不可变版本、31 项运行检查通过；失败历史保留，实际接收/解码/渲染并正常退出。两张生产菜单绘制图分别显示 Failed (r5) 与 First packet sent (r6)，已确认 SDK 目标分别为 7.2/5.2 Mbps；滑块预算不等同于编码目标。新增 SDK 失败观察仅进入开发驱动，普通应用源码与已完整构建的 `70173f17` 相同。
+
+此次成功对照显式使用 Qt Quick basic/D3D11；默认 threaded 的三次启动未进入 Session.initialize，启动页与 CLI 参数正确，诊断启动器已进入 StateStartSession。两次私有进程清理及一次调试命令失败后的非零退出均保留，不能计为 SDK 拒绝或产品崩溃证明。basic 对照未挂调试器；默认启动差异未修复，不能据此宣称桌面合成、完整启动、SDK 在途重连、其他编码器或 QoE 验收通过。
+
 ## PC 配置与复验
 
 `9a220f05` 修复 Wayland 串流窗口包装失败后的启动路径：先删除未包装成功的 Qt 窗口，再尝试既有 SDL 窗口创建及平台标志重试。普通与开发 Windows Qt/MSVC 完整构建通过；Windows 不包含原生 Wayland 分支，Linux 构建及实际 Wayland 包装失败场景分别验证，不以 Windows 构建证明其运行结果。
