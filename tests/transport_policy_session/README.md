@@ -93,3 +93,10 @@ response through the HTTP deadline. Independently reconcile the original and
 retry request IDs, expected revisions, immutable host policies and actual
 SDK/first-send receipts. Keep failed fixtures, and do not replace responses or
 receipts with synthetic success.
+
+A manual policy `budget` action may set `"expectBackendFailure": true`.
+It must observe that exact request revision with an actual `backend_failure`,
+without an SDK-applied or first-sent receipt. A successful application fails the
+step; an HTTP error cannot satisfy it. A following ordinary budget action drives
+the production menu's explicit recovery. Independently verify the hardware SDK
+failure, rollback/rebuild, accepted policies and successful recovery receipts.

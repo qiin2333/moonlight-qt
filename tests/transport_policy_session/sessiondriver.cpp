@@ -66,6 +66,15 @@ TransportPolicySessionDriver::TransportPolicySessionDriver(OverlayMenuPanel& pan
         const auto step = value.toObject();
         const auto action = step.value(QStringLiteral("action")).toString();
         const int budget = step.value(QStringLiteral("budgetKbps")).toInt();
+        if (step.contains(QStringLiteral("expectBackendFailure")) &&
+            (!step.value(QStringLiteral("expectBackendFailure")).isBool() || m_LegacyMode ||
+             m_StatisticsMode || m_NotificationsMode || action != QStringLiteral("budget") ||
+             step.value(QStringLiteral("expectBitrate")).toBool() ||
+             step.value(QStringLiteral("expectFec")).toBool() ||
+             step.value(QStringLiteral("expectRequestError")).toBool())) {
+            throw std::invalid_argument(
+                "Backend failure requires a manual policy budget action without HTTP faults");
+        }
         if (m_NotificationsMode) {
             if (action != QStringLiteral("observe") || budget < 500 || budget > 800000)
                 throw std::invalid_argument(
@@ -299,6 +308,34 @@ void TransportPolicySessionDriver::tick(const TransportPolicy::View& view)
         m_RequestErrorObservation = snapshot(view);
         m_Waiting = false;
         save();
+        return;
+    }
+    if (m_Waiting &&
+        m_Steps[m_Index].toObject().value(QStringLiteral("expectBackendFailure")).toBool()) {
+        if (!view.status || view.submitting || !view.queryError.isEmpty() ||
+            !view.requestRevision || *view.requestRevision == m_PreviousRequest)
+            return;
+        const auto& status = *view.status;
+        if (status.accepted.revision != *view.requestRevision ||
+            status.accepted.totalKbps != m_ExpectedBudget)
+            return;
+        for (const auto& receipt : status.receipts) {
+            if (receipt.policy.revision != *view.requestRevision)
+                continue;
+            if (receipt.encoderApplied || receipt.firstSentFrame) {
+                finish(false, QStringLiteral("Expected backend failure was applied or sent"));
+                return;
+            }
+            if (receipt.failure == QStringLiteral("backend_failure")) {
+                m_ShowMenu();
+                m_Panel.navigateToLevel(2);
+                recordStep(view);
+                return;
+            }
+            if (receipt.failure != QStringLiteral("none"))
+                finish(false, QStringLiteral("Unexpected backend failure reason"));
+            return;
+        }
         return;
     }
     if (!view.canSubmit())
