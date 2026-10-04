@@ -3671,8 +3671,8 @@ void Session::stopTransportPolicy()
     // No worker owns Session/NvComputer or a callback into the overlay.
     if (m_TransportPolicy) {
         const auto view = m_TransportPolicy->view();
-        if (view.status)
-            m_TransportReconnectBudgetKbps = view.status->accepted.totalKbps;
+        if (view.status && view.status->confirmed)
+            m_TransportReconnectBudgetKbps = view.status->confirmed->totalKbps;
         m_TransportPolicy.reset();
     }
 }
