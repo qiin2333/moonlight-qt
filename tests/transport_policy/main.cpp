@@ -536,6 +536,21 @@ private slots:
         j["receipts"] = QJsonArray();
         EXPECT_INVALID(TransportPolicy::parseStatus(j));
     }
+    void contradictoryPoliciesWithTheSameRevisionFail()
+    {
+        auto j = sample("samples/policy-initial.json");
+        auto accepted = j.value("accepted").toObject();
+        accepted["wireBudgetKbps"] = accepted.value("wireBudgetKbps").toInt() - 1000;
+        j["accepted"] = accepted;
+        EXPECT_INVALID(TransportPolicy::parseStatus(j));
+        j = sample("samples/policy-initial.json");
+        auto rows = j.value("receipts").toArray();
+        auto receipt = rows.last().toObject();
+        receipt["encoderKbps"] = receipt.value("encoderKbps").toInt() - 1;
+        rows[rows.size() - 1] = receipt;
+        j["receipts"] = rows;
+        EXPECT_INVALID(TransportPolicy::parseStatus(j));
+    }
     void duplicateOrFutureReceiptsFail()
     {
         auto j = sample("samples/policy-initial.json");
@@ -619,6 +634,10 @@ private slots:
         TransportPolicy::Mirror mirror(s.sessionId);
         mirror.accept(s);
         auto changed = s;
+        changed.accepted.immutableFields.insert("wireBudgetKbps", 42);
+        EXPECT_INVALID(mirror.accept(changed));
+        QVERIFY(!mirror.canSubmit());
+        changed = s;
         changed.receipts[0].policy.immutableFields.insert("encoderKbps", 42);
         EXPECT_INVALID(mirror.accept(changed));
         changed = s;

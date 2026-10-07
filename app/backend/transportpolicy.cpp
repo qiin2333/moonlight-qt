@@ -242,6 +242,9 @@ Status parseStatus(const QJsonObject& j)
         require(confirmed->revision == identity(j, "encoderAppliedRevision") &&
                     compareIdentity(confirmed->revision, accepted.revision) <= 0,
                 "Inconsistent encoder policy");
+        require(confirmed->revision != accepted.revision ||
+                    confirmed->immutableFields == accepted.immutableFields,
+                "Policy revision was mutated within response");
     } else
         require(j.value(QStringLiteral("encoderAppliedRevision")).isNull(),
                 "Unexpected applied revision");
@@ -255,6 +258,10 @@ Status parseStatus(const QJsonObject& j)
         require(row.isObject(), "Invalid receipt");
         auto r = row.toObject();
         auto p = policy(r);
+        require((p.revision != accepted.revision || p.immutableFields == accepted.immutableFields) &&
+                    (!confirmed || p.revision != confirmed->revision ||
+                     p.immutableFields == confirmed->immutableFields),
+                "Policy revision was mutated within response");
         require(compareIdentity(p.revision, accepted.revision) <= 0 && !seen.contains(p.revision),
                 "Inconsistent receipt revision");
         seen.insert(p.revision);

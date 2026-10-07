@@ -33,7 +33,19 @@ void Mirror::accept(Status next)
             require(compareIdentity(next.confirmed->revision, old.confirmed->revision) >= 0,
                     "Stale encoder state");
         }
+        const auto unchanged = [&](const Policy& policy) {
+            require(policy.revision != old.accepted.revision ||
+                        policy.immutableFields == old.accepted.immutableFields,
+                    "Policy revision was mutated");
+            require(!old.confirmed || policy.revision != old.confirmed->revision ||
+                        policy.immutableFields == old.confirmed->immutableFields,
+                    "Policy revision was mutated");
+        };
+        unchanged(next.accepted);
+        if (next.confirmed)
+            unchanged(*next.confirmed);
         for (const auto& receipt : next.receipts) {
+            unchanged(receipt.policy);
             for (const auto& prior : old.receipts) {
                 if (prior.policy.revision != receipt.policy.revision)
                     continue;
