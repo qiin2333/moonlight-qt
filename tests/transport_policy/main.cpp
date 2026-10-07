@@ -550,6 +550,20 @@ private slots:
         j = sample("samples/policy-initial.json");
         j["receipts"] = QJsonArray();
         EXPECT_INVALID(TransportPolicy::parseStatus(j));
+        for (int variant = 0; variant < 3; ++variant) {
+            j = sample("samples/policy-final.json");
+            auto rows = j.value("receipts").toArray();
+            auto receipt = rows.first().toObject();
+            receipt["encoderApplied"] = variant == 1;
+            receipt["firstSentFrame"] = variant == 0 ? QJsonValue("0") : QJsonValue();
+            receipt["failure"] = variant == 0 ? "none" : "backend_failure";
+            rows[0] = receipt;
+            j["receipts"] = rows;
+            if (variant < 2)
+                EXPECT_INVALID(TransportPolicy::parseStatus(j));
+            else
+                QVERIFY(!TransportPolicy::parseStatus(j).receipts.first().encoderApplied);
+        }
     }
     void contradictoryPoliciesWithTheSameRevisionFail()
     {

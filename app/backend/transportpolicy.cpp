@@ -283,6 +283,9 @@ Status parseStatus(const QJsonObject& j)
         require(r.contains(QStringLiteral("firstSentFrame")), "Missing send state");
         if (!r.value(QStringLiteral("firstSentFrame")).isNull())
             sent = identity(r, "firstSentFrame", false);
+        require(!sent || applied, "First send requires encoder application");
+        require(!applied || failure.toString() == QStringLiteral("none"),
+                "Failed receipt cannot be encoder-applied");
         if (confirmed && p.immutableFields == confirmed->immutableFields && applied)
             confirmedReceipt = true;
         receipts.push_back({ std::move(p), applied, sent, failure.toString() });
