@@ -523,6 +523,21 @@ private slots:
         p["encoderKbps"] = 123.5;
         j["accepted"] = p;
         EXPECT_INVALID(TransportPolicy::parseStatus(j));
+        for (const auto* field : { "budgetBasis", "encoderCeilingKbps" }) {
+            j = sample("samples/policy-initial.json");
+            p = j.value("accepted").toObject();
+            p.remove(QLatin1String(field));
+            j["accepted"] = p;
+            EXPECT_INVALID(TransportPolicy::parseStatus(j));
+        }
+        for (const QJsonValue ceiling :
+             { QJsonValue(0), QJsonValue(800001), QJsonValue(1.5), QJsonValue("1000") }) {
+            j = sample("samples/policy-initial.json");
+            p = j.value("accepted").toObject();
+            p["encoderCeilingKbps"] = ceiling;
+            j["accepted"] = p;
+            EXPECT_INVALID(TransportPolicy::parseStatus(j));
+        }
     }
     void contradictoryAcceptedOrAppliedVersionsFail()
     {

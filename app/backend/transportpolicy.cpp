@@ -68,6 +68,12 @@ Policy policy(const QJsonObject& j)
 {
     auto f = object(j, "fec");
     auto r = object(j, "reservesKbps");
+    const auto basis = j.value(QStringLiteral("budgetBasis"));
+    require(basis.isString() && (basis.toString() == "legacy" || basis.toString() == "normalized"),
+            "Invalid budget basis");
+    require(j.contains(QStringLiteral("encoderCeilingKbps")), "Missing encoder ceiling state");
+    if (!j.value(QStringLiteral("encoderCeilingKbps")).isNull())
+        integer(j, "encoderCeilingKbps", 1);
     std::optional<AutomaticControl> automatic;
     require(j.contains(QStringLiteral("automaticControl")), "Missing automatic control state");
     if (!j.value(QStringLiteral("automaticControl")).isNull()) {
