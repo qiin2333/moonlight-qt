@@ -223,7 +223,6 @@ protected:
     bool event(QEvent* event) override;
 
 private:
-    void paintContents(QPainter& painter);
     struct MenuItem {
         QString      label;
         QString      detail;       // shortcut key, status text, or "✓"

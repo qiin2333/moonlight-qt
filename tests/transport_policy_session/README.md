@@ -37,7 +37,7 @@ Progress and final results use atomic JSON writes. Completion asks the Session
 to exit normally. The runner must impose an outer timeout and clean up only
 process handles it created. Missing or malformed results are failures.
 
-PNG files run the same `paintContents()` method as the production QRasterWindow,
+PNG files call the production `paintOverlay()` override directly,
 using its live state, layout, fonts, and device pixel ratio. Inspect them before
 using them as layout evidence. This capture verifies painted layout; desktop
 composition remains separate. Record Qt Quick backend and render loop separately

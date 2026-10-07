@@ -80,7 +80,7 @@ private slots:
                     QImage preview(panel.size(), QImage::Format_ARGB32_Premultiplied);
                     preview.fill(Qt::transparent);
                     QPainter painter(&preview);
-                    panel.paintContents(painter);
+                    panel.paintOverlay(painter);
                     painter.end();
                     QVERIFY(preview.save(output +
                                          QStringLiteral("/menu-%1-%2.png")

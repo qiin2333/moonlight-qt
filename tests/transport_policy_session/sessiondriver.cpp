@@ -577,12 +577,12 @@ bool TransportPolicySessionDriver::recordLegacyStep(const LegacySessionObservati
     QImage image(m_Panel.size() * m_Panel.devicePixelRatio(), QImage::Format_ARGB32_Premultiplied);
     image.setDevicePixelRatio(m_Panel.devicePixelRatio());
     QPainter painter(&image);
-    m_Panel.paintContents(painter);
+    m_Panel.paintOverlay(painter);
     painter.end();
     result.insert(QStringLiteral("screenshotSaved"),
                   image.save(QDir(m_Output).filePath(screenshot)));
     result.insert(QStringLiteral("screenshotMethod"),
-                  QStringLiteral("production paintContents into QImage"));
+                  QStringLiteral("production paintOverlay into QImage"));
     result.insert(QStringLiteral("visualAcceptance"),
                   QStringLiteral("requires review; desktop composition unverified"));
     m_Results.append(result);
@@ -620,12 +620,12 @@ bool TransportPolicySessionDriver::recordStep(const TransportPolicy::View& view,
     QImage image(m_Panel.size() * m_Panel.devicePixelRatio(), QImage::Format_ARGB32_Premultiplied);
     image.setDevicePixelRatio(m_Panel.devicePixelRatio());
     QPainter painter(&image);
-    m_Panel.paintContents(painter);
+    m_Panel.paintOverlay(painter);
     painter.end();
     result.insert(QStringLiteral("screenshotSaved"),
                   image.save(QDir(m_Output).filePath(screenshot)));
     result.insert(QStringLiteral("screenshotMethod"),
-                  QStringLiteral("production paintContents into QImage"));
+                  QStringLiteral("production paintOverlay into QImage"));
     result.insert(QStringLiteral("visualAcceptance"),
                   QStringLiteral("requires review; desktop composition unverified"));
     m_Results.append(result);

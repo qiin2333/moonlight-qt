@@ -1279,11 +1279,6 @@ int OverlayMenuPanel::itemAtPos(const QPoint& pos) const
 
 void OverlayMenuPanel::paintOverlay(QPainter& p)
 {
-    paintContents(p);
-}
-
-void OverlayMenuPanel::paintContents(QPainter& p)
-{
     p.setRenderHint(QPainter::Antialiasing, false);
     p.setRenderHint(QPainter::TextAntialiasing);
 
