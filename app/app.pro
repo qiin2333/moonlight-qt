@@ -67,7 +67,7 @@ win32 {
     }
 
     INCLUDEPATH += $$PWD/../libs/windows/include
-    LIBS += ws2_32.lib winmm.lib dxva2.lib ole32.lib uuid.lib gdi32.lib user32.lib d3d9.lib dwmapi.lib dbghelp.lib
+    LIBS += ws2_32.lib winmm.lib dxva2.lib ole32.lib uuid.lib gdi32.lib user32.lib d3d9.lib dwmapi.lib dbghelp.lib advapi32.lib
 }
 macx:!disable-prebuilts {
     !exists($$PWD/../libs/mac) {
@@ -288,6 +288,7 @@ SOURCES += \
     backend/usbforwardingtunnel.cpp \
     wm.cpp \
     imageutils.cpp \
+    pipwbackground.cpp \
     streaming/video/videoenhancement.cpp
 
 HEADERS += \
@@ -360,6 +361,7 @@ HEADERS += \
     streaming/video/overlaytoast.h \
     backend/systemproperties.h \
     imageutils.h \
+    pipwbackground.h \
     uifont.h
 
 # Conditional files for non-Steam Link builds

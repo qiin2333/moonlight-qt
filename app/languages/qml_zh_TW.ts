@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>已審核的背景圖片已無法使用</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>無法建立背景圖片儲存目錄</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>無法解碼已審核的背景圖片</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -2877,5 +2889,18 @@
         <source>The host could not start USB forwarding: %1</source>
         <translation>主機未能啟動 USB 轉發：%1</translation>
     </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message><source>Background download timed out</source><translation>背景圖片下載逾時</translation></message>
+    <message><source>Invalid Pipw source or review index</source><translation>Pipw 圖片來源或審核資料無效</translation></message>
+    <message><source>Invalid Pipw redirect chain</source><translation>Pipw 重新導向鏈無效</translation></message>
+    <message><source>Invalid or oversized Pipw image</source><translation>Pipw 圖片無效或過大</translation></message>
+    <message><source>Pipw image exceeds the 20 MiB limit</source><translation>Pipw 圖片超過 20 MiB 大小限制</translation></message>
+    <message><source>Invalid Pipw redirect</source><translation>Pipw 重新導向無效</translation></message>
+    <message><source>Pipw API did not return an image redirect</source><translation>Pipw 介面未回傳圖片重新導向</translation></message>
+    <message><source>Pipw image is unavailable</source><translation>Pipw 圖片無法使用</translation></message>
+    <message><source>Pipw image has not passed content review</source><translation>Pipw 圖片未通過內容審核</translation></message>
+    <message><source>Unable to decode the reviewed background image</source><translation>無法解碼已審核的背景圖片</translation></message>
 </context>
 </TS>

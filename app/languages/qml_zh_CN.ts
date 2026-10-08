@@ -1254,6 +1254,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>已审核的背景图片已不可用</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>无法创建背景图片保存目录</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>无法解码已审核的背景图片</translation>
+    </message>
+    <message>
         <source>Unable to write file</source>
         <translation>无法写入文件</translation>
     </message>
@@ -3684,5 +3696,18 @@
         <source>Could not verify the local USB service and driver. Check the usbipd-win installation.</source>
         <translation>无法确认本地 USB 服务和驱动状态。请检查 usbipd-win 安装。</translation>
     </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message><source>Background download timed out</source><translation>背景图片下载超时</translation></message>
+    <message><source>Invalid Pipw source or review index</source><translation>Pipw 图片源或审核数据无效</translation></message>
+    <message><source>Invalid Pipw redirect chain</source><translation>Pipw 重定向链无效</translation></message>
+    <message><source>Invalid or oversized Pipw image</source><translation>Pipw 图片无效或过大</translation></message>
+    <message><source>Pipw image exceeds the 20 MiB limit</source><translation>Pipw 图片超过 20 MiB 大小限制</translation></message>
+    <message><source>Invalid Pipw redirect</source><translation>Pipw 重定向无效</translation></message>
+    <message><source>Pipw API did not return an image redirect</source><translation>Pipw 接口未返回图片重定向</translation></message>
+    <message><source>Pipw image is unavailable</source><translation>Pipw 图片不可用</translation></message>
+    <message><source>Pipw image has not passed content review</source><translation>Pipw 图片未通过内容审核</translation></message>
+    <message><source>Unable to decode the reviewed background image</source><translation>无法解码已审核的背景图片</translation></message>
 </context>
 </TS>
