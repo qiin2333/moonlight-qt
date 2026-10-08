@@ -23,7 +23,7 @@ public:
     Q_INVOKABLE void cancelBackgroundExport();
     Q_INVOKABLE QUrl backgroundExportDirectory();
     Q_INVOKABLE bool isPipwSource(const QString &url) const;
-    Q_INVOKABLE bool isReviewedBackground(const QString &path, const QString &apiUrl) const;
+    Q_INVOKABLE bool isReviewedBackground(const QString &path, const QString &apiUrl);
     Q_INVOKABLE void cancelBackgroundFetch();
     // Returns false when another background request is already in flight. The
     // caller can then coalesce the refresh and retry after the active request.
@@ -39,6 +39,7 @@ private:
     void startBackgroundRequest();
     void retryOrFailBackground(const QString &errorMessage);
     void decodeBackground(const QByteArray &imageData, bool reviewed);
+    bool restoreReviewedBackground(const QString &path, bool phone);
     static QString decodeAndSaveBackground(const QByteArray &imageData, bool reviewed = false);
     static QByteArray convertToJpeg(const QByteArray &imageData);
 

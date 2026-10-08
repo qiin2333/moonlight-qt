@@ -686,6 +686,7 @@ CenteredGridView {
         property string activeRequestKey: ""
         property bool lastRequestWasBusy: false
         property bool fetchPending: false
+        property bool networkBackgroundInitialized: false
 
         Settings {
             id: settings
@@ -756,6 +757,13 @@ CenteredGridView {
             return "file:///" + cachePath.replace(/\\/g, "/").replace(/^\/+/, "")
         }
 
+        function hasCachedBackground(cacheKey, requestUrl) {
+            return settings.cachedImagePath !== "" && settings.cachedSourceKey === cacheKey &&
+                   (imageUtils.isPipwSource(requestUrl)
+                    ? imageUtils.isReviewedBackground(settings.cachedImagePath, requestUrl)
+                    : imageUtils.fileExists(settings.cachedImagePath))
+        }
+
         function showBackground(imageUrl) {
             source = imageUrl
             currentImageUrl = imageUrl
@@ -809,18 +817,15 @@ CenteredGridView {
             }
 
             var cacheKey = configuredCacheKey()
-            var reviewedSource = imageUtils.isPipwSource(configuredNetworkUrl())
-            if (!forceRefresh && settings.cachedImagePath &&
-                    imageUtils.fileExists(settings.cachedImagePath) &&
-                    settings.cachedSourceKey === cacheKey &&
-                    (!reviewedSource || imageUtils.isReviewedBackground(settings.cachedImagePath,
-                                                                        configuredNetworkUrl()))) {
+            var firstNetworkLoad = !networkBackgroundInitialized
+            networkBackgroundInitialized = true
+            if (hasCachedBackground(cacheKey, configuredNetworkUrl())) {
                 settings.cachedSourceKey = cacheKey
                 loadingIndicator.visible = false
                 showBackground(cacheFileUrl(settings.cachedImagePath))
 
                 var oneWeek = 60 * 60 * 1000 * 24 * 7
-                if (Date.now() - settings.lastRefreshTime > oneWeek) {
+                if (forceRefresh || firstNetworkLoad || Date.now() - settings.lastRefreshTime > oneWeek) {
                     loadNewImageTimer.start()
                 }
                 return
@@ -838,12 +843,14 @@ CenteredGridView {
 
             loadingIndicator.visible = true
             fetchPending = true
-            if (imageUtils.isPipwSource(requestUrl)) {
-                // The previous image is not a fallback for a new reviewed request.
+            var requestKey = configuredCacheKey()
+            var displayingActiveCache = hasCachedBackground(requestKey, requestUrl) &&
+                    status !== Image.Error &&
+                    currentImageUrl === cacheFileUrl(settings.cachedImagePath)
+            if (!displayingActiveCache) {
                 source = "qrc:/res/gura.png"
                 currentImageUrl = ""
             }
-            var requestKey = configuredCacheKey()
             lastRequestWasBusy = false
             var requestStarted = imageUtils.fetchAndSaveRandomBackground(requestUrl)
             if (requestStarted || !lastRequestWasBusy) {
@@ -870,10 +877,9 @@ CenteredGridView {
                 return
             }
 
-            var displayingActiveCache = settings.cachedImagePath !== "" &&
-                    settings.cachedSourceKey === activeRequestKey &&
+            var displayingActiveCache = hasCachedBackground(activeRequestKey, configuredNetworkUrl()) &&
                     source.toString() === cacheFileUrl(settings.cachedImagePath)
-            if (!displayingActiveCache || imageUtils.isPipwSource(configuredNetworkUrl())) {
+            if (!displayingActiveCache) {
                 source = "qrc:/res/gura.png"
                 currentImageUrl = ""
             }

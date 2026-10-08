@@ -9,6 +9,8 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QImageReader>
+#include <QRegularExpression>
+#include <QSaveFile>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QStandardPaths>
@@ -71,6 +73,22 @@ bool writeNewImage(const QString &path, const QByteArray &bytes)
     return true;
 }
 
+bool publishCachedImage(const QString &sourcePath, const QString &destinationPath)
+{
+    if (QFileInfo(destinationPath).isSymLink())
+        return false;
+    QFile source(sourcePath);
+    QSaveFile destination(destinationPath);
+    if (!source.open(QIODevice::ReadOnly) || !destination.open(QIODevice::WriteOnly))
+        return false;
+    while (!source.atEnd()) {
+        const QByteArray chunk = source.read(64 * 1024);
+        if (chunk.isEmpty() || destination.write(chunk) != chunk.size())
+            return false;
+    }
+    return source.error() == QFileDevice::NoError && destination.commit();
+}
+
 QString originalFormatDestination(const QUrl &requestedUrl, const QString &extension)
 {
     QString path = requestedUrl.toLocalFile();
@@ -97,10 +115,6 @@ ImageUtils::ImageUtils(QObject *parent)
 ImageUtils::~ImageUtils()
 {
     cancelBackgroundFetch();
-    for (auto it = m_reviewedBackgrounds.cbegin(); it != m_reviewedBackgrounds.cend(); ++it) {
-        QFile::remove(it.key());
-        QFile::remove(it.value().originalPath);
-    }
 }
 
 void ImageUtils::saveImageToFile(const QString &imageUrl, const QUrl &localPath)
@@ -185,6 +199,11 @@ bool ImageUtils::prepareBackgroundExport(const QString &imageUrl)
 {
     cancelBackgroundExport();
     const QString path = localPathFromUrlOrPath(imageUrl);
+    if (!m_reviewedBackgrounds.contains(path) &&
+        QFileInfo(path).fileName().startsWith("pipw-preview-")) {
+        restoreReviewedBackground(path,
+                                  QFileInfo(path).fileName().startsWith("pipw-preview-phone-"));
+    }
     const auto found = m_reviewedBackgrounds.constFind(path);
     if (found == m_reviewedBackgrounds.cend()) {
         // A retired Pipw preview must not silently become an ordinary export.
@@ -241,11 +260,13 @@ bool ImageUtils::isPipwSource(const QString &url) const
     return PipwUrlPolicy::handles(QUrl(url));
 }
 
-bool ImageUtils::isReviewedBackground(const QString &path, const QString &apiUrl) const
+bool ImageUtils::isReviewedBackground(const QString &path, const QString &apiUrl)
 {
+    const bool phone = QUrlQuery(QUrl(apiUrl)).queryItemValue("phone") == "true";
     const auto found = m_reviewedBackgrounds.constFind(path);
-    if (found == m_reviewedBackgrounds.cend() ||
-        found->phone != (QUrlQuery(QUrl(apiUrl)).queryItemValue("phone") == "true"))
+    if (found == m_reviewedBackgrounds.cend())
+        return restoreReviewedBackground(path, phone);
+    if (found->phone != phone)
         return false;
     QFile original(found->originalPath);
     QFile preview(path);
@@ -255,8 +276,60 @@ bool ImageUtils::isReviewedBackground(const QString &path, const QString &apiUrl
         !PipwReviewIndex::bundled().accepts(digest.result(), found->phone))
         return false;
     digest.reset();
-    return preview.open(QIODevice::ReadOnly) && digest.addData(&preview) &&
-           digest.result() == found->previewDigest;
+    if (preview.open(QIODevice::ReadOnly) && digest.addData(&preview) &&
+        digest.result() == found->previewDigest)
+        return true;
+    preview.close();
+    return restoreReviewedBackground(path, phone);
+}
+
+bool ImageUtils::restoreReviewedBackground(const QString &path, bool phone)
+{
+    // A disk filename is only a lookup key, never evidence of approval. Check
+    // the original against the current index and derive the preview again.
+    const QFileInfo previewInfo(path);
+    const QDir cache(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
+                     "/vplus-backgrounds");
+    const QRegularExpression namePattern("^pipw-preview-(pc|phone)-([0-9a-f]{32})\\.jpg$");
+    const auto match = namePattern.match(previewInfo.fileName());
+    if (!previewInfo.isAbsolute() || previewInfo.isSymLink() || cache.canonicalPath().isEmpty() ||
+        previewInfo.dir().canonicalPath() != cache.canonicalPath() || !match.hasMatch() ||
+        (match.captured(1) == "phone") != phone)
+        return false;
+    const QByteArray expectedDigest = QByteArray::fromHex(match.captured(2).toLatin1());
+    if (!PipwReviewIndex::bundled().accepts(expectedDigest, phone))
+        return false;
+    const QString originalBase = "pipw-original-" + match.captured(1) + "-" + match.captured(2);
+    const QStringList extensions = { "jpg", "jpeg", "png", "webp", "avif", "gif", "bmp" };
+    for (const QString &extension : extensions) {
+        const QString originalPath = cache.filePath(originalBase + "." + extension);
+        const QFileInfo originalInfo(originalPath);
+        QFile original(originalPath);
+        if (!originalInfo.isFile() || originalInfo.isSymLink() ||
+            !original.open(QIODevice::ReadOnly) || original.size() > 20 * 1024 * 1024)
+            continue;
+        const QByteArray bytes = original.read(20 * 1024 * 1024 + 1);
+        const bool readSuccessfully = original.error() == QFileDevice::NoError;
+        original.close();
+        if (!readSuccessfully || bytes.isEmpty() || bytes.size() > 20 * 1024 * 1024 ||
+            QCryptographicHash::hash(bytes, QCryptographicHash::Md5) != expectedDigest ||
+            reviewedImageExtension(bytes) != extension)
+            continue;
+        const QString rebuiltPath = decodeAndSaveBackground(bytes, true);
+        if (rebuiltPath.isEmpty())
+            return false;
+        QFile rebuilt(rebuiltPath);
+        QCryptographicHash hash(QCryptographicHash::Md5);
+        const bool restored = rebuilt.open(QIODevice::ReadOnly) && hash.addData(&rebuilt) &&
+                              publishCachedImage(rebuiltPath, path);
+        rebuilt.close();
+        QFile::remove(rebuiltPath);
+        if (!restored)
+            return false;
+        m_reviewedBackgrounds.insert(path, { originalPath, expectedDigest, hash.result(), phone });
+        return true;
+    }
+    return false;
 }
 
 void ImageUtils::cancelBackgroundFetch()
@@ -444,21 +517,34 @@ void ImageUtils::decodeBackground(const QByteArray &imageData, bool reviewed)
                 }
                 return;
             }
-            // Pipw files are owned by this instance. Never prune another instance's
-            // verified original, or its save dialog may lose the selected image.
-            for (auto it = m_reviewedBackgrounds.cbegin(); it != m_reviewedBackgrounds.cend();
-                 ++it) {
-                QFile::remove(it.key());
-                QFile::remove(it.value().originalPath);
-            }
-            m_reviewedBackgrounds.clear();
+            QString previewPath = result->preview;
+            QString originalPath = result->original;
             if (reviewed) {
+                const QByteArray originalDigest =
+                    QCryptographicHash::hash(imageData, QCryptographicHash::Md5);
+                const QString cacheKey =
+                    QString(phone ? "phone-" : "pc-") + QString::fromLatin1(originalDigest.toHex());
+                const QDir cache(QFileInfo(result->preview).absolutePath());
+                previewPath = cache.filePath("pipw-preview-" + cacheKey + ".jpg");
+                originalPath = cache.filePath("pipw-original-" + cacheKey + "." +
+                                              QFileInfo(result->original).suffix());
+                if (!PipwReviewIndex::bundled().accepts(originalDigest, phone) ||
+                    !publishCachedImage(result->original, originalPath) ||
+                    !publishCachedImage(result->preview, previewPath)) {
+                    m_backgroundFetchInProgress = false;
+                    emit backgroundError(
+                        tr("Unable to load the background image. Please try another image."));
+                    return;
+                }
+                // Shared content-addressed files survive refresh, page destruction,
+                // and process exit. Repeated downloads of an image reuse the same pair.
+                m_reviewedBackgrounds.clear();
                 m_reviewedBackgrounds.insert(
-                    result->preview, { result->original,
-                                       QCryptographicHash::hash(imageData, QCryptographicHash::Md5),
-                                       result->previewDigest, phone });
+                    previewPath, { originalPath, originalDigest, result->previewDigest, phone });
+            } else {
+                m_reviewedBackgrounds.clear();
             }
-            result->retained = true;
+            result->retained = !reviewed;
             // Only application-owned cache files in the new directory are pruned.
             // User exports in Pictures/vplus and the legacy cache are untouched.
             QDir cache(QFileInfo(result->preview).absolutePath());
@@ -470,7 +556,7 @@ void ImageUtils::decodeBackground(const QByteArray &imageData, bool reviewed)
                 }
             }
             m_backgroundFetchInProgress = false;
-            emit backgroundReady(result->preview);
+            emit backgroundReady(previewPath);
         });
     connect(worker, &QThread::finished, worker, &QObject::deleteLater);
     worker->start();
