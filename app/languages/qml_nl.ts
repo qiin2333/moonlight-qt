@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>De achtergrondafbeelding is niet meer beschikbaar. Vernieuw deze en probeer het opnieuw.</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>De exportmap voor achtergrondafbeeldingen kan niet worden aangemaakt</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>De achtergrondafbeelding kan niet worden geladen. Probeer een andere afbeelding.</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw-afbeeldingen (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Time-out bij het downloaden van de achtergrondafbeelding</translation>
+    </message>
+    <message>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Er kan geen achtergrondafbeelding worden opgehaald. Probeer het later opnieuw.</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Ongeldige Pipw-omleidingsketen</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Ongeldige of te grote Pipw-afbeelding</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>De Pipw-afbeelding overschrijdt de limiet van 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Ongeldige Pipw-omleiding</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>De Pipw-API heeft geen omleiding naar een afbeelding geretourneerd</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>De Pipw-afbeelding is niet beschikbaar</translation>
+    </message>
+    <message>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Deze achtergrondafbeelding is niet beschikbaar. Probeer een andere afbeelding.</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>De achtergrondafbeelding kan niet worden geladen. Probeer een andere afbeelding.</translation>
     </message>
 </context>
 </TS>

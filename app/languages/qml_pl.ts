@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Obraz tła nie jest już dostępny. Odśwież go i spróbuj ponownie.</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Nie można utworzyć folderu eksportu obrazów tła</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Nie można wczytać obrazu tła. Wypróbuj inny obraz.</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Obrazy Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Upłynął limit czasu pobierania tła</translation>
+    </message>
+    <message>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Nie można pobrać obrazu tła. Spróbuj ponownie później.</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Nieprawidłowy łańcuch przekierowań Pipw</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Nieprawidłowy lub zbyt duży obraz Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Obraz Pipw przekracza limit 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Nieprawidłowe przekierowanie Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>API Pipw nie zwróciło przekierowania do obrazu</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Obraz Pipw jest niedostępny</translation>
+    </message>
+    <message>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Ten obraz tła jest niedostępny. Wypróbuj inny obraz.</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Nie można wczytać obrazu tła. Wypróbuj inny obraz.</translation>
     </message>
 </context>
 </TS>

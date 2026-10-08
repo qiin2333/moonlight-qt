@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>وێنەی پاشبنەما چیتر بەردەست نییە. نوێی بکەرەوە و دووبارە هەوڵ بدەرەوە.</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>ناتوانرێت بوخچەی هەناردەکردنی پاشبنەما دروست بکرێت</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>ناتوانرێت وێنەی پاشبنەما بار بکرێت. وێنەیەکی تر تاقی بکەرەوە.</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>وێنەکانی Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>کاتی داگرتنی پاشبنەما بەسەرچوو</translation>
+    </message>
+    <message>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>ناتوانرێت وێنەیەکی پاشبنەما وەربگیرێت. دواتر دووبارە هەوڵ بدەرەوە.</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>زنجیرەی ئاراستەکردنەوەی Pipw نادروستە</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>وێنەی Pipw نادروستە یان زۆر گەورەیە</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>قەبارەی وێنەی Pipw لە سنووری 20 MiB زیاترە</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>ئاراستەکردنەوەی Pipw نادروستە</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>API ی Pipw ئاراستەکردنەوە بۆ وێنە نەگەڕاندەوە</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>وێنەی Pipw بەردەست نییە</translation>
+    </message>
+    <message>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>ئەم وێنەی پاشبنەمایە بەردەست نییە. وێنەیەکی تر تاقی بکەرەوە.</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>ناتوانرێت وێنەی پاشبنەما بار بکرێت. وێنەیەکی تر تاقی بکەرەوە.</translation>
     </message>
 </context>
 </TS>

@@ -1254,6 +1254,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>背景图片已失效，请刷新后重试。</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>无法创建背景图片保存目录</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>无法加载背景图片，请换一张重试。</translation>
+    </message>
+    <message>
         <source>Unable to write file</source>
         <translation>无法写入文件</translation>
     </message>
@@ -2053,6 +2065,14 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>No keyboard? Press %1 to open the on-screen keyboard.</source>
+        <translation>没有键盘？按 %1 打开屏幕键盘。</translation>
+    </message>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw 图片 (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <source>Computers</source>
         <translation>计算机列表</translation>
@@ -3684,5 +3704,18 @@
         <source>Could not verify the local USB service and driver. Check the usbipd-win installation.</source>
         <translation>无法确认本地 USB 服务和驱动状态。请检查 usbipd-win 安装。</translation>
     </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message><source>Background download timed out</source><translation>背景图片下载超时</translation></message>
+    <message><source>Unable to retrieve a background image. Please try again later.</source><translation>无法获取背景图片，请稍后重试。</translation></message>
+    <message><source>Invalid Pipw redirect chain</source><translation>Pipw 重定向链无效</translation></message>
+    <message><source>Invalid or oversized Pipw image</source><translation>Pipw 图片无效或过大</translation></message>
+    <message><source>Pipw image exceeds the 20 MiB limit</source><translation>Pipw 图片超过 20 MiB 大小限制</translation></message>
+    <message><source>Invalid Pipw redirect</source><translation>Pipw 重定向无效</translation></message>
+    <message><source>Pipw API did not return an image redirect</source><translation>Pipw 接口未返回图片重定向</translation></message>
+    <message><source>Pipw image is unavailable</source><translation>Pipw 图片不可用</translation></message>
+    <message><source>This background image is unavailable. Please try another image.</source><translation>这张背景图片无法使用，请换一张重试。</translation></message>
+    <message><source>Unable to load the background image. Please try another image.</source><translation>无法加载背景图片，请换一张重试。</translation></message>
 </context>
 </TS>

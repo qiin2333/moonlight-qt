@@ -811,25 +811,53 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>Only local image files can be used as backgrounds</source>
+        <translation>只能使用本機圖片檔案作為背景</translation>
+    </message>
+    <message>
+        <source>The selected image file is unavailable</source>
+        <translation>所選的圖片檔案不存在或無法讀取</translation>
+    </message>
+    <message>
+        <source>Unsupported image format</source>
+        <translation>不支援的圖片格式</translation>
+    </message>
+    <message>
+        <source>Unable to decode the selected image</source>
+        <translation>無法解碼所選的圖片</translation>
+    </message>
+    <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>背景圖片已失效，請重新整理後再試。</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>無法建立背景圖片儲存目錄</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>無法載入背景圖片，請換一張再試。</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
-        <translation type="unfinished"></translation>
+        <translation>無法寫入檔案</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="73"/>
         <source>Invalid background image URL</source>
-        <translation type="unfinished"></translation>
+        <translation>背景圖片網址無效</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="118"/>
         <source>Background server returned an empty response</source>
-        <translation type="unfinished"></translation>
+        <translation>背景圖片伺服器回傳了空白回應</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="128"/>
         <source>Unable to decode background image</source>
-        <translation type="unfinished"></translation>
+        <translation>無法解碼背景圖片</translation>
     </message>
 </context>
 <context>
@@ -1563,6 +1591,26 @@
 <context>
     <name>PcView</name>
     <message>
+        <source>No keyboard? Press %1 to open the on-screen keyboard.</source>
+        <translation>沒有鍵盤？按 %1 開啟螢幕鍵盤。</translation>
+    </message>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw 圖片 (*.avif *.gif *.bmp)</translation>
+    </message>
+    <message>
+        <source>The local background could not be loaded. Photography has been restored.</source>
+        <translation>無法載入本機背景圖片，已恢復使用攝影圖片。</translation>
+    </message>
+    <message>
+        <source>Photography has been restored.</source>
+        <translation>已恢復使用攝影圖片。</translation>
+    </message>
+    <message>
+        <source>Drop one local image at a time.</source>
+        <translation>每次請只拖放一張本機圖片。</translation>
+    </message>
+    <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
         <translation>電腦</translation>
@@ -1595,17 +1643,17 @@
     <message>
         <location filename="../gui/PcView.qml" line="111"/>
         <source>Unable to open the app list for %1.</source>
-        <translation type="unfinished"></translation>
+        <translation>無法開啟 %1 的應用程式清單。</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="181"/>
         <source>Searching</source>
-        <translation type="unfinished"></translation>
+        <translation>正在搜尋</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="181"/>
         <source>No Computers</source>
-        <translation type="unfinished"></translation>
+        <translation>未找到電腦</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="392"/>
@@ -1665,52 +1713,52 @@
     <message>
         <location filename="../gui/PcView.qml" line="747"/>
         <source>Unsupported image format</source>
-        <translation type="unfinished"></translation>
+        <translation>不支援的圖片格式</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="774"/>
         <source>Drop To Set Wallpaper</source>
-        <translation type="unfinished"></translation>
+        <translation>拖放以設定桌布</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="813"/>
         <source>Save wallpaper</source>
-        <translation type="unfinished"></translation>
+        <translation>儲存桌布</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="822"/>
         <source>Refresh wallpaper</source>
-        <translation type="unfinished"></translation>
+        <translation>重新整理桌布</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="826"/>
         <source>Please wait at least 10 seconds between refreshes.</source>
-        <translation type="unfinished"></translation>
+        <translation>兩次重新整理之間請至少間隔 10 秒。</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="851"/>
         <source>Choose where to save</source>
-        <translation type="unfinished"></translation>
+        <translation>選擇儲存位置</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="852"/>
         <source>Image files (*.jpg *.jpeg *.png *.webp)</source>
-        <translation type="unfinished"></translation>
+        <translation>圖片檔案 (*.jpg *.jpeg *.png *.webp)</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="927"/>
         <source>Image saved to: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>圖片已儲存至：%1</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="931"/>
         <source>Save failed: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>儲存失敗：%1</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="939"/>
         <source>Save result</source>
-        <translation type="unfinished"></translation>
+        <translation>儲存結果</translation>
     </message>
     <message>
         <location filename="../gui/PcView.qml" line="531"/>
@@ -2877,5 +2925,18 @@
         <source>The host could not start USB forwarding: %1</source>
         <translation>主機未能啟動 USB 轉發：%1</translation>
     </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message><source>Background download timed out</source><translation>背景圖片下載逾時</translation></message>
+    <message><source>Unable to retrieve a background image. Please try again later.</source><translation>無法取得背景圖片，請稍後再試。</translation></message>
+    <message><source>Invalid Pipw redirect chain</source><translation>Pipw 重新導向鏈無效</translation></message>
+    <message><source>Invalid or oversized Pipw image</source><translation>Pipw 圖片無效或過大</translation></message>
+    <message><source>Pipw image exceeds the 20 MiB limit</source><translation>Pipw 圖片超過 20 MiB 大小限制</translation></message>
+    <message><source>Invalid Pipw redirect</source><translation>Pipw 重新導向無效</translation></message>
+    <message><source>Pipw API did not return an image redirect</source><translation>Pipw 介面未回傳圖片重新導向</translation></message>
+    <message><source>Pipw image is unavailable</source><translation>Pipw 圖片無法使用</translation></message>
+    <message><source>This background image is unavailable. Please try another image.</source><translation>這張背景圖片無法使用，請換一張再試。</translation></message>
+    <message><source>Unable to load the background image. Please try another image.</source><translation>無法載入背景圖片，請換一張再試。</translation></message>
 </context>
 </TS>

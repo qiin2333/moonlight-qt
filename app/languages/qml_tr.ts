@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Arka plan resmi artık kullanılamıyor. Yenileyip tekrar deneyin.</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Arka plan resimleri için dışa aktarma klasörü oluşturulamıyor</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Arka plan resmi yüklenemiyor. Başka bir resim deneyin.</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw resimleri (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Arka plan indirmesi zaman aşımına uğradı</translation>
+    </message>
+    <message>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Arka plan resmi alınamıyor. Daha sonra tekrar deneyin.</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Geçersiz Pipw yönlendirme zinciri</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Geçersiz veya çok büyük Pipw resmi</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Pipw resmi 20 MiB sınırını aşıyor</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Geçersiz Pipw yönlendirmesi</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>Pipw API bir resme yönlendirme döndürmedi</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Pipw resmi kullanılamıyor</translation>
+    </message>
+    <message>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Bu arka plan resmi kullanılamıyor. Başka bir resim deneyin.</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Arka plan resmi yüklenemiyor. Başka bir resim deneyin.</translation>
     </message>
 </context>
 </TS>
