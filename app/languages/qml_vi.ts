@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Ảnh nền đã được duyệt không còn khả dụng</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Ảnh nền không còn khả dụng. Hãy làm mới rồi thử lại.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Không thể tạo thư mục xuất ảnh nền</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Không thể giải mã ảnh nền đã được duyệt</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Không thể tải ảnh nền. Hãy thử ảnh khác.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Đã hết thời gian chờ tải ảnh nền</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Nguồn Pipw hoặc danh mục ảnh đã duyệt không hợp lệ</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Không thể lấy ảnh nền. Vui lòng thử lại sau.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Ảnh Pipw không khả dụng</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Ảnh Pipw chưa vượt qua bước duyệt nội dung</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Ảnh nền này không khả dụng. Hãy thử ảnh khác.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Không thể giải mã ảnh nền đã được duyệt</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Không thể tải ảnh nền. Hãy thử ảnh khác.</translation>
     </message>
 </context>
 </TS>

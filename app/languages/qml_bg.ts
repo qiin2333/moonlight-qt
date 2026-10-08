@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Провереното фоново изображение вече не е налично</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Фоновото изображение вече не е налично. Обновете го и опитайте отново.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Не може да се създаде папката за запазване на фонови изображения</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Провереното фоново изображение не може да бъде декодирано</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Фоновото изображение не може да се зареди. Опитайте с друго изображение.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Времето за изтегляне на фоновото изображение изтече</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Невалиден източник на Pipw или индекс на проверените изображения</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Не може да се получи фоново изображение. Опитайте отново по-късно.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Изображението от Pipw не е налично</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Изображението от Pipw не е преминало проверката на съдържанието</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Това фоново изображение не е налично. Опитайте с друго изображение.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Провереното фоново изображение не може да бъде декодирано</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Фоновото изображение не може да се зареди. Опитайте с друго изображение.</translation>
     </message>
 </context>
 </TS>

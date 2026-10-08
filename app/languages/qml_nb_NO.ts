@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Det kontrollerte bakgrunnsbildet er ikke lenger tilgjengelig</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Bakgrunnsbildet er ikke lenger tilgjengelig. Oppdater det og prøv igjen.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Kan ikke opprette mappen for eksport av bakgrunnsbilder</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Kan ikke dekode det kontrollerte bakgrunnsbildet</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Kan ikke laste inn bakgrunnsbildet. Prøv et annet bilde.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Nedlastingen av bakgrunnsbildet ble tidsavbrutt</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Ugyldig Pipw-kilde eller indeks over kontrollerte bilder</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Kan ikke hente et bakgrunnsbilde. Prøv igjen senere.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Pipw-bildet er ikke tilgjengelig</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Pipw-bildet har ikke bestått innholdskontrollen</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Dette bakgrunnsbildet er ikke tilgjengelig. Prøv et annet bilde.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Kan ikke dekode det kontrollerte bakgrunnsbildet</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Kan ikke laste inn bakgrunnsbildet. Prøv et annet bilde.</translation>
     </message>
 </context>
 </TS>

@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>תמונת הרקע שנבדקה אינה זמינה עוד</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>תמונת הרקע אינה זמינה עוד. יש לרענן אותה ולנסות שוב.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>לא ניתן ליצור את התיקייה לייצוא תמונות רקע</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>לא ניתן לפענח את תמונת הרקע שנבדקה</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>לא ניתן לטעון את תמונת הרקע. יש לנסות תמונה אחרת.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>הזמן הקצוב להורדת תמונת הרקע הסתיים</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>מקור Pipw או אינדקס הבדיקה אינם תקינים</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>לא ניתן לקבל תמונת רקע. יש לנסות שוב מאוחר יותר.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>תמונת Pipw אינה זמינה</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>תמונת Pipw לא עברה את בדיקת התוכן</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>תמונת הרקע הזאת אינה זמינה. יש לנסות תמונה אחרת.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>לא ניתן לפענח את תמונת הרקע שנבדקה</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>לא ניתן לטעון את תמונת הרקע. יש לנסות תמונה אחרת.</translation>
     </message>
 </context>
 </TS>

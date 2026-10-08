@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Проверенное фоновое изображение больше недоступно</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Фоновое изображение больше недоступно. Обновите его и попробуйте ещё раз.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Не удалось создать папку для экспорта фоновых изображений</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Не удалось декодировать проверенное фоновое изображение</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Не удалось загрузить фоновое изображение. Попробуйте другое изображение.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Время ожидания загрузки фона истекло</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Недопустимый источник Pipw или индекс проверенных изображений</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Не удалось получить фоновое изображение. Попробуйте позже.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Изображение Pipw недоступно</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Изображение Pipw не прошло проверку содержимого</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Это фоновое изображение недоступно. Попробуйте другое изображение.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Не удалось декодировать проверенное фоновое изображение</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Не удалось загрузить фоновое изображение. Попробуйте другое изображение.</translation>
     </message>
 </context>
 </TS>

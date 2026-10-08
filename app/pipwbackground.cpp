@@ -171,7 +171,8 @@ void PipwBackgroundDownloader::start(const QUrl &api)
         const quint64 generation = m_generation;
         QTimer::singleShot(0, this, [this, generation] {
             if (generation == m_generation)
-                completeFailure(tr("Invalid Pipw source or review index"));
+                completeFailure(
+                    tr("Unable to retrieve a background image. Please try again later."));
         });
         return;
     }
@@ -309,7 +310,7 @@ void PipwBackgroundDownloader::finish(QNetworkReply *reply, const QUrl &url, boo
         reply->header(QNetworkRequest::ContentLengthHeader).toLongLong(&hasLength);
     if ((hasLength && length != m_bytes.size()) ||
         !PipwReviewIndex::bundled().accepts(m_digest.result(), m_phone)) {
-        reject(tr("Pipw image has not passed content review"));
+        reject(tr("This background image is unavailable. Please try another image."));
         return;
     }
     emit ready(m_bytes);
@@ -347,5 +348,5 @@ void PipwBackgroundDownloader::completeFailure(const QString &message)
 
 void PipwBackgroundDownloader::rejectDecodedImage()
 {
-    reject(tr("Unable to decode the reviewed background image"));
+    reject(tr("Unable to load the background image. Please try another image."));
 }

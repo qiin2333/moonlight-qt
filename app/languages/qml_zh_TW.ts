@@ -827,16 +827,16 @@
         <translation>無法解碼所選的圖片</translation>
     </message>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>已審核的背景圖片已無法使用</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>背景圖片已失效，請重新整理後再試。</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>無法建立背景圖片儲存目錄</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>無法解碼已審核的背景圖片</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>無法載入背景圖片，請換一張再試。</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2929,14 +2929,14 @@
 <context>
     <name>PipwBackgroundDownloader</name>
     <message><source>Background download timed out</source><translation>背景圖片下載逾時</translation></message>
-    <message><source>Invalid Pipw source or review index</source><translation>Pipw 圖片來源或審核資料無效</translation></message>
+    <message><source>Unable to retrieve a background image. Please try again later.</source><translation>無法取得背景圖片，請稍後再試。</translation></message>
     <message><source>Invalid Pipw redirect chain</source><translation>Pipw 重新導向鏈無效</translation></message>
     <message><source>Invalid or oversized Pipw image</source><translation>Pipw 圖片無效或過大</translation></message>
     <message><source>Pipw image exceeds the 20 MiB limit</source><translation>Pipw 圖片超過 20 MiB 大小限制</translation></message>
     <message><source>Invalid Pipw redirect</source><translation>Pipw 重新導向無效</translation></message>
     <message><source>Pipw API did not return an image redirect</source><translation>Pipw 介面未回傳圖片重新導向</translation></message>
     <message><source>Pipw image is unavailable</source><translation>Pipw 圖片無法使用</translation></message>
-    <message><source>Pipw image has not passed content review</source><translation>Pipw 圖片未通過內容審核</translation></message>
-    <message><source>Unable to decode the reviewed background image</source><translation>無法解碼已審核的背景圖片</translation></message>
+    <message><source>This background image is unavailable. Please try another image.</source><translation>這張背景圖片無法使用，請換一張再試。</translation></message>
+    <message><source>Unable to load the background image. Please try another image.</source><translation>無法載入背景圖片，請換一張再試。</translation></message>
 </context>
 </TS>

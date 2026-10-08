@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>وێنەی پاشبنەمای پشکنراو چیتر بەردەست نییە</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>وێنەی پاشبنەما چیتر بەردەست نییە. نوێی بکەرەوە و دووبارە هەوڵ بدەرەوە.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>ناتوانرێت بوخچەی هەناردەکردنی پاشبنەما دروست بکرێت</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>ناتوانرێت وێنەی پاشبنەمای پشکنراو کۆدگشایی بکرێت</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>ناتوانرێت وێنەی پاشبنەما بار بکرێت. وێنەیەکی تر تاقی بکەرەوە.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>کاتی داگرتنی پاشبنەما بەسەرچوو</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>سەرچاوەی Pipw یان پێڕستی پشکنین نادروستە</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>ناتوانرێت وێنەیەکی پاشبنەما وەربگیرێت. دواتر دووبارە هەوڵ بدەرەوە.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>وێنەی Pipw بەردەست نییە</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>وێنەی Pipw پشکنینی ناوەڕۆکی تێنەپەڕاندووە</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>ئەم وێنەی پاشبنەمایە بەردەست نییە. وێنەیەکی تر تاقی بکەرەوە.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>ناتوانرێت وێنەی پاشبنەمای پشکنراو کۆدگشایی بکرێت</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>ناتوانرێت وێنەی پاشبنەما بار بکرێت. وێنەیەکی تر تاقی بکەرەوە.</translation>
     </message>
 </context>
 </TS>

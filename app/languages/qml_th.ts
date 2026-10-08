@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>รูปพื้นหลังที่ผ่านการตรวจสอบไม่พร้อมใช้งานแล้ว</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>รูปพื้นหลังไม่พร้อมใช้งานแล้ว โปรดรีเฟรชแล้วลองอีกครั้ง</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>ไม่สามารถสร้างโฟลเดอร์ส่งออกรูปพื้นหลังได้</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>ไม่สามารถถอดรหัสรูปพื้นหลังที่ผ่านการตรวจสอบได้</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>ไม่สามารถโหลดรูปพื้นหลังได้ โปรดลองใช้รูปอื่น</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>หมดเวลาการดาวน์โหลดรูปพื้นหลัง</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>แหล่งรูป Pipw หรือดัชนีรูปที่ตรวจสอบแล้วไม่ถูกต้อง</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>ไม่สามารถรับรูปพื้นหลังได้ โปรดลองอีกครั้งในภายหลัง</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>รูป Pipw ไม่พร้อมใช้งาน</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>รูป Pipw ยังไม่ผ่านการตรวจสอบเนื้อหา</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>รูปพื้นหลังนี้ไม่พร้อมใช้งาน โปรดลองใช้รูปอื่น</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>ไม่สามารถถอดรหัสรูปพื้นหลังที่ผ่านการตรวจสอบได้</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>ไม่สามารถโหลดรูปพื้นหลังได้ โปรดลองใช้รูปอื่น</translation>
     </message>
 </context>
 </TS>

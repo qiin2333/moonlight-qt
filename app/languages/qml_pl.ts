@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Sprawdzony obraz tła nie jest już dostępny</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Obraz tła nie jest już dostępny. Odśwież go i spróbuj ponownie.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Nie można utworzyć folderu eksportu obrazów tła</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Nie można zdekodować sprawdzonego obrazu tła</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Nie można wczytać obrazu tła. Wypróbuj inny obraz.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Upłynął limit czasu pobierania tła</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Nieprawidłowe źródło Pipw lub indeks sprawdzonych obrazów</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Nie można pobrać obrazu tła. Spróbuj ponownie później.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Obraz Pipw jest niedostępny</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Obraz Pipw nie przeszedł weryfikacji treści</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Ten obraz tła jest niedostępny. Wypróbuj inny obraz.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Nie można zdekodować sprawdzonego obrazu tła</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Nie można wczytać obrazu tła. Wypróbuj inny obraz.</translation>
     </message>
 </context>
 </TS>

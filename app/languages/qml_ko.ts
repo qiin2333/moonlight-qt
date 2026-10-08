@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>검토된 배경 이미지를 더 이상 사용할 수 없습니다</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>배경 이미지를 더 이상 사용할 수 없습니다. 새로고침한 후 다시 시도해 주세요.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>배경 이미지 내보내기 폴더를 만들 수 없습니다</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>검토된 배경 이미지를 디코딩할 수 없습니다</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>배경 이미지를 불러올 수 없습니다. 다른 이미지를 사용해 주세요.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>배경 이미지 다운로드 시간이 초과되었습니다</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Pipw 소스 또는 검토 목록이 유효하지 않습니다</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>배경 이미지를 가져올 수 없습니다. 나중에 다시 시도해 주세요.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Pipw 이미지를 사용할 수 없습니다</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Pipw 이미지가 콘텐츠 검토를 통과하지 않았습니다</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>이 배경 이미지를 사용할 수 없습니다. 다른 이미지를 사용해 주세요.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>검토된 배경 이미지를 디코딩할 수 없습니다</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>배경 이미지를 불러올 수 없습니다. 다른 이미지를 사용해 주세요.</translation>
     </message>
 </context>
 </TS>

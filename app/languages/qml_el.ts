@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Η ελεγμένη εικόνα φόντου δεν είναι πλέον διαθέσιμη</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Η εικόνα φόντου δεν είναι πλέον διαθέσιμη. Ανανεώστε την και δοκιμάστε ξανά.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Δεν ήταν δυνατή η δημιουργία του φακέλου εξαγωγής εικόνων φόντου</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Δεν ήταν δυνατή η αποκωδικοποίηση της ελεγμένης εικόνας φόντου</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Δεν ήταν δυνατή η φόρτωση της εικόνας φόντου. Δοκιμάστε άλλη εικόνα.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Έληξε το χρονικό όριο λήψης του φόντου</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Μη έγκυρη πηγή Pipw ή ευρετήριο ελεγμένων εικόνων</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Δεν ήταν δυνατή η λήψη εικόνας φόντου. Δοκιμάστε ξανά αργότερα.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Η εικόνα Pipw δεν είναι διαθέσιμη</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Η εικόνα Pipw δεν έχει περάσει τον έλεγχο περιεχομένου</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Αυτή η εικόνα φόντου δεν είναι διαθέσιμη. Δοκιμάστε άλλη εικόνα.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Δεν ήταν δυνατή η αποκωδικοποίηση της ελεγμένης εικόνας φόντου</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Δεν ήταν δυνατή η φόρτωση της εικόνας φόντου. Δοκιμάστε άλλη εικόνα.</translation>
     </message>
 </context>
 </TS>

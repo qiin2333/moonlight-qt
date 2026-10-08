@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>மதிப்பாய்வு செய்யப்பட்ட பின்னணிப் படம் இனி கிடைக்காது</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>பின்னணிப் படம் இனி கிடைக்காது. அதைப் புதுப்பித்து மீண்டும் முயற்சிக்கவும்.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>பின்னணிப் படங்களை ஏற்றுமதி செய்வதற்கான கோப்புறையை உருவாக்க முடியவில்லை</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>மதிப்பாய்வு செய்யப்பட்ட பின்னணிப் படத்தை டிகோட் செய்ய முடியவில்லை</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>பின்னணிப் படத்தை ஏற்ற முடியவில்லை. வேறொரு படத்தை முயற்சிக்கவும்.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>பின்னணிப் படத்தைப் பதிவிறக்குவதற்கான கால வரம்பு முடிந்தது</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Pipw மூலம் அல்லது மதிப்பாய்வுப் பட்டியல் செல்லுபடியாகாது</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>பின்னணிப் படத்தைப் பெற முடியவில்லை. பிறகு மீண்டும் முயற்சிக்கவும்.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Pipw படம் கிடைக்கவில்லை</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Pipw படம் உள்ளடக்க மதிப்பாய்வில் தேர்ச்சி பெறவில்லை</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>இந்தப் பின்னணிப் படம் கிடைக்கவில்லை. வேறொரு படத்தை முயற்சிக்கவும்.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>மதிப்பாய்வு செய்யப்பட்ட பின்னணிப் படத்தை டிகோட் செய்ய முடியவில்லை</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>பின்னணிப் படத்தை ஏற்ற முடியவில்லை. வேறொரு படத்தை முயற்சிக்கவும்.</translation>
     </message>
 </context>
 </TS>

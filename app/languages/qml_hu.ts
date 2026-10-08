@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Az ellenőrzött háttérkép már nem érhető el</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>A háttérkép már nem érhető el. Frissítse, majd próbálja újra.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Nem hozható létre a háttérképek exportálási könyvtára</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Az ellenőrzött háttérkép nem dekódolható</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>A háttérkép nem tölthető be. Próbáljon másik képet.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>A háttérkép letöltésének időkorlátja lejárt</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Érvénytelen Pipw-forrás vagy ellenőrzési jegyzék</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Nem sikerült lekérni háttérképet. Próbálja újra később.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>A Pipw-kép nem érhető el</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>A Pipw-kép nem ment át a tartalomellenőrzésen</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Ez a háttérkép nem érhető el. Próbáljon másik képet.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Az ellenőrzött háttérkép nem dekódolható</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>A háttérkép nem tölthető be. Próbáljon másik képet.</translation>
     </message>
 </context>
 </TS>

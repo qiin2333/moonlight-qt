@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Kontrollitud taustapilt pole enam saadaval</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Taustapilt pole enam saadaval. Värskendage seda ja proovige uuesti.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Taustapiltide ekspordikausta ei saa luua</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Kontrollitud taustapilti ei saa dekodeerida</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Taustapilti ei saa laadida. Proovige mõnda muud pilti.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Taustapildi allalaadimine aegus</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Vigane Pipw allikas või kontrollitud piltide indeks</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Taustapilti ei saa hankida. Proovige hiljem uuesti.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Pipw pilt pole saadaval</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Pipw pilt ei ole sisukontrolli läbinud</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>See taustapilt pole saadaval. Proovige mõnda muud pilti.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Kontrollitud taustapilti ei saa dekodeerida</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Taustapilti ei saa laadida. Proovige mõnda muud pilti.</translation>
     </message>
 </context>
 </TS>

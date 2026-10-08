@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Den granskade bakgrundsbilden är inte längre tillgänglig</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Bakgrundsbilden är inte längre tillgänglig. Uppdatera den och försök igen.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Det gick inte att skapa exportmappen för bakgrundsbilder</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Det gick inte att avkoda den granskade bakgrundsbilden</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Det gick inte att läsa in bakgrundsbilden. Prova en annan bild.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Tidsgränsen för nedladdning av bakgrundsbilden överskreds</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Ogiltig Pipw-källa eller granskningsindex</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Det gick inte att hämta en bakgrundsbild. Försök igen senare.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Pipw-bilden är inte tillgänglig</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Pipw-bilden har inte klarat innehållsgranskningen</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Den här bakgrundsbilden är inte tillgänglig. Prova en annan bild.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Det gick inte att avkoda den granskade bakgrundsbilden</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Det gick inte att läsa in bakgrundsbilden. Prova en annan bild.</translation>
     </message>
 </context>
 </TS>

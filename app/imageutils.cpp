@@ -119,12 +119,16 @@ void ImageUtils::saveImageToFile(const QString &imageUrl, const QUrl &localPath)
     cancelBackgroundExport();
     const QString exportedUrl = backgroundExportUrl(imageUrl);
     if (exportedUrl.isEmpty()) {
-        emit saveCompleted(false, tr("The reviewed background is no longer available"));
+        emit saveCompleted(
+            false,
+            tr("The background image is no longer available. Please refresh it and try again."));
         return;
     }
     if (exportedUrl != imageUrl &&
         !isReviewedBackground(localPathFromUrlOrPath(imageUrl), m_backgroundApiUrl.toString())) {
-        emit saveCompleted(false, tr("The reviewed background is no longer available"));
+        emit saveCompleted(
+            false,
+            tr("The background image is no longer available. Please refresh it and try again."));
         return;
     }
     QNetworkAccessManager *manager = new QNetworkAccessManager(this);
@@ -148,7 +152,8 @@ void ImageUtils::saveImageToFile(const QString &imageUrl, const QUrl &localPath)
                 const QByteArray payload = reply->readAll();
                 if (!expectedDigest.isEmpty() &&
                     QCryptographicHash::hash(payload, QCryptographicHash::Md5) != expectedDigest) {
-                    emit saveCompleted(false, tr("The reviewed background is no longer available"));
+                    emit saveCompleted(false, tr("The background image is no longer available. "
+                                                 "Please refresh it and try again."));
                     reply->deleteLater();
                     manager->deleteLater();
                     return;
@@ -184,14 +189,17 @@ bool ImageUtils::prepareBackgroundExport(const QString &imageUrl)
     if (found == m_reviewedBackgrounds.cend()) {
         // A retired Pipw preview must not silently become an ordinary export.
         if (QFileInfo(path).fileName().startsWith("pipw-preview-")) {
-            emit saveCompleted(false, tr("The reviewed background is no longer available"));
+            emit saveCompleted(false, tr("The background image is no longer available. Please "
+                                         "refresh it and try again."));
             return false;
         }
         return !imageUrl.isEmpty();
     }
     QFile original(found->originalPath);
     if (!original.open(QIODevice::ReadOnly) || original.size() > 20 * 1024 * 1024) {
-        emit saveCompleted(false, tr("The reviewed background is no longer available"));
+        emit saveCompleted(
+            false,
+            tr("The background image is no longer available. Please refresh it and try again."));
         return false;
     }
     const QByteArray bytes = original.read(20 * 1024 * 1024 + 1);
@@ -199,7 +207,9 @@ bool ImageUtils::prepareBackgroundExport(const QString &imageUrl)
     if (original.error() != QFileDevice::NoError || bytes.isEmpty() ||
         bytes.size() > 20 * 1024 * 1024 || digest != found->originalDigest ||
         !PipwReviewIndex::bundled().accepts(digest, found->phone)) {
-        emit saveCompleted(false, tr("The reviewed background is no longer available"));
+        emit saveCompleted(
+            false,
+            tr("The background image is no longer available. Please refresh it and try again."));
         return false;
     }
     m_pendingExport.source = imageUrl;
@@ -426,7 +436,8 @@ void ImageUtils::decodeBackground(const QByteArray &imageData, bool reviewed)
                         m_pipwDownloader->rejectDecodedImage();
                     else {
                         m_backgroundFetchInProgress = false;
-                        emit backgroundError(tr("Unable to decode the reviewed background image"));
+                        emit backgroundError(
+                            tr("Unable to load the background image. Please try another image."));
                     }
                 } else {
                     retryOrFailBackground(tr("Unable to decode background image"));

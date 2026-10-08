@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Zkontrolovaný obrázek pozadí již není dostupný</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Obrázek pozadí již není dostupný. Obnovte jej a zkuste to znovu.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Nelze vytvořit složku pro export obrázků pozadí</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Zkontrolovaný obrázek pozadí nelze dekódovat</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Obrázek pozadí nelze načíst. Zkuste jiný obrázek.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Vypršel časový limit stahování pozadí</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Neplatný zdroj Pipw nebo seznam zkontrolovaných obrázků</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Nelze získat obrázek pozadí. Zkuste to znovu později.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Obrázek Pipw není dostupný</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Obrázek Pipw neprošel kontrolou obsahu</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Tento obrázek pozadí není dostupný. Zkuste jiný obrázek.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Zkontrolovaný obrázek pozadí nelze dekódovat</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Obrázek pozadí nelze načíst. Zkuste jiný obrázek.</translation>
     </message>
 </context>
 </TS>

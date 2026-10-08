@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Das geprüfte Hintergrundbild ist nicht mehr verfügbar</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Das Hintergrundbild ist nicht mehr verfügbar. Aktualisieren Sie es und versuchen Sie es erneut.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Das Verzeichnis zum Exportieren von Hintergrundbildern konnte nicht erstellt werden</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Das geprüfte Hintergrundbild konnte nicht dekodiert werden</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Das Hintergrundbild konnte nicht geladen werden. Versuchen Sie ein anderes Bild.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Zeitüberschreitung beim Herunterladen des Hintergrundbilds</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Ungültige Pipw-Quelle oder ungültiger Prüfindex</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Es konnte kein Hintergrundbild abgerufen werden. Versuchen Sie es später erneut.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Das Pipw-Bild ist nicht verfügbar</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Das Pipw-Bild hat die Inhaltsprüfung nicht bestanden</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Dieses Hintergrundbild ist nicht verfügbar. Versuchen Sie ein anderes Bild.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Das geprüfte Hintergrundbild konnte nicht dekodiert werden</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Das Hintergrundbild konnte nicht geladen werden. Versuchen Sie ein anderes Bild.</translation>
     </message>
 </context>
 </TS>

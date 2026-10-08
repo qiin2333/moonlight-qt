@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>İncelenmiş arka plan resmi artık kullanılamıyor</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Arka plan resmi artık kullanılamıyor. Yenileyip tekrar deneyin.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Arka plan resimleri için dışa aktarma klasörü oluşturulamıyor</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>İncelenmiş arka plan resminin kodu çözülemiyor</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Arka plan resmi yüklenemiyor. Başka bir resim deneyin.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Arka plan indirmesi zaman aşımına uğradı</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Geçersiz Pipw kaynağı veya inceleme dizini</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Arka plan resmi alınamıyor. Daha sonra tekrar deneyin.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Pipw resmi kullanılamıyor</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Pipw resmi içerik incelemesinden geçmedi</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Bu arka plan resmi kullanılamıyor. Başka bir resim deneyin.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>İncelenmiş arka plan resminin kodu çözülemiyor</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Arka plan resmi yüklenemiyor. Başka bir resim deneyin.</translation>
     </message>
 </context>
 </TS>

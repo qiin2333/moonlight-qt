@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>Patikrintas fono paveikslėlis nebepasiekiamas</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Fono paveikslėlis nebepasiekiamas. Atnaujinkite jį ir bandykite dar kartą.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>Nepavyko sukurti fono paveikslėlių eksportavimo aplanko</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Nepavyko dekoduoti patikrinto fono paveikslėlio</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Nepavyko įkelti fono paveikslėlio. Pabandykite kitą paveikslėlį.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Baigėsi fono paveikslėlio atsisiuntimo laikas</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Neteisingas Pipw šaltinis arba patikrintų paveikslėlių indeksas</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Nepavyko gauti fono paveikslėlio. Bandykite dar kartą vėliau.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Pipw paveikslėlis nepasiekiamas</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Pipw paveikslėlis nepraėjo turinio patikros</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Šis fono paveikslėlis nepasiekiamas. Pabandykite kitą paveikslėlį.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>Nepavyko dekoduoti patikrinto fono paveikslėlio</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Nepavyko įkelti fono paveikslėlio. Pabandykite kitą paveikslėlį.</translation>
     </message>
 </context>
 </TS>

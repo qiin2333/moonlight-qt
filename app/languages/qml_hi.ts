@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>समीक्षित पृष्ठभूमि चित्र अब उपलब्ध नहीं है</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>पृष्ठभूमि चित्र अब उपलब्ध नहीं है। इसे रीफ़्रेश करके फिर से कोशिश करें।</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>पृष्ठभूमि चित्रों के निर्यात की डायरेक्टरी नहीं बनाई जा सकती</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>समीक्षित पृष्ठभूमि चित्र को डिकोड नहीं किया जा सकता</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>पृष्ठभूमि चित्र लोड नहीं किया जा सकता। किसी दूसरे चित्र का उपयोग करें।</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>पृष्ठभूमि डाउनलोड की समय सीमा समाप्त हो गई</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Pipw स्रोत या समीक्षा सूची अमान्य है</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>पृष्ठभूमि चित्र प्राप्त नहीं किया जा सकता। बाद में फिर से कोशिश करें।</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>Pipw चित्र उपलब्ध नहीं है</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>Pipw चित्र सामग्री समीक्षा में पास नहीं हुआ है</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>यह पृष्ठभूमि चित्र उपलब्ध नहीं है। किसी दूसरे चित्र का उपयोग करें।</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>समीक्षित पृष्ठभूमि चित्र को डिकोड नहीं किया जा सकता</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>पृष्ठभूमि चित्र लोड नहीं किया जा सकता। किसी दूसरे चित्र का उपयोग करें।</translation>
     </message>
 </context>
 </TS>

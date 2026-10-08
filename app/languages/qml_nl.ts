@@ -811,16 +811,16 @@
 <context>
     <name>ImageUtils</name>
     <message>
-        <source>The reviewed background is no longer available</source>
-        <translation>De gecontroleerde achtergrondafbeelding is niet meer beschikbaar</translation>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>De achtergrondafbeelding is niet meer beschikbaar. Vernieuw deze en probeer het opnieuw.</translation>
     </message>
     <message>
         <source>Unable to create the background export directory</source>
         <translation>De exportmap voor achtergrondafbeeldingen kan niet worden aangemaakt</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>De gecontroleerde achtergrondafbeelding kan niet worden gedecodeerd</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>De achtergrondafbeelding kan niet worden geladen. Probeer een andere afbeelding.</translation>
     </message>
     <message>
         <location filename="../imageutils.cpp" line="48"/>
@@ -2791,8 +2791,8 @@
         <translation>Time-out bij het downloaden van de achtergrondafbeelding</translation>
     </message>
     <message>
-        <source>Invalid Pipw source or review index</source>
-        <translation>Ongeldige Pipw-bron of index met gecontroleerde afbeeldingen</translation>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Er kan geen achtergrondafbeelding worden opgehaald. Probeer het later opnieuw.</translation>
     </message>
     <message>
         <source>Invalid Pipw redirect chain</source>
@@ -2819,12 +2819,12 @@
         <translation>De Pipw-afbeelding is niet beschikbaar</translation>
     </message>
     <message>
-        <source>Pipw image has not passed content review</source>
-        <translation>De Pipw-afbeelding is niet door de inhoudscontrole gekomen</translation>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Deze achtergrondafbeelding is niet beschikbaar. Probeer een andere afbeelding.</translation>
     </message>
     <message>
-        <source>Unable to decode the reviewed background image</source>
-        <translation>De gecontroleerde achtergrondafbeelding kan niet worden gedecodeerd</translation>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>De achtergrondafbeelding kan niet worden geladen. Probeer een andere afbeelding.</translation>
     </message>
 </context>
 </TS>
