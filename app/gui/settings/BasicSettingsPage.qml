@@ -673,6 +673,29 @@ Column {
                     }
                 }
 
+                RowLayout {
+                    width: parent.width
+                    Label { text: qsTr("FEC protection") }
+                    ComboBox {
+                        model: [qsTr("Host default"), qsTr("Automatic"), qsTr("Fixed")]
+                        currentIndex: StreamingPreferences.fecPercentage >= 0 ? 2 : StreamingPreferences.fecPercentage === -1 ? 1 : 0
+                        onActivated: {
+                            StreamingPreferences.fecPercentage = currentIndex === 0 ? -2 : currentIndex === 1 ? -1 : 20
+                            StreamingPreferences.save()
+                        }
+                    }
+                    SpinBox {
+                        visible: StreamingPreferences.fecPercentage >= 0
+                        from: 0; to: 100
+                        value: Math.max(0, StreamingPreferences.fecPercentage)
+                        onValueModified: {
+                            StreamingPreferences.fecPercentage = value
+                            StreamingPreferences.save()
+                        }
+                    }
+                    Label { visible: StreamingPreferences.fecPercentage >= 0; text: "%" }
+                }
+
                 // 「恢复默认」是个次要动作，做成滑条右下角的小方按钮
                 Item {
                     width: parent.width

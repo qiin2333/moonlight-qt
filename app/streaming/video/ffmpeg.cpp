@@ -1915,7 +1915,6 @@ void FFmpegVideoDecoder::decoderThreadProc()
             do {
                 err = avcodec_receive_frame(m_VideoDecoderCtx, frame);
                 if (err == 0) {
-                    Session::get()->notifyVideoReceived();
                     SDL_assert(m_FrameInfoQueue.size() == m_FramesIn - m_FramesOut);
                     m_FramesOut++;
 

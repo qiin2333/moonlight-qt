@@ -80,19 +80,11 @@ SOURCES += \
     $$COMMON_C_DIR/src/SdpGenerator.c \
     $$COMMON_C_DIR/src/SimpleStun.c \
     $$COMMON_C_DIR/src/VideoDepacketizer.c \
-    $$COMMON_C_DIR/src/VideoNetwork.c \
-    $$COMMON_C_DIR/src/VideoPacketFeedback.c \
-    $$COMMON_C_DIR/src/TransportFeedbackWire.c \
-    $$COMMON_C_DIR/src/TransportPolicyStatus.c \
     $$COMMON_C_DIR/src/VideoStream.c
 HEADERS += \
     $$COMMON_C_DIR/src/CursorStream.h \
     $$COMMON_C_DIR/src/Ds5HapticsStream.h \
     $$COMMON_C_DIR/src/Ds5HapticsIrStream.h \
-    $$COMMON_C_DIR/src/VideoNetworkSnapshot.h \
-    $$COMMON_C_DIR/src/TransportFeedbackWire.h \
-    $$COMMON_C_DIR/src/TransportPolicyStatus.h \
-    $$COMMON_C_DIR/src/VideoPacketFeedback.h \
     $$COMMON_C_DIR/src/Limelight.h
 INCLUDEPATH += \
     $$ENET_DIR/include \

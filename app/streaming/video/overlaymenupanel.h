@@ -19,7 +19,6 @@
 #include <vector>
 
 #include "streaming/input/gamepadglyphs.h"
-#include "backend/transportpolicycontroller.h"
 #include "overlaywindowpolicy.h"
 
 /**
@@ -42,13 +41,8 @@
 class OverlayMenuPanel : public OverlayRasterWindow
 {
     Q_OBJECT
-    friend class TransportPolicyMenuTest;
-#ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
-    friend class TransportPolicySessionDriver;
-#endif
 public:
-    enum class MenuAction
-    {
+    enum class MenuAction {
         // Quick actions (keyboard shortcuts)
         Quit,
         QuitAndExit,
@@ -70,9 +64,6 @@ public:
         // Set bitrate to the kbps value carried in MenuItem::payload.
         // Handled inside the panel (slider row + presets); never dispatched.
         SetBitrate,
-        ToggleAutomaticBitrate,
-        ToggleAutomaticFec,
-        TakeManualTransportControl,
         SetMenuPlacementTop,
         SetMenuPlacementRight,
         SetMenuPlacementLeft,
@@ -126,7 +117,6 @@ public:
     // Fired when a bitrate adjustment settles (debounced while scrubbing,
     // immediate for preset taps). The value is in kbps.
     using BitrateChangeCallback = std::function<void(int)>;
-    using TransportChangeCallback = std::function<void(bool, bool, int, bool)>;
 
     explicit OverlayMenuPanel(QWindow* parent = nullptr,
                               OverlayWindowMode windowMode = OverlayWindowMode::Detached);
@@ -142,10 +132,6 @@ public:
     }
     void setBitrateChangeCallback(BitrateChangeCallback cb) {
         m_BitrateChangeCallback = std::move(cb);
-    }
-    void setTransportChangeCallback(TransportChangeCallback cb)
-    {
-        m_TransportChangeCallback = std::move(cb);
     }
 
     // Human-readable bitrate label shared with toast/log formatting.
@@ -180,7 +166,6 @@ public:
     // Update dynamic state before showing the menu
     void updateMicrophoneState(bool enabled);
     void updateBitrateState(int bitrateKbps);
-    void updateTransportPolicyState(bool negotiated, TransportPolicy::View view);
     void updateMenuPositionState(MenuAction activePlacementAction);
     void updateGamepadMouseState(bool enabled);
     void updateFileMappingState(FileMappingState state, const QString& detail);
@@ -293,14 +278,6 @@ private:
     void selectBitratePreset(const MenuItem& item); // snap to preset + commit now
     void commitBitrateNow();                        // flush pending change to callback
     void refreshBitrateDetails();                   // level-0 detail + preset checkmarks
-    bool dispatchTransportAction(MenuAction action);
-    QString transportPhaseLabel(const QString& revision) const;
-    QString transportCurrentLabel() const;
-    QString transportOperationLabel() const;
-    QString transportEncoderLabel() const;
-    QString rawNetworkLossLabel() const;
-    QString networkSampleLabel() const;
-    QString transportStateFingerprint() const;
 
     std::vector<MenuLevel> m_MenuLevels;
     int  m_CurrentLevel;
@@ -324,10 +301,6 @@ private:
     RemoteUsbDeviceCallback m_RemoteUsbDeviceCallback;
     RemoteUsbReleaseCallback m_RemoteUsbReleaseCallback;
     BitrateChangeCallback m_BitrateChangeCallback;
-    TransportChangeCallback m_TransportChangeCallback;
-    bool m_TransportControlNegotiated = false;
-    TransportPolicy::View m_TransportView;
-    QString m_LastTransportFingerprint;
 
     // Bitrate slider state. m_BitrateKbps is the on-screen value;
     // m_CommittedBitrateKbps is the last value sent to the callback.

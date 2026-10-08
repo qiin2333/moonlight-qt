@@ -236,6 +236,8 @@ void StreamingPreferences::reload()
     fps = settings.value(SER_FPS, 60).toInt();
     enableYUV444 = settings.value(SER_YUV444, false).toBool();
     bitrateKbps = settings.value(SER_BITRATE, getDefaultBitrate(width, height, fps, enableYUV444)).toInt();
+    fecPercentage = settings.value("fecPercentage", -2).toInt();
+    if (fecPercentage < -2 || fecPercentage > 100) fecPercentage = -2;
     autoAdjustBitrate = settings.value(SER_AUTOADJUSTBITRATE, true).toBool();
     enableSunshineAbr = settings.value(SER_SUNSHINEABR, false).toBool();
     ignoreAspectRatio = settings.value(SER_IGNORE_ASPECT_RATIO, true).toBool();
@@ -682,6 +684,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_HEIGHT, height);
     settings.setValue(SER_FPS, fps);
     settings.setValue(SER_BITRATE, bitrateKbps);
+    settings.setValue("fecPercentage", fecPercentage);
     settings.setValue(SER_AUTOADJUSTBITRATE, autoAdjustBitrate);
     settings.setValue(SER_SUNSHINEABR, enableSunshineAbr);
     settings.setValue(SER_IGNORE_ASPECT_RATIO, ignoreAspectRatio);

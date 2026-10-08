@@ -155,14 +155,7 @@ Item {
         SdlGamepadKeyNavigation.enable()
     }
 
-    StackView.onActivating: Qt.callLater(startStream)
-
-    function startStream() {
-        if (streamLoader.active || (StackView.status !== StackView.Activating &&
-                                    StackView.status !== StackView.Active)) {
-            return
-        }
-
+    StackView.onActivated: {
         // Hide the toolbar before we start loading
         toolBar.shown = false
 
@@ -333,9 +326,7 @@ Item {
     Loader {
         id: streamLoader
         active: false
-        // startStream() already defers to the GUI event queue. This empty item
-        // must not wait for rendered frames to complete asynchronous incubation.
-        asynchronous: false
+        asynchronous: true
 
         onLoaded: {
             // Set the hint text. We do this here rather than

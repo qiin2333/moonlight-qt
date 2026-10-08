@@ -104,8 +104,6 @@ private:
     QByteArray m_ErrorText;
 };
 
-#include "transportpolicy.h"
-
 class NvHTTP : public QObject
 {
     Q_OBJECT
@@ -122,9 +120,6 @@ public:
     explicit NvHTTP(NvAddress address, uint16_t httpsPort, QSslCertificate serverCert, bool useTrueUid = false, QNetworkAccessManager* nam = nullptr, QString uuid = "");
 
     explicit NvHTTP(NvComputer* computer, QNetworkAccessManager* nam = nullptr);
-
-    // A background request can retain the name captured with its original connection.
-    void setClientNameOverride(const QString& name) { m_ClientNameOverride = name; }
 
     static
     int
@@ -153,13 +148,6 @@ public:
                            QString arguments,
                            int timeoutMs,
                            NvLogLevel logLevel = NvLogLevel::NVLL_VERBOSE);
-
-    QString transportSessionId() const { return m_TransportSessionId; }
-    QString transportConnectionEpoch() const { return m_TransportConnectionEpoch; }
-    void setLegacyTransportScope(const QString& sessionId, const QString& connectionEpoch);
-    TransportPolicy::Status getTransportPolicy(const QString& sessionId,
-                                               const QString& connectionEpoch = {});
-    TransportPolicy::Submission postTransportPolicy(const QString& path, const QJsonObject& body);
 
     UsbForwarding::Capability getUsbForwardingCapability();
 
@@ -252,17 +240,17 @@ private:
                        int timeoutMs,
                        NvLogLevel logLevel);
 
-    QJsonObject openJsonConnectionToObject(QUrl baseUrl, QString command, QJsonObject body,
-                                           bool post, int timeoutMs,
-                                           NvLogLevel logLevel = NvLogLevel::NVLL_VERBOSE,
-                                           int expectedHttpStatus = 0);
+    QJsonObject
+    openJsonConnectionToObject(QUrl baseUrl,
+                               QString command,
+                               QJsonObject body,
+                               bool post,
+                               int timeoutMs,
+                               NvLogLevel logLevel = NvLogLevel::NVLL_VERBOSE);
 
-    QString m_TransportSessionId;
-    QString m_TransportConnectionEpoch;
     NvAddress m_Address;
     QNetworkAccessManager* m_Nam;
     QSslCertificate m_ServerCert;
     bool m_UseTrueUid;
     QString m_Uuid;
-    std::optional<QString> m_ClientNameOverride;
 };

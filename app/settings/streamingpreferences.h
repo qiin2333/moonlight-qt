@@ -205,6 +205,7 @@ public:
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
     Q_PROPERTY(int bitrateKbps MEMBER bitrateKbps NOTIFY bitrateChanged)
+    Q_PROPERTY(int fecPercentage MEMBER fecPercentage NOTIFY fecChanged)
     Q_PROPERTY(bool autoAdjustBitrate MEMBER autoAdjustBitrate NOTIFY autoAdjustBitrateChanged)
     Q_PROPERTY(bool enableSunshineAbr MEMBER enableSunshineAbr NOTIFY enableSunshineAbrChanged)
     Q_PROPERTY(bool ignoreAspectRatio MEMBER ignoreAspectRatio NOTIFY ignoreAspectRatioChanged)
@@ -282,6 +283,7 @@ public:
     int height;
     int fps;
     int bitrateKbps;
+    int fecPercentage;
     bool autoAdjustBitrate;
     bool enableSunshineAbr;
     bool ignoreAspectRatio;
@@ -349,6 +351,7 @@ public:
 signals:
     void displayModeChanged();
     void bitrateChanged();
+    void fecChanged();
     void autoAdjustBitrateChanged();
     void enableSunshineAbrChanged();
     void ignoreAspectRatioChanged();
