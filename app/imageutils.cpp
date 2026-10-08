@@ -145,29 +145,29 @@ void ImageUtils::saveImageToFile(const QString &imageUrl, const QUrl &localPath)
         }
     }
 
-    connect(
-        reply, &QNetworkReply::finished, this,
-        [this, manager, reply, destination, expectedDigest]() {
-            if (reply->error() == QNetworkReply::NoError) {
-                const QByteArray payload = reply->readAll();
-                if (!expectedDigest.isEmpty() &&
-                    QCryptographicHash::hash(payload, QCryptographicHash::Md5) != expectedDigest) {
-                    emit saveCompleted(false, tr("The background image is no longer available. "
-                                                 "Please refresh it and try again."));
-                    reply->deleteLater();
-                    manager->deleteLater();
-                    return;
+    connect(reply, &QNetworkReply::finished, this,
+            [this, manager, reply, destination, expectedDigest]() {
+                if (reply->error() == QNetworkReply::NoError) {
+                    const QByteArray payload = reply->readAll();
+                    if (!expectedDigest.isEmpty() &&
+                        QCryptographicHash::hash(payload, QCryptographicHash::Md5) !=
+                            expectedDigest) {
+                        emit saveCompleted(false, tr("The background image is no longer available. "
+                                                     "Please refresh it and try again."));
+                        reply->deleteLater();
+                        manager->deleteLater();
+                        return;
+                    }
+                    const QString filePath = destination;
+                    const bool written = !filePath.isEmpty() && writeNewImage(filePath, payload);
+                    emit saveCompleted(written, written ? filePath : tr("Unable to write file"));
+                } else {
+                    emit saveCompleted(false, reply->errorString());
                 }
-                const QString filePath = destination;
-                const bool written = !filePath.isEmpty() && writeNewImage(filePath, payload);
-                emit saveCompleted(written, written ? filePath : tr("Unable to write file"));
-            } else {
-                emit saveCompleted(false, reply->errorString());
-            }
 
-            reply->deleteLater();
-            manager->deleteLater();
-        });
+                reply->deleteLater();
+                manager->deleteLater();
+            });
 }
 
 QString ImageUtils::backgroundExportUrl(const QString &imageUrl) const

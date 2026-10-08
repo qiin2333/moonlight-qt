@@ -19,6 +19,9 @@ bool isRedirect(int status)
     return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
 }
 const QStringList Extensions = { "webp", "png", "jpg", "jpeg", "avif", "gif", "bmp" };
+// Exact image hosts returned by the official PC and Phone API. Never trust
+// arbitrary redirect hosts or suffix matches, even when image bytes are checked.
+const QStringList ImageHosts = { "globe.cdn.media-library.fun" };
 }
 
 PipwReviewIndex::PipwReviewIndex(const QByteArray &json)
@@ -91,14 +94,15 @@ bool PipwUrlPolicy::handles(const QUrl &url)
 
 bool PipwUrlPolicy::isApi(const QUrl &url)
 {
-    return handles(url) && url.isValid() && url.scheme() == "https" && url.userInfo().isEmpty() &&
-           !url.hasFragment();
+    return handles(url) && url.isValid() && url.scheme() == "https" && url.port(443) == 443 &&
+           url.userInfo().isEmpty() && !url.hasFragment();
 }
 
 bool PipwUrlPolicy::isCandidate(const QUrl &url, bool phone)
 {
-    if (!url.isValid() || url.scheme() != "https" || url.host().isEmpty() ||
-        !url.userInfo().isEmpty() || url.hasFragment())
+    if (!url.isValid() || url.scheme() != "https" || url.port(443) != 443 ||
+        !ImageHosts.contains(url.host(), Qt::CaseInsensitive) || !url.userInfo().isEmpty() ||
+        url.hasFragment())
         return false;
     const QRegularExpression encodedSeparators("%(2f|5c|25|2e)",
                                                QRegularExpression::CaseInsensitiveOption);
