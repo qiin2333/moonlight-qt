@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>İncelenmiş arka plan resmi artık kullanılamıyor</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Arka plan resimleri için dışa aktarma klasörü oluşturulamıyor</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>İncelenmiş arka plan resminin kodu çözülemiyor</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw resimleri (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Arka plan indirmesi zaman aşımına uğradı</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Geçersiz Pipw kaynağı veya inceleme dizini</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Geçersiz Pipw yönlendirme zinciri</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Geçersiz veya çok büyük Pipw resmi</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Pipw resmi 20 MiB sınırını aşıyor</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Geçersiz Pipw yönlendirmesi</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>Pipw API bir resme yönlendirme döndürmedi</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Pipw resmi kullanılamıyor</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>Pipw resmi içerik incelemesinden geçmedi</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>İncelenmiş arka plan resminin kodu çözülemiyor</translation>
     </message>
 </context>
 </TS>

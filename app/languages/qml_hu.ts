@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>Az ellenőrzött háttérkép már nem érhető el</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Nem hozható létre a háttérképek exportálási könyvtára</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Az ellenőrzött háttérkép nem dekódolható</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw-képek (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="828"/>
         <source>Are you sure you want to quit?</source>
         <translation>Biztosan ki akarsz lépni?</translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>A háttérkép letöltésének időkorlátja lejárt</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Érvénytelen Pipw-forrás vagy ellenőrzési jegyzék</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Érvénytelen Pipw-átirányítási lánc</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Érvénytelen vagy túl nagy Pipw-kép</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>A Pipw-kép meghaladja a 20 MiB-os méretkorlátot</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Érvénytelen Pipw-átirányítás</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>A Pipw API nem adott vissza képre mutató átirányítást</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>A Pipw-kép nem érhető el</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>A Pipw-kép nem ment át a tartalomellenőrzésen</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Az ellenőrzött háttérkép nem dekódolható</translation>
     </message>
 </context>
 </TS>

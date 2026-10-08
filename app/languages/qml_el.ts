@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>Η ελεγμένη εικόνα φόντου δεν είναι πλέον διαθέσιμη</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Δεν ήταν δυνατή η δημιουργία του φακέλου εξαγωγής εικόνων φόντου</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Δεν ήταν δυνατή η αποκωδικοποίηση της ελεγμένης εικόνας φόντου</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Εικόνες Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Έληξε το χρονικό όριο λήψης του φόντου</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Μη έγκυρη πηγή Pipw ή ευρετήριο ελεγμένων εικόνων</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Μη έγκυρη αλυσίδα ανακατευθύνσεων Pipw</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Μη έγκυρη ή υπερβολικά μεγάλη εικόνα Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Η εικόνα Pipw υπερβαίνει το όριο των 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Μη έγκυρη ανακατεύθυνση Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>Το API του Pipw δεν επέστρεψε ανακατεύθυνση σε εικόνα</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Η εικόνα Pipw δεν είναι διαθέσιμη</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>Η εικόνα Pipw δεν έχει περάσει τον έλεγχο περιεχομένου</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Δεν ήταν δυνατή η αποκωδικοποίηση της ελεγμένης εικόνας φόντου</translation>
     </message>
 </context>
 </TS>

@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>Провереното фоново изображение вече не е налично</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Не може да се създаде папката за запазване на фонови изображения</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Провереното фоново изображение не може да бъде декодирано</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Изображения от Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Времето за изтегляне на фоновото изображение изтече</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Невалиден източник на Pipw или индекс на проверените изображения</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Невалидна верига от пренасочвания на Pipw</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Невалидно или твърде голямо изображение от Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Изображението от Pipw надвишава ограничението от 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Невалидно пренасочване на Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>API на Pipw не върна пренасочване към изображение</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Изображението от Pipw не е налично</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>Изображението от Pipw не е преминало проверката на съдържанието</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Провереното фоново изображение не може да бъде декодирано</translation>
     </message>
 </context>
 </TS>

@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>תמונת הרקע שנבדקה אינה זמינה עוד</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>לא ניתן ליצור את התיקייה לייצוא תמונות רקע</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>לא ניתן לפענח את תמונת הרקע שנבדקה</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>תמונות Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>הזמן הקצוב להורדת תמונת הרקע הסתיים</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>מקור Pipw או אינדקס הבדיקה אינם תקינים</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>שרשרת ההפניות של Pipw אינה תקינה</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>תמונת Pipw אינה תקינה או גדולה מדי</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>תמונת Pipw חורגת מהמגבלה של 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>הפניית Pipw אינה תקינה</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>ה־API של Pipw לא החזיר הפניה לתמונה</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>תמונת Pipw אינה זמינה</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>תמונת Pipw לא עברה את בדיקת התוכן</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>לא ניתן לפענח את תמונת הרקע שנבדקה</translation>
     </message>
 </context>
 </TS>

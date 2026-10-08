@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>รูปพื้นหลังที่ผ่านการตรวจสอบไม่พร้อมใช้งานแล้ว</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>ไม่สามารถสร้างโฟลเดอร์ส่งออกรูปพื้นหลังได้</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>ไม่สามารถถอดรหัสรูปพื้นหลังที่ผ่านการตรวจสอบได้</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>รูป Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>หมดเวลาการดาวน์โหลดรูปพื้นหลัง</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>แหล่งรูป Pipw หรือดัชนีรูปที่ตรวจสอบแล้วไม่ถูกต้อง</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>ลำดับการเปลี่ยนเส้นทางของ Pipw ไม่ถูกต้อง</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>รูป Pipw ไม่ถูกต้องหรือมีขนาดใหญ่เกินไป</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>รูป Pipw มีขนาดเกินขีดจำกัด 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>การเปลี่ยนเส้นทางของ Pipw ไม่ถูกต้อง</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>API ของ Pipw ไม่ได้ส่งคืนการเปลี่ยนเส้นทางไปยังรูป</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>รูป Pipw ไม่พร้อมใช้งาน</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>รูป Pipw ยังไม่ผ่านการตรวจสอบเนื้อหา</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>ไม่สามารถถอดรหัสรูปพื้นหลังที่ผ่านการตรวจสอบได้</translation>
     </message>
 </context>
 </TS>

@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>Ảnh nền đã được duyệt không còn khả dụng</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Không thể tạo thư mục xuất ảnh nền</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Không thể giải mã ảnh nền đã được duyệt</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Ảnh Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Đã hết thời gian chờ tải ảnh nền</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Nguồn Pipw hoặc danh mục ảnh đã duyệt không hợp lệ</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Chuỗi chuyển hướng Pipw không hợp lệ</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Ảnh Pipw không hợp lệ hoặc quá lớn</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Ảnh Pipw vượt quá giới hạn 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Chuyển hướng Pipw không hợp lệ</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>API Pipw không trả về chuyển hướng tới ảnh</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Ảnh Pipw không khả dụng</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>Ảnh Pipw chưa vượt qua bước duyệt nội dung</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Không thể giải mã ảnh nền đã được duyệt</translation>
     </message>
 </context>
 </TS>

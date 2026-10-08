@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>மதிப்பாய்வு செய்யப்பட்ட பின்னணிப் படம் இனி கிடைக்காது</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>பின்னணிப் படங்களை ஏற்றுமதி செய்வதற்கான கோப்புறையை உருவாக்க முடியவில்லை</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>மதிப்பாய்வு செய்யப்பட்ட பின்னணிப் படத்தை டிகோட் செய்ய முடியவில்லை</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw படங்கள் (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>பின்னணிப் படத்தைப் பதிவிறக்குவதற்கான கால வரம்பு முடிந்தது</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Pipw மூலம் அல்லது மதிப்பாய்வுப் பட்டியல் செல்லுபடியாகாது</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Pipw வழிமாற்றுச் சங்கிலி செல்லுபடியாகாது</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Pipw படம் செல்லுபடியாகாது அல்லது மிகப் பெரியதாக உள்ளது</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Pipw படம் 20 MiB வரம்பை மீறுகிறது</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Pipw வழிமாற்றம் செல்லுபடியாகாது</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>Pipw API படத்திற்கான வழிமாற்றத்தை வழங்கவில்லை</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Pipw படம் கிடைக்கவில்லை</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>Pipw படம் உள்ளடக்க மதிப்பாய்வில் தேர்ச்சி பெறவில்லை</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>மதிப்பாய்வு செய்யப்பட்ட பின்னணிப் படத்தை டிகோட் செய்ய முடியவில்லை</translation>
     </message>
 </context>
 </TS>

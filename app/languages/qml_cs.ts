@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>Zkontrolovaný obrázek pozadí již není dostupný</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Nelze vytvořit složku pro export obrázků pozadí</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Zkontrolovaný obrázek pozadí nelze dekódovat</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Obrázky Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Vypršel časový limit stahování pozadí</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Neplatný zdroj Pipw nebo seznam zkontrolovaných obrázků</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Neplatný řetězec přesměrování Pipw</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Neplatný nebo příliš velký obrázek Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Obrázek Pipw překračuje limit 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Neplatné přesměrování Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>API Pipw nevrátilo přesměrování na obrázek</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Obrázek Pipw není dostupný</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>Obrázek Pipw neprošel kontrolou obsahu</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Zkontrolovaný obrázek pozadí nelze dekódovat</translation>
     </message>
 </context>
 </TS>

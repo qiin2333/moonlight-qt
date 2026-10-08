@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>Kontrollitud taustapilt pole enam saadaval</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Taustapiltide ekspordikausta ei saa luua</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Kontrollitud taustapilti ei saa dekodeerida</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw pildid (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Taustapildi allalaadimine aegus</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Vigane Pipw allikas või kontrollitud piltide indeks</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Vigane Pipw ümbersuunamiste ahel</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Vigane või liiga suur Pipw pilt</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Pipw pilt ületab 20 MiB piirangu</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Vigane Pipw ümbersuunamine</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>Pipw API ei tagastanud ümbersuunamist pildile</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Pipw pilt pole saadaval</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>Pipw pilt ei ole sisukontrolli läbinud</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Kontrollitud taustapilti ei saa dekodeerida</translation>
     </message>
 </context>
 </TS>

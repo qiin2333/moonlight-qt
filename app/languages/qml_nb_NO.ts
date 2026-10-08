@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The reviewed background is no longer available</source>
+        <translation>Det kontrollerte bakgrunnsbildet er ikke lenger tilgjengelig</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Kan ikke opprette mappen for eksport av bakgrunnsbilder</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Kan ikke dekode det kontrollerte bakgrunnsbildet</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw-bilder (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Nedlastingen av bakgrunnsbildet ble tidsavbrutt</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw source or review index</source>
+        <translation>Ugyldig Pipw-kilde eller indeks over kontrollerte bilder</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Ugyldig kjede av Pipw-omdirigeringer</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Ugyldig eller for stort Pipw-bilde</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Pipw-bildet overskrider grensen på 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Ugyldig Pipw-omdirigering</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>Pipw-API-et returnerte ikke en omdirigering til et bilde</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Pipw-bildet er ikke tilgjengelig</translation>
+    </message>
+    <message>
+        <source>Pipw image has not passed content review</source>
+        <translation>Pipw-bildet har ikke bestått innholdskontrollen</translation>
+    </message>
+    <message>
+        <source>Unable to decode the reviewed background image</source>
+        <translation>Kan ikke dekode det kontrollerte bakgrunnsbildet</translation>
     </message>
 </context>
 </TS>
