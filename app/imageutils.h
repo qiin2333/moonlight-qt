@@ -16,7 +16,7 @@ class ImageUtils : public QObject
 public:
     explicit ImageUtils(QObject *parent = nullptr);
     ~ImageUtils() override;
-    
+
     Q_INVOKABLE void saveImageToFile(const QString &imageUrl, const QUrl &localPath);
     Q_INVOKABLE QString backgroundExportUrl(const QString &imageUrl) const;
     Q_INVOKABLE bool prepareBackgroundExport(const QString &imageUrl);
@@ -49,14 +49,16 @@ private:
     quint64 m_backgroundGeneration = 0;
     QPointer<QNetworkReply> m_backgroundReply;
     QPointer<PipwBackgroundDownloader> m_pipwDownloader;
-    struct ReviewedBackground {
+    struct ReviewedBackground
+    {
         QString originalPath;
         QByteArray originalDigest;
         QByteArray previewDigest;
         bool phone;
     };
     QHash<QString, ReviewedBackground> m_reviewedBackgrounds;
-    struct {
+    struct
+    {
         QString source;
         QString originalUrl;
         QString extension;

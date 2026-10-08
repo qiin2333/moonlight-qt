@@ -816,6 +816,7 @@ CenteredGridView {
                     (!reviewedSource || imageUtils.isReviewedBackground(settings.cachedImagePath,
                                                                         configuredNetworkUrl()))) {
                 settings.cachedSourceKey = cacheKey
+                loadingIndicator.visible = false
                 showBackground(cacheFileUrl(settings.cachedImagePath))
 
                 var oneWeek = 60 * 60 * 1000 * 24 * 7

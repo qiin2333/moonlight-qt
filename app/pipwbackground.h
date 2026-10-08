@@ -61,7 +61,7 @@ private:
     QElapsedTimer m_overall;
     QElapsedTimer m_candidate;
     QByteArray m_bytes;
-    QCryptographicHash m_digest{QCryptographicHash::Md5};
+    QCryptographicHash m_digest{ QCryptographicHash::Md5 };
     QUrl m_template;
     QStringList m_visited;
     bool m_phone = false;
