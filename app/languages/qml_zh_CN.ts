@@ -2066,6 +2066,14 @@
 <context>
     <name>PcView</name>
     <message>
+        <source>No keyboard? Press %1 to open the on-screen keyboard.</source>
+        <translation>没有键盘？按 %1 打开屏幕键盘。</translation>
+    </message>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw 图片 (*.avif *.gif *.bmp)</translation>
+    </message>
+    <message>
         <source>Computers</source>
         <translation>计算机列表</translation>
     </message>

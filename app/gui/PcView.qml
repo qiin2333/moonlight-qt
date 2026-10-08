@@ -1008,7 +1008,8 @@ CenteredGridView {
     FileDialog {
         id: saveFileDialog
         title: qsTr("Choose where to save")
-        nameFilters: [qsTr("Image files (*.jpg *.jpeg *.png *.webp)"), "Pipw (*.avif *.gif *.bmp)"]
+        nameFilters: [qsTr("Image files (*.jpg *.jpeg *.png *.webp)"),
+                      qsTr("Pipw images (*.avif *.gif *.bmp)")]
         fileMode: FileDialog.SaveFile
         property string exportSource: ""
 
