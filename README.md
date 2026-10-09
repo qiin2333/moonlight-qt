@@ -89,7 +89,7 @@ python3 setup-deps.py
 
 要求：
 
-- Qt 6 SDK，建议使用与 CI 接近的 Qt 6.11.x。
+- Qt 6 SDK，建议使用与 Windows CI 一致的 Qt 6.12.0。
 - Visual Studio 2022，使用 MSVC 工具链。
 - 生成面向普通用户的安装包时需要 7-Zip。
 - 调试 DirectX 相关问题时可安装 Windows Graphics Tools。

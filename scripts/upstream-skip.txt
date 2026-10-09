@@ -17,4 +17,4 @@ a903c5ce 同上(color range 系列)
 0eff3b9b Qt 6.11.2 暂缓:全仓保持 6.11.1,升级涉及 6 处 CI 钉,单独评估
 da331234 不删仓库内 vswhere.exe:scripts/run-test.bat 依赖它定位 MSVC 环境
 6cae32bf 不删仓库内 jom.exe:scripts/run-test.bat 依赖它做并行编译
-14c26d8c common-c 指向我方 fork(qiin2333/moonlight-common-c),上游 gitlink 不跟;frame loss 修复待单独移植(待办)
+14c26d8c common-c 指向我方 fork(qiin2333/moonlight-common-c);frame loss 修复已由 common-c 6687783 (#29) 合入

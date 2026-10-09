@@ -789,69 +789,6 @@ void SdlInputHandler::updateRemoteCursor(const RemoteCursorUpdate& update)
     }
 }
 
-void SdlInputHandler::raiseAllKeys(bool clearKeys)
-{
-    if (m_KeysDown.isEmpty()) {
-        return;
-    }
-
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Raising %d keys%s",
-                (int)m_KeysDown.count(),
-                clearKeys ? "" : " (keeping local state for retry)");
-
-    int failedCount = 0;
-    auto keysDown = m_KeysDown;
-
-    for (auto keyDown : std::as_const(keysDown)) {
-        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
-                     "Raising key: vk=0x%04x",
-                     (int)keyDown);
-
-        int rc = LiSendKeyboardEvent(keyDown, KEY_ACTION_UP, 0);
-        if (rc == 0) {
-            if (clearKeys) {
-                m_KeysDown.remove(keyDown);
-            }
-        }
-        else {
-            failedCount++;
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "LiSendKeyboardEvent failed while raising key: rc=%d vk=0x%04x",
-                        rc,
-                        (int)keyDown);
-        }
-    }
-
-    if (clearKeys && failedCount != 0) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Keeping %d keys marked down for a later retry",
-                    failedCount);
-    }
-}
-
-void SdlInputHandler::notifyMouseLeave()
-{
-    if (m_NeedsManualCaptureOnLeave) {
-        // SDL on Windows doesn't send the mouse button up until the mouse re-enters the window
-        // after leaving it. This breaks some of the Aero snap gestures, so we'll capture it to
-        // allow us to receive the mouse button up events later.
-        //
-        // On macOS and X11, capturing the mouse allows us to receive mouse motion outside the
-        // window (button up already worked without capture).
-        if (m_AbsoluteMouseMode && isCaptureActive()) {
-            // NB: Not using SDL_GetGlobalMouseState() because we want our state not the system's
-            Uint32 mouseState = SDL_GetMouseState(nullptr, nullptr);
-            for (Uint32 button = SDL_BUTTON_LEFT; button <= SDL_BUTTON_X2; button++) {
-                if (mouseState & SDL_BUTTON(button)) {
-                    SDL_CaptureMouse(SDL_TRUE);
-                    break;
-                }
-            }
-        }
-    }
-}
-
 void SdlInputHandler::notifyFocusLost()
 {
     Uint32 windowFlags = SDL_GetWindowFlags(m_Window);

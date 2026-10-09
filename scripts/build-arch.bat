@@ -27,6 +27,11 @@ if /I "%BUILD_CONFIG%"=="debug" (
                 exit /b 1
             )
 
+            if not defined SIGNTOOL_PARAMS (
+                echo A signtool parameter string must be specified in SIGNTOOL_PARAMS for signed release builds
+                exit /b 1
+            )
+
             echo Updating dependencies
             powershell %cd%\setup-deps.ps1
             if !ERRORLEVEL! NEQ 0 (
@@ -108,8 +113,6 @@ if /I "%BUILD_ARCH%"=="arm64" (
 )
 
 echo Detected target architecture: %ARCH%
-
-set SIGNTOOL_PARAMS=sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 /sha1 8b9d0d682ad9459e54f05a79694bc10f9876e297 /v
 
 set BUILD_ROOT=%cd%\build
 set SOURCE_ROOT=%cd%
@@ -283,7 +286,7 @@ if "%SIGN%"=="1" (
     for /r "%DEPLOY_FOLDER%" %%f in (*.dll *.exe) do (
         set FILES_TO_SIGN=!FILES_TO_SIGN! %%f
     )
-    signtool %SIGNTOOL_PARAMS% !FILES_TO_SIGN!
+    signtool sign %SIGNTOOL_PARAMS% !FILES_TO_SIGN!
     if !ERRORLEVEL! NEQ 0 goto Error
 )
 

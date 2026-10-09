@@ -156,7 +156,7 @@ jobs:
         arch: win64_msvc2022_64
         host: windows
         target: desktop
-        version: '6.11.1'
+        version: '6.12.0'
         modules: 'qtmultimedia qtimageformats'
         use-naqt: true
 
@@ -227,6 +227,8 @@ jobs:
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat stylus_replay stylus_replay_test
         if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat keyboard_state keyboard_state
+        if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat overlay_event_wake_state overlay_event_wake_state
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat overlay_button_native_wake overlay_button_native_wake
@@ -289,7 +291,7 @@ jobs:
         dir: ${{ github.workspace }}\arm64\
         host: windows
         target: desktop
-        version: '6.11.1'
+        version: '6.12.0'
         modules: 'qtmultimedia qtimageformats'
         use-naqt: true
 
@@ -594,7 +596,7 @@ jobs:
         pkg-config --modversion vulkan
     - name: Build SDL3
       run: |
-        export SDL3_REV=ddba673cddfa79ce798eca5ba402e0f1a2a2a243
+        export SDL3_REV=829a65d769d935c4852f8159e964312c0957260a
         git clone https://github.com/libsdl-org/SDL.git SDL3
         cd SDL3
         git checkout $SDL3_REV
@@ -606,8 +608,8 @@ jobs:
 
     - name: Build sdl2-compat
       run: |
-        # release-2.32.70 的不可变 commit(可变 ref 会让同 workflow 拿到不同源码)
-        export SDL2_COMPAT_REV=a53b6ad90ecd2d0ccfe01d5cfd2059793acf8c12
+        # release-2.32.74 的不可变 commit(可变 ref 会让同 workflow 拿到不同源码)
+        export SDL2_COMPAT_REV=e4df8a55f20da762290a78c2bbe8f8d89d01486a
         git clone https://github.com/libsdl-org/sdl2-compat.git sdl2-compat
         cd sdl2-compat
         git checkout $SDL2_COMPAT_REV
@@ -659,7 +661,7 @@ jobs:
 
     - name: Build libplacebo
       run: |
-        export LIBPLACEBO_REV=41ac2980e1a898f41d7c2e07999f9862ee89d99f
+        export LIBPLACEBO_REV=92b5ac6db79f4d680eb656692f7bf51e9606f42a
         git clone https://code.videolan.org/videolan/libplacebo.git
         cd libplacebo
         git checkout $LIBPLACEBO_REV
@@ -682,7 +684,7 @@ jobs:
 
     - name: Build FFmpeg
       run: |
-        export FFMPEG_REV=n9.0
+        export FFMPEG_REV=ce8f11b9fac4cd7ccfb41ca7c01bc17f5cda8cc3 # n9.0.2
         export FFMPEG_CONFIGURE_ARGS="--enable-pic --enable-lto --disable-static --enable-shared --disable-all --disable-autodetect --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-vaapi --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-vdpau --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-vulkan --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d --enable-decoder=h264_v4l2m2m --enable-decoder=hevc_v4l2m2m --enable-pthreads --enable-v4l2-m2m"
         git clone https://github.com/FFmpeg/FFmpeg.git FFmpeg
         cd FFmpeg

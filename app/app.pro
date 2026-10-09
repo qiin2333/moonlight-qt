@@ -324,6 +324,7 @@ HEADERS += \
     streaming/input/cursorshapeclassifier.h \
     streaming/input/penhistory.h \
     streaming/input/input.h \
+    streaming/input/keyboardstate.h \
     streaming/session.h \
     streaming/filemappingclient.h \
     streaming/filemappingwebsocket.h \
