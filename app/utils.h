@@ -17,7 +17,8 @@ namespace WMUtils {
 #if defined(Q_OS_LINUX)
         const auto hasGamescopeToken = [](const QByteArray& value) {
             const QByteArray normalized = value.toLower();
-            return normalized.split(':').contains("gamescope");
+            return normalized == "gamescope" || normalized.startsWith("gamescope:") ||
+                   normalized.endsWith(":gamescope") || normalized.contains(":gamescope:");
         };
         return !qEnvironmentVariableIsEmpty("GAMESCOPE_WAYLAND_DISPLAY") ||
                hasGamescopeToken(qgetenv("XDG_CURRENT_DESKTOP")) ||
