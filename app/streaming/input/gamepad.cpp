@@ -1145,7 +1145,7 @@ void SdlInputHandler::setMotionEventState(uint16_t controllerNumber, uint8_t mot
 
 #if SDL_VERSION_ATLEAST(2, 0, 14)
     if (m_GamepadState[controllerNumber].controller != nullptr) {
-        uint8_t reportPeriodMs = reportRateHz ? (1000 / reportRateHz) : 0;
+        const auto reportPeriodMs = GamepadSensorRate::reportPeriodMs(reportRateHz);
 
         switch (motionType) {
         case LI_MOTION_TYPE_ACCEL:
