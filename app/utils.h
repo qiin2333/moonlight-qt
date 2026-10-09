@@ -7,6 +7,10 @@
 
 namespace WMUtils {
     bool isRunningX11();
+    // True when the process is running inside Valve's Gamescope compositor
+    // (SteamOS Game Mode is the common case). This is intentionally based on
+    // the compositor's environment markers instead of the host desktop name.
+    bool isRunningGamescope();
     bool isRunningNvidiaProprietaryDriverX11();
     bool supportsDesktopGLWithEGL();
     bool isRunningWayland();
