@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>La fonbildo ne plu disponeblas. Refreŝigu ĝin kaj provu denove.</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Ne eblas krei la dosierujon por eksporti fonbildojn</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Ne eblas ŝargi la fonbildon. Provu alian bildon.</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw-bildoj (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>La tempolimo por elŝuti la fonbildon eksvalidiĝis</translation>
+    </message>
+    <message>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Ne eblas akiri fonbildon. Bonvolu reprovi poste.</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Nevalida ĉeno de Pipw-redirektoj</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Nevalida aŭ tro granda Pipw-bildo</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>La Pipw-bildo superas la limon de 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Nevalida Pipw-redirekto</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>La Pipw-API ne redonis redirekton al bildo</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>La Pipw-bildo ne disponeblas</translation>
+    </message>
+    <message>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Ĉi tiu fonbildo ne disponeblas. Provu alian bildon.</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Ne eblas ŝargi la fonbildon. Provu alian bildon.</translation>
     </message>
 </context>
 </TS>

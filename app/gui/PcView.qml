@@ -685,6 +685,8 @@ CenteredGridView {
         property string currentImageUrl: ""
         property string activeRequestKey: ""
         property bool lastRequestWasBusy: false
+        property bool fetchPending: false
+        property bool networkBackgroundInitialized: false
 
         Settings {
             id: settings
@@ -697,7 +699,7 @@ CenteredGridView {
             if (status === Image.Loading) {
                 loadingIndicator.visible = true
             } else if (status === Image.Ready) {
-                loadingIndicator.visible = false
+                loadingIndicator.visible = fetchPending
             } else if (status === Image.Error) {
                 loadingIndicator.visible = false
                 if (StreamingPreferences.backgroundSource === StreamingPreferences.BGS_LOCAL) {
@@ -721,10 +723,11 @@ CenteredGridView {
             case StreamingPreferences.BGS_PHOTOGRAPHY:
                 return "photography:picsum"
             case StreamingPreferences.BGS_ANIME:
-                return "anime:pipw"
+                return "anime:pipw-reviewed-v1:pc"
             case StreamingPreferences.BGS_API:
                 var apiUrl = StreamingPreferences.backgroundImageApi.trim()
-                return apiUrl === "" ? "photography:picsum" : "api:" + apiUrl
+                return apiUrl === "" ? "photography:picsum" :
+                       (imageUtils.isPipwSource(apiUrl) ? "pipw-reviewed-v1:" : "api:") + apiUrl
             case StreamingPreferences.BGS_LOCAL:
                 return "local:" + StreamingPreferences.backgroundImageLocalPath
             case StreamingPreferences.BGS_NONE:
@@ -754,6 +757,13 @@ CenteredGridView {
             return "file:///" + cachePath.replace(/\\/g, "/").replace(/^\/+/, "")
         }
 
+        function hasCachedBackground(cacheKey, requestUrl) {
+            return settings.cachedImagePath !== "" && settings.cachedSourceKey === cacheKey &&
+                   (imageUtils.isPipwSource(requestUrl)
+                    ? imageUtils.isReviewedBackground(settings.cachedImagePath, requestUrl)
+                    : imageUtils.fileExists(settings.cachedImagePath))
+        }
+
         function showBackground(imageUrl) {
             source = imageUrl
             currentImageUrl = imageUrl
@@ -761,6 +771,7 @@ CenteredGridView {
 
         function clearBackground() {
             loadNewImageTimer.stop()
+            fetchPending = false
             loadingIndicator.visible = false
             source = ""
             currentImageUrl = ""
@@ -775,6 +786,8 @@ CenteredGridView {
 
         function reloadFromPreferences(forceRefresh) {
             loadNewImageTimer.stop()
+            imageUtils.cancelBackgroundFetch()
+            fetchPending = false
 
             if (!StreamingPreferences.backgroundSetupCompleted) {
                 clearBackground()
@@ -804,16 +817,15 @@ CenteredGridView {
             }
 
             var cacheKey = configuredCacheKey()
-            var canMigrateLegacyCache = settings.cachedSourceKey === "" &&
-                                        StreamingPreferences.backgroundSource === StreamingPreferences.BGS_ANIME
-            if (!forceRefresh && settings.cachedImagePath &&
-                    imageUtils.fileExists(settings.cachedImagePath) &&
-                    (settings.cachedSourceKey === cacheKey || canMigrateLegacyCache)) {
+            var firstNetworkLoad = !networkBackgroundInitialized
+            networkBackgroundInitialized = true
+            if (hasCachedBackground(cacheKey, configuredNetworkUrl())) {
                 settings.cachedSourceKey = cacheKey
+                loadingIndicator.visible = false
                 showBackground(cacheFileUrl(settings.cachedImagePath))
 
                 var oneWeek = 60 * 60 * 1000 * 24 * 7
-                if (Date.now() - settings.lastRefreshTime > oneWeek) {
+                if (forceRefresh || firstNetworkLoad || Date.now() - settings.lastRefreshTime > oneWeek) {
                     loadNewImageTimer.start()
                 }
                 return
@@ -830,7 +842,15 @@ CenteredGridView {
             }
 
             loadingIndicator.visible = true
+            fetchPending = true
             var requestKey = configuredCacheKey()
+            var displayingActiveCache = hasCachedBackground(requestKey, requestUrl) &&
+                    status !== Image.Error &&
+                    currentImageUrl === cacheFileUrl(settings.cachedImagePath)
+            if (!displayingActiveCache) {
+                source = "qrc:/res/gura.png"
+                currentImageUrl = ""
+            }
             lastRequestWasBusy = false
             var requestStarted = imageUtils.fetchAndSaveRandomBackground(requestUrl)
             if (requestStarted || !lastRequestWasBusy) {
@@ -857,8 +877,7 @@ CenteredGridView {
                 return
             }
 
-            var displayingActiveCache = settings.cachedImagePath !== "" &&
-                    settings.cachedSourceKey === activeRequestKey &&
+            var displayingActiveCache = hasCachedBackground(activeRequestKey, configuredNetworkUrl()) &&
                     source.toString() === cacheFileUrl(settings.cachedImagePath)
             if (!displayingActiveCache) {
                 source = "qrc:/res/gura.png"
@@ -959,7 +978,7 @@ CenteredGridView {
             text: qsTr("Save wallpaper")
             onTriggered: {
                 console.log("触发下载背景图片")
-                saveFileDialog.open()
+                saveFileDialog.openForBackground()
             }
         }
 
@@ -995,41 +1014,50 @@ CenteredGridView {
     FileDialog {
         id: saveFileDialog
         title: qsTr("Choose where to save")
-        nameFilters: [qsTr("Image files (*.jpg *.jpeg *.png *.webp)")]
+        nameFilters: [qsTr("Image files (*.jpg *.jpeg *.png *.webp)"),
+                      qsTr("Pipw images (*.avif *.gif *.bmp)")]
         fileMode: FileDialog.SaveFile
+        property string exportSource: ""
 
-        currentFile: {
+        function openForBackground() {
+            exportSource = backgroundImage.currentImageUrl
+            if (!imageUtils.prepareBackgroundExport(exportSource)) return
             var timestamp = new Date().getTime()
             // 从URL中提取文件扩展名
             var extension = ".jpg"
-            if (backgroundImage.currentImageUrl) {
-                var urlPath = backgroundImage.currentImageUrl.toString()
-                var extMatch = urlPath.match(/\.(jpg|jpeg|png|webp)($|\?)/i)
+            if (exportSource) {
+                var urlPath = imageUtils.backgroundExportUrl(exportSource)
+                var extMatch = urlPath.match(/\.(jpg|jpeg|png|webp|avif|gif|bmp)($|\?)/i)
                 if (extMatch) {
                     extension = "." + extMatch[1].toLowerCase()
                 }
             }
-            return "file:///setu_" + timestamp + extension
+            var directory = imageUtils.backgroundExportDirectory().toString()
+            if (directory === "") {
+                imageUtils.cancelBackgroundExport()
+                return
+            }
+            folder = directory
+            currentFile = directory + "/vplus-background-" + timestamp + extension
+            open()
         }
 
         onAccepted: {
-            var finalPath = saveFileDialog.fileUrl || saveFileDialog.currentFile || saveFileDialog.file
+            var finalPath = saveFileDialog.file
 
             console.log("原始路径: " + finalPath)
 
             if (finalPath) {
                 var ext = finalPath.toString().split('.').pop().toLowerCase()
-                if (["jpg", "jpeg", "png", "webp"].indexOf(ext) === -1) {
+                if (["jpg", "jpeg", "png", "webp", "avif", "gif", "bmp"].indexOf(ext) === -1) {
                     finalPath = finalPath + ".jpg"  // 添加默认扩展名
                 }
-                imageUtils.saveImageToFile(backgroundImage.currentImageUrl, finalPath)
+                imageUtils.saveImageToFile(exportSource, finalPath)
             } else {
-                var timestamp = new Date().getTime()
-                finalPath = "file:///setu_" + timestamp + ".jpg"
-                console.log("使用默认路径: " + finalPath)
-                imageUtils.saveImageToFile(backgroundImage.currentImageUrl, finalPath)
+                imageUtils.cancelBackgroundExport()
             }
         }
+        onRejected: imageUtils.cancelBackgroundExport()
     }
 
     // moonlight-dance
@@ -1061,10 +1089,12 @@ CenteredGridView {
     ImageUtils {
         id: imageUtils
         onBackgroundReady: function(filePath) {
+            backgroundImage.fetchPending = false
             loadingIndicator.visible = false
             backgroundImage.handleImageResponse(filePath)
         }
         onBackgroundError: function(errorMessage) {
+            backgroundImage.fetchPending = false
             loadingIndicator.visible = false
             backgroundImage.handleImageError(errorMessage)
         }

@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>Η εικόνα φόντου δεν είναι πλέον διαθέσιμη. Ανανεώστε την και δοκιμάστε ξανά.</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>Δεν ήταν δυνατή η δημιουργία του φακέλου εξαγωγής εικόνων φόντου</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Δεν ήταν δυνατή η φόρτωση της εικόνας φόντου. Δοκιμάστε άλλη εικόνα.</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Εικόνες Pipw (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>Έληξε το χρονικό όριο λήψης του φόντου</translation>
+    </message>
+    <message>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>Δεν ήταν δυνατή η λήψη εικόνας φόντου. Δοκιμάστε ξανά αργότερα.</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Μη έγκυρη αλυσίδα ανακατευθύνσεων Pipw</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Μη έγκυρη ή υπερβολικά μεγάλη εικόνα Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Η εικόνα Pipw υπερβαίνει το όριο των 20 MiB</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Μη έγκυρη ανακατεύθυνση Pipw</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>Το API του Pipw δεν επέστρεψε ανακατεύθυνση σε εικόνα</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Η εικόνα Pipw δεν είναι διαθέσιμη</translation>
+    </message>
+    <message>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>Αυτή η εικόνα φόντου δεν είναι διαθέσιμη. Δοκιμάστε άλλη εικόνα.</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>Δεν ήταν δυνατή η φόρτωση της εικόνας φόντου. Δοκιμάστε άλλη εικόνα.</translation>
     </message>
 </context>
 </TS>

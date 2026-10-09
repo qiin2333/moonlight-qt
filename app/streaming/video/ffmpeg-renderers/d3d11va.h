@@ -5,7 +5,6 @@
 #include <d3d11_4.h>
 #include <dxgi1_6.h>
 #include <CGuid.h>
-#include <atlbase.h>
 #include "streaming/video/videoenhancement.h"
 #include "public/common/AMFFactory.h"
 

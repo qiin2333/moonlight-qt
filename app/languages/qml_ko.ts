@@ -811,6 +811,18 @@
 <context>
     <name>ImageUtils</name>
     <message>
+        <source>The background image is no longer available. Please refresh it and try again.</source>
+        <translation>배경 이미지를 더 이상 사용할 수 없습니다. 새로고침한 후 다시 시도해 주세요.</translation>
+    </message>
+    <message>
+        <source>Unable to create the background export directory</source>
+        <translation>배경 이미지 내보내기 폴더를 만들 수 없습니다</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>배경 이미지를 불러올 수 없습니다. 다른 이미지를 사용해 주세요.</translation>
+    </message>
+    <message>
         <location filename="../imageutils.cpp" line="48"/>
         <location filename="../imageutils.cpp" line="52"/>
         <source>Unable to write file</source>
@@ -1513,6 +1525,10 @@
 </context>
 <context>
     <name>PcView</name>
+    <message>
+        <source>Pipw images (*.avif *.gif *.bmp)</source>
+        <translation>Pipw 이미지 (*.avif *.gif *.bmp)</translation>
+    </message>
     <message>
         <location filename="../gui/PcView.qml" line="39"/>
         <source>Computers</source>
@@ -2766,6 +2782,49 @@
         <location filename="../gui/main.qml" line="950"/>
         <source>Learn more</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PipwBackgroundDownloader</name>
+    <message>
+        <source>Background download timed out</source>
+        <translation>배경 이미지 다운로드 시간이 초과되었습니다</translation>
+    </message>
+    <message>
+        <source>Unable to retrieve a background image. Please try again later.</source>
+        <translation>배경 이미지를 가져올 수 없습니다. 나중에 다시 시도해 주세요.</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect chain</source>
+        <translation>Pipw 리디렉션 체인이 유효하지 않습니다</translation>
+    </message>
+    <message>
+        <source>Invalid or oversized Pipw image</source>
+        <translation>Pipw 이미지가 유효하지 않거나 너무 큽니다</translation>
+    </message>
+    <message>
+        <source>Pipw image exceeds the 20 MiB limit</source>
+        <translation>Pipw 이미지가 20 MiB 제한을 초과합니다</translation>
+    </message>
+    <message>
+        <source>Invalid Pipw redirect</source>
+        <translation>Pipw 리디렉션이 유효하지 않습니다</translation>
+    </message>
+    <message>
+        <source>Pipw API did not return an image redirect</source>
+        <translation>Pipw API가 이미지 리디렉션을 반환하지 않았습니다</translation>
+    </message>
+    <message>
+        <source>Pipw image is unavailable</source>
+        <translation>Pipw 이미지를 사용할 수 없습니다</translation>
+    </message>
+    <message>
+        <source>This background image is unavailable. Please try another image.</source>
+        <translation>이 배경 이미지를 사용할 수 없습니다. 다른 이미지를 사용해 주세요.</translation>
+    </message>
+    <message>
+        <source>Unable to load the background image. Please try another image.</source>
+        <translation>배경 이미지를 불러올 수 없습니다. 다른 이미지를 사용해 주세요.</translation>
     </message>
 </context>
 </TS>
