@@ -395,6 +395,38 @@ bool OverlayMenuButton::handleExternalMouseRelease(const QPoint& globalPosition)
     return true;
 }
 
+bool OverlayMenuButton::handleExternalTouchPress(qint64 touchId, const QPoint& globalPosition)
+{
+    if (!m_ButtonVisible.load(std::memory_order_acquire) || !geometry().contains(globalPosition) ||
+        m_InputSource != InputSource::None) {
+        return false;
+    }
+
+    m_ExternalTouchId = touchId;
+    beginInteraction(InputSource::Touch, globalPosition);
+    return true;
+}
+
+bool OverlayMenuButton::handleExternalTouchMove(qint64 touchId, const QPoint& globalPosition)
+{
+    if (m_InputSource != InputSource::Touch || m_ExternalTouchId != touchId) {
+        return false;
+    }
+
+    updateInteraction(globalPosition);
+    return true;
+}
+
+bool OverlayMenuButton::handleExternalTouchRelease(qint64 touchId, const QPoint& globalPosition)
+{
+    if (m_InputSource != InputSource::Touch || m_ExternalTouchId != touchId) {
+        return false;
+    }
+
+    finishInteraction(globalPosition);
+    return true;
+}
+
 QPoint OverlayMenuButton::clampToParent(const QPoint& position) const
 {
     return OverlayButtonPlacement::clamp(
@@ -442,7 +474,7 @@ void OverlayMenuButton::finishInteraction(const QPoint& globalPosition)
 
     const InputSource source = m_InputSource;
     const bool dragged = m_Dragging;
-    const bool activate = !m_Dragging;
+    const bool activate = !m_Dragging && geometry().contains(globalPosition);
 
     if (dragged && m_ParentGeometry.isValid()) {
         m_NormalizedPosition = OverlayButtonPlacement::normalize(
@@ -466,6 +498,7 @@ void OverlayMenuButton::cancelInteraction()
     const bool wasTouch = m_InputSource == InputSource::Touch;
     m_InputSource = InputSource::None;
     m_TouchPointId = -1;
+    m_ExternalTouchId = -1;
     m_Dragging = false;
 
     if (wasTouch) {

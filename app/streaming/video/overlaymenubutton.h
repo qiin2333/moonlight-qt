@@ -70,6 +70,9 @@ public:
     bool handleExternalMousePress(const QPoint& globalPosition);
     bool handleExternalMouseMove(const QPoint& globalPosition, bool leftButtonDown);
     bool handleExternalMouseRelease(const QPoint& globalPosition);
+    bool handleExternalTouchPress(qint64 touchId, const QPoint& globalPosition);
+    bool handleExternalTouchMove(qint64 touchId, const QPoint& globalPosition);
+    bool handleExternalTouchRelease(qint64 touchId, const QPoint& globalPosition);
 
     bool isButtonVisible() const {
         return m_ButtonVisible.load(std::memory_order_acquire);
@@ -119,6 +122,7 @@ private:
     bool m_Dragging;
     InputSource m_InputSource;
     int m_TouchPointId;
+    qint64 m_ExternalTouchId = -1;
     QPoint m_PressGlobalPosition;
     QPoint m_WindowPositionAtPress;
     QRect m_ParentGeometry;
