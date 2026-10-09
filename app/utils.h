@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QByteArray>
 #include <QString>
+#include <QtGlobal>
 
 #define THROW_BAD_ALLOC_IF_NULL(x) \
     if ((x) == nullptr) throw std::bad_alloc()
@@ -10,7 +12,20 @@ namespace WMUtils {
     // True when the process is running inside Valve's Gamescope compositor
     // (SteamOS Game Mode is the common case). This is intentionally based on
     // the compositor's environment markers instead of the host desktop name.
-    bool isRunningGamescope();
+    inline bool isRunningGamescope()
+    {
+#if defined(Q_OS_LINUX)
+        const auto hasGamescopeToken = [](const QByteArray& value) {
+            const QByteArray normalized = value.toLower();
+            return normalized.split(':').contains("gamescope");
+        };
+        return !qEnvironmentVariableIsEmpty("GAMESCOPE_WAYLAND_DISPLAY") ||
+               hasGamescopeToken(qgetenv("XDG_CURRENT_DESKTOP")) ||
+               hasGamescopeToken(qgetenv("XDG_SESSION_DESKTOP"));
+#else
+        return false;
+#endif
+    }
     bool isRunningNvidiaProprietaryDriverX11();
     bool supportsDesktopGLWithEGL();
     bool isRunningWayland();

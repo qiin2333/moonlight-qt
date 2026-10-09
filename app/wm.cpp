@@ -59,25 +59,6 @@ bool WMUtils::isRunningX11()
 #endif
 }
 
-bool WMUtils::isRunningGamescope()
-{
-#if defined(Q_OS_LINUX)
-    // Gamescope exports GAMESCOPE_WAYLAND_DISPLAY for nested clients. SteamOS
-    // also identifies the session through XDG_CURRENT_DESKTOP; accept the
-    // session variant as well because some Steam Runtime launches omit the
-    // former while retaining the latter.
-    const auto hasGamescopeToken = [](const QByteArray& value) {
-        const QByteArray normalized = value.toLower();
-        return normalized.split(':').contains("gamescope");
-    };
-    return !qEnvironmentVariableIsEmpty("GAMESCOPE_WAYLAND_DISPLAY") ||
-           hasGamescopeToken(qgetenv("XDG_CURRENT_DESKTOP")) ||
-           hasGamescopeToken(qgetenv("XDG_SESSION_DESKTOP"));
-#else
-    return false;
-#endif
-}
-
 bool WMUtils::isRunningNvidiaProprietaryDriverX11()
 {
 #ifdef HAVE_EGL
