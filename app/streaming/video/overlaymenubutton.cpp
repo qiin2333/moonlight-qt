@@ -359,6 +359,42 @@ void OverlayMenuButton::hideButton()
     hide();
 }
 
+bool OverlayMenuButton::handleExternalMousePress(const QPoint& globalPosition)
+{
+    if (!m_ButtonVisible.load(std::memory_order_acquire) || !geometry().contains(globalPosition)) {
+        return false;
+    }
+
+    if (m_InputSource == InputSource::None) {
+        beginInteraction(InputSource::Mouse, globalPosition);
+    }
+    return m_InputSource == InputSource::Mouse;
+}
+
+bool OverlayMenuButton::handleExternalMouseMove(const QPoint& globalPosition, bool leftButtonDown)
+{
+    if (m_InputSource != InputSource::Mouse) {
+        return false;
+    }
+
+    if (leftButtonDown) {
+        updateInteraction(globalPosition);
+    } else {
+        cancelInteraction();
+    }
+    return true;
+}
+
+bool OverlayMenuButton::handleExternalMouseRelease(const QPoint& globalPosition)
+{
+    if (m_InputSource != InputSource::Mouse) {
+        return false;
+    }
+
+    finishInteraction(globalPosition);
+    return true;
+}
+
 QPoint OverlayMenuButton::clampToParent(const QPoint& position) const
 {
     return OverlayButtonPlacement::clamp(

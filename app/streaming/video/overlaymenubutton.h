@@ -64,6 +64,13 @@ public:
      */
     void hideButton();
 
+    // Gamescope may route pointer events for an override-redirect overlay to
+    // the SDL stream window instead of the Qt overlay window. Let the owner
+    // loop forward those events through the same interaction state machine.
+    bool handleExternalMousePress(const QPoint& globalPosition);
+    bool handleExternalMouseMove(const QPoint& globalPosition, bool leftButtonDown);
+    bool handleExternalMouseRelease(const QPoint& globalPosition);
+
     bool isButtonVisible() const {
         return m_ButtonVisible.load(std::memory_order_acquire);
     }

@@ -5586,6 +5586,23 @@ void Session::exec()
                 break;
             }
 
+            // Gamescope can route pointer input for an override-redirect Qt
+            // button to the SDL stream window. Forward button events so the
+            // fixed overlay control remains usable even when Qt receives no
+            // mouse events for its X11 surface.
+            if (m_MenuButton && m_WaylandStreamWindow == nullptr &&
+                m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
+                const QPoint pointerPosition =
+                    qtOverlayPositionForSdlPoint(event.button.x, event.button.y);
+                const bool handled =
+                    event.type == SDL_MOUSEBUTTONDOWN
+                        ? m_MenuButton->handleExternalMousePress(pointerPosition)
+                        : m_MenuButton->handleExternalMouseRelease(pointerPosition);
+                if (handled) {
+                    break;
+                }
+            }
+
             m_InputHandler->handleMouseButtonEvent(&event.button);
             break;
         }
@@ -5600,6 +5617,14 @@ void Session::exec()
             const QPoint overlayPointerPosition =
                 qtWaylandOverlay ? qtOverlayPositionForSdlPoint(event.motion.x, event.motion.y)
                                  : QPoint();
+
+            if (m_MenuButton && !qtWaylandOverlay &&
+                m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON &&
+                m_MenuButton->handleExternalMouseMove(
+                    qtOverlayPositionForSdlPoint(event.motion.x, event.motion.y),
+                    (event.motion.state & SDL_BUTTON_LMASK) != 0)) {
+                break;
+            }
 
             if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
                 if (qtWaylandOverlay) {

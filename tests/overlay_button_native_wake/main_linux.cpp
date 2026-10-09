@@ -188,6 +188,14 @@ int main(int argc, char* argv[])
             "stationary X11 click must activate the overlay button");
     drainSemaphore(wakeSemaphore);
 
+    const int externalClickCount = clickCount.load(std::memory_order_acquire);
+    require(button.handleExternalMousePress(buttonCenter),
+            "external overlay button press must be accepted inside the button");
+    require(button.handleExternalMouseRelease(buttonCenter),
+            "external overlay button release must be accepted after a press");
+    require(clickCount.load(std::memory_order_acquire) == externalClickCount + 1,
+            "external overlay button input must activate the button callback");
+
     const int pressureWakeCount = wakeCount.load(std::memory_order_acquire);
     sendClick(display, 100);
     QThread::msleep(20);
