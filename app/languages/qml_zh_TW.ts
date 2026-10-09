@@ -145,6 +145,22 @@
 <context>
     <name>BasicSettingsPage</name>
     <message>
+        <source>FEC protection</source>
+        <translation>丟包保護（FEC）</translation>
+    </message>
+    <message>
+        <source>Host default</source>
+        <translation>跟隨主機</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>自動調整</translation>
+    </message>
+    <message>
+        <source>Fixed</source>
+        <translation>固定比例</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/BasicSettingsPage.qml" line="27"/>
         <source>Video</source>
         <translation type="unfinished"></translation>

@@ -676,7 +676,7 @@ Column {
                 RowLayout {
                     width: parent.width
                     Label { text: qsTr("FEC protection") }
-                    ComboBox {
+                    AutoResizingComboBox {
                         model: [qsTr("Host default"), qsTr("Automatic"), qsTr("Fixed")]
                         currentIndex: StreamingPreferences.fecPercentage >= 0 ? 2 : StreamingPreferences.fecPercentage === -1 ? 1 : 0
                         onActivated: {

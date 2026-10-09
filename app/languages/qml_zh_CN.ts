@@ -430,6 +430,22 @@
 <context>
     <name>BasicSettingsPage</name>
     <message>
+        <source>FEC protection</source>
+        <translation>丢包保护（FEC）</translation>
+    </message>
+    <message>
+        <source>Host default</source>
+        <translation>跟随主机</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>自动调整</translation>
+    </message>
+    <message>
+        <source>Fixed</source>
+        <translation>固定比例</translation>
+    </message>
+    <message>
         <source>Video</source>
         <translation>画面</translation>
     </message>
