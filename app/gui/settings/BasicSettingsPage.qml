@@ -735,6 +735,8 @@ Column {
                 spacing: Theme.spaceSm
                 AutoResizingComboBox {
                     anchors.verticalCenter: parent.verticalCenter
+                    // Row sizes itself from its children; avoid a parent-width dependency.
+                    maximumWidth: 220
                     model: [qsTr("Host default"), qsTr("Automatic"), qsTr("Fixed")]
                     currentIndex: StreamingPreferences.fecPercentage >= 0 ? 2 : StreamingPreferences.fecPercentage === -1 ? 1 : 0
                     Accessible.name: fecRow.title
