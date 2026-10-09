@@ -605,6 +605,62 @@
         <source>FPS</source>
         <translation>帧</translation>
     </message>
+    <message>
+        <source>Network and stability</source>
+        <translation>网络与稳定性</translation>
+    </message>
+    <message>
+        <source>These settings apply to the next stream. Bitrate adjustment and packet loss protection can be used independently.</source>
+        <translation>这些设置在下次串流时生效。自动调整码率和丢包保护可以独立使用。</translation>
+    </message>
+    <message>
+        <source>Automatically adjust bitrate (ABR)</source>
+        <translation>自动调整码率（ABR）</translation>
+    </message>
+    <message>
+        <source>Allows a compatible Sunshine host to lower the video bitrate when the network is congested, up to the limit below.</source>
+        <translation>需要兼容的 Sunshine 主机。网络拥塞时自动降低视频码率，最高不超过下方设定的上限。</translation>
+    </message>
+    <message>
+        <source>Video bitrate limit</source>
+        <translation>视频码率上限</translation>
+    </message>
+    <message>
+        <source>The highest video bitrate ABR may select. FEC adds extra bandwidth.</source>
+        <translation>自动调整码率时允许使用的最高视频码率。FEC 冗余会额外占用带宽。</translation>
+    </message>
+    <message>
+        <source>Recommended bitrate follows resolution and frame rate. Entering a value keeps it fixed.</source>
+        <translation>当前使用推荐码率，会随分辨率和帧率调整；手动输入后保留指定值。</translation>
+    </message>
+    <message>
+        <source>Your selected value is kept when resolution or frame rate changes.</source>
+        <translation>已指定码率，改变分辨率或帧率时会保留该值。</translation>
+    </message>
+    <message>
+        <source>Use recommended bitrate (%1 Mbps)</source>
+        <translation>使用推荐码率（%1 Mbps）</translation>
+    </message>
+    <message>
+        <source>Packet loss protection (FEC)</source>
+        <translation>丢包保护（FEC）</translation>
+    </message>
+    <message>
+        <source>Use the host's FEC settings. Requires a compatible host; otherwise its default behavior is used.</source>
+        <translation>使用主机的 FEC 设置。需要兼容的主机，否则使用主机的默认行为。</translation>
+    </message>
+    <message>
+        <source>Ask a compatible host to choose redundancy from network feedback. Otherwise its default behavior is used.</source>
+        <translation>由兼容的主机根据网络反馈自动选择冗余比例；不支持时使用主机的默认行为。</translation>
+    </message>
+    <message>
+        <source>Your fixed percentage takes priority over the host's FEC settings. 0% disables FEC; higher values add more bandwidth relative to video data. Requires a compatible host.</source>
+        <translation>需要兼容的主机，客户端指定比例优先于主机 FEC 设置。0% 关闭纠错；比例越高，相对视频数据增加的冗余带宽越多。</translation>
+    </message>
+    <message>
+        <source>Fixed FEC percentage</source>
+        <translation>固定 FEC 比例</translation>
+    </message>
 </context>
 <context>
     <name>CliPair</name>
@@ -894,6 +950,10 @@
     <message>
         <source>HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.</source>
         <translation>HDR10（PQ）是标准的 HDR 格式。当主机未启用 HDR 时，HLG 与 SDR 显示器的兼容性更好。</translation>
+    </message>
+    <message>
+        <source>Enable V-Sync to use frame pacing.</source>
+        <translation>开启垂直同步后才能使用帧平滑。</translation>
     </message>
 </context>
 <context>
@@ -3136,6 +3196,18 @@
     <message>
         <source>About</source>
         <translation>关于</translation>
+    </message>
+    <message>
+        <source>Streaming</source>
+        <translation>串流</translation>
+    </message>
+    <message>
+        <source>Compatibility and diagnostics</source>
+        <translation>兼容性与诊断</translation>
+    </message>
+    <message>
+        <source>Interface</source>
+        <translation>界面</translation>
     </message>
 </context>
 <context>

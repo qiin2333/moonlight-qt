@@ -16,6 +16,8 @@ SettingsRow {
 
     HardSwitch {
         id: control
+        Accessible.name: toggleRow.title
+        Accessible.description: toggleRow.description
         hoverEnabled: true
         // 只在用户操作时上报。checked 是别名，从偏好设置恢复初值也会改动它，
         // 用 onCheckedChanged 的话初始化阶段就会触发一次写回 —— 正是上面注释里

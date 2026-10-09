@@ -39,6 +39,8 @@ SettingsRow {
 
     AutoResizingComboBox {
         id: control
+        Accessible.name: row.title
+        Accessible.description: row.description
         maximumWidth: Math.min(row.maximumControlWidth,
                                Math.max(120, row.width - Theme.spaceMd * 2))
         width: row.controlWidth > 0 ? Math.min(row.controlWidth, maximumWidth) : implicitWidth

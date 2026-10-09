@@ -239,6 +239,11 @@ void StreamingPreferences::reload()
     fecPercentage = settings.value("fecPercentage", -2).toInt();
     if (fecPercentage < -2 || fecPercentage > 100)
         fecPercentage = -2;
+    // Keep the user's fixed value when switching to automatic or host default.
+    fixedFecPercentage =
+        fecPercentage >= 0 ? fecPercentage : settings.value("fixedFecPercentage", 20).toInt();
+    if (fixedFecPercentage < 0 || fixedFecPercentage > 100)
+        fixedFecPercentage = 20;
     autoAdjustBitrate = settings.value(SER_AUTOADJUSTBITRATE, true).toBool();
     enableSunshineAbr = settings.value(SER_SUNSHINEABR, false).toBool();
     ignoreAspectRatio = settings.value(SER_IGNORE_ASPECT_RATIO, true).toBool();
@@ -686,6 +691,8 @@ void StreamingPreferences::save()
     settings.setValue(SER_FPS, fps);
     settings.setValue(SER_BITRATE, bitrateKbps);
     settings.setValue("fecPercentage", fecPercentage);
+    settings.setValue("fixedFecPercentage",
+                      fecPercentage >= 0 ? fecPercentage : fixedFecPercentage);
     settings.setValue(SER_AUTOADJUSTBITRATE, autoAdjustBitrate);
     settings.setValue(SER_SUNSHINEABR, enableSunshineAbr);
     settings.setValue(SER_IGNORE_ASPECT_RATIO, ignoreAspectRatio);

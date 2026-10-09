@@ -61,10 +61,6 @@ Column {
     width: parent ? parent.width : 0
     spacing: Theme.spaceLg
 
-    function syncBitrateFromPreferences() {
-        bitrateSlider.value = bitrateToSliderValue(StreamingPreferences.bitrateKbps)
-    }
-
     // ================= 画面 =================
     SettingsCard {
         title: qsTr("Video")
@@ -234,7 +230,6 @@ Column {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                bitrateSlider.value = bitrateToSliderValue(StreamingPreferences.bitrateKbps)
                             }
                         }
 
@@ -407,7 +402,6 @@ Column {
                                                                                                           StreamingPreferences.height,
                                                                                                           StreamingPreferences.fps,
                                                                                                           StreamingPreferences.enableYUV444);
-                                bitrateSlider.value = bitrateToSliderValue(StreamingPreferences.bitrateKbps)
                             }
                         }
 
@@ -618,149 +612,161 @@ Column {
             }
         }
 
-        SettingsRow {
-            id: bitrateRow
-            title: qsTr("Video bitrate")
-            description: qsTr("Lower the bitrate on slower connections. Raise the bitrate to increase image quality.")
+        ChoiceRow {
+            title: qsTranslate("LegacySettingsPage", "Video codec")
+            selectedValue: StreamingPreferences.videoCodecConfig
+            onValueActivated: function(value) { StreamingPreferences.videoCodecConfig = value }
 
-            Text {
-                text: {
-                    var mbps = sliderValueToBitrate(bitrateSlider.value) / 1000.0
-                    return mbps < 100 ? mbps.toFixed(1) + " Mbps" : Math.round(mbps) + " Mbps"
-                }
-                color: Theme.accent
-                // 数字走等宽 + tabular-nums，拖滑条时数字不会左右抖
-                font.family: Theme.fontMono
-                font.pointSize: Theme.fontCardTitle
-                font.weight: Font.Medium
+            model: ListModel {
+                ListElement { text: qsTranslate("LegacySettingsPage", "Automatic (Recommended)"); val: StreamingPreferences.VCC_AUTO }
+                ListElement { text: qsTranslate("LegacySettingsPage", "H.264"); val: StreamingPreferences.VCC_FORCE_H264 }
+                ListElement { text: qsTranslate("LegacySettingsPage", "HEVC (H.265)"); val: StreamingPreferences.VCC_FORCE_HEVC }
+                ListElement { text: qsTranslate("LegacySettingsPage", "AV1"); val: StreamingPreferences.VCC_FORCE_AV1 }
             }
         }
 
-        // 码率滑条单独占一整行，塞进 SettingsRow 右侧会太窄
-        Item {
-            width: parent.width
-            // 同样不能用 visible，见 SettingsCard.hasVisibleContent 的注释
-            visible: bitrateRow.applicable
-            height: visible ? bitrateControls.implicitHeight : 0
+    }
 
-            Column {
-                id: bitrateControls
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    leftMargin: Theme.spaceMd
-                    rightMargin: Theme.spaceMd
-                }
-                spacing: Theme.spaceSm
-
-                HardSlider {
-                    id: bitrateSlider
-                    width: parent.width
-
-                    // 分段线性刻度：低码率精调，高码率快速覆盖完整范围。
-                    value: bitrateToSliderValue(StreamingPreferences.bitrateKbps)
-                    stepSize: 1
-                    from: 0
-                    to: bitrateSliderMax
-                    snapMode: Slider.SnapOnRelease
-
-                    onValueChanged: {
-                        StreamingPreferences.bitrateKbps = sliderValueToBitrate(value)
-                    }
-
-                    onMoved: {
-                        StreamingPreferences.autoAdjustBitrate = false
-                    }
-                }
-
-                RowLayout {
-                    width: parent.width
-                    Label { text: qsTr("FEC protection") }
-                    AutoResizingComboBox {
-                        model: [qsTr("Host default"), qsTr("Automatic"), qsTr("Fixed")]
-                        currentIndex: StreamingPreferences.fecPercentage >= 0 ? 2 : StreamingPreferences.fecPercentage === -1 ? 1 : 0
-                        onActivated: {
-                            StreamingPreferences.fecPercentage = currentIndex === 0 ? -2 : currentIndex === 1 ? -1 : 20
-                            StreamingPreferences.save()
-                        }
-                    }
-                    SpinBox {
-                        visible: StreamingPreferences.fecPercentage >= 0
-                        from: 0; to: 100
-                        value: Math.max(0, StreamingPreferences.fecPercentage)
-                        onValueModified: {
-                            StreamingPreferences.fecPercentage = value
-                            StreamingPreferences.save()
-                        }
-                    }
-                    Label { visible: StreamingPreferences.fecPercentage >= 0; text: "%" }
-                }
-
-                // 「恢复默认」是个次要动作，做成滑条右下角的小方按钮
-                Item {
-                    width: parent.width
-                    visible: resetBitrateButton.shown
-                    height: visible ? resetBitrateButton.implicitHeight : 0
-
-                    Button {
-                        id: resetBitrateButton
-                        // 关掉 FluentWinUI3 那圈白色圆角双环，焦点由下面的 2px accent 边框表达。
-                        // 详见 theme/FocusRing.qml 的注释。
-                        readonly property Item __focusFrameTarget: null
-
-
-                        anchors.right: parent.right
-                        hoverEnabled: true
-                        padding: 0
-
-                        readonly property int defaultBitrate: StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
-
-                        text: qsTr("Use Default (%1 Mbps)").arg(defaultBitrate / 1000.0)
-                        readonly property bool shown: StreamingPreferences.bitrateKbps !== defaultBitrate
-
-                        contentItem: Text {
-                            text: resetBitrateButton.text
-                            color: resetBitrateButton.hovered ? Theme.accentStrong : Theme.accent
-                            font.family: Theme.fontMono
-                            font.pointSize: Theme.fontCaption
-                            font.capitalization: Font.AllUppercase
-                            font.letterSpacing: Theme.tracking(Theme.fontCaption, 0.08)
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        background: Rectangle {
-                            implicitHeight: 30
-                            implicitWidth: resetBitrateButton.contentItem.implicitWidth + Theme.spaceLg * 2
-                            radius: 0
-                            color: resetBitrateButton.down ? Theme.accentSoft
-                                                           : (resetBitrateButton.hovered ? Theme.surface2 : "transparent")
-                            // 和 HardButton 一个规矩：hover / 按下 1px accent，focus 2px accent
-                            border.width: resetBitrateButton.visualFocus ? 2 : 1
-                            border.color: resetBitrateButton.down || resetBitrateButton.hovered
-                                          || resetBitrateButton.visualFocus
-                                        ? Theme.accent : Theme.lineStrong
-
-                            Behavior on color {
-                                ColorAnimation { duration: Theme.durFast }
-                            }
-                        }
-
-                        onClicked: {
-                            StreamingPreferences.bitrateKbps = defaultBitrate
-                            StreamingPreferences.autoAdjustBitrate = true
-                            bitrateSlider.value = bitrateToSliderValue(defaultBitrate)
-                        }
-                    }
-                }
-            }
-        }
+    SettingsCard {
+        title: qsTr("Network and stability")
+        subtitle: qsTr("These settings apply to the next stream. Bitrate adjustment and packet loss protection can be used independently.")
 
         ToggleRow {
-            title: qsTr("Smart bitrate with Sunshine")
-            description: qsTr("Allows Sunshine to automatically adjust stream bitrate up to the selected video bitrate when the host supports ABR.")
+            title: qsTr("Automatically adjust bitrate (ABR)")
+            description: qsTr("Allows a compatible Sunshine host to lower the video bitrate when the network is congested, up to the limit below.")
             checked: StreamingPreferences.enableSunshineAbr
             onToggled: function(value) { StreamingPreferences.enableSunshineAbr = value }
+        }
+
+        SettingsRow {
+            id: bitrateRow
+            title: StreamingPreferences.enableSunshineAbr ? qsTr("Video bitrate limit") : qsTr("Video bitrate")
+            description: (StreamingPreferences.enableSunshineAbr
+                          ? qsTr("The highest video bitrate ABR may select. FEC adds extra bandwidth.")
+                          : qsTr("Lower the bitrate on slower connections. Raise the bitrate to increase image quality.")) + "\n" +
+                         (StreamingPreferences.autoAdjustBitrate
+                          ? qsTr("Recommended bitrate follows resolution and frame rate. Entering a value keeps it fixed.")
+                          : qsTr("Your selected value is kept when resolution or frame rate changes."))
+
+            Row {
+                spacing: Theme.spaceSm
+                SpinBox {
+                    id: bitrateInput
+                    width: 150
+                    from: basicPage.bitrateMinKbps
+                    to: basicPage.bitrateMaxKbps
+                    stepSize: 500
+                    editable: true
+                    value: StreamingPreferences.bitrateKbps
+                    Accessible.name: bitrateRow.title
+                    Accessible.description: bitrateRow.description
+                    validator: DoubleValidator {
+                        bottom: bitrateInput.from / 1000
+                        top: bitrateInput.to / 1000
+                        decimals: 3
+                        notation: DoubleValidator.StandardNotation
+                        locale: bitrateInput.locale.name
+                    }
+                    textFromValue: function(value, locale) {
+                        var decimals = value % 1000 === 0 ? 0 : value % 100 === 0 ? 1 : value % 10 === 0 ? 2 : 3
+                        return Number(value / 1000).toLocaleString(locale, 'f', decimals)
+                    }
+                    valueFromText: function(text, locale) {
+                        return Math.round(Number.fromLocaleString(locale, text) * 1000)
+                    }
+                    onValueModified: {
+                        StreamingPreferences.autoAdjustBitrate = false
+                        StreamingPreferences.bitrateKbps = value
+                    }
+                }
+                Label {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Mbps"
+                }
+            }
+        }
+
+        // The slider is only a coarse input. Restoring preferences must not
+        // round a bitrate entered in the numeric field to a slider step.
+        Column {
+            width: parent.width
+            spacing: Theme.spaceSm
+            HardSlider {
+                id: bitrateSlider
+                width: parent.width - Theme.spaceMd * 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                value: bitrateToSliderValue(StreamingPreferences.bitrateKbps)
+                stepSize: 1
+                from: 0
+                to: bitrateSliderMax
+                snapMode: Slider.SnapOnRelease
+                Accessible.name: bitrateRow.title
+                Accessible.description: bitrateRow.description
+                onMoved: {
+                    StreamingPreferences.autoAdjustBitrate = false
+                    StreamingPreferences.bitrateKbps = sliderValueToBitrate(value)
+                }
+            }
+            HardButton {
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.spaceMd
+                text: qsTr("Use recommended bitrate (%1 Mbps)").arg(defaultBitrate / 1000)
+                readonly property int defaultBitrate: StreamingPreferences.getDefaultBitrate(
+                    StreamingPreferences.width, StreamingPreferences.height,
+                    StreamingPreferences.fps, StreamingPreferences.enableYUV444)
+                enabled: !StreamingPreferences.autoAdjustBitrate || StreamingPreferences.bitrateKbps !== defaultBitrate
+                onClicked: {
+                    StreamingPreferences.autoAdjustBitrate = true
+                    StreamingPreferences.bitrateKbps = defaultBitrate
+                }
+            }
+        }
+
+        SettingsRow {
+            id: fecRow
+            title: qsTr("Packet loss protection (FEC)")
+            description: StreamingPreferences.fecPercentage === -2
+                         ? qsTr("Use the host's FEC settings. Requires a compatible host; otherwise its default behavior is used.")
+                         : StreamingPreferences.fecPercentage === -1
+                           ? qsTr("Ask a compatible host to choose redundancy from network feedback. Otherwise its default behavior is used.")
+                           : qsTr("Your fixed percentage takes priority over the host's FEC settings. 0% disables FEC; higher values add more bandwidth relative to video data. Requires a compatible host.")
+
+            Row {
+                spacing: Theme.spaceSm
+                AutoResizingComboBox {
+                    anchors.verticalCenter: parent.verticalCenter
+                    model: [qsTr("Host default"), qsTr("Automatic"), qsTr("Fixed")]
+                    currentIndex: StreamingPreferences.fecPercentage >= 0 ? 2 : StreamingPreferences.fecPercentage === -1 ? 1 : 0
+                    Accessible.name: fecRow.title
+                    Accessible.description: fecRow.description
+                    onActivated: {
+                        if (StreamingPreferences.fecPercentage >= 0)
+                            StreamingPreferences.fixedFecPercentage = StreamingPreferences.fecPercentage
+                        StreamingPreferences.fecPercentage = currentIndex === 0 ? -2 : currentIndex === 1 ? -1 : StreamingPreferences.fixedFecPercentage
+                        StreamingPreferences.save()
+                    }
+                }
+                SpinBox {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: StreamingPreferences.fecPercentage >= 0
+                    from: 0
+                    to: 100
+                    editable: true
+                    value: StreamingPreferences.fixedFecPercentage
+                    Accessible.name: qsTr("Fixed FEC percentage")
+                    Accessible.description: fecRow.description
+                    onValueModified: {
+                        StreamingPreferences.fixedFecPercentage = value
+                        StreamingPreferences.fecPercentage = value
+                        StreamingPreferences.save()
+                    }
+                }
+                Label {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: StreamingPreferences.fecPercentage >= 0
+                    text: "%"
+                }
+            }
         }
     }
 
