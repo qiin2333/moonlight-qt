@@ -99,9 +99,11 @@ python3 setup-deps.py
 常用 release 构建脚本：
 
 ```cmd
-scripts\build-arch.bat x64 release
-scripts\generate-bundle.bat
+scripts\build-arch.bat release x64
+scripts\generate-bundle.bat release
 ```
+
+带签名构建需要调用者先设置 `SIGNTOOL_PARAMS`（仅 signtool 参数，不包含 `sign` 子命令）和 `ML_SYMBOL_STORE`（符号存储目录），并准备好可用的代码签名证书。之后依次运行 `scripts\build-arch.bat signed-release x64`、`scripts\build-arch.bat signed-release arm64` 和 `scripts\generate-bundle.bat signed-release`。例如 `SIGNTOOL_PARAMS` 可设为 `/a /tr http://timestamp.digicert.com /td sha256 /fd sha256`，从本机证书存储中选择代码签名证书。普通 `release` 构建无需这些签名参数。
 
 ### macOS
 

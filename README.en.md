@@ -99,9 +99,11 @@ Requirements:
 Common release build scripts:
 
 ```cmd
-scripts\build-arch.bat x64 release
-scripts\generate-bundle.bat
+scripts\build-arch.bat release x64
+scripts\generate-bundle.bat release
 ```
+
+For signed builds, the caller must first set `SIGNTOOL_PARAMS` (signtool arguments only, without the `sign` subcommand) and `ML_SYMBOL_STORE` (the symbol-store directory), and provide a usable code-signing certificate. Then run `scripts\build-arch.bat signed-release x64`, `scripts\build-arch.bat signed-release arm64`, and `scripts\generate-bundle.bat signed-release` in order. For example, `SIGNTOOL_PARAMS` can be `/a /tr http://timestamp.digicert.com /td sha256 /fd sha256` to select a code-signing certificate from the local certificate store. Ordinary `release` builds do not require these signing parameters.
 
 ### macOS
 
