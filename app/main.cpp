@@ -1133,6 +1133,21 @@ int main(int argc, char *argv[])
         SDL_SetHint("SDL_VIDEO_WAYLAND_MODE_SCALING", "aspect");
     }
 
+    // SteamOS Game Mode runs Gamescope as the compositor. Its default XWayland
+    // path only presents X11 clients; letting Qt choose native Wayland here
+    // leaves the stream visible through SDL while detached Qt overlay windows
+    // are treated as unrelated surfaces. Use XWayland unless the user has
+    // explicitly selected a Qt platform, so the stream and its overlays share
+    // one compositor path. Overlay windows additionally opt into
+    // override-redirect in this mode (see overlaywindowpolicy.h).
+#if defined(Q_OS_LINUX)
+    if (WMUtils::isRunningGamescope() && WMUtils::isRunningX11() &&
+        !qEnvironmentVariableIsSet("QT_QPA_PLATFORM")) {
+        qInfo() << "Gamescope detected; using the XWayland Qt platform for streaming";
+        qputenv("QT_QPA_PLATFORM", "xcb");
+    }
+#endif
+
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Moonlight V+ for PC"));
 

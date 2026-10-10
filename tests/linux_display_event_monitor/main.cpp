@@ -99,6 +99,23 @@ int main(int argc, char* argv[])
             "reattached monitor must produce a new wake edge");
     monitor.detach();
 
+    // Qt's native reader may have drained the display socket while leaving
+    // input queued for the owner thread. No POLLIN is available in that case.
+    drainEventFd(displayFd);
+    require(monitor.attach(), "queued-event fallback monitor must attach");
+    const int queuedWakeCount = wakeCount.load(std::memory_order_acquire);
+    require(wakeSemaphore.tryAcquire(1, 1000),
+            "Qt-buffered input must get a bounded wake without display readability");
+    require(wakeCount.load(std::memory_order_acquire) == queuedWakeCount + 1,
+            "queued-event fallback must produce one wake edge");
+    require(!wakeSemaphore.tryAcquire(1, 250),
+            "fallback wakes must coalesce until the owner acknowledges processing");
+    monitor.finishEventProcessing();
+    require(wakeSemaphore.tryAcquire(1, 1000),
+            "queued-event fallback must re-arm after the owner drains Qt");
+    monitor.detach();
+    require(!wakeSemaphore.tryAcquire(1, 250), "detaching must stop queued-event fallback wakes");
+
     close(displayFd);
 
     LinuxDisplayEventMonitor unavailableMonitor([]() {}, []() { return -1; });

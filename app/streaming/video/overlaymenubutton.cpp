@@ -213,10 +213,11 @@ bool OverlayMenuButton::needsEventProcessing() const
 
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
         defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
-    // If native monitoring is unavailable, retain the old continuous-pump
-    // behavior so the button never becomes unusable on an unusual system.
-    return !m_NativeEventMonitor || !m_NativeEventMonitor->isAttached() ||
-           m_EventWakeState.isPending();
+    // Keep pumping throughout a gesture even if the native monitor misses the
+    // next motion/release. Only an idle button can rely on native wakeups.
+    // If native monitoring is unavailable, retain continuous processing.
+    return m_InputSource != InputSource::None || !m_NativeEventMonitor ||
+           !m_NativeEventMonitor->isAttached() || m_EventWakeState.isPending();
 #else
     return true;
 #endif
@@ -359,6 +360,74 @@ void OverlayMenuButton::hideButton()
     hide();
 }
 
+bool OverlayMenuButton::handleExternalMousePress(const QPoint& globalPosition)
+{
+    if (!m_ButtonVisible.load(std::memory_order_acquire) || !geometry().contains(globalPosition)) {
+        return false;
+    }
+
+    if (m_InputSource == InputSource::None) {
+        beginInteraction(InputSource::Mouse, globalPosition);
+    }
+    return m_InputSource == InputSource::Mouse;
+}
+
+bool OverlayMenuButton::handleExternalMouseMove(const QPoint& globalPosition, bool leftButtonDown)
+{
+    if (m_InputSource != InputSource::Mouse) {
+        return false;
+    }
+
+    if (leftButtonDown) {
+        updateInteraction(globalPosition);
+    } else {
+        cancelInteraction();
+    }
+    return true;
+}
+
+bool OverlayMenuButton::handleExternalMouseRelease(const QPoint& globalPosition)
+{
+    if (m_InputSource != InputSource::Mouse) {
+        return false;
+    }
+
+    finishInteraction(globalPosition);
+    return true;
+}
+
+bool OverlayMenuButton::handleExternalTouchPress(qint64 touchId, const QPoint& globalPosition)
+{
+    if (!m_ButtonVisible.load(std::memory_order_acquire) || !geometry().contains(globalPosition) ||
+        m_InputSource != InputSource::None) {
+        return false;
+    }
+
+    m_ExternalTouchId = touchId;
+    beginInteraction(InputSource::Touch, globalPosition);
+    return true;
+}
+
+bool OverlayMenuButton::handleExternalTouchMove(qint64 touchId, const QPoint& globalPosition)
+{
+    if (m_InputSource != InputSource::Touch || m_ExternalTouchId != touchId) {
+        return false;
+    }
+
+    updateInteraction(globalPosition);
+    return true;
+}
+
+bool OverlayMenuButton::handleExternalTouchRelease(qint64 touchId, const QPoint& globalPosition)
+{
+    if (m_InputSource != InputSource::Touch || m_ExternalTouchId != touchId) {
+        return false;
+    }
+
+    finishInteraction(globalPosition);
+    return true;
+}
+
 QPoint OverlayMenuButton::clampToParent(const QPoint& position) const
 {
     return OverlayButtonPlacement::clamp(
@@ -406,7 +475,7 @@ void OverlayMenuButton::finishInteraction(const QPoint& globalPosition)
 
     const InputSource source = m_InputSource;
     const bool dragged = m_Dragging;
-    const bool activate = !m_Dragging;
+    const bool activate = !m_Dragging && geometry().contains(globalPosition);
 
     if (dragged && m_ParentGeometry.isValid()) {
         m_NormalizedPosition = OverlayButtonPlacement::normalize(
@@ -430,6 +499,7 @@ void OverlayMenuButton::cancelInteraction()
     const bool wasTouch = m_InputSource == InputSource::Touch;
     m_InputSource = InputSource::None;
     m_TouchPointId = -1;
+    m_ExternalTouchId = -1;
     m_Dragging = false;
 
     if (wasTouch) {

@@ -5587,6 +5587,24 @@ void Session::exec()
                 break;
             }
 
+            // Gamescope can route pointer input for an override-redirect Qt
+            // button to the SDL stream window. Forward button events so the
+            // fixed overlay control remains usable even when Qt receives no
+            // mouse events for its X11 surface.
+            if (m_MenuButton && event.button.button == SDL_BUTTON_LEFT &&
+                m_WaylandStreamWindow == nullptr &&
+                m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
+                const QPoint pointerPosition =
+                    qtOverlayPositionForSdlPoint(event.button.x, event.button.y);
+                const bool handled =
+                    event.type == SDL_MOUSEBUTTONDOWN
+                        ? m_MenuButton->handleExternalMousePress(pointerPosition)
+                        : m_MenuButton->handleExternalMouseRelease(pointerPosition);
+                if (handled) {
+                    break;
+                }
+            }
+
             m_InputHandler->handleMouseButtonEvent(&event.button);
             break;
         }
@@ -5601,6 +5619,14 @@ void Session::exec()
             const QPoint overlayPointerPosition =
                 qtWaylandOverlay ? qtOverlayPositionForSdlPoint(event.motion.x, event.motion.y)
                                  : QPoint();
+
+            if (m_MenuButton && !qtWaylandOverlay &&
+                m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON &&
+                m_MenuButton->handleExternalMouseMove(
+                    qtOverlayPositionForSdlPoint(event.motion.x, event.motion.y),
+                    (event.motion.state & SDL_BUTTON_LMASK) != 0)) {
+                break;
+            }
 
             if (m_MenuPanel && m_MenuPanel->isMenuVisible()) {
                 if (qtWaylandOverlay) {
@@ -5742,6 +5768,27 @@ void Session::exec()
         case SDL_FINGERDOWN:
         case SDL_FINGERMOTION:
         case SDL_FINGERUP:
+            if (m_MenuButton && m_WaylandStreamWindow == nullptr &&
+                m_Preferences->overlayMenuPosition == StreamingPreferences::OMP_BUTTON) {
+                const QRect parentRect = qtOverlayParentGeometry();
+                const QPoint pointerPosition(
+                    parentRect.x() + qRound(event.tfinger.x * parentRect.width()),
+                    parentRect.y() + qRound(event.tfinger.y * parentRect.height()));
+                bool handled = false;
+                if (event.type == SDL_FINGERDOWN) {
+                    handled = m_MenuButton->handleExternalTouchPress(event.tfinger.fingerId,
+                                                                     pointerPosition);
+                } else if (event.type == SDL_FINGERMOTION) {
+                    handled = m_MenuButton->handleExternalTouchMove(event.tfinger.fingerId,
+                                                                    pointerPosition);
+                } else {
+                    handled = m_MenuButton->handleExternalTouchRelease(event.tfinger.fingerId,
+                                                                       pointerPosition);
+                }
+                if (handled) {
+                    break;
+                }
+            }
             m_InputHandler->handleTouchFingerEvent(&event.tfinger);
             break;
         case SDL_DISPLAYEVENT:
