@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: libsdl-org/SDL
-          ref: ddba673cddfa79ce798eca5ba402e0f1a2a2a243
+          ref: 829a65d769d935c4852f8159e964312c0957260a # release-3.4.18
           path: deps/SDL
 
       - name: Build SDL3
@@ -65,7 +65,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: libsdl-org/sdl2-compat
-          ref: release-2.32.70
+          ref: e4df8a55f20da762290a78c2bbe8f8d89d01486a # release-2.32.74
           path: deps/sdl2-compat
 
       - name: Build sdl2-compat
@@ -110,7 +110,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: haasn/libplacebo
-          ref: 41ac2980e1a898f41d7c2e07999f9862ee89d99f
+          ref: 92b5ac6db79f4d680eb656692f7bf51e9606f42a
           path: deps/libplacebo
           submodules: 'recursive'
 
@@ -138,7 +138,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: FFmpeg/FFmpeg
-          ref: n9.0
+          ref: ce8f11b9fac4cd7ccfb41ca7c01bc17f5cda8cc3 # n9.0.2
           path: deps/FFmpeg
 
       - name: Build FFmpeg

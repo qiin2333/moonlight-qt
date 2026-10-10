@@ -2,6 +2,7 @@
 
 #include "settings/streamingpreferences.h"
 #include "streaming/input/gamepadglyphs.h"
+#include "streaming/input/gamepadsensorrate.h"
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
 #include "streaming/waylandwindowmetrics.h"
 #endif
@@ -58,11 +59,11 @@ struct GamepadState {
     bool emulatedClickpadButtonDown;
 
 #if SDL_VERSION_ATLEAST(2, 0, 14)
-    uint8_t gyroReportPeriodMs;
+    GamepadSensorRate::PeriodMs gyroReportPeriodMs;
     float lastGyroEventData[SDL_arraysize(SDL_ControllerSensorEvent::data)];
     uint32_t lastGyroEventTime;
 
-    uint8_t accelReportPeriodMs;
+    GamepadSensorRate::PeriodMs accelReportPeriodMs;
     float lastAccelEventData[SDL_arraysize(SDL_ControllerSensorEvent::data)];
     uint32_t lastAccelEventTime;
 #endif
@@ -450,7 +451,7 @@ private:
 
     int m_GamepadMask;
     GamepadState m_GamepadState[MAX_GAMEPADS];
-    QSet<short> m_KeysDown;
+    QSet<uint32_t> m_KeysDown;
     bool m_FakeMouseCaptureActive;
     bool m_KeyboardCaptureActive;
     QString m_OldIgnoreDevices;

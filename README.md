@@ -13,6 +13,8 @@ Moonlight V+ for PC 是基于 [moonlight-stream/moonlight-qt](https://github.com
 
 推荐从 [GitHub Releases](https://github.com/qiin2333/moonlight-qt/releases) 下载 Windows、macOS、Linux AppImage 和 Steam Link 构建产物。
 
+Windows 便携版升级时，建议解压到新文件夹，再复制旧目录中的 `Moonlight Game Streaming Project` 设置文件夹。若覆盖旧目录，旧版 `tls/qopensslbackend.dll` 可能与新版 Qt 不兼容并导致启动崩溃，应移除该旧文件。
+
 > **macOS 目前只提供 Apple Silicon（arm64）构建**，资产名形如 `Moonlight-VPlus-<版本>-arm64.dmg`。Intel Mac 需要自行按下面「从源码构建」的步骤编译。
 >
 > **Linux AppImage 提供 x86_64 和 aarch64 两份**，资产名形如 `Moonlight-VPlus-<版本>-x86_64.AppImage` / `Moonlight-VPlus-<版本>-aarch64.AppImage`。x86_64 在 Ubuntu 22.04 上构建（glibc >= 2.35），aarch64 在 Ubuntu 24.04 上构建（glibc >= 2.39，因此 Debian 12 / Raspberry Pi OS bookworm 用不了，需要 trixie 或更新）。
@@ -89,7 +91,7 @@ python3 setup-deps.py
 
 要求：
 
-- Qt 6 SDK，建议使用与 CI 接近的 Qt 6.11.x。
+- Qt 6 SDK，建议使用与 Windows CI 一致的 Qt 6.12.0。
 - Visual Studio 2022，使用 MSVC 工具链。
 - 生成面向普通用户的安装包时需要 7-Zip。
 - 调试 DirectX 相关问题时可安装 Windows Graphics Tools。
@@ -97,9 +99,11 @@ python3 setup-deps.py
 常用 release 构建脚本：
 
 ```cmd
-scripts\build-arch.bat x64 release
-scripts\generate-bundle.bat
+scripts\build-arch.bat release x64
+scripts\generate-bundle.bat release
 ```
+
+带签名构建需要调用者先设置 `SIGNTOOL_PARAMS`（仅 signtool 参数，不包含 `sign` 子命令）和 `ML_SYMBOL_STORE`（符号存储目录），并准备好可用的代码签名证书。之后依次运行 `scripts\build-arch.bat signed-release x64`、`scripts\build-arch.bat signed-release arm64` 和 `scripts\generate-bundle.bat signed-release`。例如 `SIGNTOOL_PARAMS` 可设为 `/a /tr http://timestamp.digicert.com /td sha256 /fd sha256`，从本机证书存储中选择代码签名证书。普通 `release` 构建无需这些签名参数。
 
 ### macOS
 

@@ -26,6 +26,8 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | usb_forwarding_backend_list | moonlight-usbd `list --json` → 设备表解析 | Windows |
 | usb_forwarding_backend_sysfs | Linux sysfs 枚举 → 设备表解析（夹具目录，跳过 hub/接口/根 hub） | Linux |
 | ds5_ir_renderer | DualSense 触觉 IR 渲染 | Windows |
+| keyboard_state | 扩展键区分、国际键标志、失焦松键失败重试 | Windows |
+| gamepad_sensor_rate | 低传感器频率周期存储、禁用值、全频率范围限速上界 | Windows |
 | pen_history_selection | 手写笔历史选择 | Windows |
 | stylus_replay | 手写笔录制回放 | Windows |
 | overlay_event_wake_state | 悬浮菜单事件唤醒状态 | Windows |

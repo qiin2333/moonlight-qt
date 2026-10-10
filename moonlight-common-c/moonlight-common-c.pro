@@ -82,9 +82,12 @@ SOURCES += \
     $$COMMON_C_DIR/src/VideoDepacketizer.c \
     $$COMMON_C_DIR/src/VideoStream.c
 HEADERS += \
+    $$COMMON_C_DIR/src/ControlStreamPacket.h \
     $$COMMON_C_DIR/src/CursorStream.h \
     $$COMMON_C_DIR/src/Ds5HapticsStream.h \
     $$COMMON_C_DIR/src/Ds5HapticsIrStream.h \
+    $$COMMON_C_DIR/src/PyrowaveProtocol.h \
+    $$COMMON_C_DIR/src/PyrowaveReassembly.h \
     $$COMMON_C_DIR/src/Limelight.h
 INCLUDEPATH += \
     $$ENET_DIR/include \

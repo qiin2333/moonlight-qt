@@ -13,6 +13,8 @@ It remains compatible with upstream Moonlight and standard Sunshine hosts, while
 
 Download Windows, macOS, Linux AppImage, and Steam Link builds from [GitHub Releases](https://github.com/qiin2333/moonlight-qt/releases).
 
+For Windows portable upgrades, extract into a new folder and copy the old `Moonlight Game Streaming Project` settings folder. If you overwrite an older installation, remove the old `tls/qopensslbackend.dll`: it can be incompatible with the newer Qt runtime and cause a startup crash.
+
 > **macOS currently ships Apple Silicon (arm64) builds only**, named like `Moonlight-VPlus-<version>-arm64.dmg`.
 >
 > **Linux AppImages are available for x86_64 and aarch64**, named like `Moonlight-VPlus-<version>-x86_64.AppImage` and `Moonlight-VPlus-<version>-aarch64.AppImage`.
@@ -89,7 +91,7 @@ python3 setup-deps.py
 
 Requirements:
 
-- Qt 6 SDK, preferably close to the Qt 6.11.x version used by CI.
+- Qt 6 SDK, preferably Qt 6.12.0 as used by Windows CI.
 - Visual Studio 2022 with the MSVC toolchain.
 - 7-Zip when building user-facing installers.
 - Windows Graphics Tools when debugging DirectX-related issues.
@@ -97,9 +99,11 @@ Requirements:
 Common release build scripts:
 
 ```cmd
-scripts\build-arch.bat x64 release
-scripts\generate-bundle.bat
+scripts\build-arch.bat release x64
+scripts\generate-bundle.bat release
 ```
+
+For signed builds, the caller must first set `SIGNTOOL_PARAMS` (signtool arguments only, without the `sign` subcommand) and `ML_SYMBOL_STORE` (the symbol-store directory), and provide a usable code-signing certificate. Then run `scripts\build-arch.bat signed-release x64`, `scripts\build-arch.bat signed-release arm64`, and `scripts\generate-bundle.bat signed-release` in order. For example, `SIGNTOOL_PARAMS` can be `/a /tr http://timestamp.digicert.com /td sha256 /fd sha256` to select a code-signing certificate from the local certificate store. Ordinary `release` builds do not require these signing parameters.
 
 ### macOS
 

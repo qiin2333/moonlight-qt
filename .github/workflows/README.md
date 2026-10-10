@@ -12,7 +12,7 @@
 - 发布 Release
 
 **支持平台：**
-- Windows (x64/ARM64) - 使用 Qt 6.11.1
+- Windows (x64/ARM64) - 使用 Qt 6.12.0
 - macOS - 使用 Qt 6.11.1
 - Linux (x86_64 / aarch64) - 使用 Qt 6.11.1
 - SteamLink - 交叉编译
@@ -84,7 +84,7 @@
 
 ### 环境要求
 
-- **Windows**: Visual Studio 2022, Qt 6.11.1
+- **Windows**: Visual Studio 2022, Qt 6.12.0
 - **macOS**: Xcode, Qt 6.11.1, Node.js
 - **Linux**: 完整的开发环境，Qt 6.11.1
 - **所有平台**: Git, 网络访问
