@@ -1708,6 +1708,7 @@ bool Session::initialize(QQuickWindow* qtWindow)
 
     m_StreamConfig.fps = m_Preferences->fps;
     m_StreamConfig.bitrate = m_Preferences->bitrateKbps;
+    m_StreamConfig.videoFecPercentage = m_Preferences->fecPercentage;
 
 #ifndef STEAM_LINK
     // Opt-in to all encryption features if we detect that the platform

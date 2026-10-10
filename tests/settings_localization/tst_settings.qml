@@ -12,10 +12,32 @@ TestCase {
     FontLoader { source: "../../app/res/fonts/Manrope-ExtraBold.ttf" }
 
     Component {
+        id: toggleComponent
+        ToggleRow { title: "ABR"; description: "Adjust video bitrate"; checked: true }
+    }
+
+    function test_toggleAccessibleWithoutInitializationWriteback() {
+        var row = createTemporaryObject(toggleComponent, this, { width: 740 })
+        verify(row)
+        var control = row.controlContent[0]
+        compare(control.Accessible.name, row.title)
+        compare(control.Accessible.description, row.description)
+        compare(control.checked, true)
+        var emissions = 0
+        row.toggled.connect(function() { emissions++ })
+        row.checked = false
+        compare(control.checked, false)
+        compare(emissions, 0)
+    }
+
+    Component {
         id: railComponent
         CategoryRail {
             height: 600
             categories: [
+                { key: "basic", title: qsTranslate("SettingsView", "Streaming"), icon: "" },
+                { key: "advanced", title: qsTranslate("SettingsView", "Compatibility and diagnostics"), icon: "" },
+                { key: "ui", title: qsTranslate("SettingsView", "Interface"), icon: "" },
                 { key: "gamepad", title: "Gamepad Settings", icon: "" },
                 { key: "peripherals", title: "Peripherals Settings", icon: "" },
                 { key: "software", title: "Software Settings", icon: "" },
@@ -27,6 +49,7 @@ TestCase {
     function test_compiledChinese() {
         compare(qsTranslate("SettingsView", "Settings"), "设置")
         compare(qsTranslate("SettingsView", "Software Settings"), "软件设置")
+        compare(qsTranslate("SettingsView", "Interface"), "界面")
         compare(qsTranslate("LegacySettingsPage", "Language"), "语言")
         compare(qsTranslate("AboutSettingsPage", "About"), "关于")
         verify(qsTranslate("OverlayMenuPanel", "Connected — select to release") !== "Connected — select to release")
@@ -54,6 +77,7 @@ TestCase {
             tryVerify(function() { return list.itemAtIndex(i) !== null })
             wait(50)
             var row = list.itemAtIndex(i)
+            compare(row.Accessible.name, rail.categories[i].title)
             var label = row.contentItem.children[1]
             verify(!label.truncated, label.text + " is truncated")
             verify(label.contentWidth <= label.width + 1, label.text + " overflows horizontally")

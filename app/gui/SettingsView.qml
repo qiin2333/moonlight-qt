@@ -32,15 +32,15 @@ FocusScope {
     // 图标取自 Microsoft Fluent UI System Icons（MIT），和 FluentWinUI3 是同一套设计语言。
     // 之前用 emoji，各平台字体不同，渲染出来大小、粗细、配色都对不齐。
     readonly property var rawCategories: [
-        { key: "basic",    icon: "qrc:/res/fluent/cat-basic.svg",    title: qsTr("Basic Settings") },
+        { key: "basic",    icon: "qrc:/res/fluent/cat-basic.svg",    title: qsTr("Streaming") },
         { key: "display",  icon: "qrc:/res/fluent/cat-display.svg",  title: qsTr("Display Settings") },
         { key: "audio",    icon: "qrc:/res/fluent/cat-audio.svg",    title: qsTr("Audio Settings") },
         { key: "host",     icon: "qrc:/res/fluent/cat-host.svg",     title: qsTr("Host Settings") },
         { key: "input",    icon: "qrc:/res/fluent/cat-input.svg",    title: qsTr("Input Settings") },
         { key: "gamepad",  icon: "qrc:/res/fluent/cat-gamepad.svg",  title: qsTr("Gamepad Settings") },
         { key: "peripherals", icon: "qrc:/res/fluent/cat-peripherals.svg", title: qsTr("Peripherals Settings") },
-        { key: "advanced", icon: "qrc:/res/fluent/cat-advanced.svg", title: qsTr("Advanced Settings") },
-        { key: "ui",       icon: "qrc:/res/fluent/cat-ui.svg",       title: qsTr("Software Settings") },
+        { key: "advanced", icon: "qrc:/res/fluent/cat-advanced.svg", title: qsTr("Compatibility and diagnostics") },
+        { key: "ui",       icon: "qrc:/res/fluent/cat-ui.svg",       title: qsTr("Interface") },
         { key: "ecosystem",icon: "qrc:/res/fluent/cat-ecosystem.svg",title: qsTr("AlkaidLab Ecosystem") },
         { key: "about",    icon: "qrc:/res/fluent/cat-about.svg",    title: qsTr("About") }
     ]
@@ -227,7 +227,6 @@ FocusScope {
                 category: settingsPage.category
 
                 onLanguageChanged: settingsPage.languageChanged()
-                onBitratePreferenceChanged: basicPage.syncBitrateFromPreferences()
             }
 
             EcosystemSettingsPage {

@@ -118,7 +118,9 @@ Column {
 
         ToggleRow {
             title: qsTr("Frame pacing")
-            description: qsTr("Frame pacing reduces micro-stutter by delaying frames that come in too early")
+            description: StreamingPreferences.enableVsync
+                         ? qsTr("Frame pacing reduces micro-stutter by delaying frames that come in too early")
+                         : qsTr("Enable V-Sync to use frame pacing.")
             controlEnabled: StreamingPreferences.enableVsync
             checked: StreamingPreferences.enableVsync && StreamingPreferences.framePacing
             onToggled: function(value) { StreamingPreferences.framePacing = value }

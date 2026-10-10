@@ -18,7 +18,6 @@ Column {
     id: settingsPage
 
     signal languageChanged()
-    signal bitratePreferenceChanged()
 
     property string category: ""
     // 关闭捕获时保留用户上次选择的作用范围，重新开启后恢复原模式。
@@ -471,7 +470,7 @@ Column {
     }
 
     SettingsCard {
-        visible: settingsPage.category === "input" && hasVisibleContent
+        visible: settingsPage.category === "gamepad" && hasVisibleContent
         title: qsTr("DualSense haptics")
 
         ChoiceRow {
@@ -640,19 +639,6 @@ Column {
         }
 
         ChoiceRow {
-            title: qsTr("Video codec")
-            selectedValue: StreamingPreferences.videoCodecConfig
-            onValueActivated: function(value) { StreamingPreferences.videoCodecConfig = value }
-
-            model: ListModel {
-                ListElement { text: qsTr("Automatic (Recommended)"); val: StreamingPreferences.VCC_AUTO }
-                ListElement { text: qsTr("H.264"); val: StreamingPreferences.VCC_FORCE_H264 }
-                ListElement { text: qsTr("HEVC (H.265)"); val: StreamingPreferences.VCC_FORCE_HEVC }
-                ListElement { text: qsTr("AV1"); val: StreamingPreferences.VCC_FORCE_AV1 }
-            }
-        }
-
-        ChoiceRow {
             applicable: SystemProperties.isDarwin
             title: qsTr("Renderer")
             selectedValue: StreamingPreferences.rendererSelection
@@ -682,7 +668,6 @@ Column {
                         StreamingPreferences.height,
                         StreamingPreferences.fps,
                         value)
-                    settingsPage.bitratePreferenceChanged()
                 }
             }
         }
