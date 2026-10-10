@@ -69,6 +69,8 @@ SOURCES += \
     $$COMMON_C_DIR/src/Platform.c \
     $$COMMON_C_DIR/src/PlatformCrypto.c \
     $$COMMON_C_DIR/src/PlatformSockets.c \
+    $$COMMON_C_DIR/src/PyrowaveProtocol.c \
+    $$COMMON_C_DIR/src/PyrowaveReassembly.c \
     $$COMMON_C_DIR/src/RtpAudioQueue.c \
     $$COMMON_C_DIR/src/RtpVideoQueue.c \
     $$COMMON_C_DIR/src/RecorderCallbacks.c \

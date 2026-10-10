@@ -106,6 +106,7 @@ Item {
 
         delegate: ItemDelegate {
             id: item
+            Accessible.name: modelData.title
 
             readonly property bool current: modelData.key === rail.currentCategory
 
