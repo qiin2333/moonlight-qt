@@ -78,8 +78,8 @@ public:
         return m_ButtonVisible.load(std::memory_order_acquire);
     }
 
-    // Native display events wake the SDL loop on desktop platforms, so an idle
-    // visible button does not need a continuous Qt event pump.
+    // Native display wakes (plus bounded Linux queue checks) service idle
+    // buttons. Active gestures keep processing between wakes.
     bool needsEventProcessing() const;
     void beginEventProcessing();
     void finishEventProcessing();

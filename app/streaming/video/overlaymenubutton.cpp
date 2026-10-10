@@ -213,10 +213,11 @@ bool OverlayMenuButton::needsEventProcessing() const
 
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
         defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
-    // If native monitoring is unavailable, retain the old continuous-pump
-    // behavior so the button never becomes unusable on an unusual system.
-    return !m_NativeEventMonitor || !m_NativeEventMonitor->isAttached() ||
-           m_EventWakeState.isPending();
+    // Keep pumping throughout a gesture even if the native monitor misses the
+    // next motion/release. Only an idle button can rely on native wakeups.
+    // If native monitoring is unavailable, retain continuous processing.
+    return m_InputSource != InputSource::None || !m_NativeEventMonitor ||
+           !m_NativeEventMonitor->isAttached() || m_EventWakeState.isPending();
 #else
     return true;
 #endif

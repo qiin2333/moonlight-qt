@@ -20,7 +20,8 @@ public:
     void detach();
     bool isAttached() const;
 
-    // Re-arm the display descriptor only after Qt has drained its native events.
+    // Re-arm display monitoring and the buffered-event fallback only after Qt
+    // has drained its native events.
     void finishEventProcessing();
 
 private:

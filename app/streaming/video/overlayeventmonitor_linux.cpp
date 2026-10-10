@@ -28,6 +28,11 @@
 #endif
 
 namespace {
+// Qt's XCB reader can consume socket data before this monitor observes POLLIN.
+// A bounded check also drains input already buffered in Qt, without restoring
+// the streaming loop's 10 ms idle Qt polling.
+constexpr int kQueuedEventCheckIntervalMs = 100;
+
 struct DisplaySource
 {
     int fd = -1;
@@ -175,21 +180,16 @@ bool LinuxDisplayEventMonitor::attach(std::uintptr_t nativeWindow)
         while (!state->stopping.load(std::memory_order_acquire)) {
             // The display connection belongs to Qt. The monitor only observes
             // readability and never consumes native events from this thread.
-            // Disable polling until the Qt pass is acknowledged so the unread
-            // descriptor cannot cause a busy loop.
-            pollfd descriptors[2] = {
-                {
-                    state->displayFd,
-                    static_cast<short>(state->wakeOutstanding.load(
-                            std::memory_order_acquire) ? 0 : POLLIN),
-                    0
-                },
-                { state->controlFd, POLLIN, 0 }
-            };
+            // Disable polling and the queued-event check until the Qt pass is
+            // acknowledged so an unread descriptor cannot cause a busy loop.
+            const bool waitingForQt = state->wakeOutstanding.load(std::memory_order_acquire);
+            pollfd descriptors[2] = { { state->displayFd,
+                                        static_cast<short>(waitingForQt ? 0 : POLLIN), 0 },
+                                      { state->controlFd, POLLIN, 0 } };
 
             int result;
             do {
-                result = poll(descriptors, 2, -1);
+                result = poll(descriptors, 2, waitingForQt ? -1 : kQueuedEventCheckIntervalMs);
             } while (result < 0 && errno == EINTR);
 
             if (result < 0) {
@@ -212,8 +212,9 @@ bool LinuxDisplayEventMonitor::attach(std::uintptr_t nativeWindow)
             }
 
             const bool receivedDisplayEvent = descriptors[0].revents & POLLIN;
-            if (receivedDisplayEvent &&
-                    !state->wakeOutstanding.exchange(true, std::memory_order_acq_rel)) {
+            const bool queuedEventCheckDue = result == 0;
+            if ((receivedDisplayEvent || queuedEventCheckDue) &&
+                !state->wakeOutstanding.exchange(true, std::memory_order_acq_rel)) {
                 invokeWakeCallback(state->wakeCallback);
             }
         }

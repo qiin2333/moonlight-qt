@@ -196,6 +196,22 @@ int main(int argc, char* argv[])
     require(clickCount.load(std::memory_order_acquire) == externalClickCount + 1,
             "external overlay button input must activate the button callback");
 
+    // A held gesture must keep the owner pumping after the initial wake was
+    // consumed, including when Qt's native reader hides release readability.
+    const int heldClickCount = clickCount.load(std::memory_order_acquire);
+    require(button.handleExternalTouchPress(42, button.geometry().center()),
+            "external touch must begin a button gesture");
+    button.beginEventProcessing();
+    button.finishEventProcessing();
+    require(button.needsEventProcessing(),
+            "an active touch must continue processing without a pending wake");
+    require(button.handleExternalTouchRelease(42, button.geometry().center()),
+            "external touch release must finish the held gesture");
+    require(clickCount.load(std::memory_order_acquire) == heldClickCount + 1,
+            "held touch must activate once on release");
+    settleQtEvents(button);
+    drainSemaphore(wakeSemaphore);
+
     const int pressureWakeCount = wakeCount.load(std::memory_order_acquire);
     sendClick(display, 100);
     QThread::msleep(20);
