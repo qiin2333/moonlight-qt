@@ -255,7 +255,7 @@ if not x%QT_PATH:\5.=%==x%QT_PATH% (
     set WINDEPLOYQT_ARGS=--no-qmltooling --no-virtualkeyboard
 ) else (
     rem Qt 6.8+
-    set WINDEPLOYQT_ARGS=--no-system-d3d-compiler --no-system-dxc-compiler --skip-plugin-types qmltooling,generic --no-ffmpeg
+    set WINDEPLOYQT_ARGS=--no-system-d3d-compiler --no-system-dxc-compiler --skip-plugin-types qmltooling,generic --no-ffmpeg --force-openssl
     rem FluentWinUI3 depends on the Fusion fallback style, so deploy both styles
     rem and their implementation libraries.
     set WINDEPLOYQT_ARGS=!WINDEPLOYQT_ARGS! --no-quickcontrols2imagine --no-quickcontrols2universal
