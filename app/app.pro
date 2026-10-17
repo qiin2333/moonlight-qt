@@ -1,4 +1,4 @@
-QT += core quick network quickcontrols2 svg gui-private
+QT += core quick network quickcontrols2 svg widgets gui-private
 !config_SL: QT += multimedia
 CONFIG += c++17
 

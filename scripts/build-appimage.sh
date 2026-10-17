@@ -119,7 +119,7 @@ PROBE_NODES=$(va_nodes $LIBVA_FALLBACK_DIR/libva-probe)
 APP_RUN=$BUILD_ROOT/AppRun-libva
 cat > $APP_RUN <<'APPRUN_EOF'
 #!/bin/bash
-# AppRun: prefer the host libva; use staged libraries only when the host cannot run us.
+# AppRun: use desktop portals and prefer the host libva when compatible.
 #
 # VA-API driver modules on the host are loaded by libva and export an entrypoint
 # named after the libva version they were built against (__vaDriverInit_1_XX).
@@ -134,6 +134,9 @@ cat > $APP_RUN <<'APPRUN_EOF'
 # separate so a missing host Wayland adapter can be supplied without shadowing an
 # otherwise compatible host libva core and its matching GPU drivers.
 APPDIR="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
+# Qt auto-selects portals for Flatpak/Snap, but not AppImage. Use the bundled
+# portal backend for native file dialogs unless the user selected a theme.
+export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME-xdgdesktopportal}"
 LIBVA_FALLBACK="$APPDIR/opt/libva-fallback"
 LIBVA_WAYLAND_FALLBACK="$APPDIR/opt/libva-wayland-fallback"
 
@@ -241,6 +244,8 @@ VERIFY_ROOT=$(mktemp -d "$BUILD_ROOT/appimage-verify.XXXXXX") || fail "Unable to
 ) || fail "Unable to extract AppImage for verification!"
 EXTRACTED_APPDIR=$VERIFY_ROOT/squashfs-root
 
+[ -e "$EXTRACTED_APPDIR/usr/plugins/platformthemes/libqxdgdesktopportal.so" ] || \
+  fail "AppImage is missing the Qt desktop portal platform theme!"
 [ -e "$EXTRACTED_APPDIR/usr/plugins/platforms/libqxcb.so" ] || \
   fail "AppImage is missing the Qt XCB platform plugin!"
 find "$EXTRACTED_APPDIR/usr/plugins/platforms" -maxdepth 1 -name 'libqwayland*.so' -print -quit | grep -q . || \
