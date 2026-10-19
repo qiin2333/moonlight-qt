@@ -157,6 +157,10 @@ public:
 
     void setWindow(SDL_Window* window);
 
+    // Absolute mouse/touch/pen coordinates are scaled to the stream resolution,
+    // which can change mid-session (host resolution change, reconnect).
+    void setStreamDimensions(int streamWidth, int streamHeight);
+
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     void setWaylandWindowCoordinateMetrics(WaylandWindowMetrics::CoordinateMetrics metrics);
 #endif
