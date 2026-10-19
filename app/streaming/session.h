@@ -268,6 +268,10 @@ private:
 
     void updateOptimalWindowDisplayMode();
 
+    void scheduleWindowResolutionMatch();
+    void processWindowResolutionMatch();
+    void handleHostResolutionReport(int width, int height);
+
     enum class DecoderAvailability {
         None,
         Software,
@@ -331,6 +335,8 @@ private:
 
     static
     void clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame);
+
+    static void clResolutionChanged(uint32_t width, uint32_t height);
 
     static
     int arInit(int audioConfiguration,
@@ -413,6 +419,17 @@ private:
     int m_ActiveVideoWidth;
     int m_ActiveVideoHeight;
     int m_ActiveVideoFrameRate;
+
+    // "Match stream resolution to window size" (LI_FF_CLIENT_RESOLUTION_CHANGE)
+    struct ResolutionMatchState
+    {
+        bool hostSupported = false;
+        QSize hostDisplaySize;   // Latest display size reported by the host on this connection
+        QSize requestedSize;     // Last size requested and not yet reflected in the stream
+        Uint32 requestTicks = 0; // When the unanswered request was sent; 0 if none
+        Uint32 deadline = 0;     // When a resize has settled; 0 if none pending
+        bool deferred = false;   // Skipped while minimized or not 1:1; retried when that changes
+    } m_ResolutionMatch;
 
     OpusMSDecoder* m_OpusDecoder;
     IAudioRenderer* m_AudioRenderer;
