@@ -384,8 +384,7 @@ void write_seq_parameter_set_rbsp(sps_t* sps, bs_t* b)
     }
     else if( sps->pic_order_cnt_type == 1 )
     {
-        if (sps->num_ref_frames_in_pic_order_cnt_cycle > 256)
-        {
+        if (sps->num_ref_frames_in_pic_order_cnt_cycle > 256) {
             sps->num_ref_frames_in_pic_order_cnt_cycle = 256;
         }
 
@@ -534,8 +533,7 @@ void write_vui_parameters(sps_t* sps, bs_t* b)
 
 void write_hrd_parameters(hrd_t* hrd, bs_t* b)
 {
-    if (hrd->cpb_cnt_minus1 > 31)
-    {
+    if (hrd->cpb_cnt_minus1 > 31) {
         hrd->cpb_cnt_minus1 = 31;
     }
 

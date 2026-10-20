@@ -135,12 +135,10 @@ bool DxVsyncSource::waitForVsync()
 
         // VidPnSourceId is scoped to the adapter, so we must also check the adapter LUID
         if (m_AdapterLuid.LowPart != openAdapterParams.AdapterLuid.LowPart ||
-                m_AdapterLuid.HighPart != openAdapterParams.AdapterLuid.HighPart ||
-                m_WaitForVblankEventParams.VidPnSourceId != openAdapterParams.VidPnSourceId) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Monitor changed: %s %d Hz",
-                        monitorInfo.szDevice,
-                        monitorMode.dmDisplayFrequency);
+            m_AdapterLuid.HighPart != openAdapterParams.AdapterLuid.HighPart ||
+            m_WaitForVblankEventParams.VidPnSourceId != openAdapterParams.VidPnSourceId) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Monitor changed: %s %d Hz",
+                        monitorInfo.szDevice, monitorMode.dmDisplayFrequency);
         }
 
         m_WaitForVblankEventParams.hAdapter = openAdapterParams.hAdapter;
@@ -155,8 +153,7 @@ bool DxVsyncSource::waitForVsync()
     if (status != STATUS_SUCCESS) {
         if (status != STATUS_GRAPHICS_PRESENT_OCCLUDED) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                         "D3DKMTWaitForVerticalBlankEvent() failed: %x",
-                         status);
+                         "D3DKMTWaitForVerticalBlankEvent() failed: %x", status);
         }
 
         m_LastMonitor = nullptr;
