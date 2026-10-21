@@ -1449,6 +1449,22 @@
         <translation>7.1.4 环绕声</translation>
     </message>
     <message>
+        <source>Spatial audio</source>
+        <translation>空间音频</translation>
+    </message>
+    <message>
+        <source>Renders surround sound as spatial audio on headphones, built-in speakers and other stereo outputs.</source>
+        <translation>在耳机、内置扬声器和其他立体声输出设备上，将环绕声渲染为空间音频。</translation>
+    </message>
+    <message>
+        <source>Head tracking</source>
+        <translation>头部追踪</translation>
+    </message>
+    <message>
+        <source>Requires supported AirPods or Beats headphones.</source>
+        <translation>需要支持的 AirPods 或 Beats 耳机。</translation>
+    </message>
+    <message>
         <source>Mute host PC speakers while streaming</source>
         <translation>流式传输启动时将主机的扬声器静音</translation>
     </message>

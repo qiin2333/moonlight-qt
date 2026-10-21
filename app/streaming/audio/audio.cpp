@@ -5,6 +5,10 @@
 #include "renderers/slaud.h"
 #endif
 
+#ifdef HAVE_COREAUDIO
+#include "renderers/coreaudio.h"
+#endif
+
 #include "renderers/sdl.h"
 
 #include <Limelight.h>
@@ -31,6 +35,12 @@ IAudioRenderer* Session::createAudioRenderer(const POPUS_MULTISTREAM_CONFIGURATI
         return nullptr;
     }
 #endif
+#if defined(HAVE_COREAUDIO)
+    else if (mlAudio == "coreaudio") {
+        TRY_INIT_RENDERER(CoreAudioRenderer, opusConfig)
+        return nullptr;
+    }
+#endif
     else if (!mlAudio.isEmpty()) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Unknown audio backend: %s",
@@ -43,6 +53,11 @@ IAudioRenderer* Session::createAudioRenderer(const POPUS_MULTISTREAM_CONFIGURATI
 #if defined(HAVE_SLAUDIO)
     // Steam Link should always have SLAudio
     TRY_INIT_RENDERER(SLAudioRenderer, opusConfig)
+#endif
+
+#if defined(HAVE_COREAUDIO)
+    // Prefer CoreAudio on macOS for spatial audio
+    TRY_INIT_RENDERER(CoreAudioRenderer, opusConfig)
 #endif
 
     // Default to SDL

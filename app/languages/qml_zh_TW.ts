@@ -989,6 +989,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Spatial audio</source>
+        <translation>空間音訊</translation>
+    </message>
+    <message>
+        <source>Renders surround sound as spatial audio on headphones, built-in speakers and other stereo outputs.</source>
+        <translation>在耳機、內建喇叭和其他立體聲輸出裝置上，將環繞音效轉譯為空間音訊。</translation>
+    </message>
+    <message>
+        <source>Head tracking</source>
+        <translation>頭部追蹤</translation>
+    </message>
+    <message>
+        <source>Requires supported AirPods or Beats headphones.</source>
+        <translation>需要支援的 AirPods 或 Beats 耳機。</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="98"/>
         <source>Mute host PC speakers while streaming</source>
         <translation>串流時將主機電腦的喇叭靜音</translation>

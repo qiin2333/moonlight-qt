@@ -897,6 +897,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Spatial audio</source>
+        <translation>空間オーディオ</translation>
+    </message>
+    <message>
+        <source>Renders surround sound as spatial audio on headphones, built-in speakers and other stereo outputs.</source>
+        <translation>ヘッドホン、内蔵スピーカー、その他のステレオ出力で、サラウンドを空間オーディオとしてレンダリングします。</translation>
+    </message>
+    <message>
+        <source>Head tracking</source>
+        <translation>ヘッドトラッキング</translation>
+    </message>
+    <message>
+        <source>Requires supported AirPods or Beats headphones.</source>
+        <translation>対応する AirPods または Beats のヘッドホンが必要です。</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="98"/>
         <source>Mute host PC speakers while streaming</source>
         <translation>ストリーミング中にホストPCのスピーカーをミュートする</translation>
