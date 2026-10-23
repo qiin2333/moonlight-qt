@@ -230,9 +230,9 @@ FFmpegVideoDecoder::FFmpegVideoDecoder(bool testOnly)
     : m_Pkt(av_packet_alloc()), m_VideoDecoderCtx(nullptr), m_RequiredPixelFormat(AV_PIX_FMT_NONE),
       m_DecodeBuffer(1024 * 1024, 0), m_HwDecodeCfg(nullptr), m_BackendRenderer(nullptr),
       m_FrontendRenderer(nullptr), m_ConsecutiveFailedDecodes(0), m_Pacer(nullptr),
-      m_BwTracker(10, 250), m_FramesIn(0), m_FramesOut(0), m_LastFrameNumber(0), m_StreamFps(0),
-      m_VideoFormat(0), m_NeedsSpsFixup(false), m_NeedsAv1ObuRepack(false),
-      m_LoggedHdr10PlusMetadata(false), m_TestOnly(testOnly),
+      m_BwTracker(10, 250), m_LastRtpBytesReceived(0), m_FramesIn(0), m_FramesOut(0),
+      m_LastFrameNumber(0), m_StreamFps(0), m_VideoFormat(0), m_NeedsSpsFixup(false),
+      m_NeedsAv1ObuRepack(false), m_LoggedHdr10PlusMetadata(false), m_TestOnly(testOnly),
       m_CurrentTestMode(TestMode::TestFrameOnly), m_DecoderThread(nullptr),
       m_VideoEnhancement(&VideoEnhancement::getInstance())
 {
@@ -2158,7 +2158,14 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
         m_LastFrameNumber = du->frameNumber;
     }
 
-    m_BwTracker.AddBytes(du->fullLength);
+    // Feed the overlay tracker with wire-level bytes received on the video
+    // RTP stream (includes FEC), the same source the Android client uses for
+    // its bandwidth display. The counter is monotonic within a stream.
+    uint64_t rtpBytes = LiGetRTPVideoBytesReceived();
+    if (rtpBytes >= m_LastRtpBytesReceived) {
+        m_BwTracker.AddBytes((size_t)(rtpBytes - m_LastRtpBytesReceived));
+    }
+    m_LastRtpBytesReceived = rtpBytes;
 
     // Flip stats windows roughly every second
     if (LiGetMicroseconds() > m_ActiveWndVideoStats.measurementStartUs + 1000000) {
