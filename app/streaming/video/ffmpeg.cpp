@@ -3,7 +3,6 @@
 #include "av1obu.h"
 #include "utils.h"
 #include "streaming/session.h"
-#include "streaming/network/bandwidth.h"
 
 #include <h264_stream.h>
 extern "C" {
@@ -230,10 +229,11 @@ enum AVPixelFormat FFmpegVideoDecoder::ffGetFormat(AVCodecContext* context,
 FFmpegVideoDecoder::FFmpegVideoDecoder(bool testOnly)
     : m_Pkt(av_packet_alloc()), m_VideoDecoderCtx(nullptr), m_RequiredPixelFormat(AV_PIX_FMT_NONE),
       m_DecodeBuffer(1024 * 1024, 0), m_HwDecodeCfg(nullptr), m_BackendRenderer(nullptr),
-      m_FrontendRenderer(nullptr), m_ConsecutiveFailedDecodes(0), m_Pacer(nullptr), m_FramesIn(0),
-      m_FramesOut(0), m_LastFrameNumber(0), m_StreamFps(0), m_VideoFormat(0),
-      m_NeedsSpsFixup(false), m_NeedsAv1ObuRepack(false), m_LoggedHdr10PlusMetadata(false),
-      m_TestOnly(testOnly), m_CurrentTestMode(TestMode::TestFrameOnly), m_DecoderThread(nullptr),
+      m_FrontendRenderer(nullptr), m_ConsecutiveFailedDecodes(0), m_Pacer(nullptr),
+      m_BwTracker(10, 250), m_FramesIn(0), m_FramesOut(0), m_LastFrameNumber(0), m_StreamFps(0),
+      m_VideoFormat(0), m_NeedsSpsFixup(false), m_NeedsAv1ObuRepack(false),
+      m_LoggedHdr10PlusMetadata(false), m_TestOnly(testOnly),
+      m_CurrentTestMode(TestMode::TestFrameOnly), m_DecoderThread(nullptr),
       m_VideoEnhancement(&VideoEnhancement::getInstance())
 {
     SDL_zero(m_ActiveWndVideoStats);
@@ -942,7 +942,7 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
     {
         char rttString[32];
         char bandwidthString[32];
-        int bandwidthKbps = BandwidthCalculator::instance()->getCurrentBandwidthKbps();
+        double avgVideoMbps = m_BwTracker.GetAverageMbps();
 
         if (stats.lastRtt != 0)
         {
@@ -953,20 +953,10 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
             snprintf(rttString, sizeof(rttString), "N/A");
         }
 
-        if (bandwidthKbps != 0)
-        {
-            if (bandwidthKbps >= 1000)
-            {
-                float mbps = bandwidthKbps / 1000.0f;
-                snprintf(bandwidthString, sizeof(bandwidthString), "**%.2f** {16}Mbps{18}", mbps);
-            }
-            else
-            {
-                snprintf(bandwidthString, sizeof(bandwidthString), "**%d** {16}Kbps{18}", bandwidthKbps);
-            }
-        }
-        else
-        {
+        if (avgVideoMbps != 0) {
+            snprintf(bandwidthString, sizeof(bandwidthString), "**%.2f** {16}Mbps{18}",
+                     avgVideoMbps);
+        } else {
             snprintf(bandwidthString, sizeof(bandwidthString), "N/A");
         }
 
@@ -2167,6 +2157,8 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
         m_ActiveWndVideoStats.totalFrames += du->frameNumber - (m_LastFrameNumber + 1);
         m_LastFrameNumber = du->frameNumber;
     }
+
+    m_BwTracker.AddBytes(du->fullLength);
 
     // Flip stats windows roughly every second
     if (LiGetMicroseconds() > m_ActiveWndVideoStats.measurementStartUs + 1000000) {

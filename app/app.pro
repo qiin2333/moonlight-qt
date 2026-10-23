@@ -264,7 +264,7 @@ SOURCES += \
     streaming/audio/audio.cpp \
     streaming/audio/dualsensehaptics.cpp \
     streaming/audio/renderers/sdlaud.cpp \
-    streaming/network/bandwidth.cpp \
+    streaming/bandwidth.cpp \
     gui/computermodel.cpp \
     gui/appmodel.cpp \
     streaming/streamutils.cpp \
@@ -342,7 +342,7 @@ HEADERS += \
     gui/computermodel.h \
     gui/appmodel.h \
     streaming/video/decoder.h \
-    streaming/network/bandwidth.h \
+    streaming/bandwidth.h \
     streaming/streamutils.h \
     backend/autoupdatechecker.h \
     backend/portableupdateinstaller.h \
