@@ -4,6 +4,8 @@
 #include "utils.h"
 #include "streaming/session.h"
 
+#include <cmath>
+
 #include <h264_stream.h>
 extern "C" {
 #include <libavutil/mastering_display_metadata.h>
@@ -229,8 +231,7 @@ enum AVPixelFormat FFmpegVideoDecoder::ffGetFormat(AVCodecContext* context,
 FFmpegVideoDecoder::FFmpegVideoDecoder(bool testOnly)
     : m_Pkt(av_packet_alloc()), m_VideoDecoderCtx(nullptr), m_RequiredPixelFormat(AV_PIX_FMT_NONE),
       m_DecodeBuffer(1024 * 1024, 0), m_HwDecodeCfg(nullptr), m_BackendRenderer(nullptr),
-      m_FrontendRenderer(nullptr), m_ConsecutiveFailedDecodes(0), m_Pacer(nullptr),
-      m_BwTracker(10, 250), m_LastRtpBytesReceived(LiGetRTPVideoBytesReceived()), m_FramesIn(0),
+      m_FrontendRenderer(nullptr), m_ConsecutiveFailedDecodes(0), m_Pacer(nullptr), m_FramesIn(0),
       m_FramesOut(0), m_LastFrameNumber(0), m_StreamFps(0), m_VideoFormat(0),
       m_NeedsSpsFixup(false), m_NeedsAv1ObuRepack(false), m_LoggedHdr10PlusMetadata(false),
       m_TestOnly(testOnly), m_CurrentTestMode(TestMode::TestFrameOnly), m_DecoderThread(nullptr),
@@ -942,7 +943,11 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
     {
         char rttString[32];
         char bandwidthString[32];
-        double avgVideoMbps = m_BwTracker.GetAverageMbps();
+
+        // Instantaneous wire-level rate of the video RTP stream (includes
+        // FEC), no smoothing — same source and meter as the Android client.
+        double bandwidthMbps =
+            m_BandwidthMeter.update(LiGetRTPVideoBytesReceived(), LiGetMicroseconds());
 
         if (stats.lastRtt != 0)
         {
@@ -953,9 +958,9 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
             snprintf(rttString, sizeof(rttString), "N/A");
         }
 
-        if (avgVideoMbps != 0) {
+        if (!std::isnan(bandwidthMbps)) {
             snprintf(bandwidthString, sizeof(bandwidthString), "**%.2f** {16}Mbps{18}",
-                     avgVideoMbps);
+                     bandwidthMbps);
         } else {
             snprintf(bandwidthString, sizeof(bandwidthString), "N/A");
         }
@@ -2157,15 +2162,6 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
         m_ActiveWndVideoStats.totalFrames += du->frameNumber - (m_LastFrameNumber + 1);
         m_LastFrameNumber = du->frameNumber;
     }
-
-    // Feed the overlay tracker with wire-level bytes received on the video
-    // RTP stream (includes FEC), the same source the Android client uses for
-    // its bandwidth display. The counter is monotonic within a stream.
-    uint64_t rtpBytes = LiGetRTPVideoBytesReceived();
-    if (rtpBytes >= m_LastRtpBytesReceived) {
-        m_BwTracker.AddBytes((size_t)(rtpBytes - m_LastRtpBytesReceived));
-    }
-    m_LastRtpBytesReceived = rtpBytes;
 
     // Flip stats windows roughly every second
     if (LiGetMicroseconds() > m_ActiveWndVideoStats.measurementStartUs + 1000000) {

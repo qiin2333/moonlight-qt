@@ -115,8 +115,7 @@ private:
     IFFmpegRenderer* m_FrontendRenderer;
     int m_ConsecutiveFailedDecodes;
     Pacer* m_Pacer;
-    BandwidthTracker m_BwTracker;
-    uint64_t m_LastRtpBytesReceived;
+    BandwidthMeter m_BandwidthMeter;
     VIDEO_STATS m_ActiveWndVideoStats;
     VIDEO_STATS m_LastWndVideoStats;
     VIDEO_STATS m_GlobalVideoStats;
