@@ -60,7 +60,8 @@ MountError WindowsExplorerMirrorProvider::reveal(const MountId& id)
         // Explorer requires /select, outside the quoted path, unlike Qt's argv quoting.
         QProcess explorer;
         explorer.setProgram(QStringLiteral("explorer.exe"));
-        explorer.setNativeArguments(QStringLiteral("/select,\"%1\"").arg(explorerPathArgument(markerPath)));
+        explorer.setNativeArguments(
+            QStringLiteral("/select,\"%1\"").arg(explorerPathArgument(markerPath)));
         opened = explorer.startDetached();
     }
     if (!opened) {
