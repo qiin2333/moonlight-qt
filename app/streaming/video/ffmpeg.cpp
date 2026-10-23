@@ -3,7 +3,8 @@
 #include "av1obu.h"
 #include "utils.h"
 #include "streaming/session.h"
-#include "streaming/network/bandwidth.h"
+
+#include <cmath>
 
 #include <h264_stream.h>
 extern "C" {
@@ -942,7 +943,11 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
     {
         char rttString[32];
         char bandwidthString[32];
-        int bandwidthKbps = BandwidthCalculator::instance()->getCurrentBandwidthKbps();
+
+        // Instantaneous wire-level rate of the video RTP stream (includes
+        // FEC), no smoothing — same source and meter as the Android client.
+        double bandwidthMbps =
+            m_BandwidthMeter.update(LiGetRTPVideoBytesReceived(), LiGetMicroseconds());
 
         if (stats.lastRtt != 0)
         {
@@ -953,20 +958,10 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
             snprintf(rttString, sizeof(rttString), "N/A");
         }
 
-        if (bandwidthKbps != 0)
-        {
-            if (bandwidthKbps >= 1000)
-            {
-                float mbps = bandwidthKbps / 1000.0f;
-                snprintf(bandwidthString, sizeof(bandwidthString), "**%.2f** {16}Mbps{18}", mbps);
-            }
-            else
-            {
-                snprintf(bandwidthString, sizeof(bandwidthString), "**%d** {16}Kbps{18}", bandwidthKbps);
-            }
-        }
-        else
-        {
+        if (!std::isnan(bandwidthMbps)) {
+            snprintf(bandwidthString, sizeof(bandwidthString), "**%.2f** {16}Mbps{18}",
+                     bandwidthMbps);
+        } else {
             snprintf(bandwidthString, sizeof(bandwidthString), "N/A");
         }
 

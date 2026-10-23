@@ -24,7 +24,6 @@
 
 #include <Limelight.h>
 #include "SDL_compat.h"
-#include "network/bandwidth.h"
 #include "utils.h"
 #include <QCoreApplication>
 #include <QHostInfo>
@@ -1993,9 +1992,6 @@ bool Session::initialize(QQuickWindow* qtWindow)
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
         return false;
     }
-
-    // 启动带宽计算
-    BandwidthCalculator::instance()->start();
 
     return true;
 }
@@ -5957,9 +5953,6 @@ DispatchDeferredCleanup:
     // When it is complete, it will release our s_ActiveSessionSemaphore
     // reference.
     QThreadPool::globalInstance()->start(new DeferredSessionCleanupTask(this));
-
-    // 停止带宽计算
-    BandwidthCalculator::instance()->stop();
 }
 
 #ifndef STEAM_LINK
