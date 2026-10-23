@@ -57,8 +57,12 @@ MountError WindowsExplorerMirrorProvider::reveal(const MountId& id)
 #if defined(Q_OS_WIN32) || defined(Q_OS_WIN)
     const QString markerPath = revealMarkerPath(current.displayPath);
     if (QFileInfo::exists(markerPath)) {
-        opened = QProcess::startDetached(QStringLiteral("explorer.exe"),
-                                         { QStringLiteral("/select,%1").arg(explorerPathArgument(markerPath)) });
+        // Explorer requires /select, outside the quoted path, unlike Qt's argv quoting.
+        QProcess explorer;
+        explorer.setProgram(QStringLiteral("explorer.exe"));
+        explorer.setNativeArguments(
+            QStringLiteral("/select,\"%1\"").arg(explorerPathArgument(markerPath)));
+        opened = explorer.startDetached();
     }
     if (!opened) {
         opened = QProcess::startDetached(QStringLiteral("explorer.exe"),

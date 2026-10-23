@@ -3171,52 +3171,59 @@ bool Session::openFileMappingMountPath()
                                     { QStringLiteral("-R"),
                                       markerPath })) {
         appendFileMappingDiagnostic(
-                QStringLiteral("finder_reveal.open_r"),
-                QStringLiteral("ok=true marker=%1").arg(markerPath),
-                m_Computer ? m_Computer->uuid : QString(),
-                m_FileMappingSessionId);
+            QStringLiteral("finder_reveal.open_r"),
+            QStringLiteral("launched=true navigation_verified=false marker=%1").arg(markerPath),
+            m_Computer ? m_Computer->uuid : QString(), m_FileMappingSessionId);
         return true;
     }
     if (QProcess::startDetached(QStringLiteral("/usr/bin/open"),
                                 { m_FileMappingMountPath })) {
         appendFileMappingDiagnostic(
-                QStringLiteral("finder_reveal.open_folder"),
-                QStringLiteral("ok=true mount_path=%1").arg(m_FileMappingMountPath),
-                m_Computer ? m_Computer->uuid : QString(),
-                m_FileMappingSessionId);
+            QStringLiteral("finder_reveal.open_folder"),
+            QStringLiteral("launched=true navigation_verified=false mount_path=%1")
+                .arg(m_FileMappingMountPath),
+            m_Computer ? m_Computer->uuid : QString(), m_FileMappingSessionId);
         return true;
     }
 #elif defined(Q_OS_WIN32) || defined(Q_OS_WIN)
-    if (QFileInfo::exists(markerPath) &&
-            QProcess::startDetached(QStringLiteral("explorer.exe"),
-                                    { QStringLiteral("/select,%1").arg(QDir::toNativeSeparators(markerPath)) })) {
+    const auto launchExplorer = [this](const QString& event, const QString& nativeArguments) {
+        QProcess explorer;
+        explorer.setProgram(QStringLiteral("explorer.exe"));
+        explorer.setNativeArguments(nativeArguments);
+        const bool launched = explorer.startDetached();
         appendFileMappingDiagnostic(
-                QStringLiteral("explorer_reveal.open_select"),
-                QStringLiteral("ok=true marker=%1").arg(markerPath),
-                m_Computer ? m_Computer->uuid : QString(),
-                m_FileMappingSessionId);
+            event,
+            QStringLiteral("launched=%1 navigation_verified=false program=explorer.exe "
+                           "native_arguments=%2 error=%3")
+                .arg(launched ? QStringLiteral("true") : QStringLiteral("false"), nativeArguments,
+                     launched ? QString() : explorer.errorString()),
+            m_Computer ? m_Computer->uuid : QString(), m_FileMappingSessionId);
+        return launched;
+    };
+
+    // Explorer requires /select, outside the quoted path, unlike Qt's argv quoting.
+    if (QFileInfo::exists(markerPath) &&
+        launchExplorer(
+            QStringLiteral("explorer_reveal.open_select"),
+            QStringLiteral("/select,\"%1\"").arg(QDir::toNativeSeparators(markerPath)))) {
         return true;
     }
-    if (QProcess::startDetached(QStringLiteral("explorer.exe"),
-                                { QDir::toNativeSeparators(m_FileMappingMountPath) })) {
-        appendFileMappingDiagnostic(
-                QStringLiteral("explorer_reveal.open_folder"),
-                QStringLiteral("ok=true mount_path=%1").arg(m_FileMappingMountPath),
-                m_Computer ? m_Computer->uuid : QString(),
-                m_FileMappingSessionId);
+    if (launchExplorer(
+            QStringLiteral("explorer_reveal.open_folder"),
+            QStringLiteral("\"%1\"").arg(QDir::toNativeSeparators(m_FileMappingMountPath)))) {
         return true;
     }
 #endif
 
-    const bool opened = QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
+    const bool requestAccepted =
+        QDesktopServices::openUrl(QUrl::fromLocalFile(m_FileMappingMountPath));
     appendFileMappingDiagnostic(
-            QStringLiteral("finder_reveal.desktop_services"),
-            QStringLiteral("ok=%1 mount_path=%2")
-                    .arg(opened ? QStringLiteral("true") : QStringLiteral("false"),
-                         m_FileMappingMountPath),
-            m_Computer ? m_Computer->uuid : QString(),
-            m_FileMappingSessionId);
-    return opened;
+        QStringLiteral("finder_reveal.desktop_services"),
+        QStringLiteral("request_accepted=%1 navigation_verified=false mount_path=%2")
+            .arg(requestAccepted ? QStringLiteral("true") : QStringLiteral("false"),
+                 m_FileMappingMountPath),
+        m_Computer ? m_Computer->uuid : QString(), m_FileMappingSessionId);
+    return requestAccepted;
 }
 
 void Session::requestRuntimeBitrateChange(int bitrateKbps)
