@@ -14,11 +14,12 @@ static std::uint32_t EffectiveWindowSeconds(std::uint32_t windowSeconds)
 
 BandwidthTracker::BandwidthTracker(uint32_t windowSec, uint32_t bucketMs)
     : windowSeconds(seconds(EffectiveWindowSeconds(windowSec))),
-      bucketIntervalMs(bucketMs > 0
-                           ? (int)(std::min)(bucketMs, EffectiveWindowSeconds(windowSec) * 1000U)
-                           : k_DefaultBucketIntervalMs)
+      bucketIntervalMs(
+          bucketMs > 0 ? (int)(std::min)(bucketMs, EffectiveWindowSeconds(windowSec) * 1000U / 4U)
+                       : k_DefaultBucketIntervalMs)
 {
-    // The interval is clamped to the window, so the bucket count is always >= 1
+    // The interval is clamped so the window always contains at least four
+    // buckets, keeping bucketCount >= 4 and the average window non-empty
     bucketCount = EffectiveWindowSeconds(windowSec) * 1000U / (uint32_t)bucketIntervalMs;
     buckets.resize(bucketCount);
 }
