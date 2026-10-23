@@ -1,14 +1,25 @@
 #include "bandwidth.h"
 
+#include <algorithm>
+
 using namespace std::chrono;
 
-BandwidthTracker::BandwidthTracker(uint32_t windowSeconds, uint32_t bucketIntervalMs)
-    : windowSeconds(seconds(windowSeconds)), bucketIntervalMs(bucketIntervalMs)
+static constexpr std::uint32_t k_DefaultWindowSeconds = 10;
+static constexpr std::uint32_t k_DefaultBucketIntervalMs = 250;
+
+static std::uint32_t EffectiveWindowSeconds(std::uint32_t windowSeconds)
 {
-    if (bucketIntervalMs <= 0) {
-        bucketIntervalMs = 250;
-    }
-    bucketCount = (windowSeconds * 1000) / bucketIntervalMs;
+    return windowSeconds > 0 ? windowSeconds : k_DefaultWindowSeconds;
+}
+
+BandwidthTracker::BandwidthTracker(uint32_t windowSec, uint32_t bucketMs)
+    : windowSeconds(seconds(EffectiveWindowSeconds(windowSec))),
+      bucketIntervalMs(bucketMs > 0
+                           ? (int)(std::min)(bucketMs, EffectiveWindowSeconds(windowSec) * 1000U)
+                           : k_DefaultBucketIntervalMs)
+{
+    // The interval is clamped to the window, so the bucket count is always >= 1
+    bucketCount = EffectiveWindowSeconds(windowSec) * 1000U / (uint32_t)bucketIntervalMs;
     buckets.resize(bucketCount);
 }
 
@@ -30,26 +41,26 @@ double BandwidthTracker::GetAverageMbps()
     int currentIndex = (ms.count() / bucketIntervalMs) % bucketCount;
     int maxBuckets = bucketCount / 4;
     size_t totalBytes = 0;
-    steady_clock::time_point oldestBucket = now;
 
-    // Sum bytes from 25% most recent buckets as long as they are completed
-    for (int i = 0; i < maxBuckets; i++) {
+    // Sum exactly the maxBuckets completed buckets that precede the
+    // in-progress one
+    for (int i = 1; i <= maxBuckets; i++) {
         int idx = (currentIndex - i + bucketCount) % bucketCount;
         const Bucket &bucket = buckets[idx];
-        if (isValid(bucket, now) && (now - bucket.start >= milliseconds(bucketIntervalMs))) {
+        if (isValid(bucket, now)) {
             totalBytes += bucket.bytes;
-            if (bucket.start < oldestBucket) {
-                oldestBucket = bucket.start;
-            }
         }
     }
 
-    double elapsed = duration<double>(now - oldestBucket).count();
-    if (elapsed <= 0.0) {
+    // The summed buckets always cover exactly maxBuckets bucket intervals,
+    // so the rate is normalized against that fixed duration instead of a
+    // wall-clock window that shifts with the current bucket phase
+    double elapsedSeconds = maxBuckets * (bucketIntervalMs / 1000.0);
+    if (elapsedSeconds <= 0.0) {
         return 0.0;
     }
 
-    return totalBytes * 8.0 / 1000000.0 / elapsed;
+    return totalBytes * 8.0 / 1000000.0 / elapsedSeconds;
 }
 
 double BandwidthTracker::GetPeakMbps()
