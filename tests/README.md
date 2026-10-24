@@ -57,7 +57,8 @@ AMF 生命周期测试直接编译生产 `AmfSession`，通过实现 SDK C ABI �
 重配和帧处理失败，验证对象释放顺序、空返回、重复清理和多会话 DLL 引用，不访问会话私有字段。
 装有支持视频超分的 AMD 驱动时，
 可执行 `scripts\run-test.bat amf_lifecycle amf_lifecycle --hardware`，额外验证真实 D3D11/AMF
-的 NV12/P010 放大/缩小、锐度重配、帧拷贝和析构，以及通过越界锐度触发 AMF 重配失败后
-重建源尺寸 VP 输入、RGBA 输出、SRV 和输入/输出视图并执行 VP 处理；此硬件选项不在 CI 中运行。
+的 NV12/P010 放大/缩小、锐度重配、帧拷贝、重配失败清理和析构；此硬件选项不在 CI 中运行。
+独立搭建 VP 管线的[诊断工具](https://github.com/qiin2333/moonlight-qt/tree/22bdda430ac75060282386e9c59bb57aed910ca8/diagnostics/d3d11-vp)
+已拆到单独分支，只检查驱动资源组合，不作为生产渲染器回退路径的回归证明。
 
 剪贴板 TLS 回归仅访问本机随机端口。`clipboard_payload_routing/fixtures/` 中的证书和私钥是公开测试素材，不能用于实际配对；证书有效期至 2036 年，届时需要更新。测试不会访问用户配对凭据，也不使用系统剪贴板。macOS 的原生复合写入路径仍需实机验证。
