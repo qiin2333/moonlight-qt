@@ -11,6 +11,7 @@
 #include "streaming/video/videoenhancement.h"
 
 #include <SDL_syswm.h>
+#include <QScopeGuard>
 
 #include <dwmapi.h>
 
@@ -1156,6 +1157,28 @@ void D3D11VARenderer::renderVideo(AVFrame* frame)
         unlockContext(this);
     }
 
+    // Complete render-to-decode synchronization even when AMF rejects a frame.
+    // Skipping the draw must not let the decoder reuse a texture still being copied.
+    const auto renderFence = qScopeGuard([this] {
+        // Make the decoder wait until this render context finishes reading its textures.
+        if (m_DecodeDevice != m_RenderDevice) {
+            SDL_assert(m_DecodeR2DFence);
+            SDL_assert(m_RenderR2DFence);
+
+            // Because Pacer keeps a reference to the current frame until the next frame is
+            // rendered, we insert a wait for the previous frame's fence value rather than the
+            // current one. This means the fence should generally not cause a pipeline bubble for
+            // the decoder unless rendering is taking much longer than expected.
+            if (SUCCEEDED(m_RenderDeviceContext->Signal(m_RenderR2DFence.Get(), m_R2DFenceValue))) {
+                lockContext(this);
+                SDL_assert(m_R2DFenceValue > 0);
+                m_DecodeDeviceContext->Wait(m_DecodeR2DFence.Get(), m_R2DFenceValue - 1);
+                unlockContext(this);
+                m_R2DFenceValue++;
+            }
+        }
+    });
+
     UINT srvIndex;
     if (m_BindDecoderOutputTextures) {
         // Our indexing logic depends on a direct mapping into m_VideoTextureResourceViews
@@ -1175,6 +1198,8 @@ void D3D11VARenderer::renderVideo(AVFrame* frame)
                                                      (int)(intptr_t)frame->data[1],
                                                      &m_SrcBox);
         if (!m_Amf.render(m_AmfTexture.Get(), m_VideoTexture.Get(), m_RenderDeviceContext.Get())) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "AMF frame processing failed; skipping video draw");
             return;
         }
 
@@ -1224,24 +1249,6 @@ void D3D11VARenderer::renderVideo(AVFrame* frame)
     // Unbind SRVs for this frame
     ID3D11ShaderResourceView* nullSrvs[2] = {};
     m_RenderDeviceContext->PSSetShaderResources(0, 2, nullSrvs);
-
-    // Insert a fence to force the decode context to wait for the render context to finish reading
-    if (m_DecodeDevice != m_RenderDevice) {
-        SDL_assert(m_DecodeR2DFence);
-        SDL_assert(m_RenderR2DFence);
-
-        // Because Pacer keeps a reference to the current frame until the next frame is rendered,
-        // we insert a wait for the previous frame's fence value rather than the current one.
-        // This means the fence should generally not cause a pipeline bubble for the decoder
-        // unless rendering is taking much longer than expected.
-        if (SUCCEEDED(m_RenderDeviceContext->Signal(m_RenderR2DFence.Get(), m_R2DFenceValue))) {
-            lockContext(this);
-            SDL_assert(m_R2DFenceValue > 0);
-            m_DecodeDeviceContext->Wait(m_DecodeR2DFence.Get(), m_R2DFenceValue - 1);
-            unlockContext(this);
-            m_R2DFenceValue++;
-        }
-    }
 }
 
 // This function must NOT use any DXGI or ID3D11DeviceContext methods
@@ -2807,8 +2814,10 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
         } else if (m_VideoEnhancement->isVendorIntel()) {
             enableIntelVideoSuperResolution();
         }
-        if (m_Amf.isInitialized()) {
-            m_Amf.setSharpness(2.00);
+        if (m_Amf.isInitialized() && !m_Amf.setSharpness(2.00)) {
+            SDL_LogError(
+                SDL_LOG_CATEGORY_APPLICATION,
+                "AMF sharpness update failed for Rec. 2020; AMF upscaling is no longer active");
         }
         break;
     }
@@ -2830,8 +2839,9 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
         } else if (m_VideoEnhancement->isVendorIntel()) {
             enableIntelVideoSuperResolution(false);
         }
-        if (m_Amf.isInitialized()) {
-            m_Amf.setSharpness(m_AmfUpScalerSharpness ? 0.30 : 2.00);
+        if (m_Amf.isInitialized() && !m_Amf.setSharpness(m_AmfUpScalerSharpness ? 0.30 : 2.00)) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "AMF sharpness update failed; AMF upscaling is no longer active");
         }
     }
 }
