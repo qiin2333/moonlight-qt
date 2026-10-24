@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.16)
+project(d3d11_vp_probe LANGUAGES CXX)
+if(NOT WIN32)
+    message(FATAL_ERROR "This diagnostic requires Windows and the Windows SDK")
+endif()
+add_executable(d3d11_vp_probe main.cpp)
+target_compile_features(d3d11_vp_probe PRIVATE cxx_std_17)
+target_link_libraries(d3d11_vp_probe PRIVATE d3d11 dxgi)
