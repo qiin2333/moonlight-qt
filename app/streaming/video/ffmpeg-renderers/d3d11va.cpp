@@ -860,6 +860,10 @@ bool D3D11VARenderer::prepareDecoderContextInGetFormat(AVCodecContext *context, 
 
 void D3D11VARenderer::renderFrame(AVFrame* frame)
 {
+    if (m_RenderResetPending) {
+        return;
+    }
+
     // Acquire the context lock for rendering to prevent concurrent
     // access from inside FFmpeg's decoding code
     if (m_DecodeDevice == m_RenderDevice) {
@@ -875,8 +879,17 @@ void D3D11VARenderer::renderFrame(AVFrame* frame)
     m_RenderDeviceContext->OMSetRenderTargets(1, m_RenderTargetView.GetAddressOf(), nullptr);
 
     // Prepare the Enhanced Output
-    if (m_VideoEnhancement->isVideoEnhancementEnabled()) {
-        prepareEnhancedOutput(frame);
+    if (m_VideoEnhancement->isVideoEnhancementEnabled() && !prepareEnhancedOutput(frame)) {
+        // A partial fallback must never reach renderVideo(). The event loop will
+        // destroy this renderer and recreate all decoder/render resources.
+        m_RenderResetPending = true;
+        if (m_DecodeDevice == m_RenderDevice) {
+            unlockContext(this);
+        }
+        SDL_Event event = {};
+        event.type = SDL_RENDER_DEVICE_RESET;
+        SDL_PushEvent(&event);
+        return;
     }
 
     // Render our video frame with the aspect-ratio adjusted viewport
@@ -2772,16 +2785,29 @@ bool D3D11VARenderer::enableNvidiaHDR(bool activate, bool logInfo)
     return true;
 }
 
-void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
+bool D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
 {
     bool frameFullRange = isFrameFullRange(frame);
     int frameColorSpace = getFrameColorspace(frame);
     int frameColorTrc = frame->color_trc;
 
     if (frameColorSpace == m_LastColorSpace && frameFullRange == m_LastFullRange && frameColorTrc == m_LastEnhColorTrc) {
-        return;
+        return true;
     }
 
+    const double sharpness =
+        frameColorSpace == COLORSPACE_REC_2020 || !m_AmfUpScalerSharpness ? 2.00 : 0.30;
+    if (m_Amf.isInitialized() && !m_Amf.setSharpness(sharpness)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "AMF sharpness update failed; rebuilding video processor fallback");
+        if (!rebuildVideoProcessorFallback(frame)) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "Failed to rebuild video processor fallback; resetting decoder");
+            return false;
+        }
+    }
+
+    // Reapply current color metadata after rebuilding the VP resources.
     m_LastColorSpace = frameColorSpace;
     m_LastFullRange = frameFullRange;
     m_LastEnhColorTrc = frameColorTrc;
@@ -2814,11 +2840,6 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
         } else if (m_VideoEnhancement->isVendorIntel()) {
             enableIntelVideoSuperResolution();
         }
-        if (m_Amf.isInitialized() && !m_Amf.setSharpness(2.00)) {
-            SDL_LogError(
-                SDL_LOG_CATEGORY_APPLICATION,
-                "AMF sharpness update failed for Rec. 2020; AMF upscaling is no longer active");
-        }
         break;
     }
 
@@ -2839,11 +2860,34 @@ void D3D11VARenderer::prepareEnhancedOutput(AVFrame* frame)
         } else if (m_VideoEnhancement->isVendorIntel()) {
             enableIntelVideoSuperResolution(false);
         }
-        if (m_Amf.isInitialized() && !m_Amf.setSharpness(m_AmfUpScalerSharpness ? 0.30 : 2.00)) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                         "AMF sharpness update failed; AMF upscaling is no longer active");
-        }
     }
+    return true;
+}
+
+bool D3D11VARenderer::rebuildVideoProcessorFallback(AVFrame* frame)
+{
+    // AMF has already reset. Its output-sized YUV textures and views cannot be
+    // reused as the source-sized VP input or the RGBA VP output.
+    SDL_assert(!m_Amf.isInitialized());
+    SDL_assert(!m_BindDecoderOutputTextures);
+    m_StreamData = {};
+    m_InputView.Reset();
+    m_OutputView.Reset();
+    m_EnhancedTexture.Reset();
+    m_AmfTexture.Reset();
+    m_VideoTextureResourceViews.clear();
+    m_VideoTexture.Reset();
+    m_VideoVertexBuffer.Reset();
+
+    if (!m_VideoProcessor && !createVideoProcessor()) {
+        return false;
+    }
+    auto* framesContext = reinterpret_cast<AVHWFramesContext*>(frame->hw_frames_ctx->data);
+    if (!setupVideoTexture(framesContext) || !setupEnhancedTexture() ||
+        !initializeVideoProcessor()) {
+        return false;
+    }
+    return true;
 }
 
 bool D3D11VARenderer::setupAmfTexture()

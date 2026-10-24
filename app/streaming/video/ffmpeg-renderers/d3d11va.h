@@ -62,7 +62,8 @@ private:
     bool enableAMDHDR(bool activate = true, bool logInfo = true);
     bool enableIntelHDR(bool activate = true, bool logInfo = true);
     bool enableNvidiaHDR(bool activate = true, bool logInfo = true);
-    void prepareEnhancedOutput(AVFrame* frame);
+    bool prepareEnhancedOutput(AVFrame* frame);
+    bool rebuildVideoProcessorFallback(AVFrame* frame);
     bool setupAmfTexture();
     bool setupEnhancedTexture();
     int getAdapterIndexByEnhancementCapabilities();
@@ -116,6 +117,7 @@ private:
     VideoEnhancement* m_VideoEnhancement;
     bool m_AutoStreamSuperResolution = false;
     bool m_VideoProcessorOutputRGBA = false;
+    bool m_RenderResetPending = false;
 
     DECODER_PARAMETERS m_DecoderParams;
     DXGI_FORMAT m_TextureFormat;

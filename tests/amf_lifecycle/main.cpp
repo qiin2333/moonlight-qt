@@ -141,7 +141,12 @@ void testReconfigurationAndFrameFailures(const QString& library, const QString& 
         QFile::remove(log);
         setMode(nullptr);
         AmfSession session(library);
-        require(session.initialize(parameters()), "session setup failed");
+        auto config = parameters();
+        config.width = 1920;
+        config.height = 1080;
+        config.outputWidth = 1280;
+        config.outputHeight = 720;
+        require(session.initialize(config), "downscale session setup failed");
         setMode(stage);
         require(!session.setSharpness(2.0) && !session.isInitialized(),
                 "failed reconfiguration retained an active session");
