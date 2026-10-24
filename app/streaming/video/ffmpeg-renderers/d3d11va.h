@@ -6,7 +6,7 @@
 #include <dxgi1_6.h>
 #include <CGuid.h>
 #include "streaming/video/videoenhancement.h"
-#include "public/common/AMFFactory.h"
+#include "amfsession.h"
 
 extern "C" {
 #include <libavutil/hwcontext_d3d11va.h>
@@ -62,7 +62,8 @@ private:
     bool enableAMDHDR(bool activate = true, bool logInfo = true);
     bool enableIntelHDR(bool activate = true, bool logInfo = true);
     bool enableNvidiaHDR(bool activate = true, bool logInfo = true);
-    void prepareEnhancedOutput(AVFrame* frame);
+    bool prepareEnhancedOutput(AVFrame* frame);
+    bool rebuildVideoProcessorFallback(AVFrame* frame);
     bool setupAmfTexture();
     bool setupEnhancedTexture();
     int getAdapterIndexByEnhancementCapabilities();
@@ -116,6 +117,7 @@ private:
     VideoEnhancement* m_VideoEnhancement;
     bool m_AutoStreamSuperResolution = false;
     bool m_VideoProcessorOutputRGBA = false;
+    bool m_RenderResetPending = false;
 
     DECODER_PARAMETERS m_DecoderParams;
     DXGI_FORMAT m_TextureFormat;
@@ -157,12 +159,7 @@ private:
     AVBufferRef* m_HwDeviceContext;
 
     // AMD (AMF)
-    amf::AMFContextPtr m_AmfContext;
-    amf::AMFSurfacePtr m_AmfSurface;
-    amf::AMFDataPtr m_AmfData;
-    amf::AMFComponent* m_AmfUpScaler;
-    bool m_AmfInitialized = false;
+    AmfSession m_Amf;
     bool m_AmfUpScalerSharpness = false;
-    amf::AMF_SURFACE_FORMAT m_AmfUpScalerSurfaceFormat;
 };
 
