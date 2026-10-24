@@ -261,6 +261,8 @@ jobs:
         rem 剪贴板回归使用 offscreen GUI 和本地 TLS，其余为独立逻辑测试。
         call scripts\run-test.bat cursor_shape_classification cursor_shape_classification
         if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat reconnect_video_callbacks reconnect_video_callbacks
+        if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat clipboard_payload_routing clipboard_payload_routing
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat clipboard_helper_lifecycle clipboard_helper_lifecycle
