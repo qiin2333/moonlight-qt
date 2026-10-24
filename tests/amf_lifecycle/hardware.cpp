@@ -2,25 +2,20 @@
 #include <dxgi1_2.h>
 #include <wrl/client.h>
 
-#include "streaming/video/ffmpeg-renderers/amfresources.h"
-#include "streaming/video/ffmpeg-renderers/amfruntime.h"
-#include "public/include/components/HQScaler.h"
+#include "streaming/video/ffmpeg-renderers/amfsession.h"
 
 #include <iostream>
+#include <vector>
 
 using Microsoft::WRL::ComPtr;
-using Resources = AmfResources<AmfRuntime, amf::AMFContextPtr, amf::AMFComponentPtr,
-                               amf::AMFSurfacePtr, amf::AMFDataPtr, amf::AMFCapsPtr>;
 
-// Optional integration with the installed AMD driver; CI uses deterministic
-// lifecycle tests. The D3D device deliberately outlives every AMF resource.
+// Optional integration through the same public session API as the renderer.
 bool testAmfHardware()
 {
     ComPtr<IDXGIFactory1> factory;
     if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
         return false;
     }
-
     int adaptersTested = 0;
     ComPtr<IDXGIAdapter1> adapter;
     for (UINT index = 0; factory->EnumAdapters1(index, adapter.ReleaseAndGetAddressOf()) == S_OK;
@@ -29,65 +24,65 @@ bool testAmfHardware()
         if (FAILED(adapter->GetDesc1(&desc)) || desc.VendorId != 0x1002) {
             continue;
         }
-
         ComPtr<ID3D11Device> device;
+        ComPtr<ID3D11DeviceContext> context;
         if (FAILED(D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
                                      D3D11_CREATE_DEVICE_VIDEO_SUPPORT, nullptr, 0,
-                                     D3D11_SDK_VERSION, &device, nullptr, nullptr))) {
+                                     D3D11_SDK_VERSION, &device, nullptr, &context))) {
             return false;
         }
-
-        for (int cycle = 0; cycle < 5; ++cycle) {
-            const auto format = cycle >= 3 ? amf::AMF_SURFACE_P010 : amf::AMF_SURFACE_NV12;
-            Resources resources;
-            if (!resources.runtime.load()) {
+        for (bool tenBit : { false, true }) {
+            AmfSession::Parameters config;
+            config.device = device.Get();
+            config.width = 1280;
+            config.height = 720;
+            config.outputWidth = 1920;
+            config.outputHeight = 1080;
+            config.tenBit = tenBit;
+            AmfSession session;
+            if (!session.probe(config) || session.isInitialized() || !session.initialize(config)) {
+                std::cerr << "hardware probe/activation failed" << std::endl;
                 return false;
             }
-            auto* amfFactory = resources.runtime.factory();
-            if (amfFactory->CreateContext(&resources.context) != AMF_OK ||
-                resources.context->InitDX11(device.Get()) != AMF_OK) {
+            D3D11_TEXTURE2D_DESC texture = {};
+            texture.Width = config.width;
+            texture.Height = config.height;
+            texture.MipLevels = 1;
+            texture.ArraySize = 1;
+            texture.Format = tenBit ? DXGI_FORMAT_P010 : DXGI_FORMAT_NV12;
+            texture.SampleDesc.Count = 1;
+            texture.Usage = D3D11_USAGE_DEFAULT;
+            texture.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+            texture.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+            const UINT pitch = config.width * (tenBit ? 2 : 1);
+            std::vector<unsigned char> pixels(pitch * config.height * 3 / 2, 0);
+            D3D11_SUBRESOURCE_DATA initial = { pixels.data(), pitch, 0 };
+            ComPtr<ID3D11Texture2D> input;
+            ComPtr<ID3D11Texture2D> output;
+            if (FAILED(device->CreateTexture2D(&texture, &initial, &input))) {
                 return false;
             }
-            // Real failure after partial initialization must unload cleanly.
-            if (cycle == 0) {
-                if (amfFactory->CreateComponent(resources.context, L"MoonlightInvalidComponent",
-                                                &resources.upScaler) == AMF_OK) {
+            texture.Width = config.outputWidth;
+            texture.Height = config.outputHeight;
+            if (FAILED(device->CreateTexture2D(&texture, nullptr, &output))) {
+                return false;
+            }
+            for (double sharpness : { 2.0, 0.30 }) {
+                {
+                    AmfSession probe;
+                    if (!probe.probe(config)) {
+                        return false;
+                    }
+                }
+                if (!session.setSharpness(sharpness) ||
+                    !session.render(input.Get(), output.Get(), context.Get())) {
+                    std::cerr << "hardware reconfiguration/frame copy failed, tenBit=" << tenBit
+                              << std::endl;
                     return false;
                 }
-                resources.reset();
-                resources.reset();
-                continue;
             }
-
-            if (amfFactory->CreateComponent(resources.context, AMFHQScaler, &resources.upScaler) !=
-                    AMF_OK ||
-                resources.upScaler->GetCaps(&resources.caps) != AMF_OK || !resources.caps ||
-                resources.caps->GetAccelerationType() == amf::AMF_ACCEL_NOT_SUPPORTED ||
-                resources.context->AllocSurface(amf::AMF_MEMORY_DX11, format, 1280, 720,
-                                                &resources.surface) != AMF_OK) {
-                return false;
-            }
-            if (resources.upScaler->SetProperty(AMF_HQ_SCALER_OUTPUT_SIZE,
-                                                AMFConstructSize(1920, 1080)) != AMF_OK ||
-                resources.upScaler->SetProperty(AMF_HQ_SCALER_ENGINE_TYPE, amf::AMF_MEMORY_DX11) !=
-                    AMF_OK ||
-                resources.upScaler->SetProperty(AMF_HQ_SCALER_ALGORITHM,
-                                                AMF_HQ_SCALER_ALGORITHM_VIDEOSR1_0) != AMF_OK ||
-                resources.upScaler->Init(format, 1280, 720) != AMF_OK) {
-                return false;
-            }
-            if (resources.surface->QueryInterface(
-                    amf::AMFData::IID(), reinterpret_cast<void**>(&resources.data)) != AMF_OK) {
-                return false;
-            }
-            if (cycle % 2 == 1) {
-                // Successful capability probe: caps are still live at reset.
-                resources.reset();
-                resources.reset();
-            } else {
-                resources.initialized = true;
-                // Active-stream resources are released by the destructor.
-            }
+            session.reset();
+            session.reset();
         }
         ++adaptersTested;
     }

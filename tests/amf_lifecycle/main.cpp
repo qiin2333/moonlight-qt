@@ -1,17 +1,15 @@
-#include "streaming/video/ffmpeg-renderers/amfresources.h"
-#include "streaming/video/ffmpeg-renderers/amfruntime.h"
+#include "streaming/video/ffmpeg-renderers/amfsession.h"
 
 #include <QCoreApplication>
-#include <QDebug>
+#include <QFile>
 #include <QStringList>
-
-#include <memory>
-#include <iostream>
-
-#ifdef Q_OS_WIN
+#include <QTemporaryDir>
 #include <windows.h>
+
+#include <iostream>
+#include <type_traits>
+
 bool testAmfHardware();
-#endif
 
 namespace {
 int failures = 0;
@@ -19,246 +17,194 @@ int failures = 0;
 void require(bool condition, const QString& message)
 {
     if (!condition) {
-        qCritical().noquote() << message;
+        std::cerr << qPrintable(message) << std::endl;
         ++failures;
     }
 }
 
-struct State
+AmfSession::Parameters parameters()
 {
-    int loaderReferences = 0;
-    int liveObjects = 0;
-    QStringList events;
-};
-
-struct Runtime
-{
-    std::shared_ptr<State> state = std::make_shared<State>();
-    bool loaded = false;
-
-    void load()
-    {
-        if (!loaded) {
-            loaded = true;
-            ++state->loaderReferences;
-            state->events << "load";
-        }
-    }
-
-    void unload()
-    {
-        if (loaded) {
-            loaded = false;
-            if (--state->loaderReferences == 0) {
-                require(state->liveObjects == 0, "DLL unloaded with live AMF interfaces");
-            }
-            state->events << "unload";
-        }
-    }
-};
-
-// Use the real SDK smart pointer so its operator& and Release behavior are
-// exercised; the interfaces check that every call precedes DLL unloading.
-class Interface
-{
-public:
-    Interface(State& state, const QString& name) : m_State(state), m_Name(name)
-    {
-        ++m_State.liveObjects;
-    }
-
-    amf_long Acquire()
-    {
-        checkLoaded();
-        return ++m_References;
-    }
-
-    amf_long Release()
-    {
-        checkLoaded();
-        m_State.events << m_Name + ".release";
-        const auto references = --m_References;
-        if (references == 0) {
-            --m_State.liveObjects;
-            delete this;
-        }
-        return references;
-    }
-
-    void Terminate()
-    {
-        checkLoaded();
-        m_State.events << m_Name + ".terminate";
-    }
-
-private:
-    void checkLoaded()
-    {
-        require(m_State.loaderReferences > 0, m_Name + " called after DLL unload");
-    }
-
-    State& m_State;
-    QString m_Name;
-    amf_long m_References = 1;
-};
-
-using Ptr = amf::AMFInterfacePtr_T<Interface>;
-using Resources = AmfResources<Runtime, Ptr, Ptr, Ptr, Ptr, Ptr>;
-
-void populate(Resources& resources, int stage)
-{
-    resources.runtime.load();
-    auto& state = *resources.runtime.state;
-    Ptr* interfaceSlots[] = { std::addressof(resources.context), std::addressof(resources.upScaler),
-                              std::addressof(resources.caps), std::addressof(resources.surface),
-                              std::addressof(resources.data) };
-    const char* names[] = { "context", "scaler", "caps", "surface", "data" };
-    for (int i = 0; i < stage; ++i) {
-        Interface** slot = &(*interfaceSlots[i]);
-        *slot = new Interface(state, QString::fromLatin1(names[i]));
-    }
+    AmfSession::Parameters result;
+    // The fixture accepts an opaque D3D handle and never dereferences it.
+    result.device = reinterpret_cast<ID3D11Device*>(1);
+    result.width = 1280;
+    result.height = 720;
+    result.outputWidth = 1920;
+    result.outputHeight = 1080;
+    return result;
 }
 
-void testPartialInitialization()
+void setMode(const wchar_t* mode)
 {
-    // Failure after runtime load, context/component creation, GetCaps,
-    // AllocSurface, or after obtaining an output frame.
-    for (int stage = 0; stage <= 5; ++stage) {
-        Resources resources;
-        populate(resources, stage);
-        resources.reset();
-        auto& state = *resources.runtime.state;
-        require(state.liveObjects == 0, QString("failure stage %1 leaked interfaces").arg(stage));
-        require(state.loaderReferences == 0, "failure leaked a runtime reference");
-        require(!resources.initialized, "failure retained initialized state");
-        const auto events = state.events;
-        resources.reset();
-        require(state.events == events, "cleanup was not idempotent");
-    }
+    SetEnvironmentVariableW(L"MOONLIGHT_AMF_FIXTURE_MODE", mode);
 }
 
-void testProbeAndActiveDestruction()
+QStringList events(const QString& path)
 {
-    for (bool activate : { false, true }) {
-        std::shared_ptr<State> state;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    return QString::fromUtf8(file.readAll()).split('\n', Qt::SkipEmptyParts);
+}
+
+void requireUnloaded(const QString& path)
+{
+    require(GetModuleHandleW(L"amf_runtime_fixture.dll") == nullptr, "session retained the DLL");
+    const auto log = events(path);
+    require(!log.isEmpty() && log.last() == "unload:0",
+            "DLL unloaded with live interfaces: " + log.join(','));
+}
+
+void testFailures(const QString& library, const QString& log)
+{
+    for (const auto* stage : { L"init", L"nullfactory", L"context", L"nullcontext", L"dx11",
+                               L"component", L"nullcomponent", L"caps", L"nullcaps", L"unsupported",
+                               L"surface", L"nullsurface", L"property", L"scalerinit" }) {
+        QFile::remove(log);
+        setMode(stage);
+        AmfSession session(library);
+        require(!session.initialize(parameters()) && !session.isInitialized(),
+                "initialization accepted failure at " + QString::fromWCharArray(stage));
+        requireUnloaded(log);
+        const auto before = events(log);
+        session.reset();
+        session.reset();
+        require(events(log) == before, "repeated cleanup called released interfaces");
+        require(!session.probe(parameters()), "probe accepted a failing SDK stage");
+        requireUnloaded(log);
+        setMode(nullptr);
+        require(session.probe(parameters()),
+                "session could not recover after initialization failure");
+        require(!session.isInitialized(), "probe left an active session");
+        requireUnloaded(log);
+    }
+    setMode(nullptr);
+}
+
+void testProbeAndFrames(const QString& library, const QString& log)
+{
+    QFile::remove(log);
+    {
+        AmfSession session(library);
+        auto config = parameters();
+        for (bool tenBit : { false, true }) {
+            config.tenBit = tenBit;
+            require(session.probe(config), "capability probe failed");
+            require(!session.isInitialized(), "successful probe retained active state");
+            requireUnloaded(log);
+        }
+        require(events(log).contains("nv12") && events(log).contains("p010"),
+                "format selection was lost");
+        require(session.initialize(config), "session activation failed");
+        require(session.setSharpness(2.0), "sharpness reconfiguration failed");
+        // The C fixture deliberately has no output plane: the session must reject
+        // it before invoking D3D. Data/output references remain owned until reset.
+        require(!session.render(reinterpret_cast<ID3D11Texture2D*>(1),
+                                reinterpret_cast<ID3D11Texture2D*>(2),
+                                reinterpret_cast<ID3D11DeviceContext*>(3)),
+                "missing output plane was accepted");
+    }
+    requireUnloaded(log);
+    const QStringList cleanup = { "caps.release",      "data.release",     "output.release",
+                                  "surface.release",   "scaler.terminate", "scaler.release",
+                                  "context.terminate", "context.release",  "unload:0" };
+    const auto actual = events(log);
+    require(actual.mid(actual.size() - cleanup.size()) == cleanup,
+            "session destruction order changed");
+}
+
+void testIndependentSessions(const QString& library, const QString& log)
+{
+    QFile::remove(log);
+    {
+        AmfSession active(library);
+        require(active.initialize(parameters()), "active session failed");
         {
-            Resources resources;
-            populate(resources, 5);
-            state = resources.runtime.state;
-            if (activate) {
-                resources.initialized = true;
-            } else {
-                resources.reset();
-                require(state->liveObjects == 0, "successful probe retained interfaces");
-                // Multiple adapters are probed before activating a stream.
-                populate(resources, 5);
-                resources.reset();
-                populate(resources, 5);
-                resources.initialized = true;
-            }
+            AmfSession unused(library);
         }
-        require(state->liveObjects == 0 && state->loaderReferences == 0,
-                "destructor leaked AMF state");
-        const QStringList cleanup = { "caps.release",     "data.release",   "surface.release",
-                                      "scaler.terminate", "scaler.release", "context.terminate",
-                                      "context.release",  "unload" };
-        require(state->events.mid(state->events.size() - cleanup.size()) == cleanup,
-                "AMF interfaces were destroyed in the wrong order");
-    }
-}
-
-void testIndependentRenderers()
-{
-    Resources active;
-    populate(active, 5);
-    auto& state = *active.runtime.state;
-    {
-        Resources unused;
-        unused.runtime.state = active.runtime.state;
-    }
-    require(state.loaderReferences == 1, "unused renderer unloaded active runtime");
-    {
-        Resources probe;
-        probe.runtime.state = active.runtime.state;
-        populate(probe, 5);
-    }
-    require(state.loaderReferences == 1 && state.liveObjects == 5,
-            "probe destroyed another renderer's runtime or objects");
-    active.reset();
-}
-
-void testRuntimeLoadFailures()
-{
-    AmfRuntime missing(QStringLiteral("moonlight-missing-amf-runtime-for-test.dll"));
-    require(!missing.load() && !missing.factory(), "missing DLL was accepted");
-    missing.unload();
-    missing.unload();
-#ifdef Q_OS_WIN
-    AmfRuntime noEntryPoint(QStringLiteral("kernel32.dll"));
-    require(!noEntryPoint.load() && !noEntryPoint.factory(), "DLL without AMFInit was accepted");
-    require(!noEntryPoint.load(), "missing-entry-point retry retained invalid factory");
-    noEntryPoint.unload();
-#endif
-}
-
-#ifdef Q_OS_WIN
-void testRuntimeOwnership()
-{
-    const auto fileName = QCoreApplication::applicationDirPath() + "/amf_runtime_fixture.dll";
-    const auto loaded = [] {
-        return GetModuleHandleW(L"amf_runtime_fixture.dll") != nullptr;
-    };
-    for (const auto* mode : { L"fail", L"null" }) {
-        SetEnvironmentVariableW(L"MOONLIGHT_AMF_FIXTURE_MODE", mode);
-        AmfRuntime runtime(fileName);
-        require(!runtime.load() && !runtime.factory(), "invalid AMFInit result was accepted");
-        require(!loaded(), "failed AMFInit leaked its DLL reference");
-        require(!runtime.load() && !loaded(), "AMFInit failure retry leaked its DLL reference");
-    }
-    SetEnvironmentVariableW(L"MOONLIGHT_AMF_FIXTURE_MODE", nullptr);
-    {
-        AmfRuntime active(fileName);
-        require(active.load() && active.factory(), "fixture runtime failed to load");
-        require(active.load(), "repeated runtime load failed");
         {
-            AmfRuntime unused(fileName);
+            AmfSession probe(library);
+            require(probe.probe(parameters()), "second session probe failed");
         }
-        require(loaded(), "unused runtime unloaded another owner's DLL");
-        {
-            AmfRuntime probe(fileName);
-            require(probe.load(), "second runtime owner failed to load");
-        }
-        require(loaded(), "probe unloaded another owner's DLL");
-        if (active.factory()) {
-            require(QString::fromWCharArray(active.factory()->GetCacheFolder()) == "fixture",
-                    "surviving runtime factory is invalid");
-        }
-        active.unload();
-        require(!loaded(), "repeated load acquired an extra DLL reference");
-        require(active.load(), "runtime reload after cleanup failed");
+        require(active.isInitialized() && active.setSharpness(2.0),
+                "another session invalidated the active owner");
+        require(!events(log).contains("unload:0"), "another session unloaded the active DLL");
+        require(active.initialize(parameters()), "repeated activation failed");
     }
-    require(!loaded(), "runtime destructor leaked its DLL reference");
+    requireUnloaded(log);
 }
-#endif
+
+void testReconfigurationAndFrameFailures(const QString& library, const QString& log)
+{
+    for (const auto* stage : { L"flush", L"terminate", L"property", L"scalerinit" }) {
+        QFile::remove(log);
+        setMode(nullptr);
+        AmfSession session(library);
+        require(session.initialize(parameters()), "session setup failed");
+        setMode(stage);
+        require(!session.setSharpness(2.0) && !session.isInitialized(),
+                "failed reconfiguration retained an active session");
+        requireUnloaded(log);
+    }
+    for (const auto* stage :
+         { L"wrap", L"submit", L"query", L"nulloutput", L"flush", L"querysurface" }) {
+        QFile::remove(log);
+        setMode(nullptr);
+        {
+            AmfSession session(library);
+            require(session.initialize(parameters()), "frame session setup failed");
+            setMode(stage);
+            require(!session.render(reinterpret_cast<ID3D11Texture2D*>(1),
+                                    reinterpret_cast<ID3D11Texture2D*>(2),
+                                    reinterpret_cast<ID3D11DeviceContext*>(3)),
+                    "invalid frame output was accepted");
+        }
+        requireUnloaded(log);
+    }
+    setMode(nullptr);
+}
+
+void testInvalidInputs()
+{
+    for (const auto& name : { QStringLiteral("moonlight-missing-amf-runtime-for-test.dll"),
+                              QStringLiteral("kernel32.dll") }) {
+        AmfSession session(name);
+        require(!session.initialize(parameters()), "invalid runtime was accepted");
+        require(!session.probe(parameters()), "invalid runtime probe was accepted");
+        session.reset();
+    }
+    AmfSession inactive;
+    require(!inactive.setSharpness(2.0) && !inactive.render(nullptr, nullptr, nullptr),
+            "inactive session accepted work");
+    require(!inactive.initialize({}), "invalid parameters were accepted");
+}
 } // namespace
 
 int main(int argc, char** argv)
 {
+    static_assert(!std::is_copy_constructible_v<AmfSession>);
     QCoreApplication app(argc, argv);
-    testPartialInitialization();
-    testProbeAndActiveDestruction();
-    testIndependentRenderers();
-    testRuntimeLoadFailures();
-#ifdef Q_OS_WIN
-    testRuntimeOwnership();
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    QTemporaryDir directory;
+    if (!directory.isValid()) {
+        return 1;
+    }
+    const auto library = QCoreApplication::applicationDirPath() + "/amf_runtime_fixture.dll";
+    const auto log = directory.filePath("lifecycle.log");
+    SetEnvironmentVariableW(L"MOONLIGHT_AMF_FIXTURE_LOG",
+                            reinterpret_cast<const wchar_t*>(log.utf16()));
+    testFailures(library, log);
+    testProbeAndFrames(library, log);
+    testIndependentSessions(library, log);
+    testReconfigurationAndFrameFailures(library, log);
+    testInvalidInputs();
+    SetEnvironmentVariableW(L"MOONLIGHT_AMF_FIXTURE_LOG", nullptr);
     if (app.arguments().contains(QStringLiteral("--hardware"))) {
         require(testAmfHardware(), "AMF hardware integration test failed");
     }
-#endif
-    if (failures == 0) {
-        std::cout << "AMF lifecycle regression tests passed" << std::endl;
-    } else {
-        std::cerr << failures << " AMF lifecycle checks failed" << std::endl;
-    }
+    std::cout << (failures ? "AMF session regression tests failed: "
+                           : "AMF session regression tests passed: ")
+              << failures << std::endl;
     return failures == 0 ? 0 : 1;
 }
