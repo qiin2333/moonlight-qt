@@ -553,6 +553,8 @@ win32:!winrt {
     HEADERS += \
         streaming/video/ffmpeg-renderers/dxva2.h \
         streaming/video/ffmpeg-renderers/d3d11va.h \
+        streaming/video/ffmpeg-renderers/amfresources.h \
+        streaming/video/ffmpeg-renderers/amfruntime.h \
         streaming/video/ffmpeg-renderers/pacer/dxvsyncsource.h
 }
 win32:!winrt {

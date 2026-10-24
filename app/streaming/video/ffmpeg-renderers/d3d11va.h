@@ -6,7 +6,8 @@
 #include <dxgi1_6.h>
 #include <CGuid.h>
 #include "streaming/video/videoenhancement.h"
-#include "public/common/AMFFactory.h"
+#include "amfresources.h"
+#include "amfruntime.h"
 
 extern "C" {
 #include <libavutil/hwcontext_d3d11va.h>
@@ -157,11 +158,9 @@ private:
     AVBufferRef* m_HwDeviceContext;
 
     // AMD (AMF)
-    amf::AMFContextPtr m_AmfContext;
-    amf::AMFSurfacePtr m_AmfSurface;
-    amf::AMFDataPtr m_AmfData;
-    amf::AMFComponent* m_AmfUpScaler;
-    bool m_AmfInitialized = false;
+    AmfResources<AmfRuntime, amf::AMFContextPtr, amf::AMFComponentPtr, amf::AMFSurfacePtr,
+                 amf::AMFDataPtr, amf::AMFCapsPtr>
+        m_Amf;
     bool m_AmfUpScalerSharpness = false;
     amf::AMF_SURFACE_FORMAT m_AmfUpScalerSurfaceFormat;
 };
