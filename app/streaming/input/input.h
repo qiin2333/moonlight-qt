@@ -2,7 +2,6 @@
 
 #include "settings/streamingpreferences.h"
 #include "streaming/input/gamepadglyphs.h"
-#include "streaming/input/gamepadsensorrate.h"
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
 #include "streaming/waylandwindowmetrics.h"
 #endif
@@ -59,14 +58,11 @@ struct GamepadState {
     bool emulatedClickpadButtonDown;
 
 #if SDL_VERSION_ATLEAST(2, 0, 14)
-    GamepadSensorRate::PeriodMs gyroReportPeriodMs;
-    float lastGyroEventData[SDL_arraysize(SDL_ControllerSensorEvent::data)];
-    uint32_t lastGyroEventTime;
-
-    GamepadSensorRate::PeriodMs accelReportPeriodMs;
-    float lastAccelEventData[SDL_arraysize(SDL_ControllerSensorEvent::data)];
-    uint32_t lastAccelEventTime;
+    // Actual local subscriptions, separate from the common sender's host demand.
+    bool gyroSensorEnabled;
+    bool accelSensorEnabled;
 #endif
+
 
     int buttons;
     short lsX, lsY;
