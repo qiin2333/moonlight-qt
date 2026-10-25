@@ -35,7 +35,7 @@ static bool reject=false, overrideDisabled=false;
 int LiSendControllerMotionEvent(uint8_t, uint8_t type, float x, float y, float z) {
     sent.push_back({type,x,y,z});return reject ? -1 : 0;
 }
-int LiStopControllerMotionEvent(uint8_t, bool) {stops++;return 0;}
+int LiStopControllerMotionEvent(uint8_t) {stops++;return 0;}
 void SDL_LogWarn(int,const char*,...) {}
 int SDL_GameControllerSetSensorEnabled(SDL_GameController*,int,int) {return 0;}
 namespace Utils {

@@ -1155,7 +1155,7 @@ void SdlInputHandler::setMotionEventState(uint16_t controllerNumber, uint8_t mot
                                                    reportRateHz ? SDL_TRUE : SDL_FALSE) == 0 &&
                 reportRateHz > 0;
             if (!m_GamepadState[controllerNumber].gyroSensorEnabled)
-                LiStopControllerMotionEvent((uint8_t)controllerNumber, false);
+                LiStopControllerMotionEvent((uint8_t)controllerNumber);
             break;
         }
     }
