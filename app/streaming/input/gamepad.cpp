@@ -606,17 +606,17 @@ void SdlInputHandler::handleControllerSensorEvent(SDL_ControllerSensorEvent* eve
     // SDL cannot set the hardware sampling rate; preserve its callback cadence.
     switch (event->sensor) {
     case SDL_SENSOR_ACCEL:
-        if (state->accelSensorEnabled) LiSendControllerMotionEvent((uint8_t)state->index, LI_MOTION_TYPE_ACCEL,
-                                    event->data[0], event->data[1], event->data[2]);
+        if (state->accelSensorEnabled)
+            LiSendControllerMotionEvent((uint8_t)state->index, LI_MOTION_TYPE_ACCEL, event->data[0],
+                                        event->data[1], event->data[2]);
         break;
     case SDL_SENSOR_GYRO:
-        if (state->gyroSensorEnabled) LiSendControllerMotionEvent((uint8_t)state->index, LI_MOTION_TYPE_GYRO,
-                                    event->data[0] * 57.2957795f,
-                                    event->data[1] * 57.2957795f,
-                                    event->data[2] * 57.2957795f);
+        if (state->gyroSensorEnabled)
+            LiSendControllerMotionEvent((uint8_t)state->index, LI_MOTION_TYPE_GYRO,
+                                        event->data[0] * 57.2957795f, event->data[1] * 57.2957795f,
+                                        event->data[2] * 57.2957795f);
         break;
     }
-
 }
 
 void SdlInputHandler::handleControllerTouchpadEvent(SDL_ControllerTouchpadEvent* event)
@@ -972,7 +972,7 @@ void SdlInputHandler::handleControllerDeviceEvent(SDL_ControllerDeviceEvent* eve
             // Preserve demand for the reserved single-player host slot, but retire
             // all samples from the departing physical source before publishing removal.
             LiResetControllerMotionEvents((uint8_t)state->index,
-                (m_GamepadMask & (1 << state->index)) == 0);
+                                          (m_GamepadMask & (1 << state->index)) == 0);
 
             // Send a final event to let the PC know this gamepad is gone
             if (notifyHost) {
@@ -1143,14 +1143,19 @@ void SdlInputHandler::setMotionEventState(uint16_t controllerNumber, uint8_t mot
         case LI_MOTION_TYPE_ACCEL:
             m_GamepadState[controllerNumber].accelSensorEnabled =
                 SDL_GameControllerSetSensorEnabled(m_GamepadState[controllerNumber].controller,
-                    SDL_SENSOR_ACCEL, reportRateHz ? SDL_TRUE : SDL_FALSE) == 0 && reportRateHz > 0;
+                                                   SDL_SENSOR_ACCEL,
+                                                   reportRateHz ? SDL_TRUE : SDL_FALSE) == 0 &&
+                reportRateHz > 0;
             break;
 
         case LI_MOTION_TYPE_GYRO:
             m_GamepadState[controllerNumber].gyroSensorEnabled =
                 SDL_GameControllerSetSensorEnabled(m_GamepadState[controllerNumber].controller,
-                    SDL_SENSOR_GYRO, reportRateHz ? SDL_TRUE : SDL_FALSE) == 0 && reportRateHz > 0;
-            if (!m_GamepadState[controllerNumber].gyroSensorEnabled) LiStopControllerMotionEvent((uint8_t)controllerNumber, false);
+                                                   SDL_SENSOR_GYRO,
+                                                   reportRateHz ? SDL_TRUE : SDL_FALSE) == 0 &&
+                reportRateHz > 0;
+            if (!m_GamepadState[controllerNumber].gyroSensorEnabled)
+                LiStopControllerMotionEvent((uint8_t)controllerNumber, false);
             break;
         }
     }

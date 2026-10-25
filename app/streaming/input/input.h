@@ -63,7 +63,6 @@ struct GamepadState {
     bool accelSensorEnabled;
 #endif
 
-
     int buttons;
     short lsX, lsY;
     short rsX, rsY;
