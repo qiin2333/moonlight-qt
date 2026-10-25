@@ -11,11 +11,11 @@ struct Coordinates
     float chromaVMax;
 };
 
-inline Coordinates calculate(int frameWidth, int frameHeight, int textureWidth,
-                             int textureHeight, bool enhancedOutput)
+inline Coordinates calculate(int frameWidth, int frameHeight, int textureWidth, int textureHeight,
+                             bool enhancedOutput)
 {
     if (enhancedOutput) {
-        return {1.0f, 1.0f, 1.0f, 1.0f};
+        return { 1.0f, 1.0f, 1.0f, 1.0f };
     }
 
     return {

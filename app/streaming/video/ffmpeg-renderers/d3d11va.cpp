@@ -1138,8 +1138,8 @@ void D3D11VARenderer::bindColorConversion(bool frameChanged, AVFrame* frame)
     constBuf.hlgMode = (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) ? 1.0f : 0.0f;
 
     // Limit chroma texcoords to avoid sampling from alignment texels
-    const auto sampling = VideoTextureSampling::calculate(
-        frame->width, frame->height, textureWidth, textureHeight, m_Amf.isInitialized());
+    const auto sampling = VideoTextureSampling::calculate(frame->width, frame->height, textureWidth,
+                                                          textureHeight, m_Amf.isInitialized());
     constBuf.chromaUVMax[0] = sampling.chromaUMax;
     constBuf.chromaUVMax[1] = sampling.chromaVMax;
 
@@ -1435,8 +1435,8 @@ bool D3D11VARenderer::notifyWindowChanged(PWINDOW_STATE_CHANGE_INFO stateInfo)
         // Enhancement resources (AMF scaler, VP rectangles and output textures)
         // are sized during initialization. Let Session recreate them together,
         // rather than resizing only the swapchain and stretching stale output.
-        if (m_VideoEnhancement->isVideoEnhancementEnabled() &&
-            stateInfo->width > 0 && stateInfo->height > 0 &&
+        if (m_VideoEnhancement->isVideoEnhancementEnabled() && stateInfo->width > 0 &&
+            stateInfo->height > 0 &&
             (stateInfo->width != m_DisplayWidth || stateInfo->height != m_DisplayHeight)) {
             return false;
         }
