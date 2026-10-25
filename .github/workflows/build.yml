@@ -271,6 +271,8 @@ jobs:
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat amf_lifecycle amf_lifecycle
         if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat video_texture_sampling video_texture_sampling
+        if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat file_mapping_transport file_mapping_transport
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat file_mapping_mirror_e2e file_mapping_mirror_e2e
