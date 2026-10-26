@@ -3,6 +3,7 @@
 
 #include "d3d11va.h"
 #include "dxutil.h"
+#include "videotexturesampling.h"
 #include "path.h"
 #include "utils.h"
 
@@ -1021,18 +1022,12 @@ void D3D11VARenderer::bindVideoVertexBuffer(bool frameChanged, AVFrame* frame)
         SDL_FRect renderRect;
         StreamUtils::screenSpaceToNormalizedDeviceCoords(&dst, &renderRect, m_DisplayWidth, m_DisplayHeight);
 
-        float uMax, vMax;
-        if (m_VideoProcessorOutputRGBA) {
-            // VP RGBA output: VP already scaled to m_OutputTexture dimensions,
-            // texture has no alignment padding. Sample the full texture.
-            uMax = 1.0f;
-            vMax = 1.0f;
-        } else {
-            // Don't sample from the alignment padding area
-            auto framesContext = (AVHWFramesContext*)frame->hw_frames_ctx->data;
-            uMax = (float)frame->width / framesContext->width;
-            vMax = (float)frame->height / framesContext->height;
-        }
+        auto framesContext = (AVHWFramesContext*)frame->hw_frames_ctx->data;
+        const auto sampling = VideoTextureSampling::calculate(
+            frame->width, frame->height, framesContext->width, framesContext->height,
+            m_VideoProcessorOutputRGBA || m_Amf.isInitialized());
+        const float uMax = sampling.uMax;
+        const float vMax = sampling.vMax;
 
         VERTEX verts[] =
         {
@@ -1128,17 +1123,25 @@ void D3D11VARenderer::bindColorConversion(bool frameChanged, AVFrame* frame)
 
     std::array<float, 2> chromaOffset;
     getFrameChromaCositingOffsets(frame, chromaOffset);
-    constBuf.chromaOffset[0] = chromaOffset[0] / framesContext->width;
-    constBuf.chromaOffset[1] = chromaOffset[1] / framesContext->height;
+    int textureWidth = framesContext->width;
+    int textureHeight = framesContext->height;
+    if (m_Amf.isInitialized()) {
+        D3D11_TEXTURE2D_DESC desc;
+        m_VideoTexture->GetDesc(&desc);
+        textureWidth = static_cast<int>(desc.Width);
+        textureHeight = static_cast<int>(desc.Height);
+    }
+    constBuf.chromaOffset[0] = chromaOffset[0] / textureWidth;
+    constBuf.chromaOffset[1] = chromaOffset[1] / textureHeight;
 
     // Set HLG mode flag for shader HLG→PQ EOTF conversion
     constBuf.hlgMode = (frame->color_trc == AVCOL_TRC_ARIB_STD_B67) ? 1.0f : 0.0f;
 
     // Limit chroma texcoords to avoid sampling from alignment texels
-    constBuf.chromaUVMax[0] = frame->width != framesContext->width ?
-                                  ((float)(frame->width - 1) / framesContext->width) : 1.0f;
-    constBuf.chromaUVMax[1] = frame->height != (int)framesContext->height ?
-                                  ((float)(frame->height - 1) / framesContext->height) : 1.0f;
+    const auto sampling = VideoTextureSampling::calculate(frame->width, frame->height, textureWidth,
+                                                          textureHeight, m_Amf.isInitialized());
+    constBuf.chromaUVMax[0] = sampling.chromaUMax;
+    constBuf.chromaUVMax[1] = sampling.chromaVMax;
 
     D3D11_SUBRESOURCE_DATA constData = {};
     constData.pSysMem = &constBuf;
@@ -1429,6 +1432,15 @@ bool D3D11VARenderer::notifyWindowChanged(PWINDOW_STATE_CHANGE_INFO stateInfo)
     }
 
     if (stateInfo->stateChangeFlags & WINDOW_STATE_CHANGE_SIZE) {
+        // Enhancement resources (AMF scaler, VP rectangles and output textures)
+        // are sized during initialization. Let Session recreate them together,
+        // rather than resizing only the swapchain and stretching stale output.
+        if (m_VideoEnhancement->isVideoEnhancementEnabled() && stateInfo->width > 0 &&
+            stateInfo->height > 0 &&
+            (stateInfo->width != m_DisplayWidth || stateInfo->height != m_DisplayHeight)) {
+            return false;
+        }
+
         // Resize our swapchain and reconstruct size-dependent resources
 
         DXGI_SWAP_CHAIN_DESC1 swapchainDesc;
@@ -2042,7 +2054,12 @@ bool D3D11VARenderer::setupVideoTexture(AVHWFramesContext* framesContext)
     D3D11_TEXTURE2D_DESC texDesc = {};
 
     // Size of the output texture
-    if (m_VideoEnhancement->isVideoEnhancementEnabled()) {
+    if (m_Amf.isInitialized()) {
+        // The final quad handles letterboxing. AMF produces just the image,
+        // without embedding another set of bars into the sampled texture.
+        texDesc.Width = m_OutputTexture.width;
+        texDesc.Height = m_OutputTexture.height;
+    } else if (m_VideoEnhancement->isVideoEnhancementEnabled()) {
         texDesc.Width = m_DisplayWidth;
         texDesc.Height = m_DisplayHeight;
     } else {
@@ -2632,8 +2649,8 @@ bool D3D11VARenderer::enableAMDVideoSuperResolution(bool activate, bool logInfo,
     parameters.device = device ? device : m_RenderDevice.Get();
     parameters.width = m_DecoderParams.width;
     parameters.height = m_DecoderParams.height;
-    parameters.outputWidth = m_DisplayWidth;
-    parameters.outputHeight = m_DisplayHeight;
+    parameters.outputWidth = m_OutputTexture.width;
+    parameters.outputHeight = m_OutputTexture.height;
     parameters.frameRate = m_DecoderParams.frameRate;
     parameters.tenBit = (m_DecoderParams.videoFormat & VIDEO_FORMAT_MASK_10BIT) != 0;
     parameters.sharpness = m_AmfUpScalerSharpness ? 0.30 : 2.00;
