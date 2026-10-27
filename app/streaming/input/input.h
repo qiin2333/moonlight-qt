@@ -203,7 +203,7 @@ public:
 
     void setAdaptiveTriggers(uint16_t controllerNumber, DualSenseOutputReport *report);
 
-    int getDualSenseHapticsControllerNumber() const;
+    int getDualSenseHapticsControllerNumber(SDL_JoystickID* instanceId = nullptr) const;
 
     // 提示文案用的手柄 UI 风格：取第一只已连接手柄，未连接回落 Xbox 布局
     GamepadUiStyle getGamepadUiStyle() const;

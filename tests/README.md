@@ -26,7 +26,8 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | usb_forwarding_environment | USB 转发就绪态 → 错误文案映射(--require-ready 走活探测) | Windows |
 | usb_forwarding_backend_list | moonlight-usbd `list --json` → 设备表解析 | Windows |
 | usb_forwarding_backend_sysfs | Linux sysfs 枚举 → 设备表解析（夹具目录，跳过 hub/接口/根 hub） | Linux |
-| ds5_ir_renderer | DualSense 触觉 IR 渲染 | Windows |
+| ds5_ir_renderer | DualSense IR 渲染、PCM 边界和控制报文 | Windows |
+| ds5_haptics_worker | 生产发送线程的状态顺序、阻塞写入、设备切换、停止屏障和短效果排空 | Windows |
 | keyboard_state | 扩展键区分、国际键标志、失焦松键失败重试 | Windows |
 | gamepad_sensor_rate | 低传感器频率周期存储、禁用值、全频率范围限速上界 | Windows |
 | pen_history_selection | 手写笔历史选择 | Windows |

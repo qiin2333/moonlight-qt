@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <cstddef>
+#include <cstdint>
 
 #include <Limelight.h>
 
@@ -21,7 +23,10 @@ public:
 
     static bool isAvailable();
     void submit(const LI_DS5_HAPTICS_PCM_FRAME& frame);
-    void setControllerTarget(int controllerNumber);
+    void updateControl(std::uint16_t controllerNumber, const std::uint8_t* state);
+    bool hasControl(std::uint16_t controllerNumber) const;
+    bool submitEffect(std::uint16_t controllerNumber, const void* effect, std::size_t size);
+    void setControllerTarget(int controllerNumber, int joystickInstanceId = -1);
     void reset();
     bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame, bool& startedNative);
 

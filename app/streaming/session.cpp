@@ -870,6 +870,15 @@ void Session::clDs5HapticsPcm(const LI_DS5_HAPTICS_PCM_FRAME* frame)
     }
 }
 
+void Session::clDs5HapticsState(std::uint16_t controllerNumber, const std::uint8_t* state)
+{
+    Session* session = s_ActiveSession;
+    if (session != nullptr && session->m_DualSenseHapticsRenderer != nullptr) {
+        // Accept on the same receive path as PCM. Device writes belong to the renderer worker.
+        session->m_DualSenseHapticsRenderer->updateControl(controllerNumber, state);
+    }
+}
+
 void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
 {
     if (frame == nullptr) {
@@ -3756,13 +3765,17 @@ void Session::notifyMouseEmulationMode(bool enabled)
 void Session::updateDualSenseHapticsControllerTarget()
 {
     if (m_DualSenseHapticsRenderer != nullptr) {
+        SDL_JoystickID instanceId = -1;
+        const auto controller = m_InputHandler != nullptr
+            ? m_InputHandler->getDualSenseHapticsControllerNumber(&instanceId) : -1;
         m_DualSenseHapticsRenderer->setControllerTarget(
-            m_InputHandler != nullptr ? m_InputHandler->getDualSenseHapticsControllerNumber() : -1);
+            controller, instanceId);
     }
 }
 
 void Session::handleSdlUserEvent(const SDL_UserEvent& event)
 {
+    static_assert(sizeof(DualSenseOutputReport) == 47, "SDL DualSense effect payload layout");
     switch (event.code) {
     case SDL_CODE_FRAME_READY:
         if (m_VideoDecoder != nullptr) {
@@ -3773,6 +3786,8 @@ void Session::handleSdlUserEvent(const SDL_UserEvent& event)
         m_FlushingWindowEventsRef--;
         break;
     case SDL_CODE_GAMECONTROLLER_RUMBLE:
+        if (m_DualSenseHapticsRenderer != nullptr &&
+            m_DualSenseHapticsRenderer->hasControl((uint16_t)(uintptr_t)event.data1)) break;
         m_InputHandler->rumble((uint16_t)(uintptr_t)event.data1,
                                (uint16_t)((uintptr_t)event.data2 >> 16),
                                (uint16_t)((uintptr_t)event.data2 & 0xFFFF));
@@ -3788,12 +3803,28 @@ void Session::handleSdlUserEvent(const SDL_UserEvent& event)
                                             (uint16_t)((uintptr_t)event.data2 & 0xFFFF));
         break;
     case SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED:
+    {
+        DualSenseOutputReport report {};
+        report.validFlag1 = 4;
+        report.lightbarRed = (uint8_t)((uintptr_t)event.data2 >> 16);
+        report.lightbarGreen = (uint8_t)((uintptr_t)event.data2 >> 8);
+        report.lightbarBlue = (uint8_t)((uintptr_t)event.data2);
+        if (m_DualSenseHapticsRenderer != nullptr &&
+            m_DualSenseHapticsRenderer->submitEffect((uint16_t)(uintptr_t)event.data1,
+                                                    &report, sizeof(report))) break;
         m_InputHandler->setControllerLED((uint16_t)(uintptr_t)event.data1,
                                          (uint8_t)((uintptr_t)event.data2 >> 16),
                                          (uint8_t)((uintptr_t)event.data2 >> 8),
                                          (uint8_t)((uintptr_t)event.data2));
         break;
+    }
     case SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS:
+        if (m_DualSenseHapticsRenderer != nullptr &&
+            m_DualSenseHapticsRenderer->submitEffect((uint16_t)(uintptr_t)event.data1,
+                                                    event.data2, sizeof(DualSenseOutputReport))) {
+            SDL_free(event.data2);
+            break;
+        }
         m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.data1,
                                             (DualSenseOutputReport *)event.data2);
         break;
@@ -4419,10 +4450,14 @@ void Session::start()
     bool enablePhysicalDualSenseHaptics = false;
     k_ConnCallbacks.ds5HapticsPcm = nullptr;
     k_ConnCallbacks.ds5HapticsIrV2 = nullptr;
+    LiSetDs5HapticsStateCallback(nullptr);
     if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
         enablePhysicalDualSenseHaptics = true;
         k_ConnCallbacks.ds5HapticsPcm = Session::clDs5HapticsPcm;
+#if SDL_VERSION_ATLEAST(2, 0, 16)
+        LiSetDs5HapticsStateCallback(Session::clDs5HapticsState);
+#endif
         if (m_DualSenseHapticsRenderer == nullptr) {
             m_DualSenseHapticsRenderer =
                 new DualSenseHapticsRenderer(DualSenseHapticsRenderer::Mode::Physical);
