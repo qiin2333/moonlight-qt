@@ -21,8 +21,8 @@ public:
 
     bool update(unsigned controller, const std::uint8_t* state)
     {
-        if (controller >= m_Controllers.size() || state == nullptr ||
-            (state[0] & ~3) || (state[1] & ~4) || (state[2] & ~0x62) || (state[7] & ~1))
+        if (controller >= m_Controllers.size() || state == nullptr || (state[0] & ~3) ||
+            (state[1] & ~4) || (state[2] & ~0x62) || (state[7] & ~1))
             return false;
         std::array<std::uint8_t, 8> snapshot;
         std::copy_n(state, snapshot.size(), snapshot.begin());
@@ -32,7 +32,8 @@ public:
 
     bool mergeEffect(unsigned controller, const Effect& effect)
     {
-        if (!has(controller)) return false;
+        if (!has(controller))
+            return false;
         auto& extra = m_Controllers[controller].extra;
         for (unsigned side = 0; side < 2; ++side) {
             const auto flag = 4 << side;
@@ -67,10 +68,11 @@ public:
     void reset() { m_Controllers = {}; }
 
 private:
-    struct Controller {
+    struct Controller
+    {
         std::optional<std::array<std::uint8_t, 8>> state;
-        Effect extra {};
+        Effect extra{};
     };
-    std::array<Controller, 16> m_Controllers {};
+    std::array<Controller, 16> m_Controllers{};
 };
 }

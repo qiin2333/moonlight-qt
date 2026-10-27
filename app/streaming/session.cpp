@@ -3766,10 +3766,11 @@ void Session::updateDualSenseHapticsControllerTarget()
 {
     if (m_DualSenseHapticsRenderer != nullptr) {
         SDL_JoystickID instanceId = -1;
-        const auto controller = m_InputHandler != nullptr
-            ? m_InputHandler->getDualSenseHapticsControllerNumber(&instanceId) : -1;
-        m_DualSenseHapticsRenderer->setControllerTarget(
-            controller, instanceId);
+        const auto controller =
+            m_InputHandler != nullptr
+                ? m_InputHandler->getDualSenseHapticsControllerNumber(&instanceId)
+                : -1;
+        m_DualSenseHapticsRenderer->setControllerTarget(controller, instanceId);
     }
 }
 
@@ -3787,7 +3788,8 @@ void Session::handleSdlUserEvent(const SDL_UserEvent& event)
         break;
     case SDL_CODE_GAMECONTROLLER_RUMBLE:
         if (m_DualSenseHapticsRenderer != nullptr &&
-            m_DualSenseHapticsRenderer->hasControl((uint16_t)(uintptr_t)event.data1)) break;
+            m_DualSenseHapticsRenderer->hasControl((uint16_t)(uintptr_t)event.data1))
+            break;
         m_InputHandler->rumble((uint16_t)(uintptr_t)event.data1,
                                (uint16_t)((uintptr_t)event.data2 >> 16),
                                (uint16_t)((uintptr_t)event.data2 & 0xFFFF));
@@ -3802,16 +3804,16 @@ void Session::handleSdlUserEvent(const SDL_UserEvent& event)
                                             (uint8_t)((uintptr_t)event.data2 >> 16),
                                             (uint16_t)((uintptr_t)event.data2 & 0xFFFF));
         break;
-    case SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED:
-    {
-        DualSenseOutputReport report {};
+    case SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED: {
+        DualSenseOutputReport report{};
         report.validFlag1 = 4;
         report.lightbarRed = (uint8_t)((uintptr_t)event.data2 >> 16);
         report.lightbarGreen = (uint8_t)((uintptr_t)event.data2 >> 8);
         report.lightbarBlue = (uint8_t)((uintptr_t)event.data2);
         if (m_DualSenseHapticsRenderer != nullptr &&
-            m_DualSenseHapticsRenderer->submitEffect((uint16_t)(uintptr_t)event.data1,
-                                                    &report, sizeof(report))) break;
+            m_DualSenseHapticsRenderer->submitEffect((uint16_t)(uintptr_t)event.data1, &report,
+                                                     sizeof(report)))
+            break;
         m_InputHandler->setControllerLED((uint16_t)(uintptr_t)event.data1,
                                          (uint8_t)((uintptr_t)event.data2 >> 16),
                                          (uint8_t)((uintptr_t)event.data2 >> 8),
@@ -3820,8 +3822,8 @@ void Session::handleSdlUserEvent(const SDL_UserEvent& event)
     }
     case SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS:
         if (m_DualSenseHapticsRenderer != nullptr &&
-            m_DualSenseHapticsRenderer->submitEffect((uint16_t)(uintptr_t)event.data1,
-                                                    event.data2, sizeof(DualSenseOutputReport))) {
+            m_DualSenseHapticsRenderer->submitEffect((uint16_t)(uintptr_t)event.data1, event.data2,
+                                                     sizeof(DualSenseOutputReport))) {
             SDL_free(event.data2);
             break;
         }

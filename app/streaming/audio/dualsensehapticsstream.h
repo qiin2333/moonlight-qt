@@ -19,8 +19,8 @@ public:
         Ignore,
     };
 
-    Action observe(std::uint8_t flags, std::uint16_t controllerNumber,
-                   std::uint32_t sequenceNumber, std::uint16_t frameCount = 0)
+    Action observe(std::uint8_t flags, std::uint16_t controllerNumber, std::uint32_t sequenceNumber,
+                   std::uint16_t frameCount = 0)
     {
         if (m_Active && controllerNumber != m_ControllerNumber) {
             return Action::Ignore;
@@ -41,7 +41,8 @@ public:
         m_HasSequence = true;
         m_ControllerNumber = controllerNumber;
         m_ExpectedSequence = sequenceNumber + 1;
-        if (end && frameCount == 0) return Action::End;
+        if (end && frameCount == 0)
+            return Action::End;
         // Unreliable PCM gaps do not discard queued samples or restart the endpoint.
         return needsReset ? Action::ResetAndAccept : Action::Accept;
     }
