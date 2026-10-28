@@ -4,6 +4,8 @@
 
 #include <AudioUnit/AudioUnit.h>
 
+#include <vector>
+
 // Renders a 5.1, 7.1 or 7.1.4 stream to stereo with Apple's AUSpatialMixer,
 // binaurally (with optional head tracking) for headphones.
 class CoreAudioSpatialMixer
@@ -13,7 +15,9 @@ public:
 
     ~CoreAudioSpatialMixer();
 
+    // inputLayout holds an AudioChannelLayout describing the stream's channel order
     bool initialize(AUSpatialMixerOutputType outputType, int sampleRate, int channelCount,
+                    const std::vector<unsigned char>& inputLayout,
                     UInt32 maxFrames, bool headTracking);
 
     // Renders interleaved input into the non-interleaved stereo buffers in output.
@@ -35,7 +39,4 @@ private:
     AudioUnit m_Mixer;
     int m_ChannelCount;
     const float* m_Input;
-
-    // Interleaved input channel to read for each mixer input channel
-    int m_ChannelMap[AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT];
 };

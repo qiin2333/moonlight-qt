@@ -5,6 +5,7 @@
 
 #include <AudioUnit/AudioUnit.h>
 #include <CoreAudio/CoreAudio.h>
+#include <dispatch/dispatch.h>
 
 #include <atomic>
 #include <cstring>
@@ -38,6 +39,12 @@ public:
 
         m_WritePos.store(writePos + bytes, std::memory_order_release);
         return true;
+    }
+
+    // Bytes waiting to be read. Only meaningful to the reader.
+    size_t available() const
+    {
+        return m_WritePos.load(std::memory_order_acquire) - m_ReadPos.load(std::memory_order_relaxed);
     }
 
     bool read(void* data, size_t bytes)
@@ -84,7 +91,6 @@ public:
 private:
     bool openOutputUnit();
     AUSpatialMixerOutputType getSpatialMixerOutputType();
-    void addListeners();
     void removeListeners();
 
     static OSStatus renderCallback(void* inRefCon,
@@ -94,19 +100,22 @@ private:
                                    UInt32 inNumberFrames,
                                    AudioBufferList* ioData);
 
-    static OSStatus deviceChanged(AudioObjectID inObjectID,
-                                  UInt32 inNumberAddresses,
-                                  const AudioObjectPropertyAddress* inAddresses,
-                                  void* inClientData);
-
     AudioUnit m_OutputUnit;
     AudioDeviceID m_OutputDevice;
-    bool m_ListenersAdded;
     std::atomic<bool> m_NeedsReinit;
 
+    // Property listeners run on our own queue, so the destructor can wait for
+    // one that's already running before the renderer goes away
+    dispatch_queue_t m_ListenerQueue;
+    AudioObjectPropertyListenerBlock m_ListenerBlock;
+
     UInt32 m_FrameSize;
+    UInt32 m_MaxFrames;
     std::vector<unsigned char> m_PacketBuffer;
     CoreAudioRingBuffer m_RingBuffer;
+
+    // Only touched by the I/O thread
+    bool m_Starved;
 
     // Only used for spatial audio, which needs the interleaved samples in one
     // piece before splitting them up by channel

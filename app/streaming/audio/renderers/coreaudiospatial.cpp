@@ -20,10 +20,9 @@ AudioStreamBasicDescription nonInterleavedFloatFormat(int sampleRate, int channe
     return asbd;
 }
 
-template <typename T>
-bool setProperty(AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, const T& value)
+bool setProperty(AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, const void* data, UInt32 size)
 {
-    OSStatus status = AudioUnitSetProperty(unit, property, scope, 0, &value, sizeof(value));
+    OSStatus status = AudioUnitSetProperty(unit, property, scope, 0, data, size);
     if (status != noErr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Unable to set spatial mixer property %u: %d",
@@ -34,6 +33,12 @@ bool setProperty(AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope sc
     return true;
 }
 
+template <typename T>
+bool setProperty(AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, const T& value)
+{
+    return setProperty(unit, property, scope, &value, sizeof(value));
+}
+
 }
 
 CoreAudioSpatialMixer::CoreAudioSpatialMixer()
@@ -41,9 +46,6 @@ CoreAudioSpatialMixer::CoreAudioSpatialMixer()
       m_ChannelCount(0),
       m_Input(nullptr)
 {
-    for (int i = 0; i < AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT; i++) {
-        m_ChannelMap[i] = i;
-    }
 }
 
 CoreAudioSpatialMixer::~CoreAudioSpatialMixer()
@@ -55,27 +57,10 @@ CoreAudioSpatialMixer::~CoreAudioSpatialMixer()
 }
 
 bool CoreAudioSpatialMixer::initialize(AUSpatialMixerOutputType outputType, int sampleRate, int channelCount,
+                                       const std::vector<unsigned char>& inputLayout,
                                        UInt32 maxFrames, bool headTracking)
 {
-    // The host sends WAVE channel order: FL FR FC LFE BL BR SL SR (TFL TFR TBL TBR).
-    // WAVE_5_1_B and WAVE_7_1 match it, but Atmos_7_1_4 puts the side pair
-    // before the back pair, so 7.1.4 needs those two pairs swapped.
-    AudioChannelLayoutTag layoutTag;
-    switch (channelCount) {
-    case 6:
-        layoutTag = kAudioChannelLayoutTag_WAVE_5_1_B;
-        break;
-    case 8:
-        layoutTag = kAudioChannelLayoutTag_WAVE_7_1;
-        break;
-    case 12:
-        layoutTag = kAudioChannelLayoutTag_Atmos_7_1_4;
-        m_ChannelMap[4] = 6;
-        m_ChannelMap[5] = 7;
-        m_ChannelMap[6] = 4;
-        m_ChannelMap[7] = 5;
-        break;
-    default:
+    if (inputLayout.empty()) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Spatial audio does not support %d channels",
                      channelCount);
@@ -97,8 +82,6 @@ bool CoreAudioSpatialMixer::initialize(AUSpatialMixerOutputType outputType, int 
         return false;
     }
 
-    AudioChannelLayout inputLayout = {};
-    inputLayout.mChannelLayoutTag = layoutTag;
     AudioChannelLayout outputLayout = {};
     outputLayout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo;
 
@@ -111,7 +94,8 @@ bool CoreAudioSpatialMixer::initialize(AUSpatialMixerOutputType outputType, int 
     if (!setProperty(m_Mixer, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, (UInt32)1) ||
             !setProperty(m_Mixer, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input,
                          nonInterleavedFloatFormat(sampleRate, channelCount)) ||
-            !setProperty(m_Mixer, kAudioUnitProperty_AudioChannelLayout, kAudioUnitScope_Input, inputLayout) ||
+            !setProperty(m_Mixer, kAudioUnitProperty_AudioChannelLayout, kAudioUnitScope_Input,
+                         inputLayout.data(), (UInt32)inputLayout.size()) ||
             !setProperty(m_Mixer, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output,
                          nonInterleavedFloatFormat(sampleRate, 2)) ||
             !setProperty(m_Mixer, kAudioUnitProperty_AudioChannelLayout, kAudioUnitScope_Output, outputLayout) ||
@@ -198,7 +182,7 @@ OSStatus CoreAudioSpatialMixer::inputCallback(void* inRefCon,
 
     for (int channel = 0; channel < me->m_ChannelCount; channel++) {
         float* out = static_cast<float*>(ioData->mBuffers[channel].mData);
-        const float* in = me->m_Input + me->m_ChannelMap[channel];
+        const float* in = me->m_Input + channel;
         for (UInt32 frame = 0; frame < inNumberFrames; frame++) {
             out[frame] = in[frame * me->m_ChannelCount];
         }

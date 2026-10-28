@@ -4,8 +4,12 @@
 
 #include "SDL_compat.h"
 
+#include <AudioToolbox/AudioToolbox.h>
+#include <Block.h>
 #include <IOKit/audio/IOAudioTypes.h>
 #include <QString>
+
+#include <utility>
 
 namespace {
 
@@ -17,10 +21,12 @@ constexpr AudioObjectPropertyAddress DefaultDeviceAddress = {
 };
 
 // The data source changes when headphones are plugged into the built-in jack,
-// which changes how spatial audio has to be rendered
+// which changes how spatial audio has to be rendered. The stream configuration
+// changes the channel count that decides between spatial audio and passthrough.
 constexpr AudioObjectPropertyAddress DeviceAddresses[] = {
     { kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain },
     { kAudioDevicePropertyDataSource, kAudioDevicePropertyScopeOutput, kAudioObjectPropertyElementMain },
+    { kAudioDevicePropertyStreamConfiguration, kAudioDevicePropertyScopeOutput, kAudioObjectPropertyElementMain },
 };
 
 template <typename T>
@@ -68,14 +74,63 @@ UInt32 outputChannelCount(AudioDeviceID device)
     return channels;
 }
 
+// The host sends WAVE channel order: FL FR FC LFE BL BR SL SR (TFL TFR TBL TBR).
+// WAVE_5_1_B and WAVE_7_1 describe it, but there's no WAVE tag for 7.1.4, so
+// that one is Atmos_7_1_4 with its side pair and back pair swapped.
+std::vector<unsigned char> streamChannelLayout(int channelCount)
+{
+    AudioChannelLayoutTag tag;
+    switch (channelCount) {
+    case 2:
+        tag = kAudioChannelLayoutTag_Stereo;
+        break;
+    case 6:
+        tag = kAudioChannelLayoutTag_WAVE_5_1_B;
+        break;
+    case 8:
+        tag = kAudioChannelLayoutTag_WAVE_7_1;
+        break;
+    case 12:
+        tag = kAudioChannelLayoutTag_Atmos_7_1_4;
+        break;
+    default:
+        return {};
+    }
+
+    UInt32 size = 0;
+    if (AudioFormatGetPropertyInfo(kAudioFormatProperty_ChannelLayoutForTag,
+                                   sizeof(tag), &tag, &size) != noErr) {
+        return {};
+    }
+
+    std::vector<unsigned char> storage(size);
+    auto layout = reinterpret_cast<AudioChannelLayout*>(storage.data());
+    if (AudioFormatGetProperty(kAudioFormatProperty_ChannelLayoutForTag,
+                               sizeof(tag), &tag, &size, layout) != noErr) {
+        return {};
+    }
+
+    if (channelCount == 12) {
+        layout->mChannelLayoutTag = kAudioChannelLayoutTag_UseChannelDescriptions;
+        std::swap(layout->mChannelDescriptions[4], layout->mChannelDescriptions[6]);
+        std::swap(layout->mChannelDescriptions[5], layout->mChannelDescriptions[7]);
+    }
+    return storage;
+}
+
 }
 
 CoreAudioRenderer::CoreAudioRenderer()
     : m_OutputUnit(nullptr),
       m_OutputDevice(kAudioObjectUnknown),
-      m_ListenersAdded(false),
       m_NeedsReinit(false),
+      m_ListenerQueue(dispatch_queue_create("CoreAudioRenderer", DISPATCH_QUEUE_SERIAL)),
+      m_ListenerBlock(Block_copy(^(UInt32, const AudioObjectPropertyAddress*) {
+          m_NeedsReinit = true;
+      })),
       m_FrameSize(0),
+      m_MaxFrames(0),
+      m_Starved(true),
       m_SpatialMixer(nullptr)
 {
 }
@@ -90,12 +145,22 @@ CoreAudioRenderer::~CoreAudioRenderer()
     }
 
     removeListeners();
+
+    // Wait for a listener that was already running when it was removed
+    dispatch_sync(m_ListenerQueue, ^{});
+    dispatch_release(m_ListenerQueue);
+    Block_release(m_ListenerBlock);
+
     delete m_SpatialMixer;
 }
 
 bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION* opusConfig)
 {
     StreamingPreferences* prefs = StreamingPreferences::get();
+
+    // Listen before reading anything, so a change during setup isn't missed
+    AudioObjectAddPropertyListenerBlock(kAudioObjectSystemObject, &DefaultDeviceAddress,
+                                        m_ListenerQueue, m_ListenerBlock);
 
     if (!getDeviceProperty(kAudioObjectSystemObject, kAudioHardwarePropertyDefaultOutputDevice,
                            kAudioObjectPropertyScopeGlobal, m_OutputDevice) ||
@@ -105,30 +170,30 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
         return false;
     }
 
-    // Listen before reading the device, so a change during setup isn't missed
-    addListeners();
+    // The data source isn't present on every device, so failures are ignored
+    for (const AudioObjectPropertyAddress& addr : DeviceAddresses) {
+        AudioObjectAddPropertyListenerBlock(m_OutputDevice, &addr, m_ListenerQueue, m_ListenerBlock);
+    }
 
     UInt32 deviceChannels = outputChannelCount(m_OutputDevice);
     AUSpatialMixerOutputType outputType = getSpatialMixerOutputType();
 
-    // Surround is spatialized unless it can go straight to real surround speakers.
-    // A 2-channel USB DAC claims to be external speakers, so the channel count
-    // decides too.
+    // Surround is spatialized when the device can't play every channel itself
     bool spatial = opusConfig->channelCount > 2 &&
-                   (outputType != kSpatialMixerOutputType_ExternalSpeakers ||
-                    deviceChannels < (UInt32)opusConfig->channelCount);
+                   deviceChannels < (UInt32)opusConfig->channelCount &&
+                   prefs->spatialAudioConfig != StreamingPreferences::SAC_DISABLED;
 
-    if (spatial && prefs->spatialAudioConfig == StreamingPreferences::SAC_DISABLED) {
-        if (deviceChannels < (UInt32)opusConfig->channelCount) {
-            // AUHAL drops channels the device doesn't have instead of downmixing
-            // them, so let the SDL renderer handle this as it did before
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Spatial audio is disabled and the output device has only %u channels",
-                        deviceChannels);
-            return false;
-        }
-        spatial = false;
+    if (deviceChannels < (spatial ? 2U : (UInt32)opusConfig->channelCount)) {
+        // AUHAL drops channels the device doesn't have instead of downmixing
+        // them, so let the SDL renderer handle this as it did before
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "The output device has only %u channels for %s",
+                    deviceChannels,
+                    spatial ? "spatial audio" : "passthrough");
+        return false;
     }
+
+    std::vector<unsigned char> layout = streamChannelLayout(opusConfig->channelCount);
 
     m_FrameSize = opusConfig->channelCount * sizeof(float);
 
@@ -180,6 +245,15 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
     callback.inputProc = renderCallback;
     callback.inputProcRefCon = this;
 
+    // Let AUHAL route each channel to the matching speaker of the device's
+    // layout. Without it, channels go to the device's channels in order.
+    if (!spatial && !layout.empty() &&
+            AudioUnitSetProperty(m_OutputUnit, kAudioUnitProperty_AudioChannelLayout, kAudioUnitScope_Input, 0,
+                                 layout.data(), (UInt32)layout.size()) != noErr) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Unable to set the CoreAudio output channel layout");
+    }
+
     OSStatus status;
     if ((status = AudioUnitSetProperty(m_OutputUnit, kAudioUnitProperty_StreamFormat,
                                        kAudioUnitScope_Input, 0, &asbd, sizeof(asbd))) != noErr ||
@@ -192,10 +266,10 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
         return false;
     }
 
-    UInt32 maxFrames = 0;
-    UInt32 size = sizeof(maxFrames);
+    // This takes in any sample rate conversion to the device rate
+    UInt32 size = sizeof(m_MaxFrames);
     if (AudioUnitGetProperty(m_OutputUnit, kAudioUnitProperty_MaximumFramesPerSlice,
-                             kAudioUnitScope_Global, 0, &maxFrames, &size) != noErr) {
+                             kAudioUnitScope_Global, 0, &m_MaxFrames, &size) != noErr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Unable to get the CoreAudio output unit's maximum frames per slice");
         return false;
@@ -204,16 +278,18 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
     if (spatial) {
         m_SpatialMixer = new CoreAudioSpatialMixer();
         if (!m_SpatialMixer->initialize(outputType, opusConfig->sampleRate, opusConfig->channelCount,
-                                        maxFrames, prefs->spatialHeadTracking)) {
+                                        layout, m_MaxFrames, prefs->spatialHeadTracking)) {
             return false;
         }
 
-        m_RenderBuffer.resize(maxFrames * m_FrameSize);
+        m_RenderBuffer.resize(m_MaxFrames * m_FrameSize);
     }
 
+    // The ring has to hold a whole callback on top of the packet of slack
+    // renderCallback() waits for, and one more packet arriving meanwhile
     m_PacketBuffer.resize(opusConfig->samplesPerFrame * m_FrameSize);
-    m_RingBuffer.init(qMax(opusConfig->sampleRate / 1000 * RingBufferDurationMs,
-                           opusConfig->samplesPerFrame * 2) * m_FrameSize);
+    m_RingBuffer.init(qMax((UInt32)(opusConfig->sampleRate / 1000 * RingBufferDurationMs),
+                           m_MaxFrames + opusConfig->samplesPerFrame * 2) * m_FrameSize);
 
     status = AudioOutputUnitStart(m_OutputUnit);
     if (status != noErr) {
@@ -294,37 +370,16 @@ AUSpatialMixerOutputType CoreAudioRenderer::getSpatialMixerOutputType()
     }
 }
 
-void CoreAudioRenderer::addListeners()
-{
-    // The data source isn't present on every device, so failures are ignored
-    AudioObjectAddPropertyListener(kAudioObjectSystemObject, &DefaultDeviceAddress, deviceChanged, this);
-    for (const AudioObjectPropertyAddress& addr : DeviceAddresses) {
-        AudioObjectAddPropertyListener(m_OutputDevice, &addr, deviceChanged, this);
-    }
-    m_ListenersAdded = true;
-}
-
 void CoreAudioRenderer::removeListeners()
 {
-    if (!m_ListenersAdded) {
-        return;
+    // Removing a listener that was never added just fails
+    AudioObjectRemovePropertyListenerBlock(kAudioObjectSystemObject, &DefaultDeviceAddress,
+                                           m_ListenerQueue, m_ListenerBlock);
+    if (m_OutputDevice != kAudioObjectUnknown) {
+        for (const AudioObjectPropertyAddress& addr : DeviceAddresses) {
+            AudioObjectRemovePropertyListenerBlock(m_OutputDevice, &addr, m_ListenerQueue, m_ListenerBlock);
+        }
     }
-
-    AudioObjectRemovePropertyListener(kAudioObjectSystemObject, &DefaultDeviceAddress, deviceChanged, this);
-    for (const AudioObjectPropertyAddress& addr : DeviceAddresses) {
-        AudioObjectRemovePropertyListener(m_OutputDevice, &addr, deviceChanged, this);
-    }
-    m_ListenersAdded = false;
-}
-
-OSStatus CoreAudioRenderer::deviceChanged(AudioObjectID,
-                                          UInt32,
-                                          const AudioObjectPropertyAddress*,
-                                          void* inClientData)
-{
-    auto me = static_cast<CoreAudioRenderer*>(inClientData);
-    me->m_NeedsReinit = true;
-    return noErr;
 }
 
 OSStatus CoreAudioRenderer::renderCallback(void* inRefCon,
@@ -337,23 +392,33 @@ OSStatus CoreAudioRenderer::renderCallback(void* inRefCon,
     auto me = static_cast<CoreAudioRenderer*>(inRefCon);
     size_t bytes = inNumberFrames * me->m_FrameSize;
 
-    if (me->m_SpatialMixer != nullptr) {
-        if (bytes <= me->m_RenderBuffer.size()) {
-            // Keep the mixer running through an underrun so its output stays
-            // continuous when audio resumes
-            if (!me->m_RingBuffer.read(me->m_RenderBuffer.data(), bytes)) {
-                memset(me->m_RenderBuffer.data(), 0, bytes);
-            }
-            return me->m_SpatialMixer->render(reinterpret_cast<const float*>(me->m_RenderBuffer.data()),
-                                              inNumberFrames, ioActionFlags, inTimeStamp, ioData);
+    // After running dry, wait for a packet of slack on top of this callback,
+    // so a little network jitter doesn't starve every other callback
+    bool ready = me->m_RingBuffer.available() >=
+                 bytes + (me->m_Starved ? me->m_PacketBuffer.size() : 0);
+    me->m_Starved = !ready;
+
+    if (inNumberFrames > me->m_MaxFrames) {
+        // The device buffer grew past what we sized everything for
+        me->m_NeedsReinit = true;
+    }
+    else if (me->m_SpatialMixer != nullptr) {
+        // Keep the mixer running through an underrun so its output stays
+        // continuous when audio resumes
+        if (!ready || !me->m_RingBuffer.read(me->m_RenderBuffer.data(), bytes)) {
+            memset(me->m_RenderBuffer.data(), 0, bytes);
+        }
+        if (me->m_SpatialMixer->render(reinterpret_cast<const float*>(me->m_RenderBuffer.data()),
+                                       inNumberFrames, ioActionFlags, inTimeStamp, ioData) == noErr) {
+            return noErr;
         }
     }
-    else if (ioData->mNumberBuffers == 1 && ioData->mBuffers[0].mDataByteSize == bytes &&
+    else if (ready && ioData->mNumberBuffers == 1 && ioData->mBuffers[0].mDataByteSize == bytes &&
              me->m_RingBuffer.read(ioData->mBuffers[0].mData, bytes)) {
         return noErr;
     }
 
-    // Not enough audio has arrived yet
+    // Not enough audio has arrived yet, or the mixer failed
     for (UInt32 i = 0; i < ioData->mNumberBuffers; i++) {
         memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
     }
