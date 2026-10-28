@@ -72,6 +72,9 @@ jobs:
     - name: Check pull renderers report received video
       run: python3 -m unittest discover -s tests/reconnect_video_callbacks -p 'test_*.py'
 
+    - name: Test client-resolution integration
+      run: python3 -m unittest discover -s tests/resolution_match -p 'test_*.py'
+
   pyrowave-tests:
     runs-on: ubuntu-latest
     permissions:
