@@ -64,6 +64,15 @@
         defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
 #define SDL_CODE_PROCESS_QT_OVERLAY_EVENTS 109
 #endif
+#define SDL_CODE_RESOLUTION_CHANGED 111
+
+// Hosts that apply LiRequestResolutionChange() advertise this bit
+// (qiin2333/moonlight-common-c#10); older common-c headers lack the define.
+#ifndef LI_FF_CLIENT_RESOLUTION_CHANGE
+#define LI_FF_CLIENT_RESOLUTION_CHANGE 0x400
+#endif
+// LiRequestResolutionChange(): the host can't take resolution requests
+#define RESOLUTION_CHANGE_ERR_UNSUPPORTED -2
 
 #include <openssl/rand.h>
 
@@ -93,16 +102,18 @@
 
 namespace {
 
-int SDLCALL keepNonRumbleEvent(void*, SDL_Event* event)
+// Drops queued events that only make sense for the connection that produced them
+int SDLCALL keepConnectionIndependentEvent(void*, SDL_Event* event)
 {
     return event->type != SDL_USEREVENT ||
            (event->user.code != SDL_CODE_GAMECONTROLLER_RUMBLE &&
-            event->user.code != SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS);
+            event->user.code != SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS &&
+            event->user.code != SDL_CODE_RESOLUTION_CHANGED);
 }
 
 void stopControllerRumbleAtConnectionBoundary(SdlInputHandler* inputHandler)
 {
-    SDL_FilterEvents(keepNonRumbleEvent, nullptr);
+    SDL_FilterEvents(keepConnectionIndependentEvent, nullptr);
     if (inputHandler != nullptr) {
         inputHandler->stopAllRumble();
     }
@@ -388,11 +399,11 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     Session::clSetMotionEventState,
     Session::clSetControllerLED,
     Session::clSetAdaptiveTriggers,
-    nullptr, // resolutionChanged (unused on Qt client)
+    Session::clResolutionChanged,
     Session::clClipboardData,
     Session::clCursorUpdate,
     nullptr,
-    nullptr
+    nullptr,
 };
 
 Session* Session::s_ActiveSession;
@@ -900,6 +911,18 @@ void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
     // energy here; device-specific renderers can replace this calibration.
     const auto output = dualsense_haptics::renderIrV2(*frame);
     clRumble(frame->controllerNumber, output.lowFrequency, output.highFrequency);
+}
+
+void Session::clResolutionChanged(uint32_t width, uint32_t height)
+{
+    // Invoked on moonlight-common-c's callback thread with the host's latest
+    // resolution. The decoder must be recreated on the main thread.
+    SDL_Event event = {};
+    event.type = SDL_USEREVENT;
+    event.user.code = SDL_CODE_RESOLUTION_CHANGED;
+    event.user.data1 = (void*)(uintptr_t)width;
+    event.user.data2 = (void*)(uintptr_t)height;
+    pushEventOrWarn(event);
 }
 
 void Session::clRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger, uint16_t rightTrigger)
@@ -2593,6 +2616,161 @@ void Session::updateOptimalWindowDisplayMode()
     SDL_SetWindowDisplayMode(m_Window, &bestMode);
 }
 
+// The host applies resolution requests, and its stream follows its display, only
+// while it streams its display 1:1 (in either orientation).
+static bool isHostStreamingDisplay1To1(const QSize& hostDisplay, const QSize& stream)
+{
+    return hostDisplay == stream || hostDisplay == stream.transposed();
+}
+
+void Session::scheduleWindowResolutionMatch()
+{
+    constexpr Uint32 RESOLUTION_MATCH_DEBOUNCE_MS = 400;
+
+    // Restarted by every resize event, so only the settled size is requested
+    if (m_Preferences->resolutionMatchWindow && m_ResolutionMatch.hostSupported) {
+        m_ResolutionMatch.deadline = SDL_GetTicks() + RESOLUTION_MATCH_DEBOUNCE_MS;
+    }
+}
+
+void Session::processWindowResolutionMatch()
+{
+    if (!m_Preferences->resolutionMatchWindow || !m_ResolutionMatch.hostSupported) {
+        m_ResolutionMatch.deadline = 0;
+        return;
+    }
+
+    // A host display mode change can take a few seconds, and the host doesn't
+    // answer requests it ignores.
+    constexpr Uint32 RESOLUTION_REQUEST_TIMEOUT_MS = 5000;
+    constexpr int MIN_REQUESTED_DIMENSION = 256;
+    constexpr int MAX_REQUESTED_DIMENSION = 16384;
+
+    const Uint32 now = SDL_GetTicks();
+    if (m_ResolutionMatch.deadline == 0 || !SDL_TICKS_PASSED(now, m_ResolutionMatch.deadline)) {
+        return;
+    }
+
+    // Let the host answer the previous request first, so the window is compared
+    // against the resolution the host actually ended up with.
+    if (m_ResolutionMatch.requestTicks != 0 &&
+        !SDL_TICKS_PASSED(now, m_ResolutionMatch.requestTicks + RESOLUTION_REQUEST_TIMEOUT_MS)) {
+        m_ResolutionMatch.deadline = now + 100;
+        return;
+    }
+
+    m_ResolutionMatch.deadline = 0;
+    m_ResolutionMatch.requestTicks = 0;
+    m_ResolutionMatch.deferred = false;
+
+    int width, height;
+    if (isStreamingWindowFullscreen()) {
+        // Fullscreen goes back to the resolution the stream was started with
+        width = m_StreamConfig.width;
+        height = m_StreamConfig.height;
+    } else if (isStreamingWindowMinimized()) {
+        m_ResolutionMatch.deferred = true;
+        return;
+    } else {
+#if SDL_VERSION_ATLEAST(2, 26, 0)
+        SDL_GetWindowSizeInPixels(m_Window, &width, &height);
+#else
+        SDL_GetWindowSize(m_Window, &width, &height);
+#endif
+    }
+
+    // Encoders require even dimensions. The host ignores sizes outside its
+    // supported range without answering, so don't ask for them.
+    const QSize target(width & ~1, height & ~1);
+    if (target.width() < MIN_REQUESTED_DIMENSION || target.height() < MIN_REQUESTED_DIMENSION ||
+        target.width() > MAX_REQUESTED_DIMENSION || target.height() > MAX_REQUESTED_DIMENSION) {
+        return;
+    }
+
+    // Neither the current size nor a repeat of a request the host ignored would change anything
+    const QSize stream(m_ActiveVideoWidth, m_ActiveVideoHeight);
+    if (target == stream || target == m_ResolutionMatch.requestedSize) {
+        return;
+    }
+
+    if (!isHostStreamingDisplay1To1(m_ResolutionMatch.hostDisplaySize, stream)) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Host isn't streaming its display 1:1; not requesting %dx%d yet",
+                    target.width(), target.height());
+        m_ResolutionMatch.deferred = true;
+        return;
+    }
+
+    const int result = LiRequestResolutionChange(target.width(), target.height());
+    if (result == 0) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Requested %dx%d stream resolution to match the window", target.width(),
+                    target.height());
+        m_ResolutionMatch.requestedSize = target;
+        m_ResolutionMatch.requestTicks = now;
+    } else {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "LiRequestResolutionChange(%d, %d) failed: %d",
+                    target.width(), target.height(), result);
+        if (result == RESOLUTION_CHANGE_ERR_UNSUPPORTED) {
+            m_ResolutionMatch.hostSupported = false;
+        }
+    }
+}
+
+void Session::handleHostResolutionReport(int width, int height)
+{
+    if (!m_ResolutionMatch.hostSupported || width <= 0 || height <= 0) {
+        return;
+    }
+
+    // The host reports its display size: once at stream start, then whenever its
+    // display changes. It encodes at the negotiated size from stream start and
+    // only follows its display if it was streaming it 1:1.
+    const QSize reported(width, height);
+    const QSize stream(m_ActiveVideoWidth, m_ActiveVideoHeight);
+    const QSize previousDisplay = m_ResolutionMatch.hostDisplaySize;
+    const bool streamFollowsDisplay = isHostStreamingDisplay1To1(previousDisplay, stream);
+    m_ResolutionMatch.hostDisplaySize = reported;
+    m_ResolutionMatch.requestTicks = 0;
+
+    // Retry a match that was skipped while the host couldn't apply it
+    if (m_ResolutionMatch.deferred) {
+        scheduleWindowResolutionMatch();
+    }
+
+    if (!streamFollowsDisplay || reported == stream) {
+        return;
+    }
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Host changed the stream resolution to %dx%d; recreating the decoder", width,
+                height);
+
+    // Queue the reset first. If that fails, keeping the old decoder is
+    // better than being left without one.
+    SDL_Event resetEvent = {};
+    resetEvent.type = SDL_RENDER_DEVICE_RESET;
+    if (SDL_PushEvent(&resetEvent) < 0) {
+        // A later report must still be able to retry this transition.
+        m_ResolutionMatch.hostDisplaySize = previousDisplay;
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Failed to queue decoder reset for resolution change: %s", SDL_GetError());
+        return;
+    }
+
+    // Destroy the old decoder now so it never receives frames at the new
+    // resolution. drSubmitDecodeUnit() drops frames until the reset creates
+    // the new decoder and requests an IDR frame.
+    SDL_LockMutex(m_DecoderLock);
+    delete m_VideoDecoder;
+    m_VideoDecoder = nullptr;
+    m_ActiveVideoWidth = width;
+    m_ActiveVideoHeight = height;
+    SDL_UnlockMutex(m_DecoderLock);
+
+    m_ResolutionMatch.requestedSize = QSize();
+}
+
 void Session::toggleFullscreen()
 {
     bool fullScreen = !isStreamingWindowFullscreen();
@@ -3833,6 +4011,9 @@ void Session::handleSdlUserEvent(const SDL_UserEvent& event)
     case SDL_CODE_FLUSH_TOUCHPAD_FRAME:
         m_InputHandler->flushPendingTouchpadFrameEvent();
         break;
+    case SDL_CODE_RESOLUTION_CHANGED:
+        handleHostResolutionReport((int)(uintptr_t)event.data1, (int)(uintptr_t)event.data2);
+        break;
     case SDL_CODE_FLUSH_CURSOR_VISIBILITY:
         if (m_InputHandler != nullptr) {
             m_InputHandler->flushPendingRemoteCursorHide();
@@ -3923,6 +4104,7 @@ bool Session::tryReconnect()
 
     bool reconnected = false;
     bool cancelled = false;
+    QSize deferredResolution;
 
     // Returns true if the user wants to cancel the reconnect (close/quit/Esc)
     auto isCancelEvent = [](const SDL_Event& ev) -> bool {
@@ -3938,13 +4120,21 @@ bool Session::tryReconnect()
         return false;
     };
 
-    auto handleReconnectEvent = [this, &isCancelEvent](SDL_Event& ev) -> bool {
+    auto handleReconnectEvent = [this, &isCancelEvent, &deferredResolution](SDL_Event& ev) -> bool {
         if (isCancelEvent(ev)) {
             return true;
         }
 
         if (ev.type == SDL_USEREVENT) {
-            handleSdlUserEvent(ev.user);
+            // A resolution report here comes from the connection being started.
+            // Handle it once that connection is up, since drSetup() is still
+            // running on the connection thread.
+            if (ev.user.code == SDL_CODE_RESOLUTION_CHANGED) {
+                deferredResolution =
+                    QSize((int)(uintptr_t)ev.user.data1, (int)(uintptr_t)ev.user.data2);
+            } else {
+                handleSdlUserEvent(ev.user);
+            }
             return false;
         }
 
@@ -4020,6 +4210,7 @@ bool Session::tryReconnect()
         if (m_DualSenseHapticsRenderer != nullptr) {
             m_DualSenseHapticsRenderer->reset();
         }
+        deferredResolution = QSize();
 
         Uint32 backoffUntil = SDL_GetTicks() + backoffMs;
         while (SDL_GetTicks() < backoffUntil &&
@@ -4050,6 +4241,13 @@ bool Session::tryReconnect()
         SDL_Event resetEvent = {};
         resetEvent.type = SDL_RENDER_DEVICE_RESET;
         pushEventOrWarn(resetEvent);
+
+        // startConnectionAsync() reset the state for this connection. The host
+        // may have reported its initial display size while we were connecting.
+        if (deferredResolution.isValid()) {
+            handleHostResolutionReport(deferredResolution.width(), deferredResolution.height());
+        }
+        scheduleWindowResolutionMatch();
 
         // Streaming is healthy again, so a subsequent SDL_QUIT is expected
         // to mean a real termination rather than another reconnect.
@@ -4376,6 +4574,17 @@ bool Session::startConnectionAsync()
         // We already displayed an error dialog in the stage failure
         // listener.
         return false;
+    }
+
+    // The reconnect pump defers resolution reports and never touches this state
+    // until the connection thread finishes.
+    m_ResolutionMatch = {};
+    // The host computes this per session from all of its preconditions
+    m_ResolutionMatch.hostSupported =
+        (LiGetHostFeatureFlags() & LI_FF_CLIENT_RESOLUTION_CHANGE) != 0;
+    if (m_Preferences->resolutionMatchWindow && !m_ResolutionMatch.hostSupported) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Host does not allow client resolution changes; not matching the window size");
     }
 
     if (m_InputHandler != nullptr) {
@@ -5209,6 +5418,7 @@ void Session::exec()
     for (;;) {
         hideGuiWindowWhenSettled(false);
         processSunshineAbrFeedback();
+        processWindowResolutionMatch();
 #ifdef Q_OS_WIN32
         processClientSdrWhiteUpdate();
 #endif
@@ -5241,6 +5451,11 @@ void Session::exec()
             // due, a 1 ms wake is sufficient and prevents a busy loop if the
             // native dispatcher needs one more turn to deliver the update.
             waitTimeoutMs = qMin(waitTimeoutMs, qMax(toastDelayMs, 1));
+        }
+        if (m_ResolutionMatch.deadline != 0) {
+            // Wake up when the window resize debounce settles
+            const int matchDelayMs = (int)(Sint32)(m_ResolutionMatch.deadline - SDL_GetTicks());
+            waitTimeoutMs = qMin(waitTimeoutMs, qMax(matchDelayMs, 1));
         }
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
         if (const int replayDelayMs = m_StylusReplayTest ?
@@ -5356,6 +5571,15 @@ void Session::exec()
                 // DISPLAY_CHANGED：同一块屏上改系统缩放只会发 SIZE_CHANGED。
                 // 比例没变时这个调用会直接返回，挂宽一点不亏。
                 m_InputHandler->refreshRemoteCursorScale();
+
+                // Restoring alone doesn't resize the window, so only retry a match
+                // that was skipped. Re-requesting otherwise would revert
+                // resolution changes the host made on its own.
+                if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
+                    (event.window.event == SDL_WINDOWEVENT_RESTORED &&
+                     m_ResolutionMatch.deferred)) {
+                    scheduleWindowResolutionMatch();
+                }
                 break;
             }
 
@@ -5552,6 +5776,9 @@ void Session::exec()
             // Set HDR mode. We may miss the callback if we're in the middle
             // of recreating our decoder at the time the HDR transition happens.
             m_VideoDecoder->setHdrMode(LiGetCurrentHostDisplayHdrMode());
+
+            // The stream resolution may have changed (host resolution change or reconnect)
+            m_InputHandler->setStreamDimensions(m_ActiveVideoWidth, m_ActiveVideoHeight);
 
             // After a window resize, we need to reset the pointer lock region
             m_InputHandler->updatePointerRegionLock();

@@ -38,6 +38,7 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | overlay_menu_navigation | 悬浮菜单键盘/鼠标导航(QTest 事件,需 offscreen) | Windows |
 | settings_localization | 中文翻译 .qm + 设置页布局(qmltestrunner) | Windows |
 | linux_display_event_monitor | Linux 显示事件唤醒 | Linux |
+| resolution_match | 客户端驱动分辨率:Session 方法 + 源码门禁(python unittest,需 C++ 编译器) | Linux |
 
 ## 仅本地/手动
 
@@ -45,6 +46,20 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 |---|---|
 | usb_forwarding_tunnel | USB/IP 隧道手动联调探针:需要 10 个 CLI 参数和真实 usbipd 服务端,不能进 CI。用法看 main.cpp 头注释 |
 | `file-mapping/smoke/` | 文件映射冒烟二进制,复用 app 源码,手工构建运行。刻意**不注册**进 moonlight-qt.pro 的 SUBDIRS:它链接 app 后端与 OpenSSL,注册会给全部平台构建(含 SteamLink 老工具链)平添失败面,而它没有自动化验证价值 |
+
+`resolution_match` compiles the production Session resize/report methods with fake
+time, window geometry, transport and decoder-reset events. Run `python -m unittest
+discover -s tests/resolution_match -p 'test_*.py'` from a C++ compiler environment
+(MSVC developer shell on Windows). It covers disabled/unsupported hosts sending
+nothing, debounce, one outstanding request, timeout, 1:1 display gating, fullscreen,
+decoder reset failure and host-initiated changes with matching disabled. Source
+integration gates also protect unique SDL event codes, connection-state reset and
+the single input-dimension setter.
+
+Window matching defaults off. It needs a Foundation Sunshine build containing
+[AlkaidLab/foundation-sunshine#729](https://github.com/AlkaidLab/foundation-sunshine/pull/729)
+with `allow_client_resolution_change` enabled; normal releases without its negotiated
+`0x400` capability stay inert. These tests do not alter a host or its display.
 
 ## 约定
 
