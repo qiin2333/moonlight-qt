@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdlib>
 #include <cstdio>
 #include <deque>
 #include <iostream>
@@ -321,7 +322,14 @@ int main(int argc, char* argv[])
     writer.stopAndDrain();
     if (controller.workerThread() != nullptr) {
         controller.workerThread()->quit();
-        controller.workerThread()->wait(2000);
+        if (!controller.workerThread()->wait(2000)) {
+            // The engine thread is stuck in a clipboard call (the stalled-
+            // pasteboard case). Unwinding would destroy a running QThread
+            // and abort via qFatal; exit immediately instead — the OS
+            // reclaims the stuck thread and the writer has already drained.
+            std::fflush(nullptr);
+            std::exit(rc);
+        }
     }
     if (!stdinThread.wait(1000)) {
         stdinThread.terminate();

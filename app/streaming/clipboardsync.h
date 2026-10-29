@@ -122,6 +122,15 @@ public:
     // Start watching the local clipboard and accepting inbound payloads.
     // Must be called on the thread the engine lives on (moveToThread + a
     // functor invokeMethod targeting the engine, per the helper's usage).
+    //
+    // Threading trade-off, decided deliberately: QClipboard operations are
+    // executed on the engine's worker thread even though Qt's *supported*
+    // usage is GUI-thread-only. NSPasteboard itself is an Apple thread-safe
+    // class, and worker-thread reads AND writes are verified empirically on
+    // the shipping platform (macOS 26.6 / Qt 6.11) — the alternative
+    // (clipboard writes on the GUI thread) reintroduces the outage where one
+    // blocked write wedged both sync directions. Re-verify on major Qt
+    // upgrades.
     void start();
 
     // Disconnect signals and stop processing both directions.
