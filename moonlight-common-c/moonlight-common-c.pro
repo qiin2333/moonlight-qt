@@ -63,6 +63,9 @@ SOURCES += \
     $$COMMON_C_DIR/src/Ds5HapticsIrStream.c \
     $$COMMON_C_DIR/src/FakeCallbacks.c \
     $$COMMON_C_DIR/src/InputStream.c \
+    $$COMMON_C_DIR/src/MatDepacketizer.c \
+    $$COMMON_C_DIR/src/MatLivePlayback.c \
+    $$COMMON_C_DIR/src/MatReceiver.c \
     $$COMMON_C_DIR/src/MicrophoneStream.c \
     $$COMMON_C_DIR/src/LinkedBlockingQueue.c \
     $$COMMON_C_DIR/src/Misc.c \
