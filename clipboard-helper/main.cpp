@@ -110,9 +110,9 @@ private:
                 }
             }
             size_t written = fwrite(line.constData(), 1, static_cast<size_t>(line.size()), stdout);
-            fflush(stdout);
-            // fwrite can buffer the whole line successfully while the later
-            // flush fails; a failed flush must count as a failed write.
+            // One flush, checked: a first unchecked flush could discard the
+            // buffered line while a second flush reports success (UCRT clears
+            // the buffer even when the underlying write failed).
             const bool flushed = fflush(stdout) == 0;
             if (written != static_cast<size_t>(line.size()) || !flushed) {
                 // Reader is gone; nothing else can be delivered.
