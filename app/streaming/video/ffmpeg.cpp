@@ -1001,6 +1001,19 @@ void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS &stats, char *output, i
 
         offset += ret;
     }
+
+    // Automatic mouse mode: which mode is active and why (absent with the setting off).
+    {
+        const QByteArray mouseMode = SdlInputHandler::getMouseModeStatus().toUtf8();
+        if (!mouseMode.isEmpty()) {
+            ret = snprintf(&output[offset], length - offset, "\n {16}%s", mouseMode.constData());
+            if (ret < 0 || ret >= length - offset) {
+                SDL_assert(false);
+                return;
+            }
+            offset += ret;
+        }
+    }
 }
 
 void FFmpegVideoDecoder::logVideoStats(VIDEO_STATS& stats, const char* title)

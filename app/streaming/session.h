@@ -327,6 +327,12 @@ private:
     void clCursorUpdate(const LI_CURSOR_UPDATE* update);
 
     static
+    void clCursorState(const LI_CURSOR_STATE* state);
+
+    static
+    void clCursorShape(const LI_CURSOR_SHAPE* shape);
+
+    static
     void clDs5HapticsPcm(const LI_DS5_HAPTICS_PCM_FRAME* frame);
 
     static

@@ -229,6 +229,10 @@ jobs:
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat keyboard_state keyboard_state
         if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat cursor_mode_policy cursor_mode_policy
+        if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat host_cursor_math host_cursor_math
+        if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat gamepad_sensor_rate gamepad_sensor_rate
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat overlay_event_wake_state overlay_event_wake_state

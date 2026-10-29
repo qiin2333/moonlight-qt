@@ -1653,6 +1653,26 @@
         <translation>启动时检查 Moonlight 是否有新版本。</translation>
     </message>
     <message>
+        <source>Automatic mouse mode</source>
+        <translation>自动鼠标模式</translation>
+    </message>
+    <message>
+        <source>On hosts that support it, the host&apos;s cursor is drawn as your own cursor, and the mouse switches between remote desktop and game control by itself when a game hides or captures the cursor.</source>
+        <translation>在支持的主机上，主机光标会作为本机鼠标指针显示；游戏隐藏或捕获光标时，鼠标会自动在远程桌面和游戏操控之间切换。</translation>
+    </message>
+    <message>
+        <source>While streaming, Ctrl+Alt+Shift+M switches to the other mode and keeps it, and Ctrl+Alt+Shift+A keeps the current mode or returns to automatic.</source>
+        <translation>串流时，Ctrl+Alt+Shift+M 切换到另一种模式并保持；Ctrl+Alt+Shift+A 保持当前模式，或恢复自动切换。</translation>
+    </message>
+    <message>
+        <source>Optimize mouse for remote desktop on hosts without automatic mode</source>
+        <translation>在不支持自动模式的主机上为远程桌面优化鼠标</translation>
+    </message>
+    <message>
+        <source>In automatic mouse mode the host&apos;s cursor is always drawn as your own cursor; Ctrl+Alt+Shift+C shows it in the video instead.</source>
+        <translation>自动鼠标模式下，主机光标始终作为本机鼠标指针显示；按 Ctrl+Alt+Shift+C 可改为显示在串流画面里。</translation>
+    </message>
+    <message>
         <source>Overlay menu position</source>
         <translation>悬浮菜单位置</translation>
     </message>

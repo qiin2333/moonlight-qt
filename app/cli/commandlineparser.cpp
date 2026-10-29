@@ -357,6 +357,7 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     parser.addToggleOption("multi-controller", "multiple controller support");
     parser.addToggleOption("quit-after", "quit app after session");
     parser.addToggleOption("absolute-mouse", "remote desktop optimized mouse control");
+    parser.addToggleOption("automatic-mouse", "automatic mouse mode on supported hosts");
     parser.addToggleOption("mouse-buttons-swap", "left and right mouse buttons swap");
     parser.addToggleOption("win-alt-swap", "win and alt keys swap");
     parser.addToggleOption("touchscreen-trackpad", "touchscreen in trackpad mode");
@@ -461,6 +462,9 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
 
     // Resolve --show-local-cursor and --no-show-local-cursor options
     preferences->showLocalCursor = parser.getToggleOptionValue("show-local-cursor", preferences->showLocalCursor);
+
+    // Resolve --automatic-mouse and --no-automatic-mouse options
+    preferences->automaticMouseMode = parser.getToggleOptionValue("automatic-mouse", preferences->automaticMouseMode);
 
     // Resolve --mouse-buttons-swap and --no-mouse-buttons-swap options
     preferences->swapMouseButtons = parser.getToggleOptionValue("mouse-buttons-swap", preferences->swapMouseButtons);

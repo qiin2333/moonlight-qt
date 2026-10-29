@@ -377,7 +377,17 @@ Column {
         title: qsTr("Mouse")
 
         ToggleRow {
-            title: qsTr("Optimize mouse for remote desktop instead of games")
+            title: qsTr("Automatic mouse mode")
+            description: qsTr("On hosts that support it, the host's cursor is drawn as your own cursor, and the mouse switches between remote desktop and game control by itself when a game hides or captures the cursor.") + " " +
+                         qsTr("While streaming, Ctrl+Alt+Shift+M switches to the other mode and keeps it, and Ctrl+Alt+Shift+A keeps the current mode or returns to automatic.")
+            checked: StreamingPreferences.automaticMouseMode
+            onToggled: function(value) { StreamingPreferences.automaticMouseMode = value }
+        }
+
+        ToggleRow {
+            title: StreamingPreferences.automaticMouseMode ?
+                       qsTr("Optimize mouse for remote desktop on hosts without automatic mode") :
+                       qsTr("Optimize mouse for remote desktop instead of games")
             description: qsTr("This enables seamless mouse control without capturing the client's mouse cursor. It is ideal for remote desktop usage but will not work in most games.") + " " +
                          qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+M.") + "\n\n" +
                          qsTr("NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.")
@@ -388,7 +398,9 @@ Column {
         ToggleRow {
             title: qsTr("Show local cursor")
             description: qsTr("This makes the client's mouse cursor visible in the stream.") + " " +
-                         qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.")
+                         qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.") +
+                         (StreamingPreferences.automaticMouseMode ?
+                              "\n\n" + qsTr("In automatic mouse mode the host's cursor is always drawn as your own cursor; Ctrl+Alt+Shift+C shows it in the video instead.") : "")
             checked: StreamingPreferences.showLocalCursor
             onToggled: function(value) { StreamingPreferences.showLocalCursor = value }
         }

@@ -63,26 +63,66 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected mouse mode toggle combo");
 
+        if (isAutomaticMouseModeActive()) {
+            // In automatic mode, switch to the other mode and keep it until unlocked
+            m_CursorPolicy.lock(m_CursorDecision.mode == CursorModePolicy::Mode::Absolute ?
+                                    CursorModePolicy::Mode::Relative : CursorModePolicy::Mode::Absolute);
+            evaluateCursorMode();
+            break;
+        }
+
         // Uncapture input
         setCaptureActive(false);
 
         // Toggle mouse mode
         m_AbsoluteMouseMode = !m_AbsoluteMouseMode;
+        m_FallbackAbsoluteMouseMode = m_AbsoluteMouseMode;
         synchronizeLocalCursorMode();
 
         // Recapture input
         setCaptureActive(true);
+        evaluateCursorMode();
+        break;
+
+    case KeyComboToggleMouseModeLock:
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Detected mouse mode lock combo");
+
+        if (m_CursorPolicy.isLocked()) {
+            m_CursorPolicy.unlock();
+        }
+        else if (isAutomaticMouseModeActive()) {
+            m_CursorPolicy.lock(m_CursorDecision.mode);
+        }
+        else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Automatic mouse mode is not active for this session");
+            break;
+        }
+        evaluateCursorMode();
         break;
 
     case KeyComboToggleCursorHide:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected show mouse combo");
 
-        if (!SDL_GetRelativeMouseMode()) {
+        if (!SDL_GetRelativeMouseMode() && isAutomaticMouseModeActive()) {
+            // Automatic mode draws the host's cursor locally; this hands it to the
+            // video for the session, and back.
+            m_HostCursorPreferVideo = !m_HostCursorPreferVideo;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Host cursor drawn by the %s",
+                        m_HostCursorPreferVideo ? "host in the video" : "client");
+            updateHostCursorControl();
+            updateLocalCursor();
+            publishMouseModeStatus();
+        }
+        else if (!SDL_GetRelativeMouseMode()) {
             // 切换本地鼠标光标可见性状态
             m_MouseCursorCapturedVisibilityState = !m_MouseCursorCapturedVisibilityState;
             synchronizeLocalCursorMode();
             applyCapturedCursorState();
+            updateLocalCursor();
         }
         else {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,

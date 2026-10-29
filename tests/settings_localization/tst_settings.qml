@@ -51,6 +51,9 @@ TestCase {
         compare(qsTranslate("SettingsView", "Software Settings"), "软件设置")
         compare(qsTranslate("SettingsView", "Interface"), "界面")
         compare(qsTranslate("LegacySettingsPage", "Language"), "语言")
+        compare(qsTranslate("LegacySettingsPage", "Automatic mouse mode"), "自动鼠标模式")
+        compare(qsTranslate("LegacySettingsPage", "Optimize mouse for remote desktop on hosts without automatic mode"),
+                "在不支持自动模式的主机上为远程桌面优化鼠标")
         compare(qsTranslate("AboutSettingsPage", "About"), "关于")
         verify(qsTranslate("OverlayMenuPanel", "Connected — select to release") !== "Connected — select to release")
         verify(qsTranslate("StylusReplayTest", "Stylus replay stopped.") !== "Stylus replay stopped.")

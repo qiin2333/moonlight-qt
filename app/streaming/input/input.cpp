@@ -27,15 +27,6 @@
 
 namespace {
 
-// 主机推来的标准光标默认换成本机的系统光标。设 MOONLIGHT_NATIVE_CURSOR=0 可以不
-// 重编就退回旧行为，用来确认某个形状是不是被认错了。
-bool nativeCursorSubstitutionEnabled()
-{
-    static const bool enabled =
-        qEnvironmentVariable("MOONLIGHT_NATIVE_CURSOR") != QStringLiteral("0");
-    return enabled;
-}
-
 bool isStreamWindowFullscreen(SDL_Window* window)
 {
     if (Session* session = Session::get()) {
@@ -44,7 +35,18 @@ bool isStreamWindowFullscreen(SDL_Window* window)
     return window != nullptr && (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
 }
 
-bool toSdlSystemCursor(NativeCursorShape shape, SDL_SystemCursor& systemCursor)
+} // namespace
+
+// 主机推来的标准光标默认换成本机的系统光标。设 MOONLIGHT_NATIVE_CURSOR=0 可以不
+// 重编就退回旧行为，用来确认某个形状是不是被认错了。
+bool SdlInputHandler::nativeCursorSubstitutionEnabled()
+{
+    static const bool enabled =
+        qEnvironmentVariable("MOONLIGHT_NATIVE_CURSOR") != QStringLiteral("0");
+    return enabled;
+}
+
+bool SdlInputHandler::toSdlSystemCursor(NativeCursorShape shape, SDL_SystemCursor& systemCursor)
 {
     switch (shape) {
     case NativeCursorShape::Arrow:
@@ -84,8 +86,6 @@ bool toSdlSystemCursor(NativeCursorShape shape, SDL_SystemCursor& systemCursor)
     }
     return false;
 }
-
-} // namespace
 
 SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight,
                                  bool enablePhysicalDualSenseHaptics)
@@ -135,8 +135,18 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_WindowsTouchpadHeightMm(0),
 #endif
       m_LeftButtonReleaseTimer(0), m_RightButtonReleaseTimer(0), m_DragTimer(0), m_DragButton(0),
-      m_NumFingersDown(0)
+      m_NumFingersDown(0),
+      m_HostCursorSupported(false), m_HostCursorReady(false), m_HostCursorHasPosition(false),
+      m_HostCursorX(0), m_HostCursorY(0), m_HostCursorControlSent(-1), m_HostCursorResendId(0),
+      m_HostCursorResendTime(0), m_HostSdlCursorScale(0), m_HostCursorPreferVideo(false),
+      m_AutomaticMouseMode(prefs.automaticMouseMode),
+      m_FallbackAbsoluteMouseMode(prefs.absoluteMouseMode), m_AutomaticCaptureDone(false),
+      m_CursorDecision { CursorModePolicy::Mode::Fallback, CursorModePolicy::Source::Fallback, 0 },
+      m_CursorModeTimer(0), m_CursorModeTimerDue(0), m_ClientDrawsGraceActive(false),
+      m_ClientDrawsSinceMs(0), m_HasAbsoluteSyncPoint(false), m_AbsoluteSyncPoint { 0, 0 }
 {
+    SDL_zero(m_HostCursorState);
+
     // System keys are always captured when running without a DE
     if (!WMUtils::isRunningDesktopEnvironment()) {
         m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
@@ -242,6 +252,13 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     m_SpecialKeyCombos[KeyComboToggleKeyboardGrab].keyCode = SDLK_k;
     m_SpecialKeyCombos[KeyComboToggleKeyboardGrab].scanCode = SDL_SCANCODE_K;
     m_SpecialKeyCombos[KeyComboToggleKeyboardGrab].enabled = WMUtils::isRunningDesktopEnvironment();
+
+    m_SpecialKeyCombos[KeyComboToggleMouseModeLock].keyCombo = KeyComboToggleMouseModeLock;
+    m_SpecialKeyCombos[KeyComboToggleMouseModeLock].keyCode = SDLK_a;
+    m_SpecialKeyCombos[KeyComboToggleMouseModeLock].scanCode = SDL_SCANCODE_A;
+    // Enabled by startHostCursor() only when automatic mode is available, so on
+    // other hosts (or with the setting off) the combo still reaches the host.
+    m_SpecialKeyCombos[KeyComboToggleMouseModeLock].enabled = false;
 
     m_OldIgnoreDevices = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES);
     m_OldIgnoreDevicesExcept = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT);
@@ -364,6 +381,11 @@ SdlInputHandler::~SdlInputHandler()
     SDL_RemoveTimer(m_RightButtonReleaseTimer);
     SDL_RemoveTimer(m_DragTimer);
     SDL_RemoveTimer(m_RemoteCursorHideTimer);
+    SDL_RemoveTimer(m_CursorModeTimer);
+
+    // Host cursor shapes live only as long as the session.
+    freeHostSdlCursors();
+    clearMouseModeStatus();
 #if !SDL_VERSION_ATLEAST(2, 0, 9)
     SDL_QuitSubSystem(SDL_INIT_HAPTIC);
     SDL_assert(!SDL_WasInit(SDL_INIT_HAPTIC));
@@ -622,6 +644,14 @@ bool SdlInputHandler::tryUseNativeRemoteCursor(const RemoteCursorUpdate& update)
 
 void SdlInputHandler::synchronizeLocalCursorMode()
 {
+    // Automatic mouse mode uses cursor protocol v2 for the whole session; a v1
+    // request would end the host's v2 subscription.
+    if (m_HostCursorSupported) {
+        m_LocalCursorMode.store(LI_CURSOR_MODE_VIDEO, std::memory_order_relaxed);
+        resetRemoteCursor();
+        return;
+    }
+
     const int cursorMode = m_AbsoluteMouseMode &&
                            m_MouseCursorCapturedVisibilityState == SDL_ENABLE ?
                                LI_CURSOR_MODE_LOCAL : LI_CURSOR_MODE_VIDEO;
@@ -676,6 +706,13 @@ qreal SdlInputHandler::getRemoteCursorScale() const
 
 void SdlInputHandler::refreshRemoteCursorScale()
 {
+    // Automatic mouse mode sizes its cursors from the video region, which covers a
+    // change of display too.
+    if (m_HostCursorSupported) {
+        updateLocalCursor();
+        return;
+    }
+
 #ifdef Q_OS_MACOS
     // 缩放比例是创建光标那一刻算的，而 updateRemoteCursor() 只在主机推来新形状时才会
     // 被调用。窗口从 Retina 屏拖到 1x 屏（或反过来）时，光标会一直停在旧比例上 ——
@@ -902,14 +939,22 @@ void SdlInputHandler::setCaptureActive(bool active)
             int mouseX, mouseY;
             int windowX, windowY;
 
-            // We have to use SDL_GetGlobalMouseState() because macOS may not reflect
-            // the new position of the mouse when outside the window.
-            SDL_GetGlobalMouseState(&mouseX, &mouseY);
+            if (m_HasAbsoluteSyncPoint) {
+                // Automatic mouse mode just warped the cursor to the host's position
+                mouseX = m_AbsoluteSyncPoint.x;
+                mouseY = m_AbsoluteSyncPoint.y;
+                m_HasAbsoluteSyncPoint = false;
+            }
+            else {
+                // We have to use SDL_GetGlobalMouseState() because macOS may not reflect
+                // the new position of the mouse when outside the window.
+                SDL_GetGlobalMouseState(&mouseX, &mouseY);
 
-            // Convert global mouse state to window-relative
-            SDL_GetWindowPosition(m_Window, &windowX, &windowY);
-            mouseX -= windowX;
-            mouseY -= windowY;
+                // Convert global mouse state to window-relative
+                SDL_GetWindowPosition(m_Window, &windowX, &windowY);
+                mouseX -= windowX;
+                mouseY -= windowY;
+            }
 
             if (isMouseInVideoRegion(mouseX, mouseY)) {
                 // Synthesize a mouse event to synchronize the cursor
@@ -945,7 +990,16 @@ void SdlInputHandler::setCaptureActive(bool active)
         else {
             SDL_SetRelativeMouseMode(SDL_FALSE);
         }
+
+        // Uncaptured, the window shows the normal cursor and the video shows the host's
+        if (m_HostCursorSupported) {
+            SDL_SetCursor(SDL_GetDefaultCursor());
+        }
     }
+
+    // Tell the host whether we draw the cursor now
+    updateHostCursorControl();
+    publishMouseModeStatus();
 
     // Update mouse pointer region constraints
     updatePointerRegionLock();

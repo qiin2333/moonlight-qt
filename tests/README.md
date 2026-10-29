@@ -14,6 +14,8 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 |---|---|---|
 | derive_version | scripts/derive-version.py 版本号推导 | Ubuntu(unittest) |
 | cursor_shape_classification | 光标位图 → 形状分类器的判定矩阵 | Windows |
+| cursor_mode_policy | 自动鼠标模式切换规则（首次移动切相对、按键按住时不回绝对、锁定、裁剪、居中检测） | Windows |
+| host_cursor_math | 主机光标坐标 → 窗口映射、裁剪框、光标缩放 | Windows |
 | clipboard_payload_routing | 剪贴板状态、复合内容、文件保护、IPC 分帧和本地 TLS 传输回归（offscreen） | Windows |
 | clipboard_helper_lifecycle | helper 异常退出、响应超时和进程管道背压 | Windows |
 | overlay_button_position | 悬浮按钮归一化/还原坐标的跨分辨率往返 | Windows |

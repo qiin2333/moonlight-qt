@@ -861,6 +861,67 @@ void Session::clCursorUpdate(const LI_CURSOR_UPDATE* update)
     }
 }
 
+// Cursor protocol v2 states and shapes go through the SDL event queue one event
+// each, so the main thread sees them in the host's order and no shape is replaced
+// by a later update (unlike the v1 single-slot mailbox above).
+void Session::clCursorState(const LI_CURSOR_STATE* state)
+{
+    // Called on the control receive thread. Log transitions, not every position update.
+    static uint8_t lastFlags = 0xFF;
+    static uint32_t lastShapeId;
+    const uint8_t flags = state->flags & ~(LI_CURSOR_STATE_FLAG_HAS_POSITION | LI_CURSOR_STATE_FLAG_RESYNC);
+    if ((state->flags & LI_CURSOR_STATE_FLAG_RESYNC) || flags != lastFlags || state->shapeId != lastShapeId) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Host cursor state %u: flags 0x%02x, shape %u, position %d,%d, reference %ux%u, scale %.3f, clip %d,%d-%d,%d",
+                    state->sequence, state->flags, state->shapeId, state->x, state->y,
+                    state->referenceWidth, state->referenceHeight, state->scaleQ16 / 65536.0,
+                    state->clipLeft, state->clipTop, state->clipRight, state->clipBottom);
+        lastFlags = flags;
+        lastShapeId = state->shapeId;
+    }
+
+    // The main thread owns the cursor and the input handler; it frees the copy.
+    LI_CURSOR_STATE* copy = (LI_CURSOR_STATE*)SDL_malloc(sizeof(*copy));
+    if (copy == nullptr) {
+        return;
+    }
+    *copy = *state;
+
+    SDL_Event event = {};
+    event.type = SDL_USEREVENT;
+    event.user.code = SDL_CODE_HOST_CURSOR_STATE;
+    event.user.data1 = copy;
+    if (SDL_PushEvent(&event) <= 0) {
+        SDL_free(copy);
+    }
+}
+
+void Session::clCursorShape(const LI_CURSOR_SHAPE* shape)
+{
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Host cursor shape %u: %ux%u, hotspot %u,%u",
+                shape->shapeId, shape->width, shape->height, shape->hotspotX, shape->hotspotY);
+
+    // One allocation: the shape header followed by its pixels, freed by the main thread.
+    size_t pixelBytes = (size_t)shape->width * shape->height * 4;
+    LI_CURSOR_SHAPE* copy = (LI_CURSOR_SHAPE*)SDL_malloc(sizeof(*copy) + pixelBytes);
+    if (copy == nullptr) {
+        return;
+    }
+    *copy = *shape;
+    uint8_t* pixels = (uint8_t*)(copy + 1);
+    SDL_memcpy(pixels, shape->pixels, pixelBytes);
+    copy->pixels = pixels;
+
+    SDL_Event event = {};
+    event.type = SDL_USEREVENT;
+    event.user.code = SDL_CODE_HOST_CURSOR_SHAPE;
+    event.user.data1 = copy;
+    if (SDL_PushEvent(&event) <= 0) {
+        SDL_free(copy);
+    }
+}
+
 void Session::clDs5HapticsPcm(const LI_DS5_HAPTICS_PCM_FRAME* frame)
 {
     Session* session = s_ActiveSession;
@@ -2297,6 +2358,25 @@ bool Session::validateLaunch(SDL_Window* testWindow)
 }
 
 
+// Host cursor events pushed after the event loop stopped would otherwise leak their
+// payloads or reach the next session; SDL_FilterEvents() drops them under SDL's lock.
+static int dropHostCursorEvents(void*, SDL_Event* event)
+{
+    if (event->type != SDL_USEREVENT) {
+        return 1;
+    }
+    switch (event->user.code) {
+    case SDL_CODE_HOST_CURSOR_STATE:
+    case SDL_CODE_HOST_CURSOR_SHAPE:
+        SDL_free(event->user.data1);
+        return 0;
+    case SDL_CODE_HOST_CURSOR_TICK:
+        return 0;
+    default:
+        return 1;
+    }
+}
+
 class DeferredSessionCleanupTask : public QRunnable
 {
 public:
@@ -2340,6 +2420,10 @@ private:
             m_Session->m_DualSenseHapticsRenderer->setControllerTarget(-1);
         }
         LiStopConnection();
+
+        // No more host cursor callbacks can run now
+        SDL_FilterEvents(dropHostCursorEvents, nullptr);
+
         stopControllerRumbleAtConnectionBoundary(nullptr);
         delete m_Session->m_DualSenseHapticsRenderer;
         m_Session->m_DualSenseHapticsRenderer = nullptr;
@@ -3818,6 +3902,23 @@ void Session::handleSdlUserEvent(const SDL_UserEvent& event)
         }
         break;
     }
+    case SDL_CODE_HOST_CURSOR_STATE:
+        if (m_InputHandler != nullptr) {
+            m_InputHandler->handleHostCursorState((const LI_CURSOR_STATE*)event.data1);
+        }
+        SDL_free(event.data1);
+        break;
+    case SDL_CODE_HOST_CURSOR_SHAPE:
+        if (m_InputHandler != nullptr) {
+            m_InputHandler->handleHostCursorShape((const LI_CURSOR_SHAPE*)event.data1);
+        }
+        SDL_free(event.data1);
+        break;
+    case SDL_CODE_HOST_CURSOR_TICK:
+        if (m_InputHandler != nullptr) {
+            m_InputHandler->handleHostCursorTick();
+        }
+        break;
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN) || \
         defined(HAVE_LINUX_DISPLAY_EVENT_MONITOR)
     case SDL_CODE_PROCESS_QT_OVERLAY_EVENTS:
@@ -3875,6 +3976,8 @@ bool Session::tryReconnect()
         m_DualSenseHapticsRenderer->setControllerTarget(-1);
     }
     LiStopConnection();
+    // The old host session's cursor states must not reach the new one
+    SDL_FilterEvents(dropHostCursorEvents, nullptr);
     stopControllerRumbleAtConnectionBoundary(m_InputHandler);
     if (m_DualSenseHapticsRenderer != nullptr) {
         m_DualSenseHapticsRenderer->reset();
@@ -3973,6 +4076,8 @@ bool Session::tryReconnect()
             if (m_InputHandler != nullptr) {
                 m_InputHandler->notifyHostOfConnectedGamepads();
                 m_InputHandler->raiseAllKeys();
+                // The new host session needs the cursor subscription again
+                m_InputHandler->startHostCursor();
             }
             break;
         }
@@ -3983,6 +4088,7 @@ bool Session::tryReconnect()
             m_DualSenseHapticsRenderer->setControllerTarget(-1);
         }
         LiStopConnection();
+        SDL_FilterEvents(dropHostCursorEvents, nullptr);
         stopControllerRumbleAtConnectionBoundary(m_InputHandler);
         if (m_DualSenseHapticsRenderer != nullptr) {
             m_DualSenseHapticsRenderer->reset();
@@ -4336,6 +4442,15 @@ bool Session::startConnectionAsync()
                                                                          false);
     }
 
+    // Cursor protocol v2 for automatic mouse mode. Nothing arrives until the input
+    // handler subscribes; with the setting off nothing is registered.
+    if (m_Preferences->automaticMouseMode) {
+        LiSetCursorStateCallbacks(clCursorState, clCursorShape);
+    }
+    else {
+        LiSetCursorStateCallbacks(nullptr, nullptr);
+    }
+
     int err = LiStartConnection(&preparedHostInfo.info, &m_StreamConfig, &k_ConnCallbacks,
                                 &m_VideoCallbacks, &m_AudioCallbacks,
                                 NULL, 0, NULL, 0);
@@ -4345,7 +4460,9 @@ bool Session::startConnectionAsync()
         return false;
     }
 
-    if (m_InputHandler != nullptr) {
+    // A host with cursor protocol v2 gets automatic mouse mode instead of the v1
+    // local cursor; a v1 request would end the v2 subscription.
+    if (m_InputHandler != nullptr && !m_InputHandler->isHostCursorV2Available()) {
         const int cursorResult =
             LiSetCursorMode(m_InputHandler->getLocalCursorMode());
         if (cursorResult != LI_CURSOR_MODE_OK &&
@@ -4828,6 +4945,9 @@ void Session::exec()
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
     syncWaylandSdlWindowState();
 #endif
+
+    // The connection is up: subscribe to the host cursor if the host offers it
+    m_InputHandler->startHostCursor();
 
     QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
     QImage svgImage(ICON_SIZE, ICON_SIZE, QImage::Format_RGBA8888);
