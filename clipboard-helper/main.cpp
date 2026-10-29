@@ -246,7 +246,8 @@ private:
             postToEngine([engine] { engine->start(); });
         }
         else {
-            postToEngine([engine = m_ClipboardEngine, context] { engine->setHostContext(context); });
+            postToEngine(
+                [engine = m_ClipboardEngine, context] { engine->setHostContext(context); });
         }
 
         writeProtocolLine(ClipboardIpc::encodeReady(sequence));
@@ -274,19 +275,20 @@ private:
         m_ClipboardEngine = engine;
     }
 
-    template <typename Fn>
-    void postToEngine(Fn&& fn)
+    template <typename Fn> void postToEngine(Fn&& fn)
     {
         if (m_ClipboardEngine == nullptr) {
             return;
         }
-        QMetaObject::invokeMethod(m_ClipboardEngine,
-                                  [engine = QPointer<ClipboardSync>(m_ClipboardEngine), fn = std::forward<Fn>(fn)]() mutable {
-                                      if (engine != nullptr) {
-                                          fn();
-                                      }
-                                  },
-                                  Qt::QueuedConnection);
+        QMetaObject::invokeMethod(
+            m_ClipboardEngine,
+            [engine = QPointer<ClipboardSync>(m_ClipboardEngine),
+             fn = std::forward<Fn>(fn)]() mutable {
+                if (engine != nullptr) {
+                    fn();
+                }
+            },
+            Qt::QueuedConnection);
     }
 
     ProtocolWriter* m_Writer = nullptr;
