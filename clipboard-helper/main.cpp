@@ -327,6 +327,11 @@ int main(int argc, char* argv[])
         stdinThread.terminate();
         stdinThread.wait();
     }
+    // A writer failure means protocol output was lost; surface it in the
+    // exit status so the session log shows an abnormal helper termination.
+    if (rc == 0 && writer.failed()) {
+        rc = 3;
+    }
     return rc;
 }
 
