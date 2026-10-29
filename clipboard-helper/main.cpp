@@ -111,7 +111,10 @@ private:
             }
             size_t written = fwrite(line.constData(), 1, static_cast<size_t>(line.size()), stdout);
             fflush(stdout);
-            if (written != static_cast<size_t>(line.size())) {
+            // fwrite can buffer the whole line successfully while the later
+            // flush fails; a failed flush must count as a failed write.
+            const bool flushed = fflush(stdout) == 0;
+            if (written != static_cast<size_t>(line.size()) || !flushed) {
                 // Reader is gone; nothing else can be delivered.
                 QCoreApplication::quit();
                 return;
@@ -209,9 +212,13 @@ private:
 
         if (m_ClipboardEngine == nullptr) {
             m_ClipboardEngine = new ClipboardSync(context, this);
-            // Direct: outbound frames are produced on the snapshot thread;
-            // queueing them for the GUI thread would let one wedged inbound
-            // clipboard write take host-bound traffic down with it.
+            // Direct delivery keeps the enqueue on the emitting thread and
+            // out of the GUI event loop; the writer thread owns stdout, so a
+            // slow reader never blocks helper processing. Note the frame
+            // producer still runs on the GUI thread today (QClipboard and
+            // QNAM callbacks) — moving production off-GUI requires splitting
+            // ClipboardSync's GUI-affinity internals and is a tracked
+            // follow-up.
             connect(m_ClipboardEngine, &ClipboardSync::outboundFrame, this,
                     &ClipboardHelperController::sendLocalFrame, Qt::DirectConnection);
             m_ClipboardEngine->start();
