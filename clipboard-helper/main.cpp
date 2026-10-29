@@ -55,10 +55,7 @@ public:
     {
         m_Thread = std::thread([this] { run(); });
     }
-    ~ProtocolWriter()
-    {
-        stopAndDrain();
-    }
+    ~ProtocolWriter() { stopAndDrain(); }
 
     // Thread-safe. Returns false when the line was dropped because the
     // backlog cap was hit (the reader side is gone or wedged).
@@ -70,8 +67,7 @@ public:
             std::unique_lock<std::mutex> lock(m_Mutex);
             if (m_TotalBytes + line.size() > MAX_PENDING_BYTES) {
                 ok = false;
-            }
-            else {
+            } else {
                 m_Queue.push_back(std::move(line));
                 m_TotalBytes += m_Queue.back().size();
             }
@@ -104,20 +100,16 @@ private:
             QByteArray line;
             {
                 std::unique_lock<std::mutex> lock(m_Mutex);
-                m_Condition.wait(lock, [this] {
-                    return m_Stopping || !m_Queue.empty();
-                });
+                m_Condition.wait(lock, [this] { return m_Stopping || !m_Queue.empty(); });
                 if (!m_Queue.empty()) {
                     line = std::move(m_Queue.front());
                     m_Queue.pop_front();
                     m_TotalBytes -= line.size();
-                }
-                else if (m_Stopping) {
+                } else if (m_Stopping) {
                     return;
                 }
             }
-            size_t written = fwrite(line.constData(), 1,
-                                    static_cast<size_t>(line.size()), stdout);
+            size_t written = fwrite(line.constData(), 1, static_cast<size_t>(line.size()), stdout);
             fflush(stdout);
             if (written != static_cast<size_t>(line.size())) {
                 // Reader is gone; nothing else can be delivered.
@@ -145,10 +137,7 @@ public:
     {
     }
 
-    void setWriter(ProtocolWriter* writer)
-    {
-        m_Writer = writer;
-    }
+    void setWriter(ProtocolWriter* writer) { m_Writer = writer; }
 
 public slots:
     void handleLine(const QByteArray& line)
@@ -223,9 +212,8 @@ private:
             // Direct: outbound frames are produced on the snapshot thread;
             // queueing them for the GUI thread would let one wedged inbound
             // clipboard write take host-bound traffic down with it.
-            connect(m_ClipboardEngine, &ClipboardSync::outboundFrame,
-                    this, &ClipboardHelperController::sendLocalFrame,
-                    Qt::DirectConnection);
+            connect(m_ClipboardEngine, &ClipboardSync::outboundFrame, this,
+                    &ClipboardHelperController::sendLocalFrame, Qt::DirectConnection);
             m_ClipboardEngine->start();
         }
         else {
@@ -251,7 +239,7 @@ private:
     ClipboardSync* m_ClipboardEngine = nullptr;
     // Touched from snapshot threads (inline frames) and the GUI thread (REF
     // callbacks), so the increment must be atomic.
-    std::atomic<quint32> m_NextSequence{1};
+    std::atomic<quint32> m_NextSequence{ 1 };
 };
 
 int main(int argc, char* argv[])
