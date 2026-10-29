@@ -9,9 +9,14 @@
 #include <QSslKey>
 #include <QThread>
 
+#include <atomic>
+#include <condition_variable>
 #include <cstdio>
+#include <deque>
 #include <iostream>
+#include <mutex>
 #include <string>
+#include <thread>
 
 #ifdef Q_OS_MACOS
 extern "C" void ClipboardHelperSetBackgroundActivationPolicy();
@@ -38,6 +43,98 @@ protected:
     }
 };
 
+// Single owner of stdout. Every protocol line goes through this thread so a
+// wedged GUI thread (a clipboard write blocked on pasteboard contention)
+// cannot stall host-bound traffic: outbound frames are enqueued from the
+// snapshot thread directly, never crossing the GUI event loop. The queue is
+// bounded by total bytes, symmetric with the session's stdin backlog cap.
+class ProtocolWriter
+{
+public:
+    explicit ProtocolWriter()
+    {
+        m_Thread = std::thread([this] { run(); });
+    }
+    ~ProtocolWriter()
+    {
+        stopAndDrain();
+    }
+
+    // Thread-safe. Returns false when the line was dropped because the
+    // backlog cap was hit (the reader side is gone or wedged).
+    bool write(QByteArray line)
+    {
+        line += '\n';
+        bool ok = true;
+        {
+            std::unique_lock<std::mutex> lock(m_Mutex);
+            if (m_TotalBytes + line.size() > MAX_PENDING_BYTES) {
+                ok = false;
+            }
+            else {
+                m_Queue.push_back(std::move(line));
+                m_TotalBytes += m_Queue.back().size();
+            }
+        }
+        m_Condition.notify_one();
+        return ok;
+    }
+
+    void stopAndDrain()
+    {
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            if (m_Stopping) {
+                return;
+            }
+            m_Stopping = true;
+        }
+        m_Condition.notify_all();
+        if (m_Thread.joinable()) {
+            m_Thread.join();
+        }
+    }
+
+private:
+    static constexpr size_t MAX_PENDING_BYTES = 4 * 1024 * 1024;
+
+    void run()
+    {
+        for (;;) {
+            QByteArray line;
+            {
+                std::unique_lock<std::mutex> lock(m_Mutex);
+                m_Condition.wait(lock, [this] {
+                    return m_Stopping || !m_Queue.empty();
+                });
+                if (!m_Queue.empty()) {
+                    line = std::move(m_Queue.front());
+                    m_Queue.pop_front();
+                    m_TotalBytes -= line.size();
+                }
+                else if (m_Stopping) {
+                    return;
+                }
+            }
+            size_t written = fwrite(line.constData(), 1,
+                                    static_cast<size_t>(line.size()), stdout);
+            fflush(stdout);
+            if (written != static_cast<size_t>(line.size())) {
+                // Reader is gone; nothing else can be delivered.
+                QCoreApplication::quit();
+                return;
+            }
+        }
+    }
+
+    std::thread m_Thread;
+    std::mutex m_Mutex;
+    std::condition_variable m_Condition;
+    std::deque<QByteArray> m_Queue;
+    size_t m_TotalBytes = 0;
+    bool m_Stopping = false;
+};
+
 class ClipboardHelperController : public QObject
 {
     Q_OBJECT
@@ -46,6 +143,11 @@ public:
     explicit ClipboardHelperController(QObject* parent = nullptr)
         : QObject(parent)
     {
+    }
+
+    void setWriter(ProtocolWriter* writer)
+    {
+        m_Writer = writer;
     }
 
 public slots:
@@ -118,8 +220,12 @@ private:
 
         if (m_ClipboardEngine == nullptr) {
             m_ClipboardEngine = new ClipboardSync(context, this);
+            // Direct: outbound frames are produced on the snapshot thread;
+            // queueing them for the GUI thread would let one wedged inbound
+            // clipboard write take host-bound traffic down with it.
             connect(m_ClipboardEngine, &ClipboardSync::outboundFrame,
-                    this, &ClipboardHelperController::sendLocalFrame);
+                    this, &ClipboardHelperController::sendLocalFrame,
+                    Qt::DirectConnection);
             m_ClipboardEngine->start();
         }
         else {
@@ -136,17 +242,16 @@ private:
 
     void writeProtocolLine(const QByteArray& line)
     {
-        QByteArray out = line;
-        out.append('\n');
-        size_t written = fwrite(out.constData(), 1, static_cast<size_t>(out.size()), stdout);
-        fflush(stdout);
-        if (written != static_cast<size_t>(out.size())) {
+        if (m_Writer != nullptr && !m_Writer->write(line)) {
             QCoreApplication::quit();
         }
     }
 
+    ProtocolWriter* m_Writer = nullptr;
     ClipboardSync* m_ClipboardEngine = nullptr;
-    quint32 m_NextSequence = 1;
+    // Touched from snapshot threads (inline frames) and the GUI thread (REF
+    // callbacks), so the increment must be atomic.
+    std::atomic<quint32> m_NextSequence{1};
 };
 
 int main(int argc, char* argv[])
@@ -158,7 +263,9 @@ int main(int argc, char* argv[])
     QCoreApplication::setApplicationName(QStringLiteral("Moonlight Clipboard Helper"));
     QCoreApplication::setOrganizationName(QStringLiteral("Moonlight Game Streaming Project"));
 
+    ProtocolWriter writer;
     ClipboardHelperController controller;
+    controller.setWriter(&writer);
     StdinReaderThread stdinThread;
     // Bound the reader to one GUI delivery at a time. Otherwise a blocked
     // clipboard provider lets the worker enqueue an unbounded number of frames.
@@ -167,6 +274,8 @@ int main(int argc, char* argv[])
 
     stdinThread.start();
     int rc = app.exec();
+    // Flush any protocol lines still queued, then stop the writer thread.
+    writer.stopAndDrain();
     if (!stdinThread.wait(1000)) {
         stdinThread.terminate();
         stdinThread.wait();
