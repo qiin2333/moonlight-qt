@@ -392,7 +392,8 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     Session::clClipboardData,
     Session::clCursorUpdate,
     nullptr,
-    nullptr
+    nullptr,
+    nullptr, // ds5HapticsIrExtended
 };
 
 Session* Session::s_ActiveSession;
