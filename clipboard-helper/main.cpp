@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QObject>
+#include <QPointer>
 #include <QSslCertificate>
 #include <QSslKey>
 #include <QThread>
@@ -138,7 +139,19 @@ public:
     explicit ClipboardHelperController(QObject* parent = nullptr)
         : QObject(parent)
     {
+        // The engine's dedicated thread. The GUI main thread keeps only the
+        // event loop and never touches the clipboard again.
+        m_WorkerThread = new QThread(this);
+        m_WorkerThread->setObjectName("clipboard-engine");
+        m_WorkerThread->start();
     }
+    ~ClipboardHelperController() override
+    {
+        m_WorkerThread->quit();
+        m_WorkerThread->wait(2000);
+    }
+
+    QThread* workerThread() const { return m_WorkerThread; }
 
     void setWriter(ProtocolWriter* writer) { m_Writer = writer; }
 
@@ -211,20 +224,20 @@ private:
         }
 
         if (m_ClipboardEngine == nullptr) {
-            m_ClipboardEngine = new ClipboardSync(context, this);
-            // Direct delivery keeps the enqueue on the emitting thread and
-            // out of the GUI event loop; the writer thread owns stdout, so a
-            // slow reader never blocks helper processing. Note the frame
-            // producer still runs on the GUI thread today (QClipboard and
-            // QNAM callbacks) — moving production off-GUI requires splitting
-            // ClipboardSync's GUI-affinity internals and is a tracked
-            // follow-up.
-            connect(m_ClipboardEngine, &ClipboardSync::outboundFrame, this,
+            // The engine lives on its own thread for its whole life: inbound
+            // clipboard writes happen there, so pasteboard contention can
+            // never wedge the GUI thread (which only runs the event loop).
+            auto* engine = new ClipboardSync(context);
+            adoptEngine(engine, m_WorkerThread);
+            connect(m_WorkerThread, &QThread::finished, engine, &QObject::deleteLater);
+            // Outbound frames are produced on the engine thread and enqueued
+            // onto the writer directly (the writer owns stdout).
+            connect(engine, &ClipboardSync::outboundFrame, this,
                     &ClipboardHelperController::sendLocalFrame, Qt::DirectConnection);
-            m_ClipboardEngine->start();
+            postToEngine([engine] { engine->start(); });
         }
         else {
-            m_ClipboardEngine->setHostContext(context);
+            postToEngine([engine = m_ClipboardEngine, context] { engine->setHostContext(context); });
         }
 
         writeProtocolLine(ClipboardIpc::encodeReady(sequence));
@@ -242,7 +255,33 @@ private:
         }
     }
 
+    // Move the engine onto its own thread (no parent, or moveToThread
+    // refuses). All engine methods are then invoked through queued functors
+    // targeting the engine, so they execute on that thread — including the
+    // clipboard writes whose blocking is what this refactor defends against.
+    void adoptEngine(ClipboardSync* engine, QThread* worker)
+    {
+        engine->moveToThread(worker);
+        m_ClipboardEngine = engine;
+    }
+
+    template <typename Fn>
+    void postToEngine(Fn&& fn)
+    {
+        if (m_ClipboardEngine == nullptr) {
+            return;
+        }
+        QMetaObject::invokeMethod(m_ClipboardEngine,
+                                  [engine = QPointer<ClipboardSync>(m_ClipboardEngine), fn = std::forward<Fn>(fn)]() mutable {
+                                      if (engine != nullptr) {
+                                          fn();
+                                      }
+                                  },
+                                  Qt::QueuedConnection);
+    }
+
     ProtocolWriter* m_Writer = nullptr;
+    QThread* m_WorkerThread = nullptr;
     ClipboardSync* m_ClipboardEngine = nullptr;
     // Touched from snapshot threads (inline frames) and the GUI thread (REF
     // callbacks), so the increment must be atomic.
@@ -269,8 +308,13 @@ int main(int argc, char* argv[])
 
     stdinThread.start();
     int rc = app.exec();
-    // Flush any protocol lines still queued, then stop the writer thread.
+    // Flush any protocol lines still queued, stop the writer, then wind the
+    // engine thread down (the queued engine stop is best-effort at exit).
     writer.stopAndDrain();
+    if (controller.workerThread() != nullptr) {
+        controller.workerThread()->quit();
+        controller.workerThread()->wait(2000);
+    }
     if (!stdinThread.wait(1000)) {
         stdinThread.terminate();
         stdinThread.wait();

@@ -120,7 +120,8 @@ public:
     void setHostContext(const ClipboardSyncHostContext& hostContext);
 
     // Start watching the local clipboard and accepting inbound payloads.
-    // Must be called on the GUI thread.
+    // Must be called on the thread the engine lives on (moveToThread + a
+    // functor invokeMethod targeting the engine, per the helper's usage).
     void start();
 
     // Disconnect signals and stop processing both directions.
