@@ -58,15 +58,19 @@ public:
     }
     ~ProtocolWriter() { stopAndDrain(); }
 
-    // Thread-safe. Returns false when the line was dropped because the
-    // backlog cap was hit (the reader side is gone or wedged).
+    // Thread-safe. Returns false when the line was dropped: the backlog cap
+    // was hit, or the writer already failed (queued lines would never be
+    // flushed, so callers must not count on delivery).
     bool write(QByteArray line)
     {
         line += '\n';
         bool ok = true;
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
-            if (m_TotalBytes + line.size() > MAX_PENDING_BYTES) {
+            if (m_Failed) {
+                ok = false;
+            } else if (m_TotalBytes + line.size() > MAX_PENDING_BYTES) {
+                m_Failed = true;
                 ok = false;
             } else {
                 m_Queue.push_back(std::move(line));
@@ -76,6 +80,8 @@ public:
         m_Condition.notify_one();
         return ok;
     }
+
+    bool failed() const { return m_Failed; }
 
     void stopAndDrain()
     {
@@ -117,6 +123,7 @@ private:
             const bool flushed = fflush(stdout) == 0;
             if (written != static_cast<size_t>(line.size()) || !flushed) {
                 // Reader is gone; nothing else can be delivered.
+                m_Failed = true;
                 QCoreApplication::quit();
                 return;
             }
@@ -129,6 +136,7 @@ private:
     std::deque<QByteArray> m_Queue;
     size_t m_TotalBytes = 0;
     bool m_Stopping = false;
+    std::atomic<bool> m_Failed{ false };
 };
 
 class ClipboardHelperController : public QObject
