@@ -1,5 +1,6 @@
 #include "dualsensehaptics.h"
 #include "dualsensehapticsstream.h"
+#include "dualsensehapticscontrol.h"
 
 #include "SDL_compat.h"
 
@@ -13,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <QtGlobal>
@@ -51,6 +53,8 @@ constexpr auto EndpointProbeBackoff = std::chrono::seconds(2);
 // up on it.
 constexpr auto EndpointWriteTimeout = std::chrono::milliseconds(200);
 
+constexpr auto ControlRetryBackoff = std::chrono::milliseconds(50);
+
 struct Packet
 {
     std::uint8_t flags = 0;
@@ -66,6 +70,42 @@ enum class WriteResult
     WouldBlock, // No room right now; retry after the endpoint drains.
     Failed,     // Gone or wedged; the endpoint must be reopened.
 };
+
+// Lookup and use the SDL handle under SDL's joystick lock, so unplug/close cannot
+// invalidate it. No renderer mutex is held while SDL queues the physical report.
+bool sendHapticsEffect(int instanceId, const dualsense_haptics::ControlState::Effect& effect,
+                       bool takeOwnership = false)
+{
+#if SDL_VERSION_ATLEAST(2, 0, 16)
+    SDL_LockJoysticks();
+    auto* controller = SDL_GameControllerFromInstanceID(instanceId);
+    bool success = controller != nullptr && SDL_GameControllerGetAttached(controller) &&
+                   SDL_GameControllerGetType(controller) == SDL_CONTROLLER_TYPE_PS5;
+    if (success) {
+        // Cancel SDL's old compatibility-rumble timer/cache before taking over.
+        if (takeOwnership)
+            SDL_GameControllerRumble(controller, 0, 0, 0);
+        success = SDL_GameControllerSendEffect(controller, effect.data(),
+                                               static_cast<int>(effect.size())) == 0;
+    }
+    SDL_UnlockJoysticks();
+    return success;
+#else
+    Q_UNUSED(instanceId);
+    Q_UNUSED(effect);
+    Q_UNUSED(takeOwnership);
+    return false;
+#endif
+}
+
+void releaseHapticsControl(int instanceId)
+{
+    dualsense_haptics::ControlState::Effect neutral{};
+    neutral[0] = 3 | 4 | 8;
+    neutral[1] = 0x62;
+    neutral[10] = neutral[21] = 5; // Explicitly release both adaptive triggers.
+    sendHapticsEffect(instanceId, neutral);
+}
 
 // A DualShock 4 also calls itself "Wireless Controller", but it exposes a
 // two-channel endpoint, so the channel count check rules it out.
@@ -97,7 +137,13 @@ QString describeDelay(bool known, double ms)
     return known ? QStringLiteral("%1 ms").arg(ms, 0, 'f', 1) : QStringLiteral("unknown");
 }
 
-#ifdef Q_OS_WIN32
+#ifdef MOONLIGHT_DS5_TEST_ENDPOINT
+using HapticsEndpoint = MOONLIGHT_DS5_TEST_ENDPOINT;
+bool probeHapticsEndpoint()
+{
+    return true;
+}
+#elif defined(Q_OS_WIN32)
 // Call visit() with an audio client for each active render endpoint named like
 // a DualSense, until it accepts one.
 template <typename Visit> bool findDualSenseAudioClient(Visit visit)
@@ -726,6 +772,9 @@ struct DualSenseHapticsRenderer::Impl
     // the input handler picked is played, and only while it is the only
     // DualSense connected.
     std::atomic_int controllerTarget{ -1 };
+    int joystickTarget = -1;
+    dualsense_haptics::ControlState controls;
+    bool outputDirty = false;
 
     HapticsEndpoint endpoint;
     dualsense_haptics::PcmStreamTracker streamTracker;
@@ -786,12 +835,15 @@ struct DualSenseHapticsRenderer::Impl
         streamTracker.reset();
     }
 
-    void requestReset()
+    void requestReset(bool clearControls = false)
     {
         {
             std::lock_guard lock(mutex);
             queue.clear();
             resetRequested = true;
+            if (clearControls)
+                controls.reset();
+            outputDirty = true;
         }
         condition.notify_one();
     }
@@ -843,12 +895,15 @@ struct DualSenseHapticsRenderer::Impl
     void process(Packet packet)
     {
         const auto action = streamTracker.observe(packet.flags, packet.controllerNumber,
-                                                  packet.sequenceNumber);
+                                                  packet.sequenceNumber, packet.frameCount);
         if (action == dualsense_haptics::PcmStreamTracker::Action::Ignore) {
             return;
         }
         if (action == dualsense_haptics::PcmStreamTracker::Action::End) {
-            resetAudioStream();
+            // Let the endpoint consume its tail. Reset() would discard both the
+            // short prebuffer and samples already queued in the OS audio device.
+            if (!prebuffer.empty() && !startPrebufferedStream())
+                failEndpoint();
             return;
         }
         if (action == dualsense_haptics::PcmStreamTracker::Action::ResetAndAccept) {
@@ -890,9 +945,11 @@ struct DualSenseHapticsRenderer::Impl
                 return;
             }
 
+            const bool streamEnd = packet.flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_END;
             prebufferedFrames += packet.frameCount;
             prebuffer.emplace_back(std::move(packet));
-            if (!dualsense_haptics::isPrebufferFull(prebufferedFrames, endpoint.bufferFrames()))
+            if (!dualsense_haptics::isPrebufferFull(prebufferedFrames, endpoint.bufferFrames()) &&
+                !streamEnd)
                 return;
 
             if (!startPrebufferedStream()) {
@@ -909,31 +966,83 @@ struct DualSenseHapticsRenderer::Impl
             return;
         }
 
+        int ownedJoystick = -1;
+        bool controlApplied = false;
+        bool retryControl = false;
+        std::chrono::steady_clock::time_point controlRetryDeadline;
+        auto prebufferDeadline = std::chrono::steady_clock::now();
         while (!stopping) {
             Packet packet;
+            bool hasPacket = false;
+            bool reset = false;
+            bool flushPrebuffer = false;
+            int targetJoystick;
+            std::optional<dualsense_haptics::ControlState::Effect> effect;
             {
                 std::unique_lock lock(mutex);
-                condition.wait(lock,
-                               [this] { return stopping || resetRequested || !queue.empty(); });
+                const auto ready = [this] {
+                    return stopping || resetRequested || outputDirty || !queue.empty();
+                };
+                // Coalesce new output while backing off, but let retarget/reset/stop
+                // interrupt the retry immediately. PCM stays in the bounded queue.
+                if (retryControl) {
+                    condition.wait_until(lock, controlRetryDeadline,
+                                         [this] { return stopping || resetRequested; });
+                } else if (prebuffer.empty())
+                    condition.wait(lock, ready);
+                else
+                    flushPrebuffer = !condition.wait_until(lock, prebufferDeadline, ready);
                 if (stopping) break;
-                if (resetRequested) {
-                    resetRequested = false;
-                    lock.unlock();
-                    // Silence the coils now: no stream-end packet is coming to
-                    // do it for us. Reopen on the next packet too, since the
-                    // connected controllers may have changed.
-                    resetStream();
-                    endpoint.close();
+                reset = std::exchange(resetRequested, false);
+                targetJoystick = joystickTarget;
+                if (controls.has(controllerTarget) && (outputDirty || !controlApplied || reset)) {
+                    effect = controls.effect(controllerTarget);
+                }
+                outputDirty = false;
+            }
+            if (reset) {
+                resetStream();
+                endpoint.close();
+                if (ownedJoystick >= 0)
+                    releaseHapticsControl(ownedJoystick);
+                ownedJoystick = -1;
+                controlApplied = false;
+            }
+            if (effect) {
+                if (!sendHapticsEffect(targetJoystick, *effect, ownedJoystick != targetJoystick)) {
+                    controlApplied = false;
+                    retryControl = true;
+                    controlRetryDeadline = std::chrono::steady_clock::now() + ControlRetryBackoff;
                     continue;
                 }
-                packet = std::move(queue.front());
-                queue.pop_front();
+                ownedJoystick = targetJoystick;
+                controlApplied = true;
             }
-            process(std::move(packet));
+            retryControl = false;
+            {
+                std::lock_guard lock(mutex);
+                // Output or routing may have changed while SDL was sending. Apply
+                // that change before taking PCM out of the queue.
+                if (stopping || resetRequested || outputDirty)
+                    continue;
+                if (!queue.empty()) {
+                    packet = std::move(queue.front());
+                    queue.pop_front();
+                    hasPacket = true;
+                    prebufferDeadline =
+                        std::chrono::steady_clock::now() + std::chrono::milliseconds(8);
+                }
+            }
+            if (hasPacket)
+                process(std::move(packet));
+            else if (flushPrebuffer && !prebuffer.empty() && !startPrebufferedStream())
+                failEndpoint();
         }
 
         resetStream();
         endpoint.close();
+        if (ownedJoystick >= 0)
+            releaseHapticsControl(ownedJoystick);
         endpoint.threadCleanup();
     }
 #endif
@@ -988,13 +1097,79 @@ void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
 #endif
 }
 
-void DualSenseHapticsRenderer::setControllerTarget(int controllerNumber)
+void DualSenseHapticsRenderer::updateControl(std::uint16_t controllerNumber,
+                                             const std::uint8_t* state)
+{
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    {
+        std::lock_guard lock(m_Impl->mutex);
+        if (m_Impl->stopping || !m_Impl->controls.update(controllerNumber, state))
+            return;
+        if (controllerNumber != m_Impl->controllerTarget)
+            return;
+        m_Impl->outputDirty = true;
+    }
+    m_Impl->condition.notify_one();
+#else
+    Q_UNUSED(controllerNumber);
+    Q_UNUSED(state);
+#endif
+}
+
+bool DualSenseHapticsRenderer::hasControl(std::uint16_t controllerNumber) const
+{
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    std::lock_guard lock(m_Impl->mutex);
+    return !m_Impl->stopping && controllerNumber == m_Impl->controllerTarget &&
+           m_Impl->controls.has(controllerNumber);
+#else
+    Q_UNUSED(controllerNumber);
+    return false;
+#endif
+}
+
+bool DualSenseHapticsRenderer::submitEffect(std::uint16_t controllerNumber, const void* effect,
+                                            std::size_t size)
+{
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    if (effect == nullptr || size != dualsense_haptics::ControlState::Effect{}.size())
+        return false;
+    dualsense_haptics::ControlState::Effect snapshot;
+    std::memcpy(snapshot.data(), effect, size);
+    {
+        std::lock_guard lock(m_Impl->mutex);
+        if (m_Impl->stopping || controllerNumber != m_Impl->controllerTarget ||
+            !m_Impl->controls.mergeEffect(controllerNumber, snapshot))
+            return false;
+        m_Impl->outputDirty = true;
+    }
+    m_Impl->condition.notify_one();
+    return true;
+#else
+    Q_UNUSED(controllerNumber);
+    Q_UNUSED(effect);
+    Q_UNUSED(size);
+    return false;
+#endif
+}
+
+void DualSenseHapticsRenderer::setControllerTarget(int controllerNumber, int joystickInstanceId)
 {
     Q_UNUSED(controllerNumber);
+    Q_UNUSED(joystickInstanceId);
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
-    if (m_Impl->controllerTarget.exchange(controllerNumber) != controllerNumber) {
-        m_Impl->requestReset();
+    {
+        std::lock_guard lock(m_Impl->mutex);
+        if (m_Impl->controllerTarget == controllerNumber &&
+            m_Impl->joystickTarget == joystickInstanceId)
+            return;
+        m_Impl->controllerTarget = controllerNumber;
+        m_Impl->joystickTarget = joystickInstanceId;
+        m_Impl->queue.clear();
+        m_Impl->resetRequested = true;
+        m_Impl->outputDirty = true;
     }
+    m_Impl->condition.notify_one();
 #endif
 #ifdef Q_OS_MACOS
     if (m_Impl->macRenderer != nullptr) {
@@ -1013,7 +1188,7 @@ void DualSenseHapticsRenderer::reset()
 
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
     // Drop anything the host queued before the connection died.
-    m_Impl->requestReset();
+    m_Impl->requestReset(true);
 #endif
 }
 

@@ -36,11 +36,14 @@ const int SdlInputHandler::k_ButtonMap[] = {
     TOUCHPAD_FLAG,
 };
 
-int SdlInputHandler::getDualSenseHapticsControllerNumber() const
+int SdlInputHandler::getDualSenseHapticsControllerNumber(SDL_JoystickID* instanceId) const
 {
+    if (instanceId != nullptr)
+        *instanceId = -1;
 #if SDL_VERSION_ATLEAST(2, 0, 14)
     dualsense_haptics::LocalControllerCandidate controllers[MAX_GAMEPADS];
     std::size_t controllerCount = 0;
+    SDL_JoystickID selectedInstance = -1;
     for (int i = 0; i < MAX_GAMEPADS; i++) {
         if (m_GamepadState[i].controller == nullptr) {
             continue;
@@ -49,16 +52,21 @@ int SdlInputHandler::getDualSenseHapticsControllerNumber() const
             m_GamepadState[i].index,
             SDL_GameControllerGetType(m_GamepadState[i].controller) == SDL_CONTROLLER_TYPE_PS5,
         };
+        if (SDL_GameControllerGetType(m_GamepadState[i].controller) == SDL_CONTROLLER_TYPE_PS5)
+            selectedInstance = m_GamepadState[i].jsId;
     }
 
     // Physical haptics plays on the DualSense's own audio endpoint, so only the
     // DualSense count matters. Native IR can't tell which pad controller 0 means
     // once several are merged into it.
-    if (m_EnableDualSenseHaptics) {
-        return dualsense_haptics::selectUniqueDualSense(controllers, controllerCount);
-    }
-    return dualsense_haptics::selectUniqueLocalDualSense(
-        controllers, controllerCount, m_MultiController);
+    const auto selected =
+        m_EnableDualSenseHaptics
+            ? dualsense_haptics::selectUniqueDualSense(controllers, controllerCount)
+            : dualsense_haptics::selectUniqueLocalDualSense(controllers, controllerCount,
+                                                            m_MultiController);
+    if (instanceId != nullptr && selected >= 0)
+        *instanceId = selectedInstance;
+    return selected;
 #else
     return -1;
 #endif

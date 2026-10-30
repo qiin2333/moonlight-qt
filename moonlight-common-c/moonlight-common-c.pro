@@ -65,6 +65,9 @@ SOURCES += \
     $$COMMON_C_DIR/src/InputStream.c \
     $$COMMON_C_DIR/src/MicrophoneStream.c \
     $$COMMON_C_DIR/src/LinkedBlockingQueue.c \
+    $$COMMON_C_DIR/src/MatDepacketizer.c \
+    $$COMMON_C_DIR/src/MatReceiver.c \
+    $$COMMON_C_DIR/src/MatLivePlayback.c \
     $$COMMON_C_DIR/src/Misc.c \
     $$COMMON_C_DIR/src/Platform.c \
     $$COMMON_C_DIR/src/PlatformCrypto.c \

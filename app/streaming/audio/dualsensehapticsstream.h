@@ -19,42 +19,43 @@ public:
         Ignore,
     };
 
-    Action observe(std::uint8_t flags, std::uint16_t controllerNumber,
-                   std::uint32_t sequenceNumber)
+    Action observe(std::uint8_t flags, std::uint16_t controllerNumber, std::uint32_t sequenceNumber,
+                   std::uint16_t frameCount = 0)
     {
-        if (flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_END) {
-            if (!m_Active || controllerNumber != m_ControllerNumber) {
-                return Action::Ignore;
-            }
-
-            m_Active = false;
-            return Action::End;
-        }
-
         if (m_Active && controllerNumber != m_ControllerNumber) {
             return Action::Ignore;
         }
 
         const bool streamStart = flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_START;
-        const bool needsReset =
-            streamStart ||
-            (flags & LI_DS5_HAPTICS_PCM_FLAG_DISCONTINUITY) ||
-            (m_Active && controllerNumber == m_ControllerNumber &&
-             sequenceNumber != m_ExpectedSequence);
+        const bool needsReset = streamStart || (flags & LI_DS5_HAPTICS_PCM_FLAG_DISCONTINUITY);
+        if (!needsReset && m_HasSequence && controllerNumber == m_ControllerNumber &&
+            static_cast<std::int32_t>(sequenceNumber - m_ExpectedSequence) < 0) {
+            return Action::Ignore;
+        }
+        const bool end = flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_END;
+        if (end && frameCount == 0 && (!m_Active || controllerNumber != m_ControllerNumber)) {
+            return Action::Ignore;
+        }
 
-        m_Active = true;
+        m_Active = !end;
+        m_HasSequence = true;
         m_ControllerNumber = controllerNumber;
         m_ExpectedSequence = sequenceNumber + 1;
+        if (end && frameCount == 0)
+            return Action::End;
+        // Unreliable PCM gaps do not discard queued samples or restart the endpoint.
         return needsReset ? Action::ResetAndAccept : Action::Accept;
     }
 
     void reset()
     {
         m_Active = false;
+        m_HasSequence = false;
     }
 
 private:
     bool m_Active = false;
+    bool m_HasSequence = false;
     std::uint16_t m_ControllerNumber = 0;
     std::uint32_t m_ExpectedSequence = 0;
 };

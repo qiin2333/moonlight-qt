@@ -1,6 +1,7 @@
 #include "streaming/audio/dualsensehapticscalibration.h"
 #include "streaming/audio/dualsensehapticsrouting.h"
 #include "streaming/audio/dualsensehapticsstream.h"
+#include "streaming/audio/dualsensehapticscontrol.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -111,8 +112,43 @@ int main()
           Action::ResetAndAccept);
     CHECK(tracker.observe(0, 0, 101) == Action::Accept);
 
-    // Missing packets still force the jitter buffer to resynchronize.
-    CHECK(tracker.observe(0, 0, 103) == Action::ResetAndAccept);
+    // Gaps retain buffered PCM; duplicates and reordered packets cannot replay it.
+    CHECK(tracker.observe(0, 0, 103) == Action::Accept);
+    CHECK(tracker.observe(0, 0, 103) == Action::Ignore);
+    CHECK(tracker.observe(LI_DS5_HAPTICS_PCM_FLAG_STREAM_END, 0, 102) == Action::Ignore);
+    CHECK(tracker.observe(0, 0, 104) == Action::Accept);
+    CHECK(tracker.observe(LI_DS5_HAPTICS_PCM_FLAG_STREAM_END, 0, 105, 240) == Action::Accept);
+    CHECK(tracker.observe(LI_DS5_HAPTICS_PCM_FLAG_STREAM_START | LI_DS5_HAPTICS_PCM_FLAG_STREAM_END,
+                          0, 106, 240) == Action::ResetAndAccept);
+
+    dualsense_haptics::ControlState controls;
+    const std::uint8_t host[] = { 2, 4, 0x62, 0, 0, 0x10, 0x23, 1 };
+    CHECK(controls.update(7, host));
+    CHECK(!controls.has(0) && controls.has(7));
+    CHECK(!controls.update(16, host));
+    auto invalid = std::array<std::uint8_t, 8>{ 0x80, 0, 0, 0, 0, 0, 0, 0 };
+    CHECK(!controls.update(7, invalid.data()));
+    dualsense_haptics::ControlState::Effect led{};
+    led[0] = 3;
+    led[2] = 255; // Generic rumble cannot replace authoritative zero-strength V2.
+    led[1] = 4;
+    led[44] = 11;
+    led[45] = 22;
+    led[46] = 33;
+    CHECK(controls.mergeEffect(7, led));
+    dualsense_haptics::ControlState::Effect trigger{};
+    trigger[0] = 4;
+    trigger[10] = 5;
+    trigger[11] = 99;
+    CHECK(controls.mergeEffect(7, trigger));
+    CHECK(!controls.mergeEffect(0, trigger));
+    const auto effect = controls.effect(7);
+    CHECK(effect[0] == 6 && effect[38] == 4 && effect[1] == 0x66);
+    CHECK(effect[2] == 0 && effect[3] == 0 && effect[9] == 0x10 && effect[36] == 0x23 &&
+          effect[39] == 1);
+    CHECK(effect[10] == 5 && effect[11] == 99 && effect[44] == 11 && effect[46] == 33);
+    controls.reset();
+    CHECK(!controls.has(7));
 
     // Authored left/right PCM goes to channels 3 and 4; the headset pair stays
     // silent.
