@@ -406,7 +406,11 @@ Uint32 SdlInputHandler::cursorModeTimerCallback(Uint32, void*)
     SDL_Event event = {};
     event.type = SDL_USEREVENT;
     event.user.code = SDL_CODE_HOST_CURSOR_TICK;
-    SDL_PushEvent(&event);
+    if (SDL_PushEvent(&event) < 0) {
+        // The queue is full. Retry rather than stop: m_CursorModeTimer would keep this
+        // expired ID, and scheduleCursorModeTimer() wouldn't re-arm for the same due time.
+        return 10;
+    }
     return 0;
 }
 
