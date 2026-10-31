@@ -1,4 +1,5 @@
 #include "session.h"
+#include "videocallbacks.h"
 #include "clipboardhelperclient.h"
 #include "filemappingclient.h"
 #include "filemappingux.h"
@@ -4368,6 +4369,9 @@ bool Session::startConnectionAsync()
                                                                          m_StreamConfig.fps,
                                                                          false);
     }
+
+    // A reconnect reuses callbacks that moonlight-common-c already filled in
+    prepareVideoCallbacksForConnection(&m_VideoCallbacks);
 
     int err = LiStartConnection(&preparedHostInfo.info, &m_StreamConfig, &k_ConnCallbacks,
                                 &m_VideoCallbacks, &m_AudioCallbacks,
