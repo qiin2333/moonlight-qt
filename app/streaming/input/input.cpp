@@ -418,6 +418,12 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 #endif
 }
 
+void SdlInputHandler::setStreamDimensions(int streamWidth, int streamHeight)
+{
+    m_StreamWidth = streamWidth;
+    m_StreamHeight = streamHeight;
+}
+
 #ifdef HAS_QT_SDL_WAYLAND_BRIDGE
 void SdlInputHandler::setWaylandWindowCoordinateMetrics(
     WaylandWindowMetrics::CoordinateMetrics metrics)

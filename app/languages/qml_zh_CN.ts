@@ -900,6 +900,14 @@
         <translation>窗口化</translation>
     </message>
     <message>
+        <source>Match stream resolution to window size</source>
+        <translation>串流分辨率跟随窗口大小</translation>
+    </message>
+    <message>
+        <source>Asks the host to change the stream resolution to match the window when it is resized. Fullscreen returns to the configured resolution. Requires a compatible Sunshine host.</source>
+        <translation>调整窗口大小时，请求主机将串流分辨率改为与窗口一致；全屏时恢复为设置的分辨率。需要兼容的 Sunshine 主机。</translation>
+    </message>
+    <message>
         <source>(Recommended)</source>
         <translation>(推荐)</translation>
     </message>

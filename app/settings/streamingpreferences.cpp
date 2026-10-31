@@ -20,6 +20,7 @@
 #define SER_SUNSHINEABR "sunshineabr"
 #define SER_FULLSCREEN "fullscreen"
 #define SER_IGNORE_ASPECT_RATIO "ignoreaspectratio"
+#define SER_RESOLUTION_MATCH_WINDOW "resolutionmatchwindow"
 #define SER_VSYNC "vsync"
 #define SER_GAMEOPTS "gameopts"
 #define SER_HOSTAUDIO "hostaudio"
@@ -247,6 +248,7 @@ void StreamingPreferences::reload()
     autoAdjustBitrate = settings.value(SER_AUTOADJUSTBITRATE, true).toBool();
     enableSunshineAbr = settings.value(SER_SUNSHINEABR, false).toBool();
     ignoreAspectRatio = settings.value(SER_IGNORE_ASPECT_RATIO, true).toBool();
+    resolutionMatchWindow = settings.value(SER_RESOLUTION_MATCH_WINDOW, false).toBool();
     enableVsync = settings.value(SER_VSYNC, true).toBool();
     gameOptimizations = settings.value(SER_GAMEOPTS, true).toBool();
     playAudioOnHost = settings.value(SER_HOSTAUDIO, false).toBool();
@@ -696,6 +698,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_AUTOADJUSTBITRATE, autoAdjustBitrate);
     settings.setValue(SER_SUNSHINEABR, enableSunshineAbr);
     settings.setValue(SER_IGNORE_ASPECT_RATIO, ignoreAspectRatio);
+    settings.setValue(SER_RESOLUTION_MATCH_WINDOW, resolutionMatchWindow);
     settings.setValue(SER_VSYNC, enableVsync);
     settings.setValue(SER_GAMEOPTS, gameOptimizations);
     settings.setValue(SER_HOSTAUDIO, playAudioOnHost);
