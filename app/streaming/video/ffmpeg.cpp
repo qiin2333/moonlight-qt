@@ -1889,6 +1889,7 @@ void FFmpegVideoDecoder::decoderThreadProc()
                 continue;
             }
 
+            Session::markVideoReceived();
             LiCompleteVideoFrame(handle, submitDecodeUnit(du));
         }
 
@@ -2095,6 +2096,7 @@ void FFmpegVideoDecoder::decoderThreadProc()
                     // No output data, so let's try to submit more input data,
                     // while we're waiting for this to frame to come back.
                     if (LiPollNextVideoFrame(&handle, &du)) {
+                        Session::markVideoReceived();
                         // FIXME: Handle EAGAIN on avcodec_send_packet() properly?
                         LiCompleteVideoFrame(handle, submitDecodeUnit(du));
                     }
