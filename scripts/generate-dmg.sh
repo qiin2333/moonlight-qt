@@ -130,9 +130,31 @@ bash "$SOURCE_ROOT/scripts/build-macos-fileprovider-extension.sh" "$SOURCE_ROOT"
 echo Removing dSYM files from app bundle
 find $BUILD_FOLDER/app/Moonlight.app/ -name '*.dSYM' | xargs rm -rf
 
+# The code-signing identifier must match the Info.plist bundle ID. TCC-style
+# gates such as local network privacy match the running binary by its signing
+# identifier, while LaunchServices and the permission UI use the bundle ID.
+# Linker signing names the identifier after the executable ("Moonlight"), so
+# the mismatch makes Finder launches silently fail LAN access on recent macOS
+# (qiin2333/moonlight-qt#285). Sign the whole bundle ourselves with
+# --identifier taken from the Info.plist instead, even without a real identity.
+APP_BUNDLE=$BUILD_FOLDER/app/Moonlight.app
+BUNDLE_ID=$(plutil -extract CFBundleIdentifier raw "$APP_BUNDLE/Contents/Info.plist") || fail "Cannot read CFBundleIdentifier from app bundle"
+
 if [ "$SIGNING_IDENTITY" != "" ]; then
   echo Signing app bundle
-  codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" $BUILD_FOLDER/app/Moonlight.app || fail "Signing failed!"
+  codesign --force --deep --options runtime --timestamp --identifier "$BUNDLE_ID" --sign "$SIGNING_IDENTITY" $APP_BUNDLE || fail "Signing failed!"
+else
+  echo Signing app bundle ad-hoc
+  # Seals resources and gives a consistent identity. Not a substitute for
+  # Developer ID signing and notarization.
+  codesign --force --deep --identifier "$BUNDLE_ID" --sign - $APP_BUNDLE || fail "Ad-hoc signing failed!"
+fi
+
+echo Verifying app bundle signature
+codesign --verify --deep --strict $APP_BUNDLE || fail "App bundle signature verification failed!"
+SIGNED_IDENTIFIER=$(codesign -dv $APP_BUNDLE 2>&1 | sed -n 's/^Identifier=\(.*\)$/\1/p')
+if [ "$SIGNED_IDENTIFIER" != "$BUNDLE_ID" ]; then
+  fail "Signing identifier '$SIGNED_IDENTIFIER' does not match CFBundleIdentifier '$BUNDLE_ID'"
 fi
 
 echo Creating DMG
