@@ -147,7 +147,20 @@ else
   echo Signing app bundle ad-hoc
   # Seals resources and gives a consistent identity. Not a substitute for
   # Developer ID signing and notarization.
-  codesign --force --deep --identifier "$BUNDLE_ID" --sign - $APP_BUNDLE || fail "Ad-hoc signing failed!"
+  #
+  # Nested code is signed before the bundle so the outer signature needs no
+  # --deep, which would overwrite nested signatures with the app's
+  # parameters (the File Provider extension must keep its own identifier and
+  # entitlements). The extension is signed by its build step; deployed
+  # dylibs and frameworks may have lost their build-time linker signatures
+  # to install_name_tool patching, so anything that fails verification is
+  # ad-hoc signed here as a fallback.
+  while IFS= read -r item; do
+    if ! codesign --verify "$item" 2>/dev/null; then
+      codesign --force --sign - "$item" || fail "Ad-hoc signing of $item failed!"
+    fi
+  done < <(find "$APP_BUNDLE/Contents/Frameworks" "$APP_BUNDLE/Contents/PlugIns" \( -name '*.dylib' -o -name '*.framework' \) -print 2>/dev/null)
+  codesign --force --identifier "$BUNDLE_ID" --sign - $APP_BUNDLE || fail "Ad-hoc signing failed!"
 fi
 
 echo Verifying app bundle signature
