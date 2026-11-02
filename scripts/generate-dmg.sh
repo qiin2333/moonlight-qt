@@ -130,9 +130,69 @@ bash "$SOURCE_ROOT/scripts/build-macos-fileprovider-extension.sh" "$SOURCE_ROOT"
 echo Removing dSYM files from app bundle
 find $BUILD_FOLDER/app/Moonlight.app/ -name '*.dSYM' | xargs rm -rf
 
+# The code-signing identifier must match the Info.plist bundle ID. TCC-style
+# gates such as local network privacy match the running binary by its signing
+# identifier, while LaunchServices and the permission UI use the bundle ID.
+# Linker signing names the identifier after the executable ("Moonlight"), so
+# the mismatch makes Finder launches silently fail LAN access on recent macOS
+# (qiin2333/moonlight-qt#285). Sign the whole bundle ourselves with
+# --identifier taken from the Info.plist instead, even without a real identity.
+APP_BUNDLE=$BUILD_FOLDER/app/Moonlight.app
+BUNDLE_ID=$(plutil -extract CFBundleIdentifier raw "$APP_BUNDLE/Contents/Info.plist") || fail "Cannot read CFBundleIdentifier from app bundle"
+
 if [ "$SIGNING_IDENTITY" != "" ]; then
   echo Signing app bundle
-  codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" $BUILD_FOLDER/app/Moonlight.app || fail "Signing failed!"
+  codesign --force --deep --options runtime --timestamp --identifier "$BUNDLE_ID" --sign "$SIGNING_IDENTITY" $APP_BUNDLE || fail "Signing failed!"
+else
+  echo Signing app bundle ad-hoc
+  # Seals resources and gives a consistent identity. Not a substitute for
+  # Developer ID signing and notarization.
+  #
+  # Nested code is signed before the bundle so the outer signature needs no
+  # --deep, which would overwrite nested signatures with the app's
+  # parameters (the File Provider extension must keep its own identifier and
+  # entitlements). The extension is signed by its build step; deployed
+  # dylibs and frameworks may have lost their build-time linker signatures
+  # to install_name_tool patching, so anything that fails verification is
+  # ad-hoc signed here as a fallback.
+  while IFS= read -r item; do
+    if ! codesign --verify "$item" 2>/dev/null; then
+      codesign --force --sign - "$item" || fail "Ad-hoc signing of $item failed!"
+    fi
+  done < <(find "$APP_BUNDLE/Contents/Frameworks" "$APP_BUNDLE/Contents/PlugIns" \( -name '*.dylib' -o -name '*.framework' \) -print 2>/dev/null)
+  # The deployed helpers are patched by macdeployqt after linking too and
+  # depend on the same fallback. The main executable is re-signed by the
+  # outer signature below and needs no separate treatment.
+  for helper in moonlight-clipboard-helper moonlight-usbd; do
+    item=$APP_BUNDLE/Contents/MacOS/$helper
+    [ -f "$item" ] || continue
+    if ! codesign --verify "$item" 2>/dev/null; then
+      codesign --force --sign - "$item" || fail "Ad-hoc signing of $item failed!"
+    fi
+  done
+  codesign --force --identifier "$BUNDLE_ID" --sign - $APP_BUNDLE || fail "Ad-hoc signing failed!"
+fi
+
+echo Verifying app bundle signature
+codesign --verify --deep --strict $APP_BUNDLE || fail "App bundle signature verification failed!"
+SIGNED_IDENTIFIER=$(codesign -dv $APP_BUNDLE 2>&1 | sed -n 's/^Identifier=\(.*\)$/\1/p')
+if [ "$SIGNED_IDENTIFIER" != "$BUNDLE_ID" ]; then
+  fail "Signing identifier '$SIGNED_IDENTIFIER' does not match CFBundleIdentifier '$BUNDLE_ID'"
+fi
+
+# The extension must keep its own signing identity through either outer
+# signing mode; a bundle-level identifier check cannot see it, so check the
+# extension itself.
+APPEX=$APP_BUNDLE/Contents/PlugIns/MoonlightFileProviderExtension.appex
+if [ -d "$APPEX" ]; then
+  APPEX_ID=$(plutil -extract CFBundleIdentifier raw "$APPEX/Contents/Info.plist") || fail "Cannot read File Provider extension bundle ID"
+  APPEX_SIGNED_ID=$(codesign -dv "$APPEX" 2>&1 | sed -n 's/^Identifier=\(.*\)$/\1/p')
+  if [ "$APPEX_SIGNED_ID" != "$APPEX_ID" ]; then
+    fail "File Provider extension signing identifier '$APPEX_SIGNED_ID' does not match its CFBundleIdentifier '$APPEX_ID'"
+  fi
+  if [ -n "${MOONLIGHT_FILE_PROVIDER_APP_GROUP:-}" ] && ! codesign -d --entitlements - "$APPEX" 2>/dev/null | grep -aq "application-groups"; then
+    echo "WARNING: File Provider extension signature carries no App Group entitlements" >&2
+  fi
 fi
 
 echo Creating DMG

@@ -404,6 +404,24 @@ jobs:
       run: |
         scripts/generate-dmg.sh Release
 
+    - name: Verify DMG app bundle signature
+      run: |
+        # qiin2333/moonlight-qt#285: 防止再次发布签名 Identifier 与 Bundle ID
+        # 不一致、或整包校验不通过的产物。generate-dmg.sh 里已有同样校验,
+        # 这里针对最终 DMG 里的 app 再验一遍。
+        DMG=$(ls build/installer-Release/*.dmg | head -1)
+        test -n "$DMG" || { echo "no DMG found" >&2; exit 1; }
+        MNT=$(mktemp -d /tmp/dmgverify.XXXXXX)
+        hdiutil attach "$DMG" -readonly -nobrowse -mountpoint "$MNT"
+        APP="$MNT/Moonlight.app"
+        codesign --verify --deep --strict "$APP"
+        BUNDLE_ID=$(plutil -extract CFBundleIdentifier raw "$APP/Contents/Info.plist")
+        SIGNED_ID=$(codesign -dv "$APP" 2>&1 | sed -n 's/^Identifier=\(.*\)$/\1/p')
+        echo "CFBundleIdentifier=$BUNDLE_ID"
+        echo "Signature identifier=$SIGNED_ID"
+        test "$BUNDLE_ID" = "$SIGNED_ID"
+        hdiutil detach "$MNT"
+
     - name: Smoke test USB forwarding helper
       run: |
         HELPER="build/build-Release/app/Moonlight.app/Contents/MacOS/moonlight-usbd"

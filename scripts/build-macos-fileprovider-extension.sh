@@ -75,16 +75,21 @@ sed \
   "$EXTENSION_SOURCE/Info.plist" > "$INFO_PLIST"
 
 if [ -n "${SIGNING_IDENTITY:-}" ]; then
-  ENTITLEMENTS=$EXTENSION_BUILD/$EXTENSION_NAME.entitlements
-  if [ -n "${MOONLIGHT_FILE_PROVIDER_APP_GROUP:-}" ]; then
-    sed \
-      -e "s|\$(MOONLIGHT_FILE_PROVIDER_APP_GROUP)|$FILE_PROVIDER_APP_GROUP|g" \
-      "$EXTENSION_SOURCE/$EXTENSION_NAME.entitlements" > "$ENTITLEMENTS"
-    codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$SIGNING_IDENTITY" "$APPEX" || fail "File Provider extension signing failed"
-  else
-    echo "MOONLIGHT_FILE_PROVIDER_APP_GROUP is not set; signing File Provider extension without App Group entitlements"
-    codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APPEX" || fail "File Provider extension signing failed"
-  fi
+  SIGN_ARGS=(--timestamp --sign "$SIGNING_IDENTITY")
+else
+  echo "SIGNING_IDENTITY is not set; ad-hoc signing File Provider extension"
+  SIGN_ARGS=(--sign -)
+fi
+
+ENTITLEMENTS=$EXTENSION_BUILD/$EXTENSION_NAME.entitlements
+if [ -n "${MOONLIGHT_FILE_PROVIDER_APP_GROUP:-}" ]; then
+  sed \
+    -e "s|\$(MOONLIGHT_FILE_PROVIDER_APP_GROUP)|$FILE_PROVIDER_APP_GROUP|g" \
+    "$EXTENSION_SOURCE/$EXTENSION_NAME.entitlements" > "$ENTITLEMENTS"
+  codesign --force --options runtime "${SIGN_ARGS[@]}" --entitlements "$ENTITLEMENTS" "$APPEX" || fail "File Provider extension signing failed"
+else
+  echo "MOONLIGHT_FILE_PROVIDER_APP_GROUP is not set; signing File Provider extension without App Group entitlements"
+  codesign --force --options runtime "${SIGN_ARGS[@]}" "$APPEX" || fail "File Provider extension signing failed"
 fi
 
 echo "File Provider extension bundled at $APPEX"
