@@ -42,6 +42,7 @@ Item {
     property real previewMax: StreamingPreferences.hdrMaxBrightness
     property real previewMin: StreamingPreferences.hdrMinBrightness
     property real previewAverage: StreamingPreferences.hdrMaxAverageBrightness
+    readonly property Item searchFocusTarget: hdrBrightnessModeComboBox
 
     function formatBrightness(value, decimals) {
         return Number(Number(value).toFixed(decimals)).toString()

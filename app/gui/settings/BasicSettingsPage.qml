@@ -63,11 +63,13 @@ Column {
 
     // ================= 画面 =================
     SettingsCard {
+        searchCategory: "basic"
         title: qsTr("Video")
         subtitle: qsTr("Setting values too high for your PC or network connection may cause lag, stuttering, or errors.")
 
         SettingsRow {
             title: qsTr("Resolution and FPS")
+            searchKeywords: "Resolution and FPS"
 
             Row {
                 spacing: Theme.spaceSm
@@ -614,6 +616,7 @@ Column {
 
         ChoiceRow {
             title: qsTranslate("LegacySettingsPage", "Video codec")
+            searchKeywords: "Video codec"
             selectedValue: StreamingPreferences.videoCodecConfig
             onValueActivated: function(value) { StreamingPreferences.videoCodecConfig = value }
 
@@ -628,11 +631,13 @@ Column {
     }
 
     SettingsCard {
+        searchCategory: "basic"
         title: qsTr("Network and stability")
         subtitle: qsTr("These settings apply to the next stream. Bitrate adjustment and packet loss protection can be used independently.")
 
         ToggleRow {
             title: qsTr("Automatically adjust bitrate (ABR)")
+            searchKeywords: "Automatically adjust bitrate (ABR)"
             description: qsTr("Allows a compatible Sunshine host to lower the video bitrate when the network is congested, up to the limit below.")
             checked: StreamingPreferences.enableSunshineAbr
             onToggled: function(value) { StreamingPreferences.enableSunshineAbr = value }
@@ -641,6 +646,7 @@ Column {
         SettingsRow {
             id: bitrateRow
             title: StreamingPreferences.enableSunshineAbr ? qsTr("Video bitrate limit") : qsTr("Video bitrate")
+            searchKeywords: "Video bitrate limit Video bitrate"
             description: (StreamingPreferences.enableSunshineAbr
                           ? qsTr("The highest video bitrate ABR may select. FEC adds extra bandwidth.")
                           : qsTr("Lower the bitrate on slower connections. Raise the bitrate to increase image quality.")) + "\n" +
@@ -725,6 +731,7 @@ Column {
         SettingsRow {
             id: fecRow
             title: qsTr("Packet loss protection (FEC)")
+            searchKeywords: "Packet loss protection (FEC)"
             description: StreamingPreferences.fecPercentage === -2
                          ? qsTr("Use the host's FEC settings. Requires a compatible host; otherwise its default behavior is used.")
                          : StreamingPreferences.fecPercentage === -1
@@ -774,6 +781,7 @@ Column {
 
     // ================= 画质增强 =================
     SettingsCard {
+        searchCategory: "basic"
         title: qsTr("Enhancements")
 
         ToggleRow {
@@ -786,6 +794,7 @@ Column {
                    : (SystemProperties.isVideoEnhancementExperimental()
                       ? qsTr("Video AI-Enhancement (Experimental)")
                       : qsTr("Video AI-Enhancement"))
+            searchKeywords: "Video AI-Enhancement Video AI-Enhancement (Experimental) Video AI-Enhancement (Not supported by the GPU)"
             description: qsTr("Enhance video quality by utilizing the GPU's AI-Enhancement capabilities.") + "\n" +
                          qsTr("This feature effectively upscales, reduces compression artifacts and enhances the clarity of streamed content.") + "\n" +
                          qsTr("Note:") + "\n" +
@@ -800,6 +809,7 @@ Column {
 
         SettingsRow {
             title: qsTr("Stream Resolution Scale")
+            searchKeywords: "Stream Resolution Scale"
             description: qsTr("Renders the stream below the selected resolution and upscales it on the client.")
 
             Row {
@@ -843,11 +853,13 @@ Column {
 
     // ================= 远程覆盖 =================
     SettingsCard {
+        searchCategory: "basic"
         title: qsTr("Remote overrides")
         subtitle: qsTr("Used instead of the values above when streaming over the internet.")
 
         SettingsRow {
             title: qsTr("Remote Resolution")
+            searchKeywords: "Remote Resolution"
 
             Row {
                 spacing: Theme.spaceSm
@@ -908,6 +920,7 @@ Column {
 
         SettingsRow {
             title: qsTr("Remote Frame Rate")
+            searchKeywords: "Remote Frame Rate"
 
             Row {
                 spacing: Theme.spaceSm

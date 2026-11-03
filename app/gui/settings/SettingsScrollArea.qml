@@ -50,6 +50,18 @@ Flickable {
         autoScrollAnimation.start()
     }
 
+    function scrollToItem(item) {
+        if (!item) {
+            return
+        }
+        autoScrollAnimation.stop()
+        var pos = item.mapToItem(contentItem, 0, 0)
+        autoScrollAnimation.from = contentY
+        autoScrollAnimation.to = Math.max(0, Math.min(pos.y - 40,
+                                                       Math.max(0, contentHeight - height)))
+        autoScrollAnimation.start()
+    }
+
     Window.onActiveFocusItemChanged: {
         var item = Window.activeFocusItem
         if (!item || !isChildOfFlickable(item)) {

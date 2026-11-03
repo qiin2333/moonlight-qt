@@ -57,12 +57,14 @@ Column {
     }
 
     SettingsCard {
+        searchCategory: "ecosystem"
         title: qsTranslate("AboutSettingsPage", "Server")
 
         SettingsRow {
             id: serverInfoRow
 
             title: "Foundation Sunshine"
+            searchKeywords: "Foundation Sunshine"
             description: ecosystemPage.paragraphIndent + qsTranslate("AboutSettingsPage", "Foundation Sunshine is the core streaming server of the AlkaidLab ecosystem and is installed on the controlled device. It connects AlkaidLab clients with a wide range of devices to deliver stronger streaming capabilities for gaming, creation, media, remote control, and more.")
             descriptionFontPointSize: Theme.fontSettingsSubtitle + 1
 
@@ -138,6 +140,7 @@ Column {
     }
 
     SettingsCard {
+        searchCategory: "ecosystem"
         title: qsTranslate("AboutSettingsPage", "Clients")
         subtitle: qsTranslate("AboutSettingsPage", "Client applications act as the controller for the streaming server.")
 
@@ -157,10 +160,12 @@ Column {
     }
 
     SettingsCard {
+        searchCategory: "ecosystem"
         title: qsTranslate("AboutSettingsPage", "Friendly links")
 
         SettingsRow {
             title: qsTranslate("AboutSettingsPage", "Moonlight Android Crown")
+            searchKeywords: "Moonlight Android Crown"
             description: qsTranslate("AboutSettingsPage", "A community-enhanced Android client with an alternative take on mobile input, controller support, and interface features.")
 
             HardLink {
@@ -171,6 +176,7 @@ Column {
 
         SettingsRow {
             title: "moonlight-ohos"
+            searchKeywords: "moonlight-ohos"
             description: qsTranslate("AboutSettingsPage", "The first Moonlight client built for HarmonyOS NEXT, pioneering Moonlight on HarmonyOS and compatible with the AlkaidLab ecosystem.")
 
             HardLink {
@@ -181,6 +187,7 @@ Column {
 
         SettingsRow {
             title: qsTranslate("AboutSettingsPage", "Natpierce")
+            searchKeywords: "Natpierce"
             description: qsTranslate("AboutSettingsPage", "A virtual networking tool that connects Moonlight clients to Sunshine servers over the public Internet when they are not on the same LAN.")
 
             HardLink {

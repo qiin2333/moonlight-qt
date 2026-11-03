@@ -14,6 +14,7 @@ SettingsRow {
     property var selectedValue
     property bool controlEnabled: true
     property int maximumControlWidth: 320
+    searchFocusTarget: control
     // Set this when several rows should align to the same visual width. A value
     // of 0 keeps the existing content-sized behavior.
     property int controlWidth: 0

@@ -15,6 +15,7 @@ Item {
     property Item navDownItem: null
     readonly property int columns: compact ? 3 : 2
     readonly property Item firstItem: optionRepeater.count > 0 ? optionRepeater.itemAt(0) : null
+    readonly property Item searchFocusTarget: firstItem
     readonly property int optionCount: modes.length
     readonly property var modes: [
         {

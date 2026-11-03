@@ -10,6 +10,9 @@ FocusScope {
 
     property string title: ""
     property string description: ""
+    // English source text used as a stable search alias across translations.
+    property string searchKeywords: ""
+    property Item searchFocusTarget: row
     property real descriptionFontPointSize: Theme.fontSettingsSubtitle
     // 业务上是否该显示这一行（例如某功能在当前平台不可用）
     property bool applicable: true
