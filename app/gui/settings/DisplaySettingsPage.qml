@@ -135,6 +135,8 @@ Column {
     // ================= HDR =================
     SettingsCard {
         searchCategory: "display"
+        searchKeywords: "HDR brightness Peak brightness"
+        searchTarget: hdrCard
         title: qsTr("HDR")
 
         ToggleRow {

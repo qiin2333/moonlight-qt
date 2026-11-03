@@ -235,7 +235,8 @@ Item {
                 contentItem: Column {
                     spacing: Theme.spaceXs
                     Text {
-                        text: modelData.title
+                                        text: modelData.row && modelData.row.title !== undefined
+                                              ? modelData.row.title : modelData.title
                         color: Theme.text
                         font.family: Theme.fontSans
                         font.pointSize: Theme.fontRowTitle
@@ -243,7 +244,9 @@ Item {
                         elide: Text.ElideRight
                     }
                     Text {
-                        text: modelData.categoryTitle
+                                        text: modelData.row && modelData.row.description !== undefined &&
+                                              modelData.row.description !== ""
+                                              ? modelData.row.description : modelData.categoryTitle
                         color: Theme.textSettingsSubtitle
                         font.family: Theme.fontSans
                         font.pointSize: Theme.fontSettingsSubtitle

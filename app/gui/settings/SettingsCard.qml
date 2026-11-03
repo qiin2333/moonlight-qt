@@ -12,6 +12,9 @@ Item {
     property string subtitle: ""
     // Used by the settings search index to jump to the owning category.
     property string searchCategory: ""
+    // Optional metadata for cards whose content is not a SettingsRow.
+    property string searchKeywords: ""
+    property Item searchTarget: null
     default property alias cardContent: contentColumn.data
 
     // 卡片内是否还有适用的行。全部被过滤掉时整张卡自动隐藏。

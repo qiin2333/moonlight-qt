@@ -11,6 +11,7 @@ SettingsRow {
     property alias checked: control.checked
     property alias controlEnabled: control.enabled
     property alias tooltip: tip.text
+    searchFocusTarget: control
 
     signal toggled(bool value)
 

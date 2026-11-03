@@ -92,14 +92,25 @@ FocusScope {
             if (node.searchCategory !== undefined && node.searchCategory !== "") {
                 categoryKey = node.searchCategory
             }
-            if (node.hoverable !== undefined && node.title !== undefined && node.title !== "") {
+            if (categoryKey === "peripherals" && !SystemProperties.usbForwardingAvailable) {
+                return
+            }
+            if (node.applicable !== undefined && !node.applicable) {
+                return
+            }
+            var hasRowSearchData = node.hoverable !== undefined
+            var hasExplicitSearchData = node.searchKeywords !== undefined &&
+                                        node.searchKeywords !== ""
+            if ((hasRowSearchData || hasExplicitSearchData) &&
+                    node.title !== undefined && node.title !== "") {
                 entries.push({
                     title: node.title,
                     description: node.description || "",
                     searchKeywords: node.searchKeywords || "",
                     category: categoryKey,
                     categoryTitle: settingsPage.categoryTitle(categoryKey),
-                    row: node
+                    row: node,
+                    target: node.searchTarget || node.searchFocusTarget || node
                 })
             }
             if (node.children) {
@@ -128,7 +139,11 @@ FocusScope {
         var results = []
         for (var i = 0; i < searchIndex.length && results.length < 30; ++i) {
             var entry = searchIndex[i]
-            var haystack = entry.title + " " + entry.description + " " +
+            var title = entry.row && entry.row.title !== undefined
+                    ? entry.row.title : entry.title
+            var description = entry.row && entry.row.description !== undefined
+                    ? entry.row.description : entry.description
+            var haystack = title + " " + description + " " +
                     entry.searchKeywords + " " + entry.categoryTitle
             if (fuzzyMatch(query, haystack)) {
                 results.push(entry)
@@ -152,8 +167,12 @@ FocusScope {
         searchExpanded = false
         searchQuery = ""
         Qt.callLater(function() {
-            scrollArea.scrollToItem(result.row)
-            result.row.forceActiveFocus(Qt.TabFocusReason)
+            var target = result.target || result.row
+            target = target.searchFocusTarget || target
+            scrollArea.scrollToItem(target)
+            if (target && target.forceActiveFocus) {
+                target.forceActiveFocus(Qt.TabFocusReason)
+            }
         })
     }
 

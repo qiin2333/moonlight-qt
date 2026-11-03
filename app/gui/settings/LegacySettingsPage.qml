@@ -85,11 +85,14 @@ Column {
     // ================= 主机 =================
     SettingsCard {
         searchCategory: "host"
+        searchKeywords: "Screen Combination Mode"
+        searchTarget: screenCombinationSelector
         visible: settingsPage.category === "host" && hasVisibleContent
         title: qsTr("Screen Combination Mode")
         subtitle: qsTr("Sunshine Foundation display control")
 
         ScreenCombinationModeSelector {
+            id: screenCombinationSelector
             width: parent.width
         }
     }
