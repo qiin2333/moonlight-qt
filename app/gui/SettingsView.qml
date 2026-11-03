@@ -23,11 +23,16 @@ FocusScope {
     objectName: qsTr("Settings")
 
     signal languageChanged()
+    signal searchFocusRequested()
 
     // 窄窗口时 rail 折叠成顶部横向 tab 条
     readonly property bool compact: width < Theme.compactBreakpoint
 
     property string category: "basic"
+    property string searchQuery: ""
+    property bool searchExpanded: false
+    property var searchIndex: []
+    property var searchResults: []
 
     // 图标取自 Microsoft Fluent UI System Icons（MIT），和 FluentWinUI3 是同一套设计语言。
     // 之前用 emoji，各平台字体不同，渲染出来大小、粗细、配色都对不齐。
@@ -51,6 +56,108 @@ FocusScope {
         function(c) {
             return c.key !== "peripherals" || SystemProperties.usbForwardingAvailable
         })
+
+    function categoryTitle(key) {
+        for (var i = 0; i < rawCategories.length; ++i) {
+            if (rawCategories[i].key === key) {
+                return rawCategories[i].title
+            }
+        }
+        return key
+    }
+
+    function fuzzyMatch(query, value) {
+        var q = query.toLocaleLowerCase()
+        var text = value.toLocaleLowerCase()
+        if (text.indexOf(q) >= 0) {
+            return true
+        }
+        var cursor = 0
+        for (var i = 0; i < text.length && cursor < q.length; ++i) {
+            if (text[i] === q[cursor]) {
+                ++cursor
+            }
+        }
+        return cursor === q.length
+    }
+
+    function rebuildSearchIndex() {
+        var entries = []
+
+        function walk(node, inheritedCategory) {
+            if (!node) {
+                return
+            }
+            var categoryKey = inheritedCategory
+            if (node.searchCategory !== undefined && node.searchCategory !== "") {
+                categoryKey = node.searchCategory
+            }
+            if (node.hoverable !== undefined && node.title !== undefined && node.title !== "") {
+                entries.push({
+                    title: node.title,
+                    description: node.description || "",
+                    searchKeywords: node.searchKeywords || "",
+                    category: categoryKey,
+                    categoryTitle: settingsPage.categoryTitle(categoryKey),
+                    row: node
+                })
+            }
+            if (node.children) {
+                for (var i = 0; i < node.children.length; ++i) {
+                    walk(node.children[i], categoryKey)
+                }
+            }
+        }
+
+        walk(basicPage, "basic")
+        walk(displayPage, "display")
+        walk(legacyPage, "")
+        walk(ecosystemPage, "ecosystem")
+        walk(aboutPage, "about")
+        walk(peripheralsPage, "peripherals")
+        settingsPage.searchIndex = entries
+        updateSearchResults()
+    }
+
+    function updateSearchResults() {
+        var query = searchQuery.trim()
+        if (query === "") {
+            searchResults = []
+            return
+        }
+        var results = []
+        for (var i = 0; i < searchIndex.length && results.length < 30; ++i) {
+            var entry = searchIndex[i]
+            var haystack = entry.title + " " + entry.description + " " +
+                    entry.searchKeywords + " " + entry.categoryTitle
+            if (fuzzyMatch(query, haystack)) {
+                results.push(entry)
+            }
+        }
+        searchResults = results
+    }
+
+    function openSearch() {
+        searchExpanded = true
+        searchFocusRequested()
+    }
+
+    function closeSearch() {
+        searchExpanded = false
+        searchQuery = ""
+    }
+
+    function openSearchResult(result) {
+        category = result.category
+        searchExpanded = false
+        searchQuery = ""
+        Qt.callLater(function() {
+            scrollArea.scrollToItem(result.row)
+            result.row.forceActiveFocus(Qt.TabFocusReason)
+        })
+    }
+
+    onSearchQueryChanged: updateSearchResults()
 
     StackView.onActivated: {
         // This enables Tab and BackTab based navigation rather than arrow keys.
@@ -166,7 +273,7 @@ FocusScope {
                 top: parent.top
             }
             width: settingsPage.compact ? body.width : Theme.railWidth
-            height: settingsPage.compact ? 52 : body.height
+            height: settingsPage.compact ? 96 : body.height
 
             // 分类栏底板。方角 + 1px 描边，不用硬投影：它贴着窗口左边，
             // 投影只会在右侧和内容区挤在一起。
@@ -178,8 +285,14 @@ FocusScope {
             CategoryRail {
                 id: rail
                 anchors {
-                    fill: parent
-                    margins: Theme.spaceXs
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
+                    leftMargin: Theme.spaceXs
+                    rightMargin: Theme.spaceXs
+                    bottomMargin: Theme.spaceXs
+                    top: sidebarSearch.bottom
+                    topMargin: Theme.spaceXs
                 }
                 compact: settingsPage.compact
                 categories: settingsPage.categories
@@ -189,6 +302,19 @@ FocusScope {
                     scrollArea.contentY = 0
                 }
                 onContentRequested: settingsPage.focusContent()
+            }
+
+            SettingsSearchControl {
+                id: sidebarSearch
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    topMargin: Theme.spaceXs
+                    leftMargin: Theme.spaceXs
+                }
+                width: parent.width - Theme.spaceXs * 2
+                page: settingsPage
+                z: 10
             }
         }
 
@@ -260,11 +386,14 @@ FocusScope {
                 height: visible ? implicitHeight : 0
             }
         }
+
     }
 
     Component.onCompleted: {
         // 语言切换需要重建若干下拉的模型
         settingsPage.languageChanged.connect(basicPage.languageChanged)
         settingsPage.languageChanged.connect(displayPage.languageChanged)
+        settingsPage.languageChanged.connect(settingsPage.rebuildSearchIndex)
+        Qt.callLater(settingsPage.rebuildSearchIndex)
     }
 }

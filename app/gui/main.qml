@@ -20,6 +20,17 @@ ApplicationWindow {
     property bool revealAfterFirstFrame: false
     property bool configurationChecksStarted: false
     property bool initialBackgroundChoiceHandled: false
+    readonly property var settingsItem: stackView.currentItem instanceof SettingsView
+                                         ? stackView.currentItem : null
+
+    // 搜索快捷键属于主窗口级别，避免焦点落在设置控件或文本框时失效。
+    // Windows/Linux 使用 Ctrl+K，macOS 使用 Cmd+K，并且只在设置页注册。
+    Shortcut {
+        id: settingsSearchShortcut
+        sequence: Qt.platform.os === "osx" ? "Meta+K" : "Ctrl+K"
+        enabled: window.settingsItem !== null
+        onActivated: window.settingsItem.openSearch()
+    }
 
     Timer {
         id: revealFallbackTimer
@@ -574,6 +585,7 @@ ApplicationWindow {
                         }
                     }
                 }
+
             }
 
             Text {

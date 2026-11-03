@@ -122,6 +122,7 @@ Column {
     }
 
     SettingsCard {
+        searchCategory: "about"
         title: qsTr("About")
 
         Column {
@@ -225,6 +226,7 @@ Column {
     }
 
     SettingsCard {
+        searchCategory: "about"
         title: qsTr("Legal notice")
         subtitle: qsTr("This software is released under GNU GPLv3. The full license and third-party component information are provided below.")
 
@@ -232,6 +234,7 @@ Column {
             id: legalInfoRow
 
             title: "GNU GPL v3.0"
+            searchKeywords: "GNU GPL v3.0"
 
             Flow {
                 width: Math.min(300, Math.max(0, legalInfoRow.width - Theme.spaceMd * 2))
@@ -255,6 +258,7 @@ Column {
             id: usbipdcppRow
 
             title: qsTr("usbipdcpp (LGPL-3.0)")
+            searchKeywords: "usbipdcpp (LGPL-3.0)"
             description: qsTr("This product uses usbipdcpp (https://github.com/yunsmall/usbipdcpp), licensed under LGPLv3.")
 
             Flow {

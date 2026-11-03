@@ -3174,6 +3174,14 @@
         <translation>设置</translation>
     </message>
     <message>
+        <source>Search settings...</source>
+        <translation>搜索设置...</translation>
+    </message>
+    <message>
+        <source>Search</source>
+        <translation>搜索</translation>
+    </message>
+    <message>
         <source>Basic Settings</source>
         <translation>基本设置</translation>
     </message>

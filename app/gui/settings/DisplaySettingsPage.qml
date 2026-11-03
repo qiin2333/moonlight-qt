@@ -23,11 +23,13 @@ Column {
     spacing: Theme.spaceLg
 
     SettingsCard {
+        searchCategory: "display"
         title: qsTr("Display")
 
         SettingsRow {
             applicable: SystemProperties.hasDesktopEnvironment
             title: qsTr("Display mode")
+            searchKeywords: "Display mode"
             description: qsTr("Fullscreen generally provides the best performance, but borderless windowed may work better with features like macOS Spaces, Alt+Tab, screenshot tools, on-screen overlays, etc.")
 
             AutoResizingComboBox {
@@ -103,6 +105,7 @@ Column {
 
         ToggleRow {
             title: qsTr("Stretch presentation")
+            searchKeywords: "Stretch presentation"
             description: qsTr("Ignores both client and host PC aspect ratios, which is required for displaying Half-SBS (Side-By-Side) 3D signals to AR/XR devices that only support Full-SBS (usually 1920x1080 per eye, meaning a total resolution of 3840x1080)")
             checked: StreamingPreferences.ignoreAspectRatio
             onToggled: function(value) { StreamingPreferences.ignoreAspectRatio = value }
@@ -111,6 +114,7 @@ Column {
         ToggleRow {
             id: vsyncToggle
             title: qsTr("V-Sync")
+            searchKeywords: "V-Sync"
             description: qsTr("Disabling V-Sync allows sub-frame rendering latency, but it can display visible tearing")
             checked: StreamingPreferences.enableVsync
             onToggled: function(value) { StreamingPreferences.enableVsync = value }
@@ -118,6 +122,7 @@ Column {
 
         ToggleRow {
             title: qsTr("Frame pacing")
+            searchKeywords: "Frame pacing"
             description: StreamingPreferences.enableVsync
                          ? qsTr("Frame pacing reduces micro-stutter by delaying frames that come in too early")
                          : qsTr("Enable V-Sync to use frame pacing.")
@@ -129,10 +134,12 @@ Column {
 
     // ================= HDR =================
     SettingsCard {
+        searchCategory: "display"
         title: qsTr("HDR")
 
         ToggleRow {
             title: qsTr("Enable HDR")
+            searchKeywords: "Enable HDR"
             description: SystemProperties.supportsHdr ?
                              qsTr("The stream will be HDR-capable, but some games may require an HDR monitor on your host PC to enable HDR mode.")
                            :
@@ -145,6 +152,7 @@ Column {
         SettingsRow {
             id: hdrModeRow
             title: qsTr("HDR format")
+            searchKeywords: "HDR format"
             description: qsTr("HDR10 (PQ) is the standard HDR format. HLG offers better compatibility with SDR displays when HDR is not active on the host.")
 
             AutoResizingComboBox {
