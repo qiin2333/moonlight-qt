@@ -244,6 +244,7 @@ Item {
                         elide: Text.ElideRight
                     }
                     Text {
+                        width: parent.width
                                         text: modelData.row && modelData.row.description !== undefined &&
                                               modelData.row.description !== ""
                                               ? modelData.row.description : modelData.categoryTitle

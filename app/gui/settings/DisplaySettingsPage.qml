@@ -30,6 +30,7 @@ Column {
             applicable: SystemProperties.hasDesktopEnvironment
             title: qsTr("Display mode")
             searchKeywords: "Display mode"
+            searchFocusTarget: windowModeComboBox
             description: qsTr("Fullscreen generally provides the best performance, but borderless windowed may work better with features like macOS Spaces, Alt+Tab, screenshot tools, on-screen overlays, etc.")
 
             AutoResizingComboBox {
@@ -135,7 +136,7 @@ Column {
     // ================= HDR =================
     SettingsCard {
         searchCategory: "display"
-        searchKeywords: "HDR brightness Peak brightness"
+        searchKeywords: "HDR brightness Peak brightness Minimum brightness Full-frame brightness"
         searchTarget: hdrCard
         title: qsTr("HDR")
 

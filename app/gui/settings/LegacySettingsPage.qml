@@ -288,6 +288,7 @@ Column {
             id: backgroundApiRow
             title: qsTr("Background image API")
             searchKeywords: "Background image API"
+            searchFocusTarget: backgroundApiField
             description: qsTr("Enter an image API or a direct image URL. Leaving it empty restores Photography.")
 
             HardTextField {
@@ -550,6 +551,7 @@ Column {
             id: stickDeadzoneRow
             title: qsTr("Joystick deadzone")
             searchKeywords: "Joystick deadzone"
+            searchFocusTarget: stickDeadzoneSlider
             description: qsTr("Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.")
 
             Row {
