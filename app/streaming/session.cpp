@@ -4018,7 +4018,7 @@ bool Session::tryReconnect()
             }
             if (m_InputHandler != nullptr) {
                 m_InputHandler->notifyHostOfConnectedGamepads();
-                m_InputHandler->raiseAllKeys();
+                m_InputHandler->raiseAllKeys(true, true);
             }
             break;
         }
@@ -5940,7 +5940,7 @@ DispatchDeferredCleanup:
     }
 
     // Raise any keys that are still down
-    m_InputHandler->raiseAllKeys();
+    m_InputHandler->raiseAllKeys(true, true);
 
     // Destroy the input handler now. This must be destroyed
     // before allowwing the UI to continue execution or it could

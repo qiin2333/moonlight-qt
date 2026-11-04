@@ -226,7 +226,9 @@ public:
 
     int getAttachedGamepadMask();
 
-    void raiseAllKeys(bool clearKeys = true);
+    // Release keys known to the client. Forwarded keys remain tracked by default
+    // so a later connection reset can retry releases that were only queued.
+    void raiseAllKeys(bool clearKeys = true, bool clearForwardedKeys = false);
     bool hasKeysDown() const { return !m_KeysDown.isEmpty(); }
 
     void notifyMouseLeave();
@@ -452,6 +454,7 @@ private:
     int m_GamepadMask;
     GamepadState m_GamepadState[MAX_GAMEPADS];
     QSet<uint32_t> m_KeysDown;
+    QSet<uint32_t> m_ForwardedKeys;
     bool m_FakeMouseCaptureActive;
     bool m_KeyboardCaptureActive;
     QString m_OldIgnoreDevices;
