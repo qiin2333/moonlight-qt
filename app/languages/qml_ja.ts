@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>パフォーマンスオーバーレイはSteam LinkまたはRaspberry Piではサポートされていません。</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(デフォルト)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>無効</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>ジョイスティックのデッドゾーン</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>スティックのドリフトを補正する場合などに、この割合未満のスティックの入力を無視します。0%ではスティック入力を変更せずに送信します。</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>「%1」ボタンを長押ししてゲームパッドでマウス操作を有効にする</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>これがオフの場合、%1を長押しすると代わりにストリーミング中のオーバーレイメニューが開きます。</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>ゲームパッド接続時にこれが「無効」以外の場合、%1を長押ししてもメニューが開きます（ゲームパッドマウスをオフにする必要があります）。</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>ストリーミング中はいつでも%1または%2で切り替えられます。</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>フローティングボタン（デフォルト）</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

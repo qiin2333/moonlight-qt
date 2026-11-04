@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>A teljesítményátfedés nem támogatott Steam Linken vagy Raspberry Pi-n.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Alapértelmezett)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Letiltva</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Joystick holtzónája</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Figyelmen kívül hagyja az ennél kisebb százalékos botkitéréseket, például a bot sodródásának ellensúlyozására. 0%-nál a bot bemenete módosítás nélkül kerül továbbításra.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Az egérvezérlés gamepaddel való engedélyezéséhez tartsa lenyomva a(z) „%1” gombot</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Ha ez ki van kapcsolva, a(z) %1 nyomva tartása ehelyett megnyitja a streamen belüli fedvény menüjét.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Csatlakoztatott gamepad esetén a(z) %1 nyomva tartása akkor is megnyitja a menüt, ha ez nem „Letiltva” (a Gamepad egér funkciónak ki kell lennie kapcsolva).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Streamelés közben bármikor átválthatja a(z) %1 vagy %2 használatával.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Lebegő gomb (alapértelmezett)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

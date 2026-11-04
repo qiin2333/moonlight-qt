@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Numatyta)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Išjungta</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Vairalazdės neveikos zona</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Nepaiso vairalazdės nuokrypių, mažesnių už šį procentą, pavyzdžiui, kad kompensuotų vairalazdės dreifą. Esant 0 %, vairalazdės įvestis siunčiama nepakeista.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Laikykite nuspaudę mygtuką „%1“, kad įjungtumėte pelės valdymą žaidimų pulteliu</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Kai tai išjungta, laikant nuspaustą %1 vietoje to atidaromas transliacijos perdangos meniu.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Kai prijungtas žaidimų pultelis, laikant nuspaustą %1 meniu taip pat atidaromas, jei ši parinktis nenustatyta kaip „Išjungta“ (žaidimų pultelio pelė turi būti išjungta).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Transliacijos metu bet kada galite tai perjungti naudodami %1 arba %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Slankusis mygtukas (numatyta)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

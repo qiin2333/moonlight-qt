@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>Наложение производительности не поддерживается в Steam Link или Raspberry Pi.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(По умолчанию)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Отключено</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Мёртвая зона джойстика</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Игнорирует отклонения стика ниже этого процента, например для компенсации дрейфа. При значении 0% ввод со стика передаётся без изменений.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Удерживайте кнопку «%1», чтобы включить управление мышью с помощью геймпада</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Если этот параметр выключен, удержание %1 вместо этого открывает меню оверлея во время стриминга.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>При подключённом геймпаде удержание %1 также открывает меню, если этот параметр не установлен в значение «Отключено» (требуется отключить мышь геймпада).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Во время стриминга это можно переключить в любое время с помощью %1 или %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Плавающая кнопка (по умолчанию)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

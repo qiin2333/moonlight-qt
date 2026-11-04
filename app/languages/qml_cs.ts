@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Výchozí)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Zakázáno</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Mrtvá zóna joysticku</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Ignoruje vychýlení páčky pod toto procento, například pro kompenzaci driftování. Při 0 % se vstup z páčky odesílá beze změny.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Podržením tlačítka „%1“ povolíte ovládání myši gamepadem</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Když je tato možnost vypnutá, podržením %1 se místo toho otevře překryvná nabídka během streamování.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Když je připojen gamepad, podržením %1 se nabídka otevře také, pokud tato možnost není nastavena na „Zakázáno“ (vyžaduje vypnuté ovládání myši gamepadem).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Během streamování ji můžete kdykoli přepnout pomocí %1 nebo %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Plovoucí tlačítko (výchozí)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>A sobreposição de desempenho não é suportada no Steam Link ou Raspberry Pi.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Predefinição)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Desativado</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Zona morta do joystick</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Ignora desvios do stick abaixo desta percentagem, por exemplo, para compensar o drift. A 0%, a entrada do stick é enviada sem alterações.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Mantenha o botão «%1» premido para ativar o controlo do rato com o comando</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Quando esta opção está desativada, manter %1 premido abre o menu sobreposto na transmissão.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Com um comando ligado, manter %1 premido também abre o menu quando esta opção não está definida como «Desativado» (é necessário desativar o Rato do comando).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Pode alternar esta opção a qualquer momento durante a transmissão usando %1 ou %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Botão flutuante (predefinição)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

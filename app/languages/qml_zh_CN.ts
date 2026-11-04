@@ -239,6 +239,18 @@
         <source>No external browser is available.</source>
         <translation>未找到可用的外部浏览器。</translation>
     </message>
+    <message>
+        <source>Project</source>
+        <translation>项目</translation>
+    </message>
+    <message>
+        <source>This product uses usbipdcpp (https://github.com/yunsmall/usbipdcpp), licensed under LGPLv3.</source>
+        <translation>本产品使用 usbipdcpp（https://github.com/yunsmall/usbipdcpp），遵循 LGPLv3 许可。</translation>
+    </message>
+    <message>
+        <source>usbipdcpp (LGPL-3.0)</source>
+        <translation>usbipdcpp（LGPL-3.0）</translation>
+    </message>
 </context>
 <context>
     <name>AppModel</name>
@@ -1232,6 +1244,22 @@
         <source>Unexpected file mapping RPC response: %1</source>
         <translation>文件映射 RPC 返回了预期外的响应：%1</translation>
     </message>
+    <message>
+        <source>A file mapping RPC is already in progress</source>
+        <translation>文件映射 RPC 已在进行中</translation>
+    </message>
+    <message>
+        <source>File mapping RPC response ID does not match the request</source>
+        <translation>文件映射 RPC 响应 ID 与请求不匹配</translation>
+    </message>
+    <message>
+        <source>File mapping capability redirects are not allowed</source>
+        <translation>不允许文件映射能力重定向</translation>
+    </message>
+    <message>
+        <source>File mapping host certificate mismatch</source>
+        <translation>文件映射主机证书不匹配</translation>
+    </message>
 </context>
 <context>
     <name>GamepadMapper</name>
@@ -1956,6 +1984,42 @@
         <source>Diagnostics</source>
         <translation>诊断</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>（默认）</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>禁用</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>摇杆死区</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>忽略低于此百分比的摇杆偏移，例如用于补偿摇杆漂移。0% 将不修改摇杆输入。</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>按住手柄的“%1”键启用鼠标控制</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>关闭此选项时，按住 %1 将打开串流中的悬浮菜单。</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>连接手柄后，只要此项不是“禁用”，按住 %1 也会打开菜单（需要关闭“手柄鼠标”）。</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>串流时可随时使用 %1 或 %2 切换此功能。</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>悬浮按钮（默认）</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>
@@ -2137,6 +2201,18 @@
     <message>
         <source>Developer</source>
         <translation>开发功能</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>返回</translation>
+    </message>
+    <message>
+        <source>Move</source>
+        <translation>移动</translation>
+    </message>
+    <message>
+        <source>Select</source>
+        <translation>选择</translation>
     </message>
 </context>
 <context>
@@ -2442,6 +2518,50 @@
         <source>No external browser is available.</source>
         <translation>未找到可用的外部浏览器。</translation>
     </message>
+    <message>
+        <source>%1 · Ready</source>
+        <translation>%1 · 就绪</translation>
+    </message>
+    <message>
+        <source>Could not verify the USB sharing environment. Check the usbip installation.</source>
+        <translation>无法验证 USB 共享环境。请检查 usbip 安装。</translation>
+    </message>
+    <message>
+        <source>Could not verify the bundled USB sharing service. Reinstall Moonlight.</source>
+        <translation>无法验证内置 USB 共享服务。请重新安装 Moonlight。</translation>
+    </message>
+    <message>
+        <source>Device availability</source>
+        <translation>设备可用性</translation>
+    </message>
+    <message>
+        <source>Devices managed by macOS itself — keyboards, mice, storage, and cameras — are shown as "In use by macOS" and cannot be shared without administrator access.</source>
+        <translation>由 macOS 管理的设备（键盘、鼠标、存储设备和摄像头）会显示为“由 macOS 使用中”，未经管理员授权无法共享。</translation>
+    </message>
+    <message>
+        <source>Installed (v%1). The usbipd daemon is not running; Moonlight starts it when you share a device.</source>
+        <translation>已安装（v%1）。usbipd 守护进程未运行；共享设备时 Moonlight 会启动它。</translation>
+    </message>
+    <message>
+        <source>Not installed. The usbip tool is required to share USB devices. Install the USB/IP package of your distribution (usbip-utils or linux-tools).</source>
+        <translation>未安装。共享 USB 设备需要 usbip 工具。请安装你的发行版提供的 USB/IP 软件包（usbip-utils 或 linux-tools）。</translation>
+    </message>
+    <message>
+        <source>The USB/IP kernel module is not loaded. Moonlight loads it automatically when you share a device.</source>
+        <translation>USB/IP 内核模块未加载。共享设备时 Moonlight 会自动加载它。</translation>
+    </message>
+    <message>
+        <source>The bundled USB sharing service is missing. Reinstall Moonlight.</source>
+        <translation>内置 USB 共享服务缺失。请重新安装 Moonlight。</translation>
+    </message>
+    <message>
+        <source>USB sharing service</source>
+        <translation>USB 共享服务</translation>
+    </message>
+    <message>
+        <source>While a device is shared, it is taken over by the USB/IP driver and stops working on this computer until you release it. The first share asks for administrator confirmation; the authorization is remembered for a few minutes.</source>
+        <translation>设备共享期间会被 USB/IP 驱动接管，在释放设备前无法在本机使用。首次共享会请求管理员确认；授权会记住几分钟。</translation>
+    </message>
 </context>
 <context>
     <name>PortableUpdateInstaller</name>
@@ -2699,6 +2819,18 @@
     <message>
         <source>WebSocket reply was not valid JSON: %1</source>
         <translation>WebSocket 的响应不是合法 JSON：%1</translation>
+    </message>
+    <message>
+        <source>Invalid WebSocket frame length</source>
+        <translation>WebSocket 帧长度无效</translation>
+    </message>
+    <message>
+        <source>Masked WebSocket frame received from host</source>
+        <translation>收到主机发送的带掩码 WebSocket 帧</translation>
+    </message>
+    <message>
+        <source>WebSocket text was not valid UTF-8</source>
+        <translation>WebSocket 文本不是有效的 UTF-8</translation>
     </message>
 </context>
 <context>
@@ -3166,6 +3298,22 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>无法初始化视频解码器。请检查你的流式传输设置，然后重试。</translation>
     </message>
+    <message>
+        <source>Bitrate: %1</source>
+        <translation>码率：%1</translation>
+    </message>
+    <message>
+        <source>Could not start the local USB sharing service.</source>
+        <translation>无法启动本地 USB 共享服务。</translation>
+    </message>
+    <message>
+        <source>The USB device was unplugged. Refresh the list and try again.</source>
+        <translation>USB 设备已拔出。请刷新列表后重试。</translation>
+    </message>
+    <message>
+        <source>This USB device is in use by macOS and cannot be forwarded.</source>
+        <translation>此 USB 设备正由 macOS 使用，无法转发。</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -3626,6 +3774,90 @@
         <source>Requested stop sharing. Refreshing device list…</source>
         <translation>已请求停止共享。正在刷新设备列表…</translation>
     </message>
+    <message>
+        <source>Could not create a temporary file for the USB helper.</source>
+        <translation>无法为 USB 辅助程序创建临时文件。</translation>
+    </message>
+    <message>
+        <source>Could not parse the USB device list.</source>
+        <translation>无法解析 USB 设备列表。</translation>
+    </message>
+    <message>
+        <source>Device is already shared.</source>
+        <translation>设备已经共享。</translation>
+    </message>
+    <message>
+        <source>Device shared, but its identity could not be recorded. Replacement detection is unavailable for this device.</source>
+        <translation>设备已共享，但无法记录其身份。此设备不支持替换检测。</translation>
+    </message>
+    <message>
+        <source>Device shared. Refreshing device list…</source>
+        <translation>设备已共享。正在刷新设备列表…</translation>
+    </message>
+    <message>
+        <source>Sharing stopped. Refreshing device list…</source>
+        <translation>共享已停止。正在刷新设备列表…</translation>
+    </message>
+    <message>
+        <source>The USB device changed while the authorization was pending. Refresh the device list and share again.</source>
+        <translation>授权等待期间 USB 设备发生了变化。请刷新设备列表后重新共享。</translation>
+    </message>
+    <message>
+        <source>The USB device list failed (exit %1).</source>
+        <translation>USB 设备列表获取失败（退出码 %1）。</translation>
+    </message>
+    <message>
+        <source>The USB helper could not be started.</source>
+        <translation>无法启动 USB 辅助程序。</translation>
+    </message>
+    <message>
+        <source>The USB sharing operation did not finish. Restart the usbipd service and try again.</source>
+        <translation>USB 共享操作未完成。请重启 usbipd 服务后重试。</translation>
+    </message>
+    <message>
+        <source>The USB sharing operation failed (exit %1).</source>
+        <translation>USB 共享操作失败（退出码 %1）。</translation>
+    </message>
+    <message>
+        <source>The bundled USB sharing component is missing. Reinstall Moonlight.</source>
+        <translation>内置 USB 共享组件缺失。请重新安装 Moonlight。</translation>
+    </message>
+    <message>
+        <source>The device list is out of date. Refresh it and try again.</source>
+        <translation>设备列表已过期。请刷新后重试。</translation>
+    </message>
+    <message>
+        <source>The install tool is not available on this system.</source>
+        <translation>此系统上没有可用的安装工具。</translation>
+    </message>
+    <message>
+        <source>The previous USB forwarding connection could not be released. Restart the usbipd service and reconnect the USB device before trying again.</source>
+        <translation>无法释放上一次的 USB 转发连接。请重启 usbipd 服务并重新连接 USB 设备后再试。</translation>
+    </message>
+    <message>
+        <source>The usbip tool is not installed. Install the USB/IP package of your distribution (usbip-utils or linux-tools).</source>
+        <translation>未安装 usbip 工具。请安装你的发行版提供的 USB/IP 软件包（usbip-utils 或 linux-tools）。</translation>
+    </message>
+    <message>
+        <source>This USB device cannot be shared.</source>
+        <translation>此 USB 设备无法共享。</translation>
+    </message>
+    <message>
+        <source>USB device information is unavailable (sysfs is not mounted).</source>
+        <translation>USB 设备信息不可用（sysfs 未挂载）。</translation>
+    </message>
+    <message>
+        <source>USB sharing setup could not activate the unplug-cleanup rule. It will be retried on the next share attempt.</source>
+        <translation>USB 共享设置无法启用拔出清理规则。下次尝试共享时会重试。</translation>
+    </message>
+    <message>
+        <source>USB sharing setup did not finish. Restart the usbipd service and try again.</source>
+        <translation>USB 共享设置未完成。请重启 usbipd 服务后重试。</translation>
+    </message>
+    <message>
+        <source>pkexec is not available. A polkit authentication agent is required.</source>
+        <translation>pkexec 不可用。需要 polkit 身份验证代理。</translation>
+    </message>
 </context>
 <context>
     <name>UsbForwardingBindDialog</name>
@@ -3684,6 +3916,22 @@
     <message>
         <source>Share</source>
         <translation>共享</translation>
+    </message>
+    <message>
+        <source>Device changed — release and share again</source>
+        <translation>设备已变化——请释放后重新共享</translation>
+    </message>
+    <message>
+        <source>In use by macOS</source>
+        <translation>由 macOS 使用中</translation>
+    </message>
+    <message>
+        <source>Stop sharing to restore it locally. Sharing takes over the device and asks for administrator confirmation; the authorization is remembered for a few minutes.</source>
+        <translation>停止共享以在本机恢复使用。共享会接管设备并请求管理员确认；授权会记住几分钟。</translation>
+    </message>
+    <message>
+        <source>To restore a device during a stream, release it from the USB Devices menu in the stream overlay or end the stream. Sharing is remembered by Moonlight and needs no administrator confirmation.</source>
+        <translation>串流期间要恢复设备，请在串流悬浮菜单的 USB 设备中释放它，或结束串流。Moonlight 会记住共享状态，无需再次请求管理员确认。</translation>
     </message>
 </context>
 <context>
@@ -3793,6 +4041,10 @@
         <source>Learn more</source>
         <translation>了解一下</translation>
     </message>
+    <message>
+        <source>No keyboard? Press %1 to open the on-screen keyboard.</source>
+        <translation>没有键盘？按 %1 打开屏幕键盘。</translation>
+    </message>
 </context>
 <context>
     <name>UsbForwardingEnvironment</name>
@@ -3808,6 +4060,30 @@
         <source>Could not verify the local USB service and driver. Check the usbipd-win installation.</source>
         <translation>无法确认本地 USB 服务和驱动状态。请检查 usbipd-win 安装。</translation>
     </message>
+    <message>
+        <source>Could not verify the USB sharing environment. Check the usbip installation.</source>
+        <translation>无法验证 USB 共享环境。请检查 usbip 安装。</translation>
+    </message>
+    <message>
+        <source>Could not verify the bundled USB sharing component. Reinstall Moonlight.</source>
+        <translation>无法验证内置 USB 共享组件。请重新安装 Moonlight。</translation>
+    </message>
+    <message>
+        <source>The USB/IP kernel module (usbip_host) is not loaded. Moonlight loads it automatically when you share a device.</source>
+        <translation>USB/IP 内核模块（usbip_host）未加载。共享设备时 Moonlight 会自动加载它。</translation>
+    </message>
+    <message>
+        <source>The bundled USB sharing component is missing. Reinstall Moonlight.</source>
+        <translation>内置 USB 共享组件缺失。请重新安装 Moonlight。</translation>
+    </message>
+    <message>
+        <source>The usbip tool is not installed. Install the USB/IP package of your distribution (usbip-utils or linux-tools).</source>
+        <translation>未安装 usbip 工具。请安装你的发行版提供的 USB/IP 软件包（usbip-utils 或 linux-tools）。</translation>
+    </message>
+    <message>
+        <source>The usbipd daemon is not running. Moonlight starts it automatically when you share a device.</source>
+        <translation>usbipd 守护进程未运行。共享设备时 Moonlight 会自动启动它。</translation>
+    </message>
 </context>
 <context>
     <name>PipwBackgroundDownloader</name>
@@ -3821,5 +4097,25 @@
     <message><source>Pipw image is unavailable</source><translation>Pipw 图片不可用</translation></message>
     <message><source>This background image is unavailable. Please try another image.</source><translation>这张背景图片无法使用，请换一张重试。</translation></message>
     <message><source>Unable to load the background image. Please try another image.</source><translation>无法加载背景图片，请换一张重试。</translation></message>
+</context>
+
+<context>
+    <name>GamepadKeyboard</name>
+    <message>
+        <source>On-Screen Keyboard</source>
+        <translation>屏幕键盘</translation>
+    </message>
+    <message>
+        <source>Backspace</source>
+        <translation>退格</translation>
+    </message>
+    <message>
+        <source>Space</source>
+        <translation>空格</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>确定</translation>
+    </message>
 </context>
 </TS>

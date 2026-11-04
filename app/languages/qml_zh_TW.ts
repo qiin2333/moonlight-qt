@@ -1490,6 +1490,42 @@
         <source>Diagnostics</source>
         <translation>診斷</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>（預設）</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>停用</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>搖桿死區</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>忽略低於此百分比的搖桿偏移，例如用來補償搖桿漂移。0% 會原樣傳送搖桿輸入。</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>按住「%1」按鈕即可使用遊戲手把控制滑鼠</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>關閉此功能時，按住 %1 會改為開啟串流中的浮動選單。</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>連接遊戲手把後，只要此設定不是「停用」，按住 %1 也會開啟選單（需要關閉遊戲手把滑鼠）。</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>串流期間隨時可以使用 %1 或 %2 切換此功能。</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>浮動按鈕（預設）</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

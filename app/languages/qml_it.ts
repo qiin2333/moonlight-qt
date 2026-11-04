@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>La sovrapposizione sulle performance non è supportato su Steam Link e Raspberry Pi.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Predefinito)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Disabilitato</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Zona morta del joystick</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Ignora le deviazioni dello stick inferiori a questa percentuale, ad esempio per compensare il drift. A 0% l&apos;input dello stick viene inviato senza modifiche.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Tieni premuto il pulsante «%1» per abilitare il controllo del mouse con il gamepad</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Quando è disattivato, tenendo premuto %1 si apre invece il menu in sovrimpressione durante lo streaming.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Con un gamepad collegato, tenendo premuto %1 si apre anche il menu quando questa opzione non è impostata su «Disabilitato» (è necessario disattivare Mouse gamepad).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Puoi attivarlo o disattivarlo in qualsiasi momento durante lo streaming usando %1 o %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Pulsante mobile (predefinito)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>
