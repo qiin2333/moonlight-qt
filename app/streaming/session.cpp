@@ -2896,8 +2896,7 @@ bool Session::isStreamingWindowFocused() const
         return m_WaylandStreamWindow->isActive();
     }
 
-    return m_Window != nullptr &&
-           (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS) != 0;
+    return m_Window != nullptr && (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS) != 0;
 }
 
 bool Session::isStreamingWindowMinimized() const
