@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Vaikimisi)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Keelatud</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Juhtkangi surnud tsoon</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Eirab juhtkangi kõrvalekaldeid, mis jäävad sellest protsendist väiksemaks, näiteks triivimise kompenseerimiseks. 0% korral saadetakse juhtkangi sisend muutmata.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Hiire juhtimise lubamiseks mängupuldiga hoia nuppu „%1“ all</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Kui see on välja lülitatud, avab %1 all hoidmine hoopis voosisese ülekattemenüü.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Ühendatud mängupuldi korral avab %1 all hoidmine menüü ka siis, kui see pole olekus „Keelatud“ (mängupuldi hiir peab olema välja lülitatud).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Saad seda voogesituse ajal igal ajal klahvidega %1 või %2 sisse ja välja lülitada.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Hõljuv nupp (vaikimisi)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

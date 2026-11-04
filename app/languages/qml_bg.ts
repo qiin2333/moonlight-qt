@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>Слоят за следене на производителността не се поддържа на Steam Link и Raspberry Pi.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>По подразбиране</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Деактивирано</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Мъртва зона на джойстика</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Игнорира отклоненията на стика под този процент, например за компенсиране на дрейф. При 0% входът от стика се изпраща без промяна.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Задръжте бутона „%1“, за да управлявате мишката с геймпад</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Когато това е изключено, задържането на %1 вместо това отваря менюто за наслагване по време на потока.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>При свързан геймпад задържането на %1 също отваря менюто, когато тази настройка не е „Деактивирано“ (изисква „Мишка с геймпад“ да е изключено).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Можете да го превключвате по всяко време по време на потока чрез %1 или %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Плаващ бутон (по подразбиране)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

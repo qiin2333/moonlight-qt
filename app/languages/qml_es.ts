@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>La superposición de rendimiento no es compatible con Steam Link o Raspberry Pi.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Predeterminado)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Desactivado</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Zona muerta del joystick</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Ignora las desviaciones del stick inferiores a este porcentaje, por ejemplo para compensar la deriva. Al 0 %, la entrada del stick se envía sin modificar.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Mantén pulsado el botón «%1» para activar el control del ratón con el mando</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Mientras esto esté desactivado, mantener pulsado %1 abrirá el menú superpuesto de la transmisión.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Con un mando conectado, mantener pulsado %1 también abre el menú cuando esta opción no está en «Desactivado» (requiere que «Ratón con mando» esté desactivado).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Puedes activarlo o desactivarlo en cualquier momento durante la transmisión usando %1 o %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Botón flotante (predeterminado)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

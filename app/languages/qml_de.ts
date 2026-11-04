@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>Das Leistungs-Overlay wird auf Steam Link oder Raspberry Pi nicht unterstützt.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Standard)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Deaktiviert</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Joystick-Totzone</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Ignoriert Stickbewegungen unterhalb dieses Prozentsatzes, z. B. zum Ausgleich eines Driftens. Bei 0 % wird die Stick-Eingabe unverändert gesendet.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Halte die Taste „%1“ gedrückt, um die Maussteuerung mit dem Gamepad zu aktivieren</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Wenn diese Option deaktiviert ist, öffnet das Gedrückthalten von %1 stattdessen das Overlay-Menü im Stream.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Wenn ein Gamepad verbunden ist, öffnet das Gedrückthalten von %1 das Menü auch, solange diese Option nicht auf „Deaktiviert“ steht (Gamepad-Maus muss deaktiviert sein).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Du kannst die Funktion während des Streamings jederzeit mit %1 oder %2 umschalten.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Schwebende Schaltfläche (Standard)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

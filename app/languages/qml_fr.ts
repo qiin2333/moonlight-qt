@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>L&apos;overlay des performances n&apos;est pas pris en charge par le Steam Link ou le Raspberry Pi.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Par défaut)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Désactivé</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Zone morte du joystick</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Ignore les mouvements du stick inférieurs à ce pourcentage, par exemple pour compenser une dérive. À 0 %, l’entrée du stick est envoyée sans modification.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Maintenez le bouton « %1 » pour activer le contrôle de la souris avec une manette</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Lorsque cette option est désactivée, maintenir %1 ouvre à la place le menu superposé du flux.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Lorsqu’une manette est connectée, maintenir %1 ouvre également le menu si cette option n’est pas réglée sur « Désactivé » (la souris de la manette doit être désactivée).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Vous pouvez l’activer ou la désactiver à tout moment pendant le streaming avec %1 ou %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Bouton flottant (par défaut)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

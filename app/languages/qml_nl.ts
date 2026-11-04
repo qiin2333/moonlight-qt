@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>De prestatie-overlay wordt niet ondersteund op Steam Link of Raspberry Pi.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Standaard)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Uitgeschakeld</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Dode zone van joystick</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Negeert stickafwijkingen onder dit percentage, bijvoorbeeld om stickdrift te compenseren. Bij 0% wordt de stickinvoer ongewijzigd verzonden.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Houd de knop ‘%1’ ingedrukt om muisbesturing met een gamepad in te schakelen</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Als dit uitstaat, opent het ingedrukt houden van %1 in plaats daarvan het overlaymenu tijdens het streamen.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Met een verbonden gamepad opent het ingedrukt houden van %1 ook het menu wanneer dit niet op ‘Uitgeschakeld’ staat (Gamepadmuis moet uitstaan).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Je kunt dit tijdens het streamen op elk moment in- of uitschakelen met %1 of %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Zwevende knop (standaard)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

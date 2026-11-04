@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(ברירת מחדל)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>מושבת</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>אזור מת של הג&apos;ויסטיק</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>מתעלם מהטיות של הסטיק מתחת לאחוז זה, למשל כדי לפצות על סחיפה. ב־0% הקלט מהסטיק נשלח ללא שינוי.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>החזק את הלחצן „%1“ כדי לאפשר שליטה בעכבר באמצעות בקר משחק</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>כאשר אפשרות זו כבויה, החזקת %1 פותחת במקום זאת את תפריט שכבת־העל במהלך הסטרימינג.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>כאשר בקר משחק מחובר, החזקת %1 פותחת גם את התפריט כאשר אפשרות זו אינה מוגדרת כ„מושבת“ (יש לכבות את „עכבר עם בקר“).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>אפשר להחליף מצב בכל עת במהלך הסטרימינג באמצעות %1 או %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>לחצן צף (ברירת מחדל)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

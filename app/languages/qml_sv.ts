@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>Prestandaöverlägget stöds inte på Steam Link eller Raspberry Pi.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Standard)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Inaktiverad</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Dödzon för styrspak</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Ignorerar styrspaksutslag under denna procentsats, till exempel för att kompensera för drift. Vid 0 % skickas styrspaksinmatningen oförändrad.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Håll ned knappen ”%1” för att aktivera musstyrning med handkontroll</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>När detta är avstängt öppnas i stället överlagringsmenyn under streamen när du håller ned %1.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>När en handkontroll är ansluten öppnas menyn också när du håller ned %1 om detta inte är inställt på ”Inaktiverad” (kräver att handkontrollsmus är avstängd).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Du kan växla detta när som helst under streamen med %1 eller %2.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Flytande knapp (standard)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

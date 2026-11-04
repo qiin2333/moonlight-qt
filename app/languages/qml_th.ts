@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(ค่าเริ่มต้น)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>ปิดใช้งาน</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>เดดโซนของจอยสติ๊ก</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>ละเว้นการเบี่ยงเบนของก้านอนาล็อกที่ต่ำกว่าเปอร์เซ็นต์นี้ เช่น เพื่อชดเชยอาการดริฟต์ของก้านอนาล็อก หากตั้งเป็น 0% จะส่งอินพุตจากก้านอนาล็อกโดยไม่แก้ไข</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>กดปุ่ม “%1” ค้างไว้เพื่อเปิดใช้การควบคุมเมาส์ด้วยเกมแพด</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>เมื่อปิดตัวเลือกนี้ การกด %1 ค้างไว้จะเปิดเมนูโอเวอร์เลย์ระหว่างสตรีมแทน</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>เมื่อเชื่อมต่อเกมแพดแล้ว การกด %1 ค้างไว้จะเปิดเมนูด้วยเมื่อการตั้งค่านี้ไม่ได้เป็น “ปิดใช้งาน” (ต้องปิดเมาส์เกมแพด)</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>คุณสามารถสลับการตั้งค่านี้ได้ทุกเมื่อระหว่างสตรีมโดยใช้ %1 หรือ %2</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>ปุ่มลอย (ค่าเริ่มต้น)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

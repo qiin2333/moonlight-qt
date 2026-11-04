@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>بنەڕەت</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>ناچالاک</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>ناوچەی مردووی جۆیستیک</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>لاربوونەوەکانی ستیک لە خوار ئەم ڕێژەیە پشتگوێ دەخات، بۆ نموونە بۆ جێگیرکردنی لادانی ستیک. لە 0% ـدا هاتەکانی ستیک بەبێ گۆڕانەوە دەنێردرێن.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>بۆ بەکارهێنانی کۆنتڕۆڵی ماوس بە گەیمپاد، دوگمەی «%1» بگرە</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>کاتێک ئەمە کوژاوەیە، گرتنی %1 لە جیاتی ئەوە مێنیوی ڕووکاری ناو ستریم دەکاتەوە.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>لەگەڵ بوونی گەیمپادێکی پەیوەستکراو، گرتنی %1 هەروەها مێنیو دەکاتەوە کاتێک ئەمە لەسەر «ناچالاک» نییە (پێویستە ماوسی گەیمپاد کوژێندرابێتەوە).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>دەتوانیت لە هەر کاتێک لە کاتی ستریمدا بە بەکارهێنانی %1 یان %2 بیگۆڕیت.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>دوگمەی هەڵواسراو (بنەڕەت)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

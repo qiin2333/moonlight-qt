@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>Performans katmanı Steam Link veya Raspberry Pi üzerinde desteklenmez.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(Varsayılan)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Devre dışı</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>Oyun kolu ölü bölgesi</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>Örneğin çubuk kaymasını telafi etmek için bu yüzdenin altındaki çubuk sapmalarını yok sayar. 0% değerinde çubuk girdisi değiştirilmeden gönderilir.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>Fare denetimini oyun koluyla etkinleştirmek için “%1” düğmesini basılı tutun</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>Bu kapalıyken %1 tuşunu basılı tutmak bunun yerine yayın içi katman menüsünü açar.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>Bir oyun kolu bağlıyken bu ayar “Devre dışı” değilse %1 tuşunu basılı tutmak menüyü de açar (Oyun kolu faresi kapalı olmalıdır).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>Yayın sırasında %1 veya %2 ile istediğiniz zaman açıp kapatabilirsiniz.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>Kayan düğme (varsayılan)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

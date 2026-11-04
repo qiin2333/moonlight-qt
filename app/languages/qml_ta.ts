@@ -1353,6 +1353,42 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>செயல்திறன் மேலடுக்கு நீராவி இணைப்பு அல்லது ராச்பெர்ரி பையில் ஆதரிக்கப்படவில்லை.</translation>
     </message>
+    <message>
+        <source>(Default)</source>
+        <translation>(இயல்புநிலை)</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>முடக்கப்பட்டது</translation>
+    </message>
+    <message>
+        <source>Joystick deadzone</source>
+        <translation>ஜாய்ஸ்டிக் டெட் சோன்</translation>
+    </message>
+    <message>
+        <source>Ignores stick deflections below this percentage, e.g. to compensate for a drifting stick. 0% sends stick input unmodified.</source>
+        <translation>இந்த சதவீதத்திற்குக் குறைவான ஸ்டிக் விலகல்களைப் புறக்கணிக்கிறது; எடுத்துக்காட்டாக, ஸ்டிக் டிரிஃப்டை ஈடுசெய்ய இது பயன்படும். 0% இல் ஸ்டிக் உள்ளீடு மாற்றமின்றி அனுப்பப்படும்.</translation>
+    </message>
+    <message>
+        <source>Enable mouse control with gamepads by holding the &apos;%1&apos; button</source>
+        <translation>கேம்பேடில் சுட்டியை கட்டுப்படுத்த ‘%1’ பொத்தானை அழுத்திப் பிடிக்கவும்</translation>
+    </message>
+    <message>
+        <source>While this is off, holding %1 opens the in-stream overlay menu instead.</source>
+        <translation>இது முடக்கப்பட்டிருக்கும்போது, %1 ஐ அழுத்திப் பிடிப்பது அதற்குப் பதிலாக ஸ்ட்ரீமின் மேலடுக்கு மெனுவைத் திறக்கும்.</translation>
+    </message>
+    <message>
+        <source>With a gamepad connected, holding %1 also opens the menu while this is not Disabled (requires Gamepad Mouse to be off).</source>
+        <translation>கேம்பேட் இணைக்கப்பட்டிருக்கும்போது, இது ‘முடக்கப்பட்டது’ என அமைக்கப்படாமல் இருந்தால் %1 ஐ அழுத்திப் பிடிப்பதும் மெனுவைத் திறக்கும் (கேம்பேட் மவுஸ் முடக்கப்பட்டிருக்க வேண்டும்).</translation>
+    </message>
+    <message>
+        <source>You can toggle it at any time while streaming using %1 or %2.</source>
+        <translation>ஸ்ட்ரீமிங் செய்யும் போது %1 அல்லது %2 ஐப் பயன்படுத்தி இதை எப்போது வேண்டுமானாலும் மாற்றலாம்.</translation>
+    </message>
+    <message>
+        <source>Floating button (default)</source>
+        <translation>மிதக்கும் பொத்தான் (இயல்புநிலை)</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>
