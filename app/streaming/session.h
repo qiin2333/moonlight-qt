@@ -233,6 +233,7 @@ private:
     void hideQtOverlayMenu();
     void toggleQtOverlayMenu();
     bool isStreamingWindowVisible() const;
+    bool isStreamingWindowFocused() const;
     bool isStreamingWindowMinimized() const;
     void syncQtOverlayWindowsWithSdlWindowState();
     QRect qtOverlayParentGeometry() const;
