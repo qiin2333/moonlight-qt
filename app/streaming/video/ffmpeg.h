@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <QQueue>
 #include <set>
@@ -27,6 +28,7 @@ public:
     virtual int getDecoderColorRange() override;
     virtual QSize getDecoderMaxResolution() override;
     virtual int submitDecodeUnit(PDECODE_UNIT du) override;
+    virtual uint64_t getLastDecodedFrameTimeUs() const override;
     virtual void renderFrameOnMainThread() override;
     virtual void setHdrMode(bool enabled) override;
     virtual bool notifyWindowChanged(PWINDOW_STATE_CHANGE_INFO info) override;
@@ -123,6 +125,8 @@ private:
 
     int m_FramesIn;
     int m_FramesOut;
+
+    std::atomic<uint64_t> m_LastDecodedFrameTimeUs {0};
 
     int m_LastFrameNumber;
     int m_StreamFps;
