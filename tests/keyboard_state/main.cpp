@@ -49,21 +49,20 @@ int main(int argc, char** argv)
     require(KeyboardState::raiseKeys(keys, true, [](uint32_t) { return 0; }) == 0 && keys.isEmpty(),
             "successful retry must clear the pending release");
 
-    QSet<uint32_t> localKeys{enter};
-    QSet<uint32_t> forwardedKeys{numpadEnter, international};
+    QSet<uint32_t> localKeys{ enter };
+    QSet<uint32_t> forwardedKeys{ numpadEnter, international };
     released.clear();
-    failures = KeyboardState::raiseKeys(localKeys, forwardedKeys, true, false,
-                                        [&](uint32_t state) {
-                                            released.append(state);
-                                            return 0;
-                                        });
+    failures = KeyboardState::raiseKeys(localKeys, forwardedKeys, true, false, [&](uint32_t state) {
+        released.append(state);
+        return 0;
+    });
     require(failures == 0 && released.size() == 3 && localKeys.isEmpty(),
             "cleanup must release local and forwarded keys");
     require(forwardedKeys.size() == 2 && forwardedKeys.contains(numpadEnter) &&
                 forwardedKeys.contains(international),
             "ordinary cleanup must retain the forwarded connection ledger");
-    failures = KeyboardState::raiseKeys(localKeys, forwardedKeys, true, true,
-                                        [](uint32_t) { return 0; });
+    failures =
+        KeyboardState::raiseKeys(localKeys, forwardedKeys, true, true, [](uint32_t) { return 0; });
     require(failures == 0 && forwardedKeys.isEmpty(),
             "connection cleanup must clear successfully released forwarded keys");
 

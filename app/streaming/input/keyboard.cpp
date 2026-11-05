@@ -539,8 +539,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                     (int)event->keysym.scancode,
                     (int)(0x8000 | keyCode),
                     (int)m_KeysDown.count());
-    }
-    else if (event->state == SDL_PRESSED) {
+    } else if (event->state == SDL_PRESSED) {
         // LiSendKeyboardEvent2() only confirms that the event was accepted by
         // the client. Keep the key in the connection ledger until cleanup so a
         // later disconnect can release it even if the queued KEY_UP was lost.
@@ -562,9 +561,9 @@ void SdlInputHandler::raiseAllKeys(bool clearKeys, bool clearForwardedKeys)
     const int failedCount = KeyboardState::raiseKeys(
         m_KeysDown, m_ForwardedKeys, clearKeys, clearForwardedKeys, [](uint32_t keyDown) {
             const short code = KeyboardState::code(keyDown);
-            int rc = LiSendKeyboardEvent2(code, KEY_ACTION_UP,
-                                          KeyboardState::extendedModifier(keyDown),
-                                          KeyboardState::flags(keyDown));
+            int rc =
+                LiSendKeyboardEvent2(code, KEY_ACTION_UP, KeyboardState::extendedModifier(keyDown),
+                                     KeyboardState::flags(keyDown));
             if (rc != 0) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "LiSendKeyboardEvent2 failed while raising key: rc=%d vk=0x%04x", rc,

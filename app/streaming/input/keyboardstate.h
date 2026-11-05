@@ -47,8 +47,8 @@ template <typename Sender> int raiseKeys(QSet<uint32_t>& keysDown, bool clearKey
 // the connection. The latter must survive ordinary cleanup so a later connection
 // reset can retry a release that was queued before the connection failed.
 template <typename Sender>
-int raiseKeys(QSet<uint32_t>& localKeys, QSet<uint32_t>& forwardedKeys,
-              bool clearLocalKeys, bool clearForwardedKeys, Sender send)
+int raiseKeys(QSet<uint32_t>& localKeys, QSet<uint32_t>& forwardedKeys, bool clearLocalKeys,
+              bool clearForwardedKeys, Sender send)
 {
     QSet<uint32_t> pendingKeys = localKeys;
     pendingKeys.unite(forwardedKeys);
