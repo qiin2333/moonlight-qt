@@ -226,9 +226,10 @@ public:
 
     int getAttachedGamepadMask();
 
-    // Release keys known to the client. Forwarded keys remain tracked by default
-    // so a later connection reset can retry releases that were only queued.
-    void raiseAllKeys(bool clearKeys = true, bool clearForwardedKeys = false);
+    // Release locally held keys. Connection-boundary cleanup can also include the
+    // forwarded-key ledger and decide whether to clear it after the attempt.
+    void raiseAllKeys(bool clearLocalKeys = true, bool includeForwardedKeys = false,
+                      bool clearForwardedKeys = false);
     bool hasKeysDown() const { return !m_KeysDown.isEmpty(); }
 
     void notifyMouseLeave();

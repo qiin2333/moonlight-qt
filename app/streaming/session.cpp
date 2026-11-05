@@ -3904,7 +3904,7 @@ bool Session::tryReconnect()
     // If the old control stream is still partly alive, this gives the host one last
     // chance to clear stuck key state before reconnecting.
     if (m_InputHandler != nullptr) {
-        m_InputHandler->raiseAllKeys(false);
+        m_InputHandler->raiseAllKeys(false, true);
     }
 
     // The decoder can only be used between LiStartConnection() and
@@ -4021,7 +4021,7 @@ bool Session::tryReconnect()
                 // LiSendKeyboardEvent2() only confirms local queueing. Keep the
                 // forwarded-key ledger so another immediate disconnect can retry
                 // releases that have not reached the host yet.
-                m_InputHandler->raiseAllKeys(true, false);
+                m_InputHandler->raiseAllKeys(true, true);
             }
             break;
         }
@@ -5943,7 +5943,7 @@ DispatchDeferredCleanup:
     }
 
     // Raise any keys that are still down
-    m_InputHandler->raiseAllKeys(true, true);
+    m_InputHandler->raiseAllKeys(true, true, true);
 
     // Destroy the input handler now. This must be destroyed
     // before allowwing the UI to continue execution or it could

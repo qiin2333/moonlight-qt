@@ -547,19 +547,25 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     }
 }
 
-void SdlInputHandler::raiseAllKeys(bool clearKeys, bool clearForwardedKeys)
+void SdlInputHandler::raiseAllKeys(bool clearLocalKeys, bool includeForwardedKeys,
+                                   bool clearForwardedKeys)
 {
     QSet<uint32_t> pendingKeys = m_KeysDown;
-    pendingKeys.unite(m_ForwardedKeys);
+    if (includeForwardedKeys) {
+        pendingKeys.unite(m_ForwardedKeys);
+    }
     if (pendingKeys.isEmpty()) {
         return;
     }
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Raising %d keys%s", (int)pendingKeys.count(),
-                clearKeys && clearForwardedKeys ? "" : " (keeping state for retry)");
+                clearLocalKeys && (!includeForwardedKeys || clearForwardedKeys)
+                    ? ""
+                    : " (keeping state for retry)");
 
     const int failedCount = KeyboardState::raiseKeys(
-        m_KeysDown, m_ForwardedKeys, clearKeys, clearForwardedKeys, [](uint32_t keyDown) {
+        m_KeysDown, m_ForwardedKeys, clearLocalKeys, includeForwardedKeys, clearForwardedKeys,
+        [](uint32_t keyDown) {
             const short code = KeyboardState::code(keyDown);
             int rc =
                 LiSendKeyboardEvent2(code, KEY_ACTION_UP, KeyboardState::extendedModifier(keyDown),
