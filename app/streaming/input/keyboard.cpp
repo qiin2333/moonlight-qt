@@ -503,12 +503,16 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     keyCode |= 0x8000;
     flags = shouldNotConvertToScanCodeOnServer ? SS_KBE_FLAG_NON_NORMALIZED : 0;
 
-    // Track the key state so we always know which keys are down
+    const uint32_t keyState = KeyboardState::pack(keyCode, modifiers, flags);
+
+    // Track the local physical state separately from keys forwarded during this
+    // connection. A forwarded key remains in the latter set until a connection
+    // boundary confirms that cleanup has been attempted.
     if (event->state == SDL_PRESSED) {
-        m_KeysDown.insert(KeyboardState::pack(keyCode, modifiers, flags));
+        m_KeysDown.insert(keyState);
     }
     else {
-        m_KeysDown.remove(KeyboardState::pack(keyCode, modifiers, flags));
+        m_KeysDown.remove(keyState);
     }
 
     const char keyAction = event->state == SDL_PRESSED ? KEY_ACTION_DOWN : KEY_ACTION_UP;
@@ -535,31 +539,46 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                     (int)event->keysym.scancode,
                     (int)(0x8000 | keyCode),
                     (int)m_KeysDown.count());
+    } else if (event->state == SDL_PRESSED) {
+        // LiSendKeyboardEvent2() only confirms that the event was accepted by
+        // the client. Keep the key in the connection ledger until cleanup so a
+        // later disconnect can release it even if the queued KEY_UP was lost.
+        m_ForwardedKeys.insert(keyState);
     }
 }
 
-void SdlInputHandler::raiseAllKeys(bool clearKeys)
+void SdlInputHandler::raiseAllKeys(bool clearLocalKeys, bool includeForwardedKeys,
+                                   bool clearForwardedKeys)
 {
-    if (m_KeysDown.isEmpty()) {
+    QSet<uint32_t> pendingKeys = m_KeysDown;
+    if (includeForwardedKeys) {
+        pendingKeys.unite(m_ForwardedKeys);
+    }
+    if (pendingKeys.isEmpty()) {
         return;
     }
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Raising %d keys%s", (int)m_KeysDown.count(),
-                clearKeys ? "" : " (keeping local state for retry)");
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Raising %d keys%s", (int)pendingKeys.count(),
+                clearLocalKeys && (!includeForwardedKeys || clearForwardedKeys)
+                    ? ""
+                    : " (keeping state for retry)");
 
-    const int failedCount = KeyboardState::raiseKeys(m_KeysDown, clearKeys, [](uint32_t keyDown) {
-        const short code = KeyboardState::code(keyDown);
-        int rc = LiSendKeyboardEvent2(code, KEY_ACTION_UP, KeyboardState::extendedModifier(keyDown),
-                                      KeyboardState::flags(keyDown));
-        if (rc != 0) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "LiSendKeyboardEvent2 failed while raising key: rc=%d vk=0x%04x", rc,
-                        (int)(uint16_t)code);
-        }
-        return rc;
-    });
+    const int failedCount = KeyboardState::raiseKeys(
+        m_KeysDown, m_ForwardedKeys, clearLocalKeys, includeForwardedKeys, clearForwardedKeys,
+        [](uint32_t keyDown) {
+            const short code = KeyboardState::code(keyDown);
+            int rc =
+                LiSendKeyboardEvent2(code, KEY_ACTION_UP, KeyboardState::extendedModifier(keyDown),
+                                     KeyboardState::flags(keyDown));
+            if (rc != 0) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "LiSendKeyboardEvent2 failed while raising key: rc=%d vk=0x%04x", rc,
+                            (int)(uint16_t)code);
+            }
+            return rc;
+        });
 
-    if (clearKeys && failedCount != 0) {
+    if (failedCount != 0) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Keeping %d keys marked down for a later retry",
                     failedCount);
     }

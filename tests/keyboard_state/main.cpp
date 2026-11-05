@@ -48,6 +48,43 @@ int main(int argc, char** argv)
             "temporary release must retain local state for physical key-up");
     require(KeyboardState::raiseKeys(keys, true, [](uint32_t) { return 0; }) == 0 && keys.isEmpty(),
             "successful retry must clear the pending release");
+
+    QSet<uint32_t> localKeys{ enter };
+    QSet<uint32_t> forwardedKeys{ numpadEnter, international };
+    released.clear();
+    failures =
+        KeyboardState::raiseKeys(localKeys, forwardedKeys, true, false, false, [&](uint32_t state) {
+            released.append(state);
+            return 0;
+        });
+    require(failures == 0 && released.size() == 1 && localKeys.isEmpty(),
+            "ordinary cleanup must release only locally held keys");
+    require(forwardedKeys.size() == 2 && forwardedKeys.contains(numpadEnter) &&
+                forwardedKeys.contains(international),
+            "ordinary cleanup must retain the forwarded connection ledger");
+    failures = KeyboardState::raiseKeys(localKeys, forwardedKeys, true, true, true,
+                                        [](uint32_t) { return 0; });
+    require(failures == 0 && forwardedKeys.isEmpty(),
+            "connection cleanup must clear successfully released forwarded keys");
+
+    QSet<uint32_t> overlapLocal{ enter };
+    QSet<uint32_t> overlapForwarded{ enter };
+    int overlapCalls = 0;
+    failures =
+        KeyboardState::raiseKeys(overlapLocal, overlapForwarded, true, true, true, [&](uint32_t) {
+            overlapCalls++;
+            return 0;
+        });
+    require(failures == 0 && overlapCalls == 1 && overlapLocal.isEmpty() &&
+                overlapForwarded.isEmpty(),
+            "a key held locally and forwarded must be released once");
+
+    QSet<uint32_t> failedForwarded{ numpadEnter };
+    failures = KeyboardState::raiseKeys(localKeys, failedForwarded, true, true, true,
+                                        [](uint32_t) { return -1; });
+    require(failures == 1 && failedForwarded.size() == 1 && failedForwarded.contains(numpadEnter),
+            "failed connection cleanup must retain the forwarded release");
+
     int calls = 0;
     KeyboardState::raiseKeys(keys, true, [&](uint32_t) {
         calls++;

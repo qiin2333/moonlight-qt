@@ -42,4 +42,29 @@ template <typename Sender> int raiseKeys(QSet<uint32_t>& keysDown, bool clearKey
     }
     return failedCount;
 }
+
+// Release local keys and, when requested, keys forwarded during the connection.
+// The forwarded set can survive ordinary cleanup so a later connection reset can
+// retry a release that was queued before the connection failed.
+template <typename Sender>
+int raiseKeys(QSet<uint32_t>& localKeys, QSet<uint32_t>& forwardedKeys, bool clearLocalKeys,
+              bool includeForwardedKeys, bool clearForwardedKeys, Sender send)
+{
+    QSet<uint32_t> pendingKeys = localKeys;
+    if (includeForwardedKeys) {
+        pendingKeys.unite(forwardedKeys);
+    }
+
+    const bool clearSentKeys = clearLocalKeys || (includeForwardedKeys && clearForwardedKeys);
+    const int failedCount = raiseKeys(pendingKeys, clearSentKeys, send);
+
+    if (clearLocalKeys) {
+        localKeys.intersect(pendingKeys);
+    }
+    if (includeForwardedKeys && clearForwardedKeys) {
+        forwardedKeys.intersect(pendingKeys);
+    }
+
+    return failedCount;
+}
 }
