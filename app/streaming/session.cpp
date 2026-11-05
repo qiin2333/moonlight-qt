@@ -4018,7 +4018,10 @@ bool Session::tryReconnect()
             }
             if (m_InputHandler != nullptr) {
                 m_InputHandler->notifyHostOfConnectedGamepads();
-                m_InputHandler->raiseAllKeys(true, true);
+                // LiSendKeyboardEvent2() only confirms local queueing. Keep the
+                // forwarded-key ledger so another immediate disconnect can retry
+                // releases that have not reached the host yet.
+                m_InputHandler->raiseAllKeys(true, false);
             }
             break;
         }

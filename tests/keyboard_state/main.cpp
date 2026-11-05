@@ -66,6 +66,23 @@ int main(int argc, char** argv)
     require(failures == 0 && forwardedKeys.isEmpty(),
             "connection cleanup must clear successfully released forwarded keys");
 
+    QSet<uint32_t> overlapLocal{ enter };
+    QSet<uint32_t> overlapForwarded{ enter };
+    int overlapCalls = 0;
+    failures = KeyboardState::raiseKeys(overlapLocal, overlapForwarded, true, true, [&](uint32_t) {
+        overlapCalls++;
+        return 0;
+    });
+    require(failures == 0 && overlapCalls == 1 && overlapLocal.isEmpty() &&
+                overlapForwarded.isEmpty(),
+            "a key held locally and forwarded must be released once");
+
+    QSet<uint32_t> failedForwarded{ numpadEnter };
+    failures = KeyboardState::raiseKeys(localKeys, failedForwarded, true, true,
+                                        [](uint32_t) { return -1; });
+    require(failures == 1 && failedForwarded.size() == 1 && failedForwarded.contains(numpadEnter),
+            "failed connection cleanup must retain the forwarded release");
+
     int calls = 0;
     KeyboardState::raiseKeys(keys, true, [&](uint32_t) {
         calls++;
