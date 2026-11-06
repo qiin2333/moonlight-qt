@@ -166,7 +166,13 @@ SLVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
         return DR_NEED_IDR;
     }
 
+    m_LastDecodedFrameTimeUs.store(LiGetMicroseconds(), std::memory_order_relaxed);
     return DR_OK;
+}
+
+uint64_t SLVideoDecoder::getLastDecodedFrameTimeUs() const
+{
+    return m_LastDecodedFrameTimeUs.load(std::memory_order_relaxed);
 }
 
 void SLVideoDecoder::notifyOverlayUpdated(Overlay::OverlayType type)

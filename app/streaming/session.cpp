@@ -92,6 +92,11 @@
 #include <vector>
 
 namespace {
+constexpr uint64_t VIDEO_IDLE_IDR_TIMEOUT_US = 1500000;
+constexpr Uint32 VIDEO_IDLE_IDR_COOLDOWN_MS = 2000;
+}
+
+namespace {
 
 int SDLCALL keepNonRumbleEvent(void*, SDL_Event* event)
 {
@@ -5221,9 +5226,65 @@ void Session::exec()
         }
     };
 
+    Uint32 lastIdleVideoIdrRequestTicks = 0;
+    auto requestIdleVideoRefreshIfNeeded = [&]() {
+        if (m_VideoDecoder == nullptr) {
+            return;
+        }
+
+        const uint64_t lastDecodedFrameTimeUs = m_VideoDecoder->getLastDecodedFrameTimeUs();
+        if (lastDecodedFrameTimeUs == 0) {
+            return;
+        }
+
+        const uint64_t nowUs = LiGetMicroseconds();
+        const uint64_t idleUs =
+            nowUs >= lastDecodedFrameTimeUs ? nowUs - lastDecodedFrameTimeUs : 0;
+        if (idleUs < VIDEO_IDLE_IDR_TIMEOUT_US) {
+            return;
+        }
+
+        const Uint32 nowTicks = SDL_GetTicks();
+        if (lastIdleVideoIdrRequestTicks != 0 &&
+            nowTicks - lastIdleVideoIdrRequestTicks < VIDEO_IDLE_IDR_COOLDOWN_MS) {
+            return;
+        }
+
+        LiRequestIdrFrame();
+        lastIdleVideoIdrRequestTicks = nowTicks;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Requested IDR frame after %llu ms without decoded video",
+                    static_cast<unsigned long long>(idleUs / 1000));
+    };
+    auto idleVideoWakeDelayMs = [&]() -> int {
+        if (m_VideoDecoder == nullptr) {
+            return -1;
+        }
+
+        const uint64_t lastDecodedFrameTimeUs = m_VideoDecoder->getLastDecodedFrameTimeUs();
+        if (lastDecodedFrameTimeUs == 0) {
+            return -1;
+        }
+
+        const uint64_t nowUs = LiGetMicroseconds();
+        const uint64_t idleUs =
+            nowUs >= lastDecodedFrameTimeUs ? nowUs - lastDecodedFrameTimeUs : 0;
+        if (idleUs < VIDEO_IDLE_IDR_TIMEOUT_US) {
+            return static_cast<int>((VIDEO_IDLE_IDR_TIMEOUT_US - idleUs + 999) / 1000);
+        }
+
+        const Uint32 nowTicks = SDL_GetTicks();
+        const Uint32 elapsedTicks = nowTicks - lastIdleVideoIdrRequestTicks;
+        if (lastIdleVideoIdrRequestTicks != 0 && elapsedTicks < VIDEO_IDLE_IDR_COOLDOWN_MS) {
+            return static_cast<int>(VIDEO_IDLE_IDR_COOLDOWN_MS - elapsedTicks);
+        }
+        return 1;
+    };
+
     SDL_Event event;
     for (;;) {
         hideGuiWindowWhenSettled(false);
+        requestIdleVideoRefreshIfNeeded();
         processSunshineAbrFeedback();
 #ifdef Q_OS_WIN32
         processClientSdrWhiteUpdate();
@@ -5250,6 +5311,9 @@ void Session::exec()
         int waitTimeoutMs = (m_ClipboardHelper != nullptr && m_ClipboardHelper->isRunning()) ? 100 : 1000;
         if (qtUiNeedsEventProcessing()) {
             waitTimeoutMs = qMin(waitTimeoutMs, static_cast<int>(QT_UI_EVENT_PUMP_INTERVAL_MS));
+        }
+        if (const int idleVideoDelayMs = idleVideoWakeDelayMs(); idleVideoDelayMs >= 0) {
+            waitTimeoutMs = qMin(waitTimeoutMs, qMax(idleVideoDelayMs, 1));
         }
         if (const int toastDelayMs = m_Toast ? m_Toast->nextEventDelayMs() : -1;
                 toastDelayMs >= 0) {

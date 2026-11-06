@@ -76,6 +76,9 @@ public:
     virtual int getDecoderColorRange() = 0;
     virtual QSize getDecoderMaxResolution() = 0;
     virtual int submitDecodeUnit(PDECODE_UNIT du) = 0;
+    // Monotonic timestamp of the most recent decoded video frame. A zero value
+    // means that this decoder has not produced its first frame yet.
+    virtual uint64_t getLastDecodedFrameTimeUs() const = 0;
     virtual void renderFrameOnMainThread() = 0;
     virtual void setHdrMode(bool enabled) = 0;
     virtual bool notifyWindowChanged(PWINDOW_STATE_CHANGE_INFO info) = 0;

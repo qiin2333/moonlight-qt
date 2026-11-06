@@ -3,6 +3,7 @@
 #include "decoder.h"
 #include "overlaymanager.h"
 
+#include <atomic>
 #include <SLVideo.h>
 
 class SLVideoDecoder : public IVideoDecoder, public Overlay::IOverlayRenderer
@@ -18,6 +19,7 @@ public:
     virtual int getDecoderColorRange() override;
     virtual QSize getDecoderMaxResolution() override;
     virtual int submitDecodeUnit(PDECODE_UNIT du) override;
+    virtual uint64_t getLastDecodedFrameTimeUs() const override;
     virtual void notifyOverlayUpdated(Overlay::OverlayType) override;
 
     // Unused since rendering is done directly from the decode thread
@@ -43,4 +45,5 @@ private:
 
     int m_ViewportWidth;
     int m_ViewportHeight;
+    std::atomic<uint64_t> m_LastDecodedFrameTimeUs{ 0 };
 };
