@@ -126,7 +126,7 @@ private:
     int m_FramesIn;
     int m_FramesOut;
 
-    std::atomic<uint64_t> m_LastDecodedFrameTimeUs {0};
+    std::atomic<uint64_t> m_LastDecodedFrameTimeUs{ 0 };
 
     int m_LastFrameNumber;
     int m_StreamFps;

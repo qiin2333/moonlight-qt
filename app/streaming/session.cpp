@@ -5238,8 +5238,8 @@ void Session::exec()
         }
 
         const uint64_t nowUs = LiGetMicroseconds();
-        const uint64_t idleUs = nowUs >= lastDecodedFrameTimeUs ?
-                                     nowUs - lastDecodedFrameTimeUs : 0;
+        const uint64_t idleUs =
+            nowUs >= lastDecodedFrameTimeUs ? nowUs - lastDecodedFrameTimeUs : 0;
         if (idleUs < VIDEO_IDLE_IDR_TIMEOUT_US) {
             return;
         }
@@ -5267,16 +5267,15 @@ void Session::exec()
         }
 
         const uint64_t nowUs = LiGetMicroseconds();
-        const uint64_t idleUs = nowUs >= lastDecodedFrameTimeUs ?
-                                     nowUs - lastDecodedFrameTimeUs : 0;
+        const uint64_t idleUs =
+            nowUs >= lastDecodedFrameTimeUs ? nowUs - lastDecodedFrameTimeUs : 0;
         if (idleUs < VIDEO_IDLE_IDR_TIMEOUT_US) {
             return static_cast<int>((VIDEO_IDLE_IDR_TIMEOUT_US - idleUs + 999) / 1000);
         }
 
         const Uint32 nowTicks = SDL_GetTicks();
         const Uint32 elapsedTicks = nowTicks - lastIdleVideoIdrRequestTicks;
-        if (lastIdleVideoIdrRequestTicks != 0 &&
-            elapsedTicks < VIDEO_IDLE_IDR_COOLDOWN_MS) {
+        if (lastIdleVideoIdrRequestTicks != 0 && elapsedTicks < VIDEO_IDLE_IDR_COOLDOWN_MS) {
             return static_cast<int>(VIDEO_IDLE_IDR_COOLDOWN_MS - elapsedTicks);
         }
         return 1;

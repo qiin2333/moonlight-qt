@@ -45,5 +45,5 @@ private:
 
     int m_ViewportWidth;
     int m_ViewportHeight;
-    std::atomic<uint64_t> m_LastDecodedFrameTimeUs {0};
+    std::atomic<uint64_t> m_LastDecodedFrameTimeUs{ 0 };
 };
