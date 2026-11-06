@@ -38,6 +38,7 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | overlay_menu_navigation | 悬浮菜单键盘/鼠标导航(QTest 事件,需 offscreen) | Windows |
 | settings_localization | 中文翻译 .qm + 设置页布局(qmltestrunner) | Windows |
 | linux_display_event_monitor | Linux 显示事件唤醒 | Linux |
+| reconnect_video_callbacks | 会话内重连时拉取式渲染器的回调(真实 fixupMissingCallbacks);python 门禁:拉取的帧也标记已收到视频 | Windows + Linux(python) |
 
 ## 仅本地/手动
 
