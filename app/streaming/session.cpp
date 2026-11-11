@@ -2624,6 +2624,14 @@ static bool isHostStreamingDisplay1To1(const QSize& hostDisplay, const QSize& st
     return hostDisplay == stream || hostDisplay == stream.transposed();
 }
 
+// Recreates the decoder at the current stream resolution through the main loop's reset path
+static bool queueDecoderReset()
+{
+    SDL_Event resetEvent = {};
+    resetEvent.type = SDL_RENDER_DEVICE_RESET;
+    return SDL_PushEvent(&resetEvent) > 0;
+}
+
 void Session::scheduleWindowResolutionMatch()
 {
     constexpr Uint32 RESOLUTION_MATCH_DEBOUNCE_MS = 400;
@@ -2636,6 +2644,11 @@ void Session::scheduleWindowResolutionMatch()
 
 void Session::processWindowResolutionMatch()
 {
+    // Retry a decoder reset for a host resolution change that couldn't be queued
+    if (m_ResolutionMatch.decoderResetPending && queueDecoderReset()) {
+        m_ResolutionMatch.decoderResetPending = false;
+    }
+
     if (!m_Preferences->resolutionMatchWindow || !m_ResolutionMatch.hostSupported) {
         m_ResolutionMatch.deadline = 0;
         return;
@@ -2676,7 +2689,9 @@ void Session::processWindowResolutionMatch()
 #if SDL_VERSION_ATLEAST(2, 26, 0)
         SDL_GetWindowSizeInPixels(m_Window, &width, &height);
 #else
-        SDL_GetWindowSize(m_Window, &width, &height);
+        // SDL_GetWindowSize() is in logical units on scaled Wayland and macOS
+        // displays. The drawable size is in pixels.
+        SDL_GL_GetDrawableSize(m_Window, &width, &height);
 #endif
     }
 
@@ -2694,10 +2709,10 @@ void Session::processWindowResolutionMatch()
         return;
     }
 
-    if (!isHostStreamingDisplay1To1(m_ResolutionMatch.hostDisplaySize, stream)) {
+    if (!m_ResolutionMatch.streamFollowsDisplay) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Host isn't streaming its display 1:1; not requesting %dx%d yet",
-                    target.width(), target.height());
+                    "Host isn't streaming its display 1:1; not requesting %dx%d", target.width(),
+                    target.height());
         m_ResolutionMatch.deferred = true;
         return;
     }
@@ -2720,18 +2735,22 @@ void Session::processWindowResolutionMatch()
 
 void Session::handleHostResolutionReport(int width, int height)
 {
-    if (!m_ResolutionMatch.hostSupported || width <= 0 || height <= 0) {
+    // Only requests depend on hostSupported. A host can also change its own
+    // display, and its stream may follow it.
+    if (width <= 0 || height <= 0) {
         return;
     }
 
     // The host reports its display size: once at stream start, then whenever its
-    // display changes. It encodes at the negotiated size from stream start and
-    // only follows its display if it was streaming it 1:1.
+    // display changes. It keeps the display-to-stream scale from stream start, so
+    // its stream follows its display only if it started streaming it 1:1.
     const QSize reported(width, height);
     const QSize stream(m_ActiveVideoWidth, m_ActiveVideoHeight);
-    const QSize previousDisplay = m_ResolutionMatch.hostDisplaySize;
-    const bool streamFollowsDisplay = isHostStreamingDisplay1To1(previousDisplay, stream);
-    m_ResolutionMatch.hostDisplaySize = reported;
+    const bool streamStartReport = !m_ResolutionMatch.hostReported;
+    if (streamStartReport) {
+        m_ResolutionMatch.hostReported = true;
+        m_ResolutionMatch.streamFollowsDisplay = isHostStreamingDisplay1To1(reported, stream);
+    }
     m_ResolutionMatch.requestTicks = 0;
 
     // Retry a match that was skipped while the host couldn't apply it
@@ -2739,25 +2758,13 @@ void Session::handleHostResolutionReport(int width, int height)
         scheduleWindowResolutionMatch();
     }
 
-    if (!streamFollowsDisplay || reported == stream) {
+    if (streamStartReport || !m_ResolutionMatch.streamFollowsDisplay || reported == stream) {
         return;
     }
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "Host changed the stream resolution to %dx%d; recreating the decoder", width,
                 height);
-
-    // Queue the reset first. If that fails, keeping the old decoder is
-    // better than being left without one.
-    SDL_Event resetEvent = {};
-    resetEvent.type = SDL_RENDER_DEVICE_RESET;
-    if (SDL_PushEvent(&resetEvent) < 0) {
-        // A later report must still be able to retry this transition.
-        m_ResolutionMatch.hostDisplaySize = previousDisplay;
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Failed to queue decoder reset for resolution change: %s", SDL_GetError());
-        return;
-    }
 
     // Destroy the old decoder now so it never receives frames at the new
     // resolution. drSubmitDecodeUnit() drops frames until the reset creates
@@ -2770,6 +2777,13 @@ void Session::handleHostResolutionReport(int width, int height)
     SDL_UnlockMutex(m_DecoderLock);
 
     m_ResolutionMatch.requestedSize = QSize();
+
+    if (!queueDecoderReset()) {
+        m_ResolutionMatch.decoderResetPending = true;
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Failed to queue decoder reset for resolution change, will retry: %s",
+                    SDL_GetError());
+    }
 }
 
 void Session::toggleFullscreen()

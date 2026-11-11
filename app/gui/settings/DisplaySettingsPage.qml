@@ -107,6 +107,7 @@ Column {
         ToggleRow {
             applicable: SystemProperties.hasDesktopEnvironment
             title: qsTr("Match stream resolution to window size")
+            searchKeywords: "Match stream resolution to window size"
             description: qsTr("Asks the host to change the stream resolution to match the window when it is resized. Fullscreen returns to the configured resolution. Requires a compatible Sunshine host.")
             checked: StreamingPreferences.resolutionMatchWindow
             onToggled: function(value) { StreamingPreferences.resolutionMatchWindow = value }

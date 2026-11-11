@@ -41,12 +41,27 @@ Uint32 SDL_GetTicks()
 {
     return ticks;
 }
+#ifdef HARNESS_SDL_BEFORE_2_26
+// A scaled display: SDL's window size is logical, half the pixel size
+#define SDL_VERSION_ATLEAST(a, b, c) 0
+void SDL_GetWindowSize(void*, int* width, int* height)
+{
+    *width = windowSize.width() / 2;
+    *height = windowSize.height() / 2;
+}
+void SDL_GL_GetDrawableSize(void*, int* width, int* height)
+{
+    *width = windowSize.width();
+    *height = windowSize.height();
+}
+#else
+#define SDL_VERSION_ATLEAST(a, b, c) 1
 void SDL_GetWindowSizeInPixels(void*, int* width, int* height)
 {
     *width = windowSize.width();
     *height = windowSize.height();
 }
-#define SDL_VERSION_ATLEAST(a, b, c) 1
+#endif
 void SDL_LogInfo(int, const char*, ...) {}
 void SDL_LogWarn(int, const char*, ...) {}
 int LiRequestResolutionChange(int width, int height)
@@ -120,16 +135,19 @@ bool require(bool condition, const char* message)
     return condition;
 }
 
-void prepare(Session& session)
+// Starts a connection whose host reported a 1:1 display at stream start, unless told otherwise
+void prepare(Session& session, bool hostStartsStreaming1To1 = true)
 {
     ticks = 1000;
-    sends = resetEvents = 0;
     sendResult = 0;
     queueFails = destroyedUnderLock = false;
     windowSize = QSize(1600, 900);
     session.preferences.resolutionMatchWindow = true;
     session.m_ResolutionMatch.hostSupported = true;
-    session.m_ResolutionMatch.hostDisplaySize = QSize(1280, 720);
+    if (hostStartsStreaming1To1) {
+        session.handleHostResolutionReport(1280, 720);
+    }
+    sends = resetEvents = 0;
 }
 
 int main()
@@ -151,9 +169,12 @@ int main()
         session.m_ResolutionMatch.deadline = 1;
         session.processWindowResolutionMatch();
         session.scheduleWindowResolutionMatch();
+        ok &= require(sends == 0 && session.m_ResolutionMatch.deadline == 0,
+                      "unsupported hosts must never send or schedule a request");
         session.handleHostResolutionReport(1600, 900);
-        ok &= require(sends == 0 && session.m_ResolutionMatch.deadline == 0 && resetEvents == 0,
-                      "unsupported hosts must never send, schedule or reset a decoder");
+        ok &= require(resetEvents == 1 && session.m_ActiveVideoWidth == 1600 &&
+                          session.m_ActiveVideoHeight == 900,
+                      "an unsupported host's own display change must still reset the decoder");
     }
     {
         Session session;
@@ -196,43 +217,68 @@ int main()
     }
     {
         Session session;
-        prepare(session);
-        session.m_ResolutionMatch.hostDisplaySize = QSize(1920, 1080);
+        prepare(session, false);
         session.scheduleWindowResolutionMatch();
         ticks += 400;
         session.processWindowResolutionMatch();
         ok &= require(sends == 0 && session.m_ResolutionMatch.deferred,
-                      "non-1:1 host display must defer rather than send");
+                      "a resize before the host's stream-start report must defer");
         session.handleHostResolutionReport(1280, 720);
         ticks += 400;
         session.processWindowResolutionMatch();
-        ok &= require(sends == 1, "a 1:1 display report must retry the deferred resize");
+        ok &= require(sends == 1, "a 1:1 stream-start report must retry the deferred resize");
+    }
+    {
+        // The host keeps its 1/2 stream-start scale, so its stream never follows its display
+        Session session;
+        prepare(session, false);
+        session.handleHostResolutionReport(2560, 1440);
+        session.scheduleWindowResolutionMatch();
+        ticks += 400;
+        session.processWindowResolutionMatch();
+        session.handleHostResolutionReport(1280, 720);
+        ticks += 400;
+        session.processWindowResolutionMatch();
+        ok &= require(sends == 0, "a scaled stream must never request a resolution");
+        session.handleHostResolutionReport(1920, 1080);
+        ok &= require(resetEvents == 0 && session.m_ActiveVideoWidth == 1280 &&
+                          session.m_ActiveVideoHeight == 720,
+                      "a scaled stream's display reports must not change the stream resolution");
     }
     {
         Session session;
-        prepare(session);
+        prepare(session, false);
+        session.handleHostResolutionReport(720, 1280);
+        session.scheduleWindowResolutionMatch();
+        ticks += 400;
+        session.processWindowResolutionMatch();
+        ok &= require(resetEvents == 0 && sends == 1,
+                      "a rotated 1:1 stream-start report must allow requests without a reset");
+    }
+    {
+        Session session;
+        prepare(session, false);
         session.preferences.resolutionMatchWindow = false;
-        session.m_ResolutionMatch.hostDisplaySize = QSize();
         session.handleHostResolutionReport(1280, 720);
         ok &= require(resetEvents == 0 && session.m_VideoDecoder,
                       "first connection report only records display size");
         queueFails = true;
         session.handleHostResolutionReport(1600, 900);
-        ok &= require(resetEvents == 0 && session.m_VideoDecoder &&
-                          session.m_ActiveVideoWidth == 1280,
-                      "failed reset enqueue must preserve the decoder and dimensions");
-        queueFails = false;
-        session.handleHostResolutionReport(1600, 900);
-        ok &= require(resetEvents == 1 && !session.m_VideoDecoder && destroyedUnderLock &&
+        ok &= require(resetEvents == 0 && !session.m_VideoDecoder && destroyedUnderLock &&
                           session.m_ActiveVideoWidth == 1600 && session.m_ActiveVideoHeight == 900,
-                      "host-initiated changes must reset under lock even with matching off");
+                      "host-initiated changes must replace the decoder under lock even with "
+                      "matching off");
+        queueFails = false;
+        session.processWindowResolutionMatch();
+        ok &= require(resetEvents == 1,
+                      "the main loop must retry a decoder reset that couldn't be queued");
+        session.processWindowResolutionMatch();
+        ok &= require(resetEvents == 1, "a queued decoder reset must not be repeated");
     }
     {
         Session session;
         prepare(session);
-        session.m_ActiveVideoWidth = 1600;
-        session.m_ActiveVideoHeight = 900;
-        session.m_ResolutionMatch.hostDisplaySize = QSize(1600, 900);
+        session.handleHostResolutionReport(1600, 900);
         session.fullscreen = true;
         session.scheduleWindowResolutionMatch();
         ticks += 400;
