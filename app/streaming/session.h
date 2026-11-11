@@ -438,7 +438,9 @@ private:
     struct ResolutionMatchState
     {
         bool hostSupported = false;
-        QSize hostDisplaySize;   // Latest display size reported by the host on this connection
+        bool hostReported = false;         // The host reported its display size on this connection
+        bool streamFollowsDisplay = false; // Its stream-start report showed its display 1:1
+        bool decoderResetPending = false;  // A decoder reset still needs to be queued
         QSize requestedSize;     // Last size requested and not yet reflected in the stream
         Uint32 requestTicks = 0; // When the unanswered request was sent; 0 if none
         Uint32 deadline = 0;     // When a resize has settled; 0 if none pending

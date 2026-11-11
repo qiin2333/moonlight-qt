@@ -27,6 +27,7 @@ class ResolutionMatchTests(unittest.TestCase):
         state = header[state_start:state_end + len("    } m_ResolutionMatch;")]
         methods = "\n".join(function(source, signature) for signature in (
             "static bool isHostStreamingDisplay1To1(",
+            "static bool queueDecoderReset(",
             "void Session::scheduleWindowResolutionMatch(",
             "void Session::processWindowResolutionMatch(",
             "void Session::handleHostResolutionReport(",
@@ -36,20 +37,26 @@ class ResolutionMatchTests(unittest.TestCase):
         harness = harness.replace("// SESSION_METHODS", methods)
         compiler = shutil.which("cl" if os.name == "nt" else "c++")
         self.assertIsNotNone(compiler, "Run from a C++ compiler environment")
-        with tempfile.TemporaryDirectory(prefix="moonlight-resolution-") as directory:
-            path = Path(directory)
-            unit = path / "resolution.cpp"
-            unit.write_text(harness, encoding="utf-8")
-            executable = path / ("resolution.exe" if os.name == "nt" else "resolution")
-            if os.name == "nt":
-                command = [compiler, "/nologo", "/std:c++17", "/EHsc", str(unit),
-                           f"/Fe:{executable}"]
-            else:
-                command = [compiler, "-std=c++17", str(unit), "-o", str(executable)]
-            build = subprocess.run(command, cwd=path, capture_output=True, text=True, timeout=60)
-            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
-            run = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
-            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        # SDL < 2.26 has no SDL_GetWindowSizeInPixels, and its window size is logical
+        for define in (None, "HARNESS_SDL_BEFORE_2_26"):
+            with self.subTest(define=define), \
+                    tempfile.TemporaryDirectory(prefix="moonlight-resolution-") as directory:
+                path = Path(directory)
+                unit = path / "resolution.cpp"
+                unit.write_text(harness, encoding="utf-8")
+                executable = path / ("resolution.exe" if os.name == "nt" else "resolution")
+                if os.name == "nt":
+                    command = [compiler, "/nologo", "/std:c++17", "/EHsc", str(unit),
+                               f"/Fe:{executable}"] + ([f"/D{define}"] if define else [])
+                else:
+                    command = [compiler, "-std=c++17", str(unit), "-o", str(executable)] + (
+                        [f"-D{define}"] if define else [])
+                build = subprocess.run(command, cwd=path, capture_output=True, text=True,
+                                       timeout=60)
+                self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+                run = subprocess.run([str(executable)], capture_output=True, text=True,
+                                     timeout=10)
+                self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
 
     def test_user_event_codes_are_unique(self):
         entries = re.findall(r"^#define (SDL_CODE_\w+) (\d+)$",
