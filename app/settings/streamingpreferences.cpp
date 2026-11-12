@@ -60,6 +60,7 @@
 #define SER_SWAPWINALTKEYS "swapwinaltkeys"
 #define SER_MUTEONFOCUSLOSS "muteonfocusloss"
 #define SER_BACKGROUNDGAMEPAD "backgroundgamepad"
+#define SER_GAMEPADUINAVIGATION "enablegamepaduinavigation"
 #define SER_GAMEPADQUITCOMBO "gamepadquitcombo"
 #define SER_GAMEPADDEADZONE "gamepaddeadzone"
 #define SER_REVERSESCROLL "reversescroll"
@@ -302,6 +303,7 @@ void StreamingPreferences::reload()
     swapWinAltKeys = settings.value(SER_SWAPWINALTKEYS, false).toBool();
     muteOnFocusLoss = settings.value(SER_MUTEONFOCUSLOSS, false).toBool();
     backgroundGamepad = settings.value(SER_BACKGROUNDGAMEPAD, false).toBool();
+    enableGamepadUiNavigation = settings.value(SER_GAMEPADUINAVIGATION, true).toBool();
     gamepadQuitCombo = static_cast<GamepadQuitCombo>(settings.value(SER_GAMEPADQUITCOMBO,
                                                      static_cast<int>(GamepadQuitCombo::GQC_DEFAULT)).toInt());
     // GQC_SELECT_L1_R1_X was the same button combo as the stats overlay
@@ -748,6 +750,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPWINALTKEYS, swapWinAltKeys);
     settings.setValue(SER_MUTEONFOCUSLOSS, muteOnFocusLoss);
     settings.setValue(SER_BACKGROUNDGAMEPAD, backgroundGamepad);
+    settings.setValue(SER_GAMEPADUINAVIGATION, enableGamepadUiNavigation);
     settings.setValue(SER_GAMEPADQUITCOMBO, static_cast<int>(gamepadQuitCombo));
     settings.setValue(SER_GAMEPADDEADZONE, gamepadDeadzone);
     settings.setValue(SER_REVERSESCROLL, reverseScrollDirection);

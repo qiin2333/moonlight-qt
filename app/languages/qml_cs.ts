@@ -1172,6 +1172,14 @@
         <translation>Nastavení gamepadu</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Používat gamepad k ovládání rozhraní Moonlight</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>Když je tato volba vypnutá, gamepad neovládá desktopové rozhraní Moonlight. Vstup gamepadu během streamování zůstane beze změny.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>Prohodit tlačítka gamepadu A/B a X/Y</translation>

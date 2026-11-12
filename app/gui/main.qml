@@ -955,7 +955,8 @@ ApplicationWindow {
             // Force keyboard focus on the textbox so keyboard navigation works
             editText.forceActiveFocus()
             // 手柄插拔状态以对话框打开那一刻为准
-            oskHint.visible = SdlGamepadKeyNavigation.getConnectedGamepads() > 0
+            oskHint.visible = SdlGamepadKeyNavigation.gamepadUiNavigationEnabled() &&
+                              SdlGamepadKeyNavigation.getConnectedGamepads() > 0
         }
 
         onClosed: {

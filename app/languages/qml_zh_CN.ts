@@ -1809,6 +1809,14 @@
         <translation>手柄设置</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>使用手柄导航 Moonlight 界面</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>关闭后，手柄不会控制 Moonlight 桌面界面。串流期间的手柄输入不受影响。</translation>
+    </message>
+    <message>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>交换手柄的 A/B 和 X/Y 按钮</translation>
     </message>

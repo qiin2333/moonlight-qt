@@ -1172,6 +1172,14 @@
         <translation>Paramètres de la manette</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Utiliser une manette pour naviguer dans l’interface de Moonlight</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>Lorsqu’elle est désactivée, la manette ne contrôle pas l’interface de bureau de Moonlight. Les commandes de la manette pendant le streaming ne sont pas affectées.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>Inverser les boutons A/B et X/Y de la manette</translation>

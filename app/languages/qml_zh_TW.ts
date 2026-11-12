@@ -1269,6 +1269,14 @@
         <translation>手把設定</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>使用手把瀏覽 Moonlight 介面</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>停用後，手把不會控制 Moonlight 桌面介面。串流期間的手把輸入不受影響。</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>交換手把的 A/B 和 X/Y 按鈕</translation>

@@ -1172,6 +1172,14 @@
         <translation>Impostazioni controller</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Usa il gamepad per navigare nell’interfaccia di Moonlight</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>Quando è disattivato, il gamepad non controlla l’interfaccia desktop di Moonlight. L’input del gamepad durante lo streaming non viene modificato.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>Inverti i bottoni A/B e X/Y del controller</translation>

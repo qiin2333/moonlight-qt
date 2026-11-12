@@ -366,6 +366,7 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     parser.addToggleOption("video-enhancement", "Enhance video with AI");
     parser.addToggleOption("mute-on-focus-loss", "mute audio when Moonlight window loses focus");
     parser.addToggleOption("background-gamepad", "background gamepad input");
+    parser.addFlagOption("disable-ui-gamepad", "disable gamepad navigation in the Moonlight UI");
     parser.addToggleOption("reverse-scroll-direction", "inverted scroll direction");
     parser.addToggleOption("swap-gamepad-buttons", "swap A/B and X/Y gamepad buttons (Nintendo-style)");
     parser.addToggleOption("keep-awake", "prevent display sleep while streaming");
@@ -488,6 +489,11 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
 
     // Resolve --background-gamepad and --no-background-gamepad options
     preferences->backgroundGamepad = parser.getToggleOptionValue("background-gamepad", preferences->backgroundGamepad);
+
+    // Resolve --disable-ui-gamepad
+    if (parser.isSet("disable-ui-gamepad")) {
+        preferences->enableGamepadUiNavigation = false;
+    }
 
     // Resolve --reverse-scroll-direction and --no-reverse-scroll-direction options
     preferences->reverseScrollDirection = parser.getToggleOptionValue("reverse-scroll-direction", preferences->reverseScrollDirection);

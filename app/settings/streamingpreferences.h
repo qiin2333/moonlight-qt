@@ -261,6 +261,8 @@ public:
     Q_PROPERTY(bool swapWinAltKeys MEMBER swapWinAltKeys NOTIFY swapWinAltKeysChanged)
     Q_PROPERTY(bool muteOnFocusLoss MEMBER muteOnFocusLoss NOTIFY muteOnFocusLossChanged)
     Q_PROPERTY(bool backgroundGamepad MEMBER backgroundGamepad NOTIFY backgroundGamepadChanged)
+    Q_PROPERTY(bool enableGamepadUiNavigation MEMBER enableGamepadUiNavigation NOTIFY
+                   enableGamepadUiNavigationChanged)
     Q_PROPERTY(GamepadQuitCombo gamepadQuitCombo MEMBER gamepadQuitCombo NOTIFY gamepadQuitComboChanged)
     Q_PROPERTY(bool reverseScrollDirection MEMBER reverseScrollDirection NOTIFY reverseScrollDirectionChanged)
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
@@ -319,6 +321,7 @@ public:
     bool swapWinAltKeys;
     bool muteOnFocusLoss;
     bool backgroundGamepad;
+    bool enableGamepadUiNavigation;
     GamepadQuitCombo gamepadQuitCombo;
 
     // Stick deadzone in percent (0-30); 0 passes stick input through unmodified
@@ -403,6 +406,7 @@ signals:
     void swapWinAltKeysChanged();
     void muteOnFocusLossChanged();
     void backgroundGamepadChanged();
+    void enableGamepadUiNavigationChanged();
     void gamepadQuitComboChanged();
     void gamepadDeadzoneChanged();
     void reverseScrollDirectionChanged();

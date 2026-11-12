@@ -181,15 +181,26 @@ FocusScope {
     StackView.onActivated: {
         // This enables Tab and BackTab based navigation rather than arrow keys.
         // It is required to shift focus between controls on the settings page.
-        SdlGamepadKeyNavigation.setUiNavMode(true)
+        if (SdlGamepadKeyNavigation.gamepadUiNavigationEnabled()) {
+            SdlGamepadKeyNavigation.setUiNavMode(true)
+        }
 
         // 手柄进来时把焦点放在分类栏的当前分类上，而不是内容区第一个控件。
         //
         // 以前是直接点基本设置页的分辨率下拉，于是用户进设置的第一下左右输入就把
         // 分辨率改了（issue #144）。落在分类栏上就没这个问题：分类栏不吃左右键，
         // 而且 category 是跨次保留的，从分类栏出发永远是可见、可用的那一项。
-        if (SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
+        if (SdlGamepadKeyNavigation.gamepadUiNavigationEnabled() &&
+            SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
             rail.focusCurrent()
+        }
+    }
+
+    Connections {
+        target: StreamingPreferences
+
+        function onEnableGamepadUiNavigationChanged() {
+            SdlGamepadKeyNavigation.setUiNavMode(StreamingPreferences.enableGamepadUiNavigation)
         }
     }
 
