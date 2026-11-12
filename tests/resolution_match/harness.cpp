@@ -1,8 +1,14 @@
 #include <cstdint>
 #include <initializer_list>
 #include <iostream>
+#include <utility>
 
 using Uint32 = uint32_t;
+
+template <typename T> const T& qMax(const T& a, const T& b)
+{
+    return a < b ? b : a;
+}
 
 struct QSize
 {
@@ -15,6 +21,7 @@ struct QSize
     bool isValid() const { return w >= 0 && h >= 0; }
     QSize transposed() const { return QSize(h, w); }
     bool operator==(const QSize& other) const { return w == other.w && h == other.h; }
+    bool operator!=(const QSize& other) const { return !(*this == other); }
 };
 
 struct SDL_Event
@@ -229,31 +236,50 @@ int main()
         ok &= require(sends == 1, "a 1:1 stream-start report must retry the deferred resize");
     }
     {
-        // The host keeps its 1/2 stream-start scale, so its stream never follows its display
+        // The host streams a 3840x2160 display at 1280x720 and keeps that 1/3 scale
         Session session;
         prepare(session, false);
-        session.handleHostResolutionReport(2560, 1440);
+        session.handleHostResolutionReport(3840, 2160);
         session.scheduleWindowResolutionMatch();
         ticks += 400;
         session.processWindowResolutionMatch();
-        session.handleHostResolutionReport(1280, 720);
+        ok &= require(resetEvents == 0 && sends == 0,
+                      "a scaled stream starts at the negotiated size and must never request one");
+        session.handleHostResolutionReport(2560, 1440);
+        ok &= require(resetEvents == 1 && session.m_ActiveVideoWidth == 854 &&
+                          session.m_ActiveVideoHeight == 480,
+                      "a scaled stream follows its display at the stream-start scale, rounded up "
+                      "to even");
         ticks += 400;
         session.processWindowResolutionMatch();
         ok &= require(sends == 0, "a scaled stream must never request a resolution");
-        session.handleHostResolutionReport(1920, 1080);
-        ok &= require(resetEvents == 0 && session.m_ActiveVideoWidth == 1280 &&
-                          session.m_ActiveVideoHeight == 720,
-                      "a scaled stream's display reports must not change the stream resolution");
+        session.handleHostResolutionReport(150, 120);
+        ok &= require(resetEvents == 2 && session.m_ActiveVideoWidth == 64 &&
+                          session.m_ActiveVideoHeight == 64,
+                      "the host never encodes below 64 pixels");
+    }
+    {
+        // A 4:3 display streamed at 16:9 is scaled differently per axis
+        Session session;
+        prepare(session, false);
+        session.handleHostResolutionReport(1920, 1440);
+        session.handleHostResolutionReport(1440, 1920);
+        ok &= require(resetEvents == 1 && session.m_ActiveVideoWidth == 720 &&
+                          session.m_ActiveVideoHeight == 1280,
+                      "rotating the host display must swap the stream-start scale");
     }
     {
         Session session;
         prepare(session, false);
         session.handleHostResolutionReport(720, 1280);
+        ok &= require(resetEvents == 1 && session.m_ActiveVideoWidth == 720 &&
+                          session.m_ActiveVideoHeight == 1280,
+                      "a transposed host display must reset the decoder at stream start");
         session.scheduleWindowResolutionMatch();
         ticks += 400;
         session.processWindowResolutionMatch();
-        ok &= require(resetEvents == 0 && sends == 1,
-                      "a rotated 1:1 stream-start report must allow requests without a reset");
+        ok &= require(sends == 1 && lastRequest == QSize(1600, 900),
+                      "a transposed 1:1 stream must still allow requests");
     }
     {
         Session session;

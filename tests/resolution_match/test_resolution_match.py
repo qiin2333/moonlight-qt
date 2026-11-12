@@ -27,6 +27,7 @@ class ResolutionMatchTests(unittest.TestCase):
         state = header[state_start:state_end + len("    } m_ResolutionMatch;")]
         methods = "\n".join(function(source, signature) for signature in (
             "static bool isHostStreamingDisplay1To1(",
+            "static int hostEncodedDimension(",
             "static bool queueDecoderReset(",
             "void Session::scheduleWindowResolutionMatch(",
             "void Session::processWindowResolutionMatch(",
