@@ -2617,11 +2617,19 @@ void Session::updateOptimalWindowDisplayMode()
     SDL_SetWindowDisplayMode(m_Window, &bestMode);
 }
 
-// The host applies resolution requests, and its stream follows its display, only
-// while it streams its display 1:1 (in either orientation).
+// The host applies resolution requests only if it started streaming its display
+// 1:1 (in either orientation). Mirrors encodes_display_1to1() in Foundation
+// Sunshine's src/video.cpp.
 static bool isHostStreamingDisplay1To1(const QSize& hostDisplay, const QSize& stream)
 {
     return hostDisplay == stream || hostDisplay == stream.transposed();
+}
+
+// The size the host encodes for a display dimension. Mirrors
+// compute_aligned_resolution() in Foundation Sunshine's capture loop (src/video.cpp).
+static int hostEncodedDimension(int displayDimension, float scale)
+{
+    return qMax(64, (static_cast<int>(displayDimension * scale) + 1) & ~1);
 }
 
 // Recreates the decoder at the current stream resolution through the main loop's reset path
@@ -2709,7 +2717,7 @@ void Session::processWindowResolutionMatch()
         return;
     }
 
-    if (!m_ResolutionMatch.streamFollowsDisplay) {
+    if (!m_ResolutionMatch.streamsDisplay1To1) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Host isn't streaming its display 1:1; not requesting %dx%d", target.width(),
                     target.height());
@@ -2742,15 +2750,27 @@ void Session::handleHostResolutionReport(int width, int height)
     }
 
     // The host reports its display size: once at stream start, then whenever its
-    // display changes. It keeps the display-to-stream scale from stream start, so
-    // its stream follows its display only if it started streaming it 1:1.
-    const QSize reported(width, height);
-    const QSize stream(m_ActiveVideoWidth, m_ActiveVideoHeight);
-    const bool streamStartReport = !m_ResolutionMatch.hostReported;
-    if (streamStartReport) {
-        m_ResolutionMatch.hostReported = true;
-        m_ResolutionMatch.streamFollowsDisplay = isHostStreamingDisplay1To1(reported, stream);
+    // display changes and its stream follows it. It encodes the display at the
+    // display-to-stream scale it fixed at stream start, so derive that size the way
+    // Foundation Sunshine's capture loop does (src/video.cpp, initial_scale_x/y):
+    // the axes are swapped if the display's orientation doesn't match the stream's,
+    // and again whenever the display rotates.
+    const QSize display(width, height);
+    const QSize previousDisplay = m_ResolutionMatch.hostDisplaySize;
+    if (!previousDisplay.isValid()) {
+        const int streamWidth = m_StreamConfig.width;
+        const int streamHeight = m_StreamConfig.height;
+        const bool orientationMismatch = (height > width) == (streamWidth > streamHeight);
+        m_ResolutionMatch.hostScaleX =
+            static_cast<float>(streamWidth) / (orientationMismatch ? height : width);
+        m_ResolutionMatch.hostScaleY =
+            static_cast<float>(streamHeight) / (orientationMismatch ? width : height);
+        m_ResolutionMatch.streamsDisplay1To1 =
+            isHostStreamingDisplay1To1(display, QSize(streamWidth, streamHeight));
+    } else if (display != previousDisplay && display == previousDisplay.transposed()) {
+        std::swap(m_ResolutionMatch.hostScaleX, m_ResolutionMatch.hostScaleY);
     }
+    m_ResolutionMatch.hostDisplaySize = display;
     m_ResolutionMatch.requestTicks = 0;
 
     // Retry a match that was skipped while the host couldn't apply it
@@ -2758,13 +2778,15 @@ void Session::handleHostResolutionReport(int width, int height)
         scheduleWindowResolutionMatch();
     }
 
-    if (streamStartReport || !m_ResolutionMatch.streamFollowsDisplay || reported == stream) {
+    const int encodedWidth = hostEncodedDimension(width, m_ResolutionMatch.hostScaleX);
+    const int encodedHeight = hostEncodedDimension(height, m_ResolutionMatch.hostScaleY);
+    if (encodedWidth == m_ActiveVideoWidth && encodedHeight == m_ActiveVideoHeight) {
         return;
     }
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Host changed the stream resolution to %dx%d; recreating the decoder", width,
-                height);
+                "Host changed the stream resolution to %dx%d; recreating the decoder", encodedWidth,
+                encodedHeight);
 
     // Destroy the old decoder now so it never receives frames at the new
     // resolution. drSubmitDecodeUnit() drops frames until the reset creates
@@ -2772,8 +2794,8 @@ void Session::handleHostResolutionReport(int width, int height)
     SDL_LockMutex(m_DecoderLock);
     delete m_VideoDecoder;
     m_VideoDecoder = nullptr;
-    m_ActiveVideoWidth = width;
-    m_ActiveVideoHeight = height;
+    m_ActiveVideoWidth = encodedWidth;
+    m_ActiveVideoHeight = encodedHeight;
     SDL_UnlockMutex(m_DecoderLock);
 
     m_ResolutionMatch.requestedSize = QSize();
@@ -4132,7 +4154,7 @@ bool Session::tryReconnect()
 
     bool reconnected = false;
     bool cancelled = false;
-    QSize deferredResolution;
+    std::vector<QSize> deferredResolutions;
 
     // Returns true if the user wants to cancel the reconnect (close/quit/Esc)
     auto isCancelEvent = [](const SDL_Event& ev) -> bool {
@@ -4148,18 +4170,19 @@ bool Session::tryReconnect()
         return false;
     };
 
-    auto handleReconnectEvent = [this, &isCancelEvent, &deferredResolution](SDL_Event& ev) -> bool {
+    auto handleReconnectEvent = [this, &isCancelEvent,
+                                 &deferredResolutions](SDL_Event& ev) -> bool {
         if (isCancelEvent(ev)) {
             return true;
         }
 
         if (ev.type == SDL_USEREVENT) {
-            // A resolution report here comes from the connection being started.
-            // Handle it once that connection is up, since drSetup() is still
-            // running on the connection thread.
+            // Resolution reports here come from the connection being started.
+            // Handle them in order once that connection is up, since drSetup()
+            // is still running on the connection thread.
             if (ev.user.code == SDL_CODE_RESOLUTION_CHANGED) {
-                deferredResolution =
-                    QSize((int)(uintptr_t)ev.user.data1, (int)(uintptr_t)ev.user.data2);
+                deferredResolutions.emplace_back((int)(uintptr_t)ev.user.data1,
+                                                 (int)(uintptr_t)ev.user.data2);
             } else {
                 handleSdlUserEvent(ev.user);
             }
@@ -4241,7 +4264,7 @@ bool Session::tryReconnect()
         if (m_DualSenseHapticsRenderer != nullptr) {
             m_DualSenseHapticsRenderer->reset();
         }
-        deferredResolution = QSize();
+        deferredResolutions.clear();
 
         Uint32 backoffUntil = SDL_GetTicks() + backoffMs;
         while (SDL_GetTicks() < backoffUntil &&
@@ -4274,9 +4297,10 @@ bool Session::tryReconnect()
         pushEventOrWarn(resetEvent);
 
         // startConnectionAsync() reset the state for this connection. The host
-        // may have reported its initial display size while we were connecting.
-        if (deferredResolution.isValid()) {
-            handleHostResolutionReport(deferredResolution.width(), deferredResolution.height());
+        // may have reported its display size while we were connecting. Its first
+        // report fixes the stream's scale, so none can be skipped.
+        for (const QSize& report : deferredResolutions) {
+            handleHostResolutionReport(report.width(), report.height());
         }
         scheduleWindowResolutionMatch();
 
