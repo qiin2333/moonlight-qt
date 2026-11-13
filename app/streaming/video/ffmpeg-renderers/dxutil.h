@@ -18,7 +18,7 @@ public:
             case 0x0A00: // Haswell
             case 0x0D00: // Haswell
             case 0x1600: // Broadwell
-            case 0x2200: // Cherry Trail and Braswell
+            // case 0x2200: // Cherry Trail and Braswell
                 // Block these for HEVC to avoid hybrid decode
                 return (videoFormat & VIDEO_FORMAT_MASK_H265) != 0;
             case 0x1900: // Skylake
