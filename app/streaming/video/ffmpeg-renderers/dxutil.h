@@ -18,9 +18,16 @@ public:
             case 0x0A00: // Haswell
             case 0x0D00: // Haswell
             case 0x1600: // Broadwell
-            // case 0x2200: // Cherry Trail and Braswell
                 // Block these for HEVC to avoid hybrid decode
                 return (videoFormat & VIDEO_FORMAT_MASK_H265) != 0;
+            case 0x2200: // Cherry Trail and Braswell
+                // HEVC Main (8-bit) is hardware decodable via D3D11VA on
+                // Cherry Trail with Intel driver 20.19.15.5171 or newer.
+                // Main10 remains unsupported by the hardware.
+                if (videoFormat == VIDEO_FORMAT_H265_MAIN10) {
+                    return true;
+                }
+                break;
             case 0x1900: // Skylake
                 // Blacklist these for HEVC Main10 to avoid hybrid decode.
                 // Regular HEVC Main is fine though.
