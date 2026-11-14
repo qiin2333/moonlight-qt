@@ -373,28 +373,6 @@ public:
             m_DisplayLayer.videoGravity = AVLayerVideoGravityResizeAspect;
             m_DisplayLayer.opaque = YES;
 
-            // This workaround prevents the image from going through processing that causes some
-            // color artifacts in some cases. HDR seems to be okay without this, so we'll exclude
-            // it out of caution. The artifacts seem to be far more significant on M1 Macs and
-            // the workaround can cause performance regressions on Intel Macs, so only use this
-            // on Apple silicon.
-            //
-            // https://github.com/moonlight-stream/moonlight-qt/issues/493
-            // https://github.com/moonlight-stream/moonlight-qt/issues/722
-            if (isAppleSilicon() && !(params->videoFormat & VIDEO_FORMAT_MASK_10BIT)) {
-                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                            "Using layer rasterization workaround");
-                if (info.info.cocoa.window.screen != nullptr) {
-                    m_DisplayLayer.shouldRasterize = YES;
-                    m_DisplayLayer.rasterizationScale = info.info.cocoa.window.screen.backingScaleFactor;
-                }
-                else {
-                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                                "Unable to rasterize layer due to missing NSScreen");
-                    SDL_assert(false);
-                }
-            }
-
             // Create a layer-hosted view by setting the layer before wantsLayer
             // This avoids us having to add our AVSampleBufferDisplayLayer as a
             // sublayer of a layer-backed view which leaves a useless layer in
