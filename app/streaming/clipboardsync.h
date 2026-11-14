@@ -30,6 +30,46 @@ struct ClipboardSyncHostContext
     QSslKey clientPrivateKey;
 };
 
+// Non-macOS helper builds route every QClipboard access through this
+// bridge: Qt requires clipboard operations on the GUI thread there.
+// Windows' QWindowsClipboard::setMimeData() calls OleSetClipboard() on the
+// calling thread and fails with CO_E_NOTINITIALIZED otherwise, and the
+// Linux X11/Wayland backends are GUI-thread bound as well. The bridge is
+// constructed on the helper's GUI thread and stays there for its whole
+// life; the engine thread reaches it through blocking queued calls and
+// receives change notifications via clipboardDataChanged().
+#ifndef Q_OS_MACOS
+class ClipboardBridge : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit ClipboardBridge(QObject* parent = nullptr);
+
+    // Forward QClipboard::dataChanged to clipboardDataChanged(). Called on
+    // the GUI thread via a blocking queued invocation.
+    void attachForwarding();
+    void detachForwarding();
+
+    // Deep-copied read-only snapshot of the current clipboard. The caller
+    // owns the returned object and must release it with deleteLater(),
+    // which is safe from any thread (the deferred delete is posted to the
+    // object's own thread).
+    QMimeData* cloneClipboard();
+
+    // Apply inbound clipboard content. A null image writes text-only; an
+    // empty text writes image-only; both set builds the compound flavor
+    // set (text + image + raw image/png) used by applyCompound().
+    bool writeClipboard(const QString& text, const QImage& image, const QByteArray& pngBytes);
+
+signals:
+    void clipboardDataChanged();
+
+private:
+    bool m_Forwarding = false;
+};
+#endif // !Q_OS_MACOS
+
 // ClipboardSync owns the local clipboard state inside the clipboard helper
 // process. It implements the v1 wire format (u8 version=1, u8 kind, u32
 // token, u32 length, bytes payload, little-endian) used by the Limelight
@@ -64,10 +104,18 @@ struct ClipboardSyncHostContext
 // Images are compared by decoded pixels to survive platform re-encoding.
 //
 // Threading:
-//   * Construct on the GUI thread.
-//   * start() / stop() must run on the GUI thread.
-//   * handleIncomingFrame() may be called from any thread. It marshals the
-//     payload onto the helper GUI thread via a queued metacall.
+//   * Construct on the helper GUI thread; the helper then moves the engine
+//     to its clipboard-engine worker thread and every engine slot runs
+//     there.
+//   * On non-macOS platforms every QClipboard access is marshaled to the
+//     GUI thread through ClipboardBridge; when the engine itself lives on
+//     the GUI thread (the standalone regression harness) clipboard access
+//     stays direct.
+//   * On macOS QClipboard/NSPasteboard is accessed directly on the worker
+//     thread (NSPasteboard is thread-safe; verified in #282) so a
+//     contended pasteboard write cannot wedge the GUI thread.
+//   * handleIncomingFrame() may be called from any thread. It queues the
+//     payload onto the engine's thread via a queued metacall.
 class ClipboardSync : public QObject
 {
     Q_OBJECT
@@ -123,14 +171,17 @@ public:
     // Must be called on the thread the engine lives on (moveToThread + a
     // functor invokeMethod targeting the engine, per the helper's usage).
     //
-    // Threading trade-off, decided deliberately: QClipboard operations are
-    // executed on the engine's worker thread even though Qt's *supported*
-    // usage is GUI-thread-only. NSPasteboard itself is an Apple thread-safe
-    // class, and worker-thread reads AND writes are verified empirically on
-    // the shipping platform (macOS 26.6 / Qt 6.11) — the alternative
-    // (clipboard writes on the GUI thread) reintroduces the outage where one
-    // blocked write wedged both sync directions. Re-verify on major Qt
-    // upgrades.
+    // Threading trade-off, decided deliberately per platform: on macOS
+    // QClipboard operations stay on the engine's worker thread even though
+    // Qt's *supported* usage is GUI-thread-only — NSPasteboard itself is an
+    // Apple thread-safe class, and worker-thread reads AND writes are
+    // verified empirically on the shipping platform (macOS 26.6 / Qt 6.11);
+    // the alternative (clipboard writes on the GUI thread) reintroduces the
+    // outage where one blocked write wedged both sync directions. On
+    // Windows and Linux the GUI-thread requirement is hard (OleSetClipboard
+    // returns CO_E_NOTINITIALIZED off the GUI thread), so all clipboard
+    // access there is marshaled through ClipboardBridge. Re-verify on major
+    // Qt upgrades.
     void start();
 
     // Disconnect signals and stop processing both directions.
@@ -248,6 +299,19 @@ private:
     QSet<QNetworkReply*> m_BlobReplies;
     QHash<quint32, BurstState> m_PendingBursts;
     quint32 m_NextToken = 1;
+
+#ifndef Q_OS_MACOS
+    // True when clipboard access must be marshaled to the GUI thread
+    // through m_Bridge (engine on the helper's worker thread). When the
+    // engine itself lives on the GUI thread — the standalone regression
+    // harness — direct clipboard access is used instead.
+    bool clipboardBridgeNeeded() const;
+    QMimeData* clipboardBridgeClone();
+    bool clipboardBridgeFileGuard(const char* context);
+    void clipboardBridgeWrite(const QString& text, const QImage& image, const QByteArray& pngBytes);
+
+    ClipboardBridge* m_Bridge = nullptr;
+#endif
 
 #ifdef Q_OS_MACOS
     QTimer* m_PasteboardPollTimer = nullptr;
