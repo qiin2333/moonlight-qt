@@ -275,6 +275,7 @@ void FFmpegVideoDecoder::reset()
     }
 
     m_FramesIn = m_FramesOut = 0;
+    m_LastDecodedFrameTimeUs.store(0, std::memory_order_relaxed);
     m_FrameInfoQueue.clear();
 
     delete m_Pacer;
@@ -2085,6 +2086,7 @@ void FFmpegVideoDecoder::decoderThreadProc()
                     }
 
                     m_ActiveWndVideoStats.decodedFrames++;
+                    m_LastDecodedFrameTimeUs.store(LiGetMicroseconds(), std::memory_order_relaxed);
 
                     // Queue the frame for rendering (or render now if pacer is disabled)
                     m_Pacer->submitFrame(frame);
@@ -2265,6 +2267,11 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
 
     m_FramesIn++;
     return DR_OK;
+}
+
+uint64_t FFmpegVideoDecoder::getLastDecodedFrameTimeUs() const
+{
+    return m_LastDecodedFrameTimeUs.load(std::memory_order_relaxed);
 }
 
 void FFmpegVideoDecoder::renderFrameOnMainThread()
