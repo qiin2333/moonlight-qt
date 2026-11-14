@@ -169,8 +169,9 @@ static StreamingPreferences::OverlayMenuPosition loadOverlayMenuPlacement(QSetti
     return migratedPosition;
 }
 
-StreamingPreferences::StreamingPreferences(QQmlEngine *qmlEngine)
-    : m_QmlEngine(qmlEngine)
+StreamingPreferences::StreamingPreferences(QQmlEngine* qmlEngine)
+    : m_QmlEngine(qmlEngine), m_HasGamepadUiNavigationLaunchOverride(false),
+      m_PersistedGamepadUiNavigation(true)
 {
     reload();
 }
@@ -303,7 +304,10 @@ void StreamingPreferences::reload()
     swapWinAltKeys = settings.value(SER_SWAPWINALTKEYS, false).toBool();
     muteOnFocusLoss = settings.value(SER_MUTEONFOCUSLOSS, false).toBool();
     backgroundGamepad = settings.value(SER_BACKGROUNDGAMEPAD, false).toBool();
-    enableGamepadUiNavigation = settings.value(SER_GAMEPADUINAVIGATION, true).toBool();
+    m_PersistedGamepadUiNavigation = settings.value(SER_GAMEPADUINAVIGATION, true).toBool();
+    enableGamepadUiNavigation = m_HasGamepadUiNavigationLaunchOverride
+                                    ? enableGamepadUiNavigation
+                                    : m_PersistedGamepadUiNavigation;
     gamepadQuitCombo = static_cast<GamepadQuitCombo>(settings.value(SER_GAMEPADQUITCOMBO,
                                                      static_cast<int>(GamepadQuitCombo::GQC_DEFAULT)).toInt());
     // GQC_SELECT_L1_R1_X was the same button combo as the stats overlay
@@ -684,6 +688,20 @@ QString StreamingPreferences::getSuffixFromLanguage(StreamingPreferences::Langua
     }
 }
 
+void StreamingPreferences::setGamepadUiNavigationLaunchOverride(bool enabled)
+{
+    if (!m_HasGamepadUiNavigationLaunchOverride) {
+        m_PersistedGamepadUiNavigation = enableGamepadUiNavigation;
+    }
+    m_HasGamepadUiNavigationLaunchOverride = true;
+    if (enableGamepadUiNavigation == enabled) {
+        return;
+    }
+
+    enableGamepadUiNavigation = enabled;
+    emit enableGamepadUiNavigationChanged();
+}
+
 void StreamingPreferences::save()
 {
     QSettings settings;
@@ -750,7 +768,9 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPWINALTKEYS, swapWinAltKeys);
     settings.setValue(SER_MUTEONFOCUSLOSS, muteOnFocusLoss);
     settings.setValue(SER_BACKGROUNDGAMEPAD, backgroundGamepad);
-    settings.setValue(SER_GAMEPADUINAVIGATION, enableGamepadUiNavigation);
+    settings.setValue(SER_GAMEPADUINAVIGATION, m_HasGamepadUiNavigationLaunchOverride
+                                                   ? m_PersistedGamepadUiNavigation
+                                                   : enableGamepadUiNavigation);
     settings.setValue(SER_GAMEPADQUITCOMBO, static_cast<int>(gamepadQuitCombo));
     settings.setValue(SER_GAMEPADDEADZONE, gamepadDeadzone);
     settings.setValue(SER_REVERSESCROLL, reverseScrollDirection);

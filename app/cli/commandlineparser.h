@@ -21,6 +21,11 @@ public:
 
     ParseResult parse(const QStringList &args);
 
+    // True when this process was started with --disable-ui-gamepad.
+    bool disableGamepadUiNavigation() const;
+
+private:
+    bool m_DisableGamepadUiNavigation;
 };
 
 class QuitCommandLineParser

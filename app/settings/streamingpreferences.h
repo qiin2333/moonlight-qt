@@ -19,6 +19,10 @@ public:
 
     void reload();
 
+    // Applies a process-local UI navigation override. save() keeps the user's
+    // persisted value instead of writing this launch override back to disk.
+    void setGamepadUiNavigationLaunchOverride(bool enabled);
+
     enum AudioConfig
     {
         AC_STEREO,
@@ -436,5 +440,7 @@ private:
     bool m_BackgroundSetupCompleted;
 
     QQmlEngine* m_QmlEngine;
+    bool m_HasGamepadUiNavigationLaunchOverride;
+    bool m_PersistedGamepadUiNavigation;
 };
 

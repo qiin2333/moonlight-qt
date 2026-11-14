@@ -1208,6 +1208,11 @@ int main(int argc, char *argv[])
 
     GlobalCommandLineParser parser;
     GlobalCommandLineParser::ParseResult commandLineParserResult = parser.parse(app.arguments());
+    if (parser.disableGamepadUiNavigation()) {
+        // Normal launches do not run the stream parser. Apply the same temporary
+        // override here so Moonlight.exe --disable-ui-gamepad reaches the UI.
+        StreamingPreferences::get()->setGamepadUiNavigationLaunchOverride(false);
+    }
     switch (commandLineParserResult) {
     case GlobalCommandLineParser::ListRequested:
         // Don't log to the console since it will jumble the command output
