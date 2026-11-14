@@ -702,6 +702,19 @@ void StreamingPreferences::setGamepadUiNavigationLaunchOverride(bool enabled)
     emit enableGamepadUiNavigationChanged();
 }
 
+void StreamingPreferences::setGamepadUiNavigationEnabled(bool enabled)
+{
+    // An explicit change from the settings page ends the temporary launch
+    // override so this choice is saved like any other preference.
+    m_HasGamepadUiNavigationLaunchOverride = false;
+    if (enableGamepadUiNavigation == enabled) {
+        return;
+    }
+
+    enableGamepadUiNavigation = enabled;
+    emit enableGamepadUiNavigationChanged();
+}
+
 void StreamingPreferences::save()
 {
     QSettings settings;

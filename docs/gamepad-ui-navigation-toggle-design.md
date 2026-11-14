@@ -93,7 +93,7 @@ SdlGamepadKeyNavigation.getConnectedGamepads() > 0
 
 普通启动和 `stream` 子命令都接受这个选项。`Moonlight.exe --disable-ui-gamepad` 会在界面加载前关闭本次进程的 UI 导航；`moonlight stream ... --disable-ui-gamepad` 保持原有行为。
 
-它只修改当前进程的内存值。设置页退出时仍保存用户原来的开关，不把这次启动覆盖写回 QSettings。这个选项不改变串流内的手柄透传。
+它只修改当前进程的内存值。用户没有在设置页主动改动时，退出设置仍保存原来的开关，不把这次启动覆盖写回 QSettings；如果用户在本次会话里显式切换了这个开关，新值会照常保存，本次覆盖随之失效。这个选项不改变串流内的手柄透传。
 
 如果后续需要支持脚本显式恢复默认行为，可以增加对称的 `--enable-ui-gamepad`；第一版只提供禁用选项即可，因为默认值已经是启用。
 
