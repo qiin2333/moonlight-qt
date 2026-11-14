@@ -601,6 +601,14 @@
         <translation>視窗化</translation>
     </message>
     <message>
+        <source>Match stream resolution to window size</source>
+        <translation>串流解析度跟隨視窗大小</translation>
+    </message>
+    <message>
+        <source>Asks the host to change the stream resolution to match the window when it is resized. Fullscreen returns to the configured resolution. Requires a compatible Sunshine host.</source>
+        <translation>調整視窗大小時，請求主機將串流解析度改為與視窗一致；全螢幕時恢復為設定的解析度。需要相容的 Sunshine 主機。</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/DisplaySettingsPage.qml" line="64"/>
         <source>(Recommended)</source>
         <translation>(建議)</translation>
