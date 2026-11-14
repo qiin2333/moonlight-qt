@@ -14,8 +14,10 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPointer>
 #include <QRegularExpression>
 #include <QRandomGenerator>
+#include <QThread>
 #include <QSslConfiguration>
 #include <QSslError>
 #include <QTimer>
@@ -33,6 +35,25 @@ extern "C" bool ClipboardHelperWritePasteboardCompound(const char* utf8Text,
                                                        int pngLength);
 extern "C" bool ClipboardHelperIsFinderPasteboard();
 #endif
+
+// Releases a clipboard snapshot that was deep-copied on the GUI thread by
+// ClipboardBridge::cloneClipboard(). deleteLater() is safe from any thread:
+// the deferred delete is posted to the object's own (GUI) event loop.
+namespace {
+
+struct OwnedClipboardSnapshot
+{
+    QMimeData* data = nullptr;
+
+    ~OwnedClipboardSnapshot()
+    {
+        if (data != nullptr) {
+            data->deleteLater();
+        }
+    }
+};
+
+}
 
 namespace {
 bool isImageLikeMimeFormat(const QString& format)
@@ -89,6 +110,12 @@ ClipboardSync::ClipboardSync(const ClipboardSyncHostContext& hostContext, QObjec
       m_HostContext(hostContext)
 {
     qRegisterMetaType<QByteArray>("QByteArray");
+#ifndef Q_OS_MACOS
+    // The helper constructs the engine on its GUI thread (before
+    // moveToThread), so the bridge inherits GUI-thread affinity and owns
+    // every QClipboard access on platforms that require it.
+    m_Bridge = new ClipboardBridge();
+#endif
     m_Clock.start();
     // Tokens are shared with peers. Avoid every helper restart beginning at 1.
     m_NextToken = QRandomGenerator::global()->generate();
@@ -100,7 +127,165 @@ ClipboardSync::ClipboardSync(const ClipboardSyncHostContext& hostContext, QObjec
 ClipboardSync::~ClipboardSync()
 {
     stop();
+#ifndef Q_OS_MACOS
+    // The bridge lives on the helper GUI thread; hand its deletion back to
+    // that thread. If the GUI loop is already gone (process exit) this is
+    // a harmless no-op.
+    if (m_Bridge != nullptr) {
+        m_Bridge->deleteLater();
+        m_Bridge = nullptr;
+    }
+#endif
 }
+
+#ifndef Q_OS_MACOS
+ClipboardBridge::ClipboardBridge(QObject* parent) : QObject(parent) {}
+
+void ClipboardBridge::attachForwarding()
+{
+    if (m_Forwarding) {
+        return;
+    }
+
+    QClipboard* cb = QGuiApplication::clipboard();
+    if (cb == nullptr) {
+        ClipboardLog::warn("ClipboardBridge: no QClipboard available; change forwarding disabled");
+        return;
+    }
+
+    connect(cb, &QClipboard::dataChanged, this, &ClipboardBridge::clipboardDataChanged);
+    m_Forwarding = true;
+}
+
+void ClipboardBridge::detachForwarding()
+{
+    if (!m_Forwarding) {
+        return;
+    }
+
+    QClipboard* cb = QGuiApplication::clipboard();
+    if (cb != nullptr) {
+        disconnect(cb, &QClipboard::dataChanged, this, &ClipboardBridge::clipboardDataChanged);
+    }
+    m_Forwarding = false;
+}
+
+QMimeData* ClipboardBridge::cloneClipboard()
+{
+    QClipboard* cb = QGuiApplication::clipboard();
+    if (cb == nullptr) {
+        return nullptr;
+    }
+
+    const QMimeData* original = cb->mimeData();
+    if (original == nullptr) {
+        return nullptr;
+    }
+
+    // Deep-copy every advertised flavor so the engine thread can inspect a
+    // stable read-only snapshot without touching the live clipboard.
+    QMimeData* clone = new QMimeData();
+    const QStringList formats = original->formats();
+    for (const QString& format : formats) {
+        clone->setData(format, original->data(format));
+    }
+    if (original->hasImage()) {
+        clone->setImageData(original->imageData());
+    }
+    return clone;
+}
+
+bool ClipboardBridge::writeClipboard(const QString& text, const QImage& image,
+                                     const QByteArray& pngBytes)
+{
+    QClipboard* cb = QGuiApplication::clipboard();
+    if (cb == nullptr) {
+        return false;
+    }
+
+    if (image.isNull()) {
+        cb->setText(text);
+        return true;
+    }
+
+    QMimeData* mime = new QMimeData();
+    if (!text.isEmpty()) {
+        mime->setText(text);
+    }
+    mime->setImageData(image);
+    // Provide raw PNG bytes too so apps that prefer image/png over CF_DIB
+    // (browsers, modern image editors) get the lossless copy verbatim.
+    // Intentionally NOT setting HTML: pasting a giant base64 data: URI into
+    // CF_HTML adds nothing useful (Office takes the bitmap path anyway) and
+    // some Windows clipboard hooks reject oversize CF_HTML, dropping the
+    // entire mime data set on the floor.
+    if (!pngBytes.isEmpty()) {
+        mime->setData(QStringLiteral("image/png"), pngBytes);
+    }
+    cb->setMimeData(mime);
+    return true;
+}
+
+bool ClipboardSync::clipboardBridgeNeeded() const
+{
+    return m_Bridge != nullptr && QThread::currentThread() != m_Bridge->thread();
+}
+
+QMimeData* ClipboardSync::clipboardBridgeClone()
+{
+    if (m_Bridge == nullptr) {
+        return nullptr;
+    }
+
+    QMimeData* snapshot = nullptr;
+    QMetaObject::invokeMethod(
+        m_Bridge,
+        [bridge = QPointer<ClipboardBridge>(m_Bridge)]() -> QMimeData* {
+            return bridge != nullptr ? bridge->cloneClipboard() : nullptr;
+        },
+        Qt::BlockingQueuedConnection, &snapshot);
+    return snapshot;
+}
+
+bool ClipboardSync::clipboardBridgeFileGuard(const char* context)
+{
+    if (m_Bridge == nullptr) {
+        return false;
+    }
+
+    QMimeData* snapshot = clipboardBridgeClone();
+    const bool fileRefs = snapshot != nullptr && hasFileReferences(snapshot);
+    if (snapshot != nullptr) {
+        snapshot->deleteLater();
+    }
+    if (fileRefs) {
+        ClipboardLog::debug("ClipboardSync: preserving local file clipboard; %s ignored", context);
+    }
+    return fileRefs;
+}
+
+void ClipboardSync::clipboardBridgeWrite(const QString& text, const QImage& image,
+                                         const QByteArray& pngBytes)
+{
+    if (m_Bridge == nullptr) {
+        ClipboardLog::warn("ClipboardSync: no clipboard bridge; clipboard write skipped");
+        return;
+    }
+
+    bool ok = false;
+    QMetaObject::invokeMethod(
+        m_Bridge,
+        [bridge = QPointer<ClipboardBridge>(m_Bridge), text, image, pngBytes, &ok]() {
+            if (bridge != nullptr) {
+                ok = bridge->writeClipboard(text, image, pngBytes);
+            }
+        },
+        Qt::BlockingQueuedConnection);
+    if (!ok) {
+        ClipboardLog::warn("ClipboardSync: GUI-thread clipboard write failed");
+    }
+}
+#endif // !Q_OS_MACOS
 
 bool ClipboardSync::hasFileReferences(const QMimeData* mime)
 {
@@ -169,13 +354,13 @@ void ClipboardSync::start()
         return;
     }
 
+#ifdef Q_OS_MACOS
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb == nullptr) {
         ClipboardLog::warn("ClipboardSync: no QClipboard available; sync disabled");
         return;
     }
 
-#ifdef Q_OS_MACOS
     m_LastPasteboardChangeCount = ClipboardHelperPasteboardChangeCount();
     connect(cb, &QClipboard::dataChanged,
             this, &ClipboardSync::onMacClipboardDataChanged,
@@ -187,9 +372,28 @@ void ClipboardSync::start()
     }
     m_PasteboardPollTimer->start(500);
 #else
-    connect(cb, &QClipboard::dataChanged,
-            this, &ClipboardSync::onLocalClipboardChanged,
-            Qt::UniqueConnection);
+    if (clipboardBridgeNeeded()) {
+        // Attach change forwarding on the GUI thread, then listen from the
+        // engine thread; the bridge signal is queued back here.
+        QMetaObject::invokeMethod(
+            m_Bridge,
+            [bridge = QPointer<ClipboardBridge>(m_Bridge)]() {
+                if (bridge != nullptr) {
+                    bridge->attachForwarding();
+                }
+            },
+            Qt::BlockingQueuedConnection);
+        connect(m_Bridge, &ClipboardBridge::clipboardDataChanged, this,
+                &ClipboardSync::onLocalClipboardChanged, Qt::UniqueConnection);
+    } else {
+        QClipboard* cb = QGuiApplication::clipboard();
+        if (cb == nullptr) {
+            ClipboardLog::warn("ClipboardSync: no QClipboard available; sync disabled");
+            return;
+        }
+        connect(cb, &QClipboard::dataChanged, this, &ClipboardSync::onLocalClipboardChanged,
+                Qt::UniqueConnection);
+    }
 #endif
 
     m_Active = true;
@@ -202,16 +406,28 @@ void ClipboardSync::stop()
         return;
     }
 
+#ifdef Q_OS_MACOS
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb != nullptr) {
-#ifdef Q_OS_MACOS
         disconnect(cb, &QClipboard::dataChanged,
                    this, &ClipboardSync::onMacClipboardDataChanged);
-#else
-        disconnect(cb, &QClipboard::dataChanged,
-                   this, &ClipboardSync::onLocalClipboardChanged);
-#endif
     }
+#else
+    if (m_Bridge != nullptr) {
+        disconnect(m_Bridge, &ClipboardBridge::clipboardDataChanged, this,
+                   &ClipboardSync::onLocalClipboardChanged);
+        if (clipboardBridgeNeeded()) {
+            QMetaObject::invokeMethod(
+                m_Bridge,
+                [bridge = QPointer<ClipboardBridge>(m_Bridge)]() {
+                    if (bridge != nullptr) {
+                        bridge->detachForwarding();
+                    }
+                },
+                Qt::BlockingQueuedConnection);
+        }
+    }
+#endif
 
     m_Active = false;
     beginClipboardChange();
@@ -233,7 +449,7 @@ void ClipboardSync::handleIncomingFrame(const char* data, int length)
         return;
     }
 
-    // Copy out of the recv-thread buffer and marshal to the GUI thread.
+    // Copy out of the recv-thread buffer and marshal to the engine thread.
     QByteArray frame(data, length);
     QMetaObject::invokeMethod(this, "onIncomingFrame", Qt::QueuedConnection,
                               Q_ARG(QByteArray, frame));
@@ -396,6 +612,18 @@ void ClipboardSync::applyInboundText(const QByteArray& payload)
         return;
     }
 
+#ifndef Q_OS_MACOS
+    if (clipboardBridgeNeeded()) {
+        if (clipboardBridgeFileGuard("inbound text")) {
+            return;
+        }
+
+        rememberClipboard(QString::fromUtf8(payload).toUtf8(), QImage());
+        clipboardBridgeWrite(QString::fromUtf8(payload), QImage(), QByteArray());
+        return;
+    }
+#endif
+
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb == nullptr) {
         return;
@@ -418,6 +646,18 @@ void ClipboardSync::applyInboundPng(const QByteArray& payload)
                     static_cast<int>(payload.size()));
         return;
     }
+
+#ifndef Q_OS_MACOS
+    if (clipboardBridgeNeeded()) {
+        if (clipboardBridgeFileGuard("inbound PNG")) {
+            return;
+        }
+
+        rememberClipboard(QByteArray(), image);
+        clipboardBridgeWrite(QString(), image, payload);
+        return;
+    }
+#endif
 
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb == nullptr) {
@@ -714,12 +954,24 @@ void ClipboardSync::onLocalClipboardChanged()
         return;
     }
 
-    QClipboard* cb = QGuiApplication::clipboard();
-    if (cb == nullptr) {
-        return;
-    }
+    // On the helper's worker thread, fetch a detached snapshot on the GUI
+    // thread first; its deferred delete is posted back to the GUI loop.
+    OwnedClipboardSnapshot owned;
+    const QMimeData* mime = nullptr;
+#ifndef Q_OS_MACOS
+    if (clipboardBridgeNeeded()) {
+        owned.data = clipboardBridgeClone();
+        mime = owned.data;
+    } else
+#endif
+    {
+        QClipboard* cb = QGuiApplication::clipboard();
+        if (cb == nullptr) {
+            return;
+        }
 
-    const QMimeData* mime = cb->mimeData();
+        mime = cb->mimeData();
+    }
 
     // File copies must not leak their contents as clipboard messages:
     // Finder/Explorer copies would send the file name as text and their
@@ -775,7 +1027,7 @@ void ClipboardSync::onLocalClipboardChanged()
     // Note the burst text frame is inline-only: a REF text frame would race
     // the image frame onto the wire (blob upload latency) and flip legacy
     // peers' final state to text, so oversize text is dropped from bursts.
-    QString text = hasFileReferences(mime) ? QString() : cb->text();
+    QString text = hasFileReferences(mime) ? QString() : mime->text();
     QByteArray utf8;
     if (!text.isEmpty()) {
         utf8 = text.toUtf8();
@@ -1249,14 +1501,24 @@ void ClipboardSync::removeBurst(quint32 token)
 
 void ClipboardSync::applyCompound(const QByteArray& text, const QByteArray& png)
 {
-    QClipboard* cb = QGuiApplication::clipboard();
-    if (cb == nullptr) {
-        return;
-    }
+#ifndef Q_OS_MACOS
+    if (clipboardBridgeNeeded()) {
+        if (clipboardBridgeFileGuard("inbound compound")) {
+            return;
+        }
+    } else
+#endif
+    {
+        QClipboard* cb = QGuiApplication::clipboard();
+        if (cb == nullptr) {
+            return;
+        }
 
-    if (hasFileReferences(cb->mimeData())) {
-        ClipboardLog::debug("ClipboardSync: preserving local file clipboard; inbound compound ignored");
-        return;
+        if (hasFileReferences(cb->mimeData())) {
+            ClipboardLog::debug(
+                "ClipboardSync: preserving local file clipboard; inbound compound ignored");
+            return;
+        }
     }
 
     const bool textOk = !text.isEmpty() && !text.contains('\0');
@@ -1284,13 +1546,25 @@ void ClipboardSync::applyCompound(const QByteArray& text, const QByteArray& png)
 
         rememberClipboard(QString::fromUtf8(text).toUtf8(), image);
 
-        QMimeData* mime = new QMimeData();
-        mime->setText(QString::fromUtf8(text));
-        mime->setImageData(image);
-        // Provide raw PNG bytes too so apps that prefer image/png over
-        // CF_DIB get the lossless copy verbatim (mirrors applyInboundPng).
-        mime->setData(QStringLiteral("image/png"), png);
-        cb->setMimeData(mime);
+#ifndef Q_OS_MACOS
+        if (clipboardBridgeNeeded()) {
+            clipboardBridgeWrite(QString::fromUtf8(text), image, png);
+        } else
+#endif
+        {
+            QMimeData* mime = new QMimeData();
+            mime->setText(QString::fromUtf8(text));
+            mime->setImageData(image);
+            // Provide raw PNG bytes too so apps that prefer image/png over
+            // CF_DIB get the lossless copy verbatim (mirrors applyInboundPng).
+            mime->setData(QStringLiteral("image/png"), png);
+            QClipboard* cb = QGuiApplication::clipboard();
+            if (cb != nullptr) {
+                cb->setMimeData(mime);
+            } else {
+                delete mime;
+            }
+        }
         ClipboardLog::debug("ClipboardSync: applied compound clipboard (text %d B + PNG %d B)",
                      text.size(),
                      png.size());
