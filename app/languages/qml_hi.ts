@@ -1172,6 +1172,14 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Moonlight UI में नेविगेट करने के लिए गेमपैड का उपयोग करें</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>अक्षम होने पर गेमपैड Moonlight के डेस्कटॉप इंटरफ़ेस को नियंत्रित नहीं करेंगे। स्ट्रीमिंग के दौरान गेमपैड इनपुट प्रभावित नहीं होगा।</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation type="unfinished"></translation>

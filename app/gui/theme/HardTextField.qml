@@ -29,6 +29,7 @@ TextField {
     // 自动获得该能力)。没接手柄时不拦截按键,保留 Qt 自带的文本编辑菜单。
     Keys.onMenuPressed: function(event) {
         if (typeof window !== "undefined" && window.gamepadOsk !== null &&
+                SdlGamepadKeyNavigation.gamepadUiNavigationEnabled() &&
                 SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
             window.gamepadOsk.openFor(control)
         }

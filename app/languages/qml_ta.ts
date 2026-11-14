@@ -1172,6 +1172,14 @@
         <translation>கேம்பேட் அமைப்புகள்</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Moonlight இடைமுகத்தில் வழிசெலுத்த கேம்பேடைப் பயன்படுத்தவும்</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>முடக்கப்பட்டால், கேம்பேட்கள் Moonlight டெஸ்க்டாப் இடைமுகத்தைக் கட்டுப்படுத்தாது. ஸ்ட்ரீமிங்கின் போது கேம்பேட் உள்ளீடு பாதிக்கப்படாது.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>A/B மற்றும் X/y கேம்பேட் பொத்தான்களை மாற்றவும்</translation>

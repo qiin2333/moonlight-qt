@@ -1172,6 +1172,14 @@
         <translation>Cài đặt tay cầm điều khiển</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Dùng tay cầm để điều hướng giao diện Moonlight</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>Khi tắt, tay cầm sẽ không điều khiển giao diện máy tính để bàn của Moonlight. Tín hiệu từ tay cầm trong khi truyền phát không bị ảnh hưởng.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>Đảo các nút A/B và X/Y của tay cầm điều khiển</translation>

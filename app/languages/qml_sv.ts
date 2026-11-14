@@ -1172,6 +1172,14 @@
         <translation>Inställningar för spelkontrollen</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Använd handkontroll för att navigera i Moonlights gränssnitt</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>När detta är avstängt styr handkontroller inte Moonlights skrivbordsgränssnitt. Handkontrollens indata under strömning påverkas inte.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>Byt A/B- och X/Y-kontrollerknappar</translation>

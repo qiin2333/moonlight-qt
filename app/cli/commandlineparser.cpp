@@ -140,8 +140,11 @@ private:
     QMap<QString, QStringList> m_Choices;
 };
 
-GlobalCommandLineParser::GlobalCommandLineParser()
+GlobalCommandLineParser::GlobalCommandLineParser() : m_DisableGamepadUiNavigation(false) {}
+
+bool GlobalCommandLineParser::disableGamepadUiNavigation() const
 {
+    return m_DisableGamepadUiNavigation;
 }
 
 GlobalCommandLineParser::~GlobalCommandLineParser()
@@ -165,7 +168,9 @@ GlobalCommandLineParser::ParseResult GlobalCommandLineParser::parse(const QStrin
         "See 'moonlight <action> --help' for help of specific action."
     );
     parser.addPositionalArgument("action", "Action to execute", "<action>");
+    parser.addFlagOption("disable-ui-gamepad", "disable gamepad navigation in the Moonlight UI");
     parser.parse(args);
+    m_DisableGamepadUiNavigation = parser.isSet("disable-ui-gamepad");
     auto posArgs = parser.positionalArguments();
 
     if (posArgs.isEmpty()) {
@@ -366,6 +371,7 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     parser.addToggleOption("video-enhancement", "Enhance video with AI");
     parser.addToggleOption("mute-on-focus-loss", "mute audio when Moonlight window loses focus");
     parser.addToggleOption("background-gamepad", "background gamepad input");
+    parser.addFlagOption("disable-ui-gamepad", "disable gamepad navigation in the Moonlight UI");
     parser.addToggleOption("reverse-scroll-direction", "inverted scroll direction");
     parser.addToggleOption("swap-gamepad-buttons", "swap A/B and X/Y gamepad buttons (Nintendo-style)");
     parser.addToggleOption("keep-awake", "prevent display sleep while streaming");
@@ -488,6 +494,12 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
 
     // Resolve --background-gamepad and --no-background-gamepad options
     preferences->backgroundGamepad = parser.getToggleOptionValue("background-gamepad", preferences->backgroundGamepad);
+
+    // Resolve --disable-ui-gamepad without replacing a value the user changed
+    // in this process before the stream subcommand was parsed.
+    if (parser.isSet("disable-ui-gamepad")) {
+        preferences->setGamepadUiNavigationLaunchOverride(false);
+    }
 
     // Resolve --reverse-scroll-direction and --no-reverse-scroll-direction options
     preferences->reverseScrollDirection = parser.getToggleOptionValue("reverse-scroll-direction", preferences->reverseScrollDirection);

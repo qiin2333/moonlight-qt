@@ -1172,6 +1172,14 @@
         <translation>Controller-Einstellungen</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Gamepad zur Navigation in der Moonlight-Oberfläche verwenden</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>Wenn diese Option deaktiviert ist, steuern Gamepads die Moonlight-Oberfläche nicht. Gamepad-Eingaben während des Streamings bleiben unverändert.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>Tausche die A/B und X/Y Controller-Tasten</translation>

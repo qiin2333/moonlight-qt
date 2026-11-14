@@ -540,6 +540,14 @@ Column {
         title: qsTr("Gamepad Settings")
 
         ToggleRow {
+            title: qsTr("Use gamepad to navigate Moonlight UI")
+            searchKeywords: "Use gamepad to navigate Moonlight UI"
+            description: qsTr("When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.")
+            checked: StreamingPreferences.enableGamepadUiNavigation
+            onToggled: function(value) { StreamingPreferences.enableGamepadUiNavigation = value }
+        }
+
+        ToggleRow {
             title: qsTr("Swap A/B and X/Y gamepad buttons")
             searchKeywords: "Swap A/B and X/Y gamepad buttons"
             description: qsTr("This switches gamepads into a Nintendo-style button layout")

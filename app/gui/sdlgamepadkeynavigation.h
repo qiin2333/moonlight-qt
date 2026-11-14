@@ -36,6 +36,8 @@ public:
 
     Q_INVOKABLE int getConnectedGamepads();
 
+    Q_INVOKABLE bool gamepadUiNavigationEnabled() const;
+
     // NO_GAMEPAD_QUIT=1 时游戏柄退出组合键被禁用,提示文案据此回落
     Q_INVOKABLE bool gamepadQuitComboEnabled() const;
 

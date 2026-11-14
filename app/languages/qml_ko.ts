@@ -2255,6 +2255,14 @@
         <translation>게임패드 설정</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>게임패드로 Moonlight UI 탐색</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>비활성화하면 게임패드로 Moonlight 데스크톱 인터페이스를 조작하지 않습니다. 스트리밍 중 게임패드 입력에는 영향을 주지 않습니다.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="499"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>게임패드 버튼 A/B와 X/Y 전환</translation>

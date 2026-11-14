@@ -1172,6 +1172,14 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Kasuta Moonlighti kasutajaliideses navigeerimiseks mängupulti</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>Kui see on keelatud, ei juhi mängupuldid Moonlighti töölaualiidest. Mängupuldi sisend voogesituse ajal ei muutu.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation type="unfinished"></translation>

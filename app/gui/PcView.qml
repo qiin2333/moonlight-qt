@@ -70,7 +70,8 @@ CenteredGridView {
         ComputerManager.computerAddCompleted.connect(addComplete)
 
         // Highlight the first item if a gamepad is connected
-        if (currentIndex === -1 && SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
+        if (SdlGamepadKeyNavigation.gamepadUiNavigationEnabled() &&
+            currentIndex === -1 && SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
             currentIndex = 0
         }
 
@@ -583,7 +584,8 @@ CenteredGridView {
         onOpened: {
             // Force keyboard focus on the textbox so keyboard navigation works
             editText.forceActiveFocus()
-            oskHint.visible = SdlGamepadKeyNavigation.getConnectedGamepads() > 0
+            oskHint.visible = SdlGamepadKeyNavigation.gamepadUiNavigationEnabled() &&
+                              SdlGamepadKeyNavigation.getConnectedGamepads() > 0
         }
 
         onClosed: {

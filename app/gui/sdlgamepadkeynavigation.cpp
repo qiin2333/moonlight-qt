@@ -23,6 +23,12 @@ SdlGamepadKeyNavigation::SdlGamepadKeyNavigation(StreamingPreferences* prefs)
 {
     m_PollingTimer = new QTimer(this);
     connect(m_PollingTimer, &QTimer::timeout, this, &SdlGamepadKeyNavigation::onPollingTimerFired);
+    connect(m_Prefs, &StreamingPreferences::enableGamepadUiNavigationChanged, this, [this] {
+        if (!m_Prefs->enableGamepadUiNavigation) {
+            resetNavRepeatState();
+        }
+        updateTimerState();
+    });
 }
 
 SdlGamepadKeyNavigation::~SdlGamepadKeyNavigation()
@@ -460,10 +466,11 @@ QString SdlGamepadKeyNavigation::rightShoulderName()
 
 void SdlGamepadKeyNavigation::updateTimerState()
 {
-    if (m_PollingTimer->isActive() && (!m_HasFocus || !m_Enabled)) {
+    if (m_PollingTimer->isActive() &&
+        (!m_HasFocus || !m_Enabled || !m_Prefs->enableGamepadUiNavigation)) {
         m_PollingTimer->stop();
-    }
-    else if (!m_PollingTimer->isActive() && m_HasFocus && m_Enabled) {
+    } else if (!m_PollingTimer->isActive() && m_HasFocus && m_Enabled &&
+               m_Prefs->enableGamepadUiNavigation) {
         // Flush events on the first poll
         m_FirstPoll = true;
 
@@ -509,4 +516,9 @@ int SdlGamepadKeyNavigation::getConnectedGamepads()
     }
 
     return count;
+}
+
+bool SdlGamepadKeyNavigation::gamepadUiNavigationEnabled() const
+{
+    return m_Prefs->enableGamepadUiNavigation;
 }

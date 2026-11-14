@@ -1172,6 +1172,14 @@
         <translation>Gamepad beállítások</translation>
     </message>
     <message>
+        <source>Use gamepad to navigate Moonlight UI</source>
+        <translation>Gamepad használata a Moonlight felületének navigálásához</translation>
+    </message>
+    <message>
+        <source>When disabled, gamepads do not control the Moonlight desktop interface. Gamepad input during streaming is unaffected.</source>
+        <translation>Kikapcsolva a gamepad nem vezérli a Moonlight asztali felületét. A streamelés közbeni gamepadbemenetet nem befolyásolja.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="824"/>
         <source>Swap A/B and X/Y gamepad buttons</source>
         <translation>A/B és X/Y gamepad gombok felcserélése</translation>
