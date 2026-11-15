@@ -140,6 +140,19 @@ public:
         image.save(&buffer, "PNG");
 #ifndef Q_OS_MACOS
         {
+            auto* provider = new QMimeData;
+            provider->setText("snapshot-text");
+            provider->setData("application/x-lazy-provider", QByteArrayLiteral("provider-data"));
+            cb->setMimeData(provider);
+
+            ClipboardBridge bridge;
+            QMimeData* snapshot = bridge.cloneClipboard();
+            ok &= check(snapshot != nullptr && snapshot->text() == "snapshot-text" &&
+                            !snapshot->formats().contains("application/x-lazy-provider"),
+                        "clipboard bridge must ignore unconsumed provider formats", err);
+            delete snapshot;
+        }
+        {
             cb->setText("baseline");
             ClipboardSync sync;
             sync.start();
