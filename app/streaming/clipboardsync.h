@@ -57,6 +57,11 @@ public:
     // object's own thread).
     QMimeData* cloneClipboard();
 
+    // Checks file-reference formats on the GUI thread without copying the
+    // clipboard. Only URL data may be materialized to distinguish local
+    // files from remote URLs; arbitrary advertised formats are not fetched.
+    bool hasFileReferences();
+
     // Apply inbound clipboard content. A null image writes text-only; an
     // empty text writes image-only; both set builds the compound flavor
     // set (text + image + raw image/png) used by applyCompound().

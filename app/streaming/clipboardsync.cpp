@@ -36,6 +36,12 @@ extern "C" bool ClipboardHelperWritePasteboardCompound(const char* utf8Text,
 extern "C" bool ClipboardHelperIsFinderPasteboard();
 #endif
 
+namespace {
+bool isImageLikeMimeFormat(const QString& format);
+bool isFileReferenceFormat(const QString& format);
+bool shouldCopyClipboardFormat(const QString& format);
+}
+
 // Releases a clipboard snapshot that was deep-copied on the GUI thread by
 // ClipboardBridge::cloneClipboard(). deleteLater() is safe from any thread:
 // the deferred delete is posted to the object's own (GUI) event loop.
@@ -90,6 +96,36 @@ bool isImageLikeMimeFormat(const QString& format)
     }
 
     return false;
+}
+
+bool isFileReferenceFormat(const QString& format)
+{
+    // Some native and promised-file providers expose only a platform format,
+    // without a URL that QMimeData can normalize. Match the identifying part
+    // so this also covers Qt's application/x-qt-*-mime wrappers.
+    static const QStringList fileFormatMarkers{
+        QStringLiteral("public.file-url"),     QStringLiteral("NSFilenamesPboardType"),
+        QStringLiteral("promised-file"),       QStringLiteral("FileNameW"),
+        QStringLiteral("FileGroupDescriptor"), QStringLiteral("FileContents"),
+        QStringLiteral("Shell IDList Array")
+    };
+
+    for (const QString& marker : fileFormatMarkers) {
+        if (format.contains(marker, Qt::CaseInsensitive)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool shouldCopyClipboardFormat(const QString& format)
+{
+    const QString lowerFormat = format.toLower();
+    return lowerFormat.startsWith(QStringLiteral("text/plain")) ||
+           lowerFormat.startsWith(QStringLiteral("text/html")) ||
+           lowerFormat == QStringLiteral("text/uri-list") || isImageLikeMimeFormat(format) ||
+           isFileReferenceFormat(format);
 }
 
 // PNG ::= 89 50 4E 47 0D 0A 1A 0A (RFC 2083 §3.1). Some Windows apps
@@ -182,17 +218,38 @@ QMimeData* ClipboardBridge::cloneClipboard()
         return nullptr;
     }
 
-    // Deep-copy every advertised flavor so the engine thread can inspect a
-    // stable read-only snapshot without touching the live clipboard.
+    // Deep-copy the clipboard flavors consumed by the worker so it can
+    // inspect a stable read-only snapshot without touching the live
+    // clipboard. Keep provider-backed formats out unless the worker has an
+    // extraction path that consumes them; reading every advertised format
+    // can synchronously render virtual files or large custom payloads on the
+    // GUI thread.
     QMimeData* clone = new QMimeData();
     const QStringList formats = original->formats();
     for (const QString& format : formats) {
-        clone->setData(format, original->data(format));
+        if (!shouldCopyClipboardFormat(format)) {
+            continue;
+        }
+
+        // File-reference markers are needed by name only. Avoid asking a
+        // native provider to render their data while preserving the format
+        // in the detached snapshot for hasFileReferences().
+        if (isFileReferenceFormat(format)) {
+            clone->setData(format, QByteArray());
+        } else {
+            clone->setData(format, original->data(format));
+        }
     }
     if (original->hasImage()) {
         clone->setImageData(original->imageData());
     }
     return clone;
+}
+
+bool ClipboardBridge::hasFileReferences()
+{
+    QClipboard* cb = QGuiApplication::clipboard();
+    return cb != nullptr && ClipboardSync::hasFileReferences(cb->mimeData());
 }
 
 bool ClipboardBridge::writeClipboard(const QString& text, const QImage& image,
@@ -253,11 +310,15 @@ bool ClipboardSync::clipboardBridgeFileGuard(const char* context)
         return false;
     }
 
-    QMimeData* snapshot = clipboardBridgeClone();
-    const bool fileRefs = snapshot != nullptr && hasFileReferences(snapshot);
-    if (snapshot != nullptr) {
-        snapshot->deleteLater();
-    }
+    bool fileRefs = false;
+    QMetaObject::invokeMethod(
+        m_Bridge,
+        [bridge = QPointer<ClipboardBridge>(m_Bridge), &fileRefs]() {
+            if (bridge != nullptr) {
+                fileRefs = bridge->hasFileReferences();
+            }
+        },
+        Qt::BlockingQueuedConnection);
     if (fileRefs) {
         ClipboardLog::debug("ClipboardSync: preserving local file clipboard; %s ignored", context);
     }
@@ -305,25 +366,10 @@ bool ClipboardSync::hasFileReferences(const QMimeData* mime)
         }
     }
 
-    // Some native and promised-file providers expose only a platform format,
-    // without a URL that QMimeData can normalize. Match the identifying part
-    // so this also covers Qt's application/x-qt-*-mime wrappers.
-    static const QStringList fileFormatMarkers {
-        QStringLiteral("public.file-url"),
-        QStringLiteral("NSFilenamesPboardType"),
-        QStringLiteral("promised-file"),
-        QStringLiteral("FileNameW"),
-        QStringLiteral("FileGroupDescriptor"),
-        QStringLiteral("FileContents"),
-        QStringLiteral("Shell IDList Array")
-    };
-
     const QStringList formats = mime->formats();
     for (const QString& format : formats) {
-        for (const QString& marker : fileFormatMarkers) {
-            if (format.contains(marker, Qt::CaseInsensitive)) {
-                return true;
-            }
+        if (isFileReferenceFormat(format)) {
+            return true;
         }
     }
 
@@ -971,6 +1017,13 @@ void ClipboardSync::onLocalClipboardChanged()
         }
 
         mime = cb->mimeData();
+    }
+    QMimeData emptyClipboard;
+    if (mime == nullptr) {
+        // An empty clipboard may have no MIME object. Keep processing it as
+        // empty content so the snapshot state is updated without dereferencing
+        // a null pointer.
+        mime = &emptyClipboard;
     }
 
     // File copies must not leak their contents as clipboard messages:
