@@ -20,6 +20,8 @@
 #include <QThread>
 #include <QtEndian>
 
+#include <atomic>
+
 namespace {
 bool check(bool value, const char* name, QTextStream& err)
 {
@@ -44,6 +46,35 @@ QByteArray wire(int kind, quint32 token, const QByteArray& payload)
     result.append(reinterpret_cast<const char*>(&size), 4);
     return result + payload;
 }
+
+class CountingMimeData : public QMimeData
+{
+public:
+    mutable int customRetrievals = 0;
+
+    QStringList formats() const override
+    {
+        QStringList result = QMimeData::formats();
+        result.append(QStringLiteral("application/x-lazy-provider"));
+        return result;
+    }
+
+protected:
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QVariant retrieveData(const QString& mimeType, QMetaType preferredType) const override
+#else
+    QVariant retrieveData(const QString& mimeType, QVariant::Type preferredType) const override
+#endif
+    {
+        if (mimeType == QStringLiteral("application/x-lazy-provider")) {
+            ++customRetrievals;
+            Q_UNUSED(preferredType);
+            return QVariant::fromValue(QByteArrayLiteral("provider-data"));
+        }
+        return QMimeData::retrieveData(mimeType, preferredType);
+    }
+};
+
 void incoming(ClipboardSync& sync, int kind, quint32 token, const QByteArray& payload)
 {
     QMetaObject::invokeMethod(&sync, "onIncomingFrame", Qt::DirectConnection,
@@ -139,6 +170,68 @@ public:
         buffer.open(QIODevice::WriteOnly);
         image.save(&buffer, "PNG");
 #ifndef Q_OS_MACOS
+        {
+            auto* provider = new CountingMimeData;
+            provider->setText("snapshot-text");
+            cb->setMimeData(provider);
+
+            ClipboardBridge bridge;
+            QMimeData* snapshot = bridge.cloneClipboard();
+            ok &= check(snapshot != nullptr && snapshot->text() == "snapshot-text" &&
+                            !snapshot->formats().contains("application/x-lazy-provider") &&
+                            provider->customRetrievals == 0,
+                        "clipboard bridge must ignore unconsumed provider formats", err);
+            delete snapshot;
+        }
+        {
+            cb->clear();
+            auto* sync = new ClipboardSync;
+            QThread worker;
+            sync->moveToThread(&worker);
+
+            std::atomic_bool started = false;
+            std::atomic_bool stopped = false;
+            std::atomic_bool destroyed = false;
+            QList<QByteArray> sent;
+            QObject receiver;
+            QObject::connect(sync, &ClipboardSync::outboundFrame, &receiver,
+                             [&](const QByteArray& frame) { sent.append(frame); });
+            QObject::connect(sync, &QObject::destroyed, &receiver, [&] { destroyed = true; });
+
+            worker.start();
+            QMetaObject::invokeMethod(
+                sync,
+                [sync, &started] {
+                    sync->start();
+                    started = true;
+                },
+                Qt::QueuedConnection);
+            ok &= check(waitFor([&] { return started.load(); }), "worker clipboard engine starts",
+                        err);
+
+            const QByteArray inbound = wire(ClipboardSync::KIND_TEXT, 0, "worker-inbound");
+            sync->handleIncomingFrame(inbound.constData(), inbound.size());
+            ok &= check(waitFor([&] { return cb->text() == "worker-inbound"; }),
+                        "worker inbound clipboard write reaches the GUI thread", err);
+
+            cb->setText("worker-outbound");
+            ok &= check(waitFor([&] { return sent.size() == 1; }) &&
+                            sent.first().mid(10) == "worker-outbound",
+                        "GUI clipboard changes reach the worker engine", err);
+
+            QMetaObject::invokeMethod(
+                sync,
+                [sync, &stopped] {
+                    sync->stop();
+                    stopped = true;
+                    sync->deleteLater();
+                },
+                Qt::QueuedConnection);
+            ok &= check(waitFor([&] { return stopped.load() && destroyed.load(); }),
+                        "worker clipboard engine stops without a teardown deadlock", err);
+            worker.quit();
+            ok &= check(worker.wait(2000), "worker clipboard thread exits", err);
+        }
         {
             cb->setText("baseline");
             ClipboardSync sync;
