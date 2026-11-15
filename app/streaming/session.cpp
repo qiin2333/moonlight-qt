@@ -73,7 +73,7 @@
 // Hosts that apply LiRequestResolutionChange() advertise this bit
 // (qiin2333/moonlight-common-c#10); older common-c headers lack the define.
 #ifndef LI_FF_CLIENT_RESOLUTION_CHANGE
-#define LI_FF_CLIENT_RESOLUTION_CHANGE 0x400
+#define LI_FF_CLIENT_RESOLUTION_CHANGE 0x2000
 #endif
 // LiRequestResolutionChange(): the host can't take resolution requests
 #define RESOLUTION_CHANGE_ERR_UNSUPPORTED -2
