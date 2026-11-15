@@ -465,6 +465,7 @@ void ClipboardSync::stop(bool waitForBridge)
     }
 
 #ifdef Q_OS_MACOS
+    Q_UNUSED(waitForBridge);
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb != nullptr) {
         disconnect(cb, &QClipboard::dataChanged,
