@@ -60,7 +60,11 @@ public:
     }
 
 protected:
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     QVariant retrieveData(const QString& mimeType, QMetaType preferredType) const override
+#else
+    QVariant retrieveData(const QString& mimeType, QVariant::Type preferredType) const override
+#endif
     {
         if (mimeType == QStringLiteral("application/x-lazy-provider")) {
             ++customRetrievals;
