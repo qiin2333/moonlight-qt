@@ -162,7 +162,10 @@ ClipboardSync::ClipboardSync(const ClipboardSyncHostContext& hostContext, QObjec
 
 ClipboardSync::~ClipboardSync()
 {
-    stop();
+    // During normal helper shutdown the GUI event loop has already returned
+    // before the worker is joined. Do not block this worker waiting for a
+    // GUI queued call that can no longer be dispatched.
+    stop(false);
 #ifndef Q_OS_MACOS
     // The bridge lives on the helper GUI thread; hand its deletion back to
     // that thread. If the GUI loop is already gone (process exit) this is
@@ -258,6 +261,15 @@ bool ClipboardBridge::writeClipboard(const QString& text, const QImage& image,
     QClipboard* cb = QGuiApplication::clipboard();
     if (cb == nullptr) {
         return false;
+    }
+
+    // The earlier worker-side guard can race with a user copying a file while
+    // the decoded inbound image is waiting for this GUI-thread invocation.
+    // Recheck immediately before replacing the native clipboard.
+    if (ClipboardSync::hasFileReferences(cb->mimeData())) {
+        ClipboardLog::debug(
+            "ClipboardSync: preserving local file clipboard; inbound write ignored");
+        return true;
     }
 
     if (image.isNull()) {
@@ -446,7 +458,7 @@ void ClipboardSync::start()
     ClipboardLog::info("ClipboardSync: started (text + PNG, bidirectional)");
 }
 
-void ClipboardSync::stop()
+void ClipboardSync::stop(bool waitForBridge)
 {
     if (!m_Active) {
         return;
@@ -462,7 +474,7 @@ void ClipboardSync::stop()
     if (m_Bridge != nullptr) {
         disconnect(m_Bridge, &ClipboardBridge::clipboardDataChanged, this,
                    &ClipboardSync::onLocalClipboardChanged);
-        if (clipboardBridgeNeeded()) {
+        if (clipboardBridgeNeeded() && waitForBridge) {
             QMetaObject::invokeMethod(
                 m_Bridge,
                 [bridge = QPointer<ClipboardBridge>(m_Bridge)]() {
@@ -471,6 +483,18 @@ void ClipboardSync::stop()
                     }
                 },
                 Qt::BlockingQueuedConnection);
+        } else if (clipboardBridgeNeeded()) {
+            // Destruction can happen after app.exec() has stopped dispatching
+            // GUI events. Queue the detach for the normal case, but let the
+            // process teardown path continue when the event loop is gone.
+            QMetaObject::invokeMethod(
+                m_Bridge,
+                [bridge = QPointer<ClipboardBridge>(m_Bridge)]() {
+                    if (bridge != nullptr) {
+                        bridge->detachForwarding();
+                    }
+                },
+                Qt::QueuedConnection);
         }
     }
 #endif

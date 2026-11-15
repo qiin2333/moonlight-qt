@@ -189,8 +189,10 @@ public:
     // Qt upgrades.
     void start();
 
-    // Disconnect signals and stop processing both directions.
-    void stop();
+    // Disconnect signals and stop processing both directions. The default
+    // waits for GUI-thread bridge detachment; the destructor uses false when
+    // the helper GUI event loop has already stopped during process teardown.
+    void stop(bool waitForBridge = true);
 
     // Called from the control receive thread when the host pushes a 0x5508
     // payload. Buffer is only valid for the duration of the call; we copy.
