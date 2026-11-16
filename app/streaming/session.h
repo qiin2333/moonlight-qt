@@ -443,10 +443,11 @@ private:
         float hostScaleY = 1;
         bool streamsDisplay1To1 = false;  // Started 1:1, so the host can apply requests
         bool decoderResetPending = false; // A decoder reset still needs to be queued
-        QSize requestedSize;     // Last size requested and not yet reflected in the stream
-        Uint32 requestTicks = 0; // When the unanswered request was sent; 0 if none
-        Uint32 deadline = 0;     // When a resize has settled; 0 if none pending
-        bool deferred = false;   // Skipped while minimized or not 1:1; retried on restore or report
+        QSize requestedSize;              // Last size requested and not yet reflected in the stream
+        Uint32 requestTicks = 0;          // When the unanswered request was sent; 0 if none
+        Uint32 deadline = 0;              // When a resize has settled; 0 if none pending
+        // Skipped while minimized or not 1:1; retried on restore or report
+        bool deferred = false;
     } m_ResolutionMatch;
 
     OpusMSDecoder* m_OpusDecoder;
