@@ -219,6 +219,8 @@ public:
     Q_PROPERTY(bool autoAdjustBitrate MEMBER autoAdjustBitrate NOTIFY autoAdjustBitrateChanged)
     Q_PROPERTY(bool enableSunshineAbr MEMBER enableSunshineAbr NOTIFY enableSunshineAbrChanged)
     Q_PROPERTY(bool ignoreAspectRatio MEMBER ignoreAspectRatio NOTIFY ignoreAspectRatioChanged)
+    Q_PROPERTY(
+        bool resolutionMatchWindow MEMBER resolutionMatchWindow NOTIFY resolutionMatchWindowChanged)
     Q_PROPERTY(bool enableVsync MEMBER enableVsync NOTIFY enableVsyncChanged)
     Q_PROPERTY(bool gameOptimizations MEMBER gameOptimizations NOTIFY gameOptimizationsChanged)
     Q_PROPERTY(bool playAudioOnHost MEMBER playAudioOnHost NOTIFY playAudioOnHostChanged)
@@ -300,6 +302,7 @@ public:
     bool autoAdjustBitrate;
     bool enableSunshineAbr;
     bool ignoreAspectRatio;
+    bool resolutionMatchWindow;
     bool enableVsync;
     bool gameOptimizations;
     bool playAudioOnHost;
@@ -370,6 +373,7 @@ signals:
     void autoAdjustBitrateChanged();
     void enableSunshineAbrChanged();
     void ignoreAspectRatioChanged();
+    void resolutionMatchWindowChanged();
     void enableVsyncChanged();
     void gameOptimizationsChanged();
     void playAudioOnHostChanged();
