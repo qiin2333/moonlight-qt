@@ -993,8 +993,8 @@
         <translation>空間音訊</translation>
     </message>
     <message>
-        <source>Renders surround sound as spatial audio on headphones, built-in speakers and other stereo outputs.</source>
-        <translation>在耳機、內建喇叭和其他立體聲輸出裝置上，將環繞音效轉譯為空間音訊。</translation>
+        <source>Renders surround sound with Apple&apos;s spatial audio on headphones and built-in speakers. Disable it if you don&apos;t want binaural processing, such as with USB or Bluetooth speakers.</source>
+        <translation>在耳機和內建喇叭上，使用 Apple 的空間音訊轉譯環繞音效。如果不需要雙耳處理（例如使用 USB 或藍牙喇叭時），請將其停用。</translation>
     </message>
     <message>
         <source>Head tracking</source>

@@ -1453,8 +1453,8 @@
         <translation>空间音频</translation>
     </message>
     <message>
-        <source>Renders surround sound as spatial audio on headphones, built-in speakers and other stereo outputs.</source>
-        <translation>在耳机、内置扬声器和其他立体声输出设备上，将环绕声渲染为空间音频。</translation>
+        <source>Renders surround sound with Apple&apos;s spatial audio on headphones and built-in speakers. Disable it if you don&apos;t want binaural processing, such as with USB or Bluetooth speakers.</source>
+        <translation>在耳机和内置扬声器上，使用 Apple 的空间音频渲染环绕声。如果不需要双耳处理（例如使用 USB 或蓝牙扬声器时），请将其禁用。</translation>
     </message>
     <message>
         <source>Head tracking</source>

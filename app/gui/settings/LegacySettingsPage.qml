@@ -62,7 +62,7 @@ Column {
         ChoiceRow {
             applicable: SystemProperties.isDarwin
             title: qsTr("Spatial audio")
-            description: qsTr("Renders surround sound as spatial audio on headphones, built-in speakers and other stereo outputs.")
+            description: qsTr("Renders surround sound with Apple's spatial audio on headphones and built-in speakers. Disable it if you don't want binaural processing, such as with USB or Bluetooth speakers.")
             controlEnabled: StreamingPreferences.audioConfig !== StreamingPreferences.AC_STEREO
             selectedValue: StreamingPreferences.spatialAudioConfig
             onValueActivated: function(value) { StreamingPreferences.spatialAudioConfig = value }

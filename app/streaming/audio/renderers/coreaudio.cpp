@@ -22,11 +22,13 @@ constexpr AudioObjectPropertyAddress DefaultDeviceAddress = {
 
 // The data source changes when headphones are plugged into the built-in jack,
 // which changes how spatial audio has to be rendered. The stream configuration
-// changes the channel count that decides between spatial audio and passthrough.
+// and the speaker layout change the speaker count that decides between spatial
+// audio and passthrough.
 constexpr AudioObjectPropertyAddress DeviceAddresses[] = {
     { kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain },
     { kAudioDevicePropertyDataSource, kAudioDevicePropertyScopeOutput, kAudioObjectPropertyElementMain },
     { kAudioDevicePropertyStreamConfiguration, kAudioDevicePropertyScopeOutput, kAudioObjectPropertyElementMain },
+    { kAudioDevicePropertyPreferredChannelLayout, kAudioDevicePropertyScopeOutput, kAudioObjectPropertyElementMain },
 };
 
 template <typename T>
@@ -72,6 +74,52 @@ UInt32 outputChannelCount(AudioDeviceID device)
         channels += list->mBuffers[i].mNumberChannels;
     }
     return channels;
+}
+
+// The number of speakers the user set up for the device in Audio MIDI Setup,
+// which can be fewer than its channels. An audio interface with 8 outputs is
+// usually driving a pair of stereo speakers.
+UInt32 outputSpeakerCount(AudioDeviceID device, UInt32 channelCount)
+{
+    AudioObjectPropertyAddress addr{ kAudioDevicePropertyPreferredChannelLayout,
+                                     kAudioDevicePropertyScopeOutput,
+                                     kAudioObjectPropertyElementMain };
+    UInt32 size = 0;
+    if (AudioObjectGetPropertyDataSize(device, &addr, 0, nullptr, &size) != noErr ||
+            size < offsetof(AudioChannelLayout, mChannelDescriptions)) {
+        return qMin(channelCount, 2U);
+    }
+
+    std::vector<unsigned char> storage(size);
+    auto layout = reinterpret_cast<AudioChannelLayout*>(storage.data());
+    if (AudioObjectGetPropertyData(device, &addr, 0, nullptr, &size, layout) != noErr) {
+        return qMin(channelCount, 2U);
+    }
+
+    UInt32 speakers = 0;
+    if (layout->mChannelLayoutTag == kAudioChannelLayoutTag_UseChannelDescriptions) {
+        UInt32 descriptions = qMin(layout->mNumberChannelDescriptions,
+                                   (UInt32)((size - offsetof(AudioChannelLayout, mChannelDescriptions)) /
+                                            sizeof(AudioChannelDescription)));
+        for (UInt32 i = 0; i < descriptions; i++) {
+            AudioChannelLabel label = layout->mChannelDescriptions[i].mChannelLabel;
+            if (label != kAudioChannelLabel_Unknown && label != kAudioChannelLabel_Unused) {
+                speakers++;
+            }
+        }
+    }
+    else if (layout->mChannelLayoutTag == kAudioChannelLayoutTag_UseChannelBitmap) {
+        speakers = (UInt32)__builtin_popcount(layout->mChannelBitmap);
+    }
+    else {
+        speakers = AudioChannelLayoutTag_GetNumberOfChannels(layout->mChannelLayoutTag);
+    }
+
+    // A device nobody has set up has no labels. macOS plays stereo on those.
+    if (speakers == 0) {
+        speakers = 2;
+    }
+    return qMin(speakers, channelCount);
 }
 
 // The host sends WAVE channel order: FL FR FC LFE BL BR SL SR (TFL TFR TBL TBR).
@@ -176,20 +224,24 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
     }
 
     UInt32 deviceChannels = outputChannelCount(m_OutputDevice);
+    UInt32 deviceSpeakers = outputSpeakerCount(m_OutputDevice, deviceChannels);
     AUSpatialMixerOutputType outputType = getSpatialMixerOutputType();
 
-    // Surround is spatialized when the device can't play every channel itself
+    // Surround is spatialized for stereo headphones and built-in speakers.
+    // Rendering it for external speakers would only be a downmix.
     bool spatial = opusConfig->channelCount > 2 &&
-                   deviceChannels < (UInt32)opusConfig->channelCount &&
+                   deviceSpeakers == 2 &&
+                   outputType != kSpatialMixerOutputType_ExternalSpeakers &&
                    prefs->spatialAudioConfig != StreamingPreferences::SAC_DISABLED;
 
-    if (deviceChannels < (spatial ? 2U : (UInt32)opusConfig->channelCount)) {
+    if (!spatial && deviceSpeakers < (UInt32)opusConfig->channelCount) {
         // AUHAL drops channels the device doesn't have instead of downmixing
-        // them, so let the SDL renderer handle this as it did before
+        // them, so let the SDL renderer handle this as it did before. That
+        // includes surround devices with fewer speakers than the stream.
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "The output device has only %u channels for %s",
-                    deviceChannels,
-                    spatial ? "spatial audio" : "passthrough");
+                    "The output device has only %u speakers for the %d-channel stream",
+                    deviceSpeakers,
+                    opusConfig->channelCount);
         return false;
     }
 
@@ -245,18 +297,20 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
     callback.inputProc = renderCallback;
     callback.inputProcRefCon = this;
 
+    OSStatus status = AudioUnitSetProperty(m_OutputUnit, kAudioUnitProperty_StreamFormat,
+                                           kAudioUnitScope_Input, 0, &asbd, sizeof(asbd));
+
     // Let AUHAL route each channel to the matching speaker of the device's
     // layout. Without it, channels go to the device's channels in order.
-    if (!spatial && !layout.empty() &&
+    // The layout is rejected unless the format already has as many channels.
+    if (status == noErr && !spatial && !layout.empty() &&
             AudioUnitSetProperty(m_OutputUnit, kAudioUnitProperty_AudioChannelLayout, kAudioUnitScope_Input, 0,
                                  layout.data(), (UInt32)layout.size()) != noErr) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Unable to set the CoreAudio output channel layout");
     }
 
-    OSStatus status;
-    if ((status = AudioUnitSetProperty(m_OutputUnit, kAudioUnitProperty_StreamFormat,
-                                       kAudioUnitScope_Input, 0, &asbd, sizeof(asbd))) != noErr ||
+    if (status != noErr ||
             (status = AudioUnitSetProperty(m_OutputUnit, kAudioUnitProperty_SetRenderCallback,
                                            kAudioUnitScope_Input, 0, &callback, sizeof(callback))) != noErr ||
             (status = AudioUnitInitialize(m_OutputUnit)) != noErr) {
@@ -300,9 +354,10 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
     }
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "CoreAudio output: %s (%u channels, output type %u), %s for %d-channel stream",
+                "CoreAudio output: %s (%u channels, %u speakers, output type %u), %s for %d-channel stream",
                 qUtf8Printable(deviceName(m_OutputDevice)),
                 deviceChannels,
+                deviceSpeakers,
                 (unsigned int)outputType,
                 spatial ? "spatial audio" : "passthrough",
                 opusConfig->channelCount);
@@ -345,28 +400,26 @@ AUSpatialMixerOutputType CoreAudioRenderer::getSpatialMixerOutputType()
                       kAudioObjectPropertyScopeGlobal, transport);
 
     switch (transport) {
-    case kAudioDeviceTransportTypeBluetooth:
-    case kAudioDeviceTransportTypeBluetoothLE:
-    case kAudioDeviceTransportTypeUSB:
-        // Nearly always a headset
-        return kSpatialMixerOutputType_Headphones;
+    case kAudioDeviceTransportTypeHDMI:
+    case kAudioDeviceTransportTypeDisplayPort:
+    case kAudioDeviceTransportTypeAirPlay:
+        // Always speakers
+        return kSpatialMixerOutputType_ExternalSpeakers;
 
     case kAudioDeviceTransportTypeBuiltIn: {
         UInt32 dataSource = 0;
         if (getDeviceProperty(m_OutputDevice, kAudioDevicePropertyDataSource,
-                              kAudioDevicePropertyScopeOutput, dataSource)) {
-            if (dataSource == kIOAudioOutputPortSubTypeInternalSpeaker) {
-                return kSpatialMixerOutputType_BuiltInSpeakers;
-            }
-            else if (dataSource == kIOAudioOutputPortSubTypeHeadphones) {
-                return kSpatialMixerOutputType_Headphones;
-            }
+                              kAudioDevicePropertyScopeOutput, dataSource) &&
+                dataSource == kIOAudioOutputPortSubTypeInternalSpeaker) {
+            return kSpatialMixerOutputType_BuiltInSpeakers;
         }
-        return kSpatialMixerOutputType_ExternalSpeakers;
+        return kSpatialMixerOutputType_Headphones;
     }
 
     default:
-        return kSpatialMixerOutputType_ExternalSpeakers;
+        // Nothing tells USB or Bluetooth headphones from speakers reliably,
+        // so the user turns spatial audio off for speakers
+        return kSpatialMixerOutputType_Headphones;
     }
 }
 
