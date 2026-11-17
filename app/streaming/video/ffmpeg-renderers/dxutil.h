@@ -21,9 +21,8 @@ public:
                 // Block these for HEVC to avoid hybrid decode
                 return (videoFormat & VIDEO_FORMAT_MASK_H265) != 0;
             case 0x2200: // Cherry Trail and Braswell
-                // HEVC Main (8-bit) is hardware decodable via D3D11VA on
-                // Cherry Trail with Intel driver 20.19.15.5171 or newer.
-                // Main10 remains unsupported by the hardware.
+                // HEVC Main (8-bit) is fixed-function decodable on this
+                // hardware (rated up to 4K@30). Main10 is not supported.
                 if (videoFormat == VIDEO_FORMAT_H265_MAIN10) {
                     return true;
                 }
