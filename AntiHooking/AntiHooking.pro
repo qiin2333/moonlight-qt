@@ -19,4 +19,4 @@ contains(QT_ARCH, arm64) {
 LIBS += -ldetours
 DEFINES += ANTIHOOKING_LIBRARY
 SOURCES += antihookingprotection.cpp
-HEADERS += antihookingprotection.h
+HEADERS += antihookingprotection.h dllblocklist.h

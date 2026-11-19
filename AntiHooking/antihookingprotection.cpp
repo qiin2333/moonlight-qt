@@ -1,4 +1,5 @@
 #include "antihookingprotection.h"
+#include "dllblocklist.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -70,6 +71,20 @@ private:
             if (_wcsicmp(dllName, k_BlacklistedDlls[i]) == 0) {
                 return true;
             }
+        }
+
+        // Read the process environment at load time so the policy needs no
+        // additional initialization or allocation in DllMain. Oversized
+        // values are ignored, preserving the built-in policy.
+        WCHAR optionalList[4096];
+        DWORD length =
+            GetEnvironmentVariableW(L"MOONLIGHT_BLOCK_DLLS", optionalList, ARRAYSIZE(optionalList));
+        if (length > 0 && length < ARRAYSIZE(optionalList) &&
+            matchesOptionalDllBlocklist(lpLibFileName, optionalList)) {
+            OutputDebugStringW(L"Moonlight AntiHooking: blocked optional DLL load: ");
+            OutputDebugStringW(lpLibFileName);
+            OutputDebugStringW(L"\n");
+            return true;
         }
 
         return false;

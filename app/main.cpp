@@ -884,6 +884,9 @@ int main(int argc, char *argv[])
     // Force AntiHooking.dll to be statically imported and loaded
     // by ntdll on Win32 platforms by calling a dummy function.
     AntiHookingDummyImport();
+    if (qEnvironmentVariableIsSet("MOONLIGHT_BLOCK_DLLS")) {
+        qInfo() << "Optional DLL blocklist configured; only intercepted loads can be blocked";
+    }
 #elif defined(APP_IMAGE)
     // Force libssl.so to be directly linked to our binary, so
     // linuxdeployqt can find it and include it in our AppImage.

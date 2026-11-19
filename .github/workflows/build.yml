@@ -222,6 +222,8 @@ jobs:
     - name: Test input & overlay logic
       shell: cmd
       run: |
+        call scripts\run-test.bat antihooking_blocklist antihooking_blocklist "%GITHUB_WORKSPACE%\build\build-x64-release\AntiHooking\release\AntiHooking.dll"
+        if errorlevel 1 exit /b %ERRORLEVEL%
         rem 统一入口 scripts\run-test.bat:qmake -> jom release -> 运行,法规约见脚本头注释。
         rem 新增测试时在这里加一对 call + errorlevel 检查即可。
         call scripts\run-test.bat ds5_ir_renderer ds5_ir_renderer_test
