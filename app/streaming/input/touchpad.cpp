@@ -167,6 +167,35 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
 }
 
 #ifdef HAVE_MACOS_NATIVE_TOUCHPAD
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+bool SdlInputHandler::useMacSystemDrag(const SDL_TouchFingerEvent* event)
+{
+    if (!isCaptureActive()) return false;
+    if (m_MacSystemDragContacts.isEmpty()) {
+        if (event->type != SDL_FINGERDOWN || m_MacTouchpadGestureContacts.size() != 2 ||
+            m_MacTouchpadGestureContacts.contains(event->fingerId)) {
+            return false;
+        }
+        // Cancel the previously forwarded contacts before macOS owns this drag.
+        auto contacts = m_MacTouchpadGestureContacts;
+        const Uint32 left = SDL_BUTTON(SDL_BUTTON_LEFT);
+        const bool transferPress = (m_MacTouchpadSuppressedMouseButtons & left) != 0;
+        cancelNativeTouchpadContacts();
+        m_MacSystemDragContacts = contacts;
+        m_MacSystemDragDevice = event->touchId;
+        if (transferPress) {
+            // AppKit can deliver mouse-down just before the third SDL contact.
+            m_MacTouchpadSuppressedMouseButtons &= ~left;
+            LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, m_SwapMouseButtons ? BUTTON_RIGHT : BUTTON_LEFT);
+        }
+    }
+    if (event->touchId != m_MacSystemDragDevice) return false;
+    if (event->type == SDL_FINGERDOWN) m_MacSystemDragContacts.insert(event->fingerId);
+    if (event->type == SDL_FINGERUP) m_MacSystemDragContacts.remove(event->fingerId);
+    return true;
+}
+
+#endif
 void SdlInputHandler::updateMacTouchpadGesture(const SDL_TouchFingerEvent* event)
 {
     if (event->type == SDL_FINGERDOWN &&
@@ -302,6 +331,9 @@ bool SdlInputHandler::shouldSuppressMacTouchpadMouseButtonEvent(
         return true;
     }
 
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    if (!m_MacSystemDragContacts.isEmpty()) return false;
+#endif
     if (event->state != SDL_PRESSED || !isCaptureActive()) {
         return false;
     }
@@ -360,6 +392,11 @@ bool SdlInputHandler::shouldSuppressMacTouchpadMouseButtonEvent(
 
 void SdlInputHandler::resetMacTouchpadState()
 {
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    m_MacSystemDragContacts.clear();
+    m_MacSystemDragDevice = 0;
+#endif
+
     if (m_MacTouchpadButtonDown) {
         sendMacTouchpadButtonState(false);
     }

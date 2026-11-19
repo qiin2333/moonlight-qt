@@ -439,6 +439,10 @@ private:
     bool m_EnableDualSenseHaptics;
     bool m_SwapMouseButtons;
     bool m_SwapWinAltKeys;
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    const QString m_MacWindowsKeys;
+#endif
+
     bool m_ReverseScrollDirection;
     bool m_SwapFaceButtons;
     StreamingPreferences::GamepadQuitCombo m_GamepadQuitCombo;
@@ -541,6 +545,11 @@ private:
     Uint32 m_MacTouchpadLastTapTimestamp;
     Uint32 m_MacTouchpadGestureStartTimestamp;
     SDL_FingerID m_MacTouchpadGesturePrimaryFinger;
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    bool useMacSystemDrag(const SDL_TouchFingerEvent* event);
+    QSet<SDL_FingerID> m_MacSystemDragContacts;
+    SDL_TouchID m_MacSystemDragDevice = 0;
+#endif
     QSet<SDL_FingerID> m_MacTouchpadGestureContacts;
     float m_MacTouchpadGestureStartX;
     float m_MacTouchpadGestureStartY;
