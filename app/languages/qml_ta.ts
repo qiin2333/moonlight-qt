@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>முழுமையான சுட்டி முறை</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>சுட்டியின் இயக்கத்திற்குப் பதிலாக அதன் இடத்தை அனுப்புகிறது. தொலைநிலைப் பணிமேடைக்கு ஏற்றது; பெரும்பாலான விளையாட்டுகளுக்குச் சார்பு முறை சிறந்தது.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>தொலைநிலைக் காட்டியை உள்ளூரில் காட்டு</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>தொலைநிலைக் காட்டியைக் காட்ட உள்ளூர்க் காட்டியைப் பயன்படுத்துகிறது. காட்டியின் வடிவம் வழங்கியின் ஆதரவைப் பொறுத்தது. முழுமையான சுட்டி முறை தேவை.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>ஆடியோ அமைப்புகள்</translation>
@@ -2594,6 +2614,10 @@
         <location filename="../streaming/session.cpp" line="4143"/>
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>வீடியோ டிகோடரை துவக்க முடியவில்லை. உங்கள் ச்ட்ரீமிங் அமைப்புகளை சரிபார்த்து மீண்டும் முயற்சிக்கவும்.</translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>முழுமையான மவுஸ் பயன்முறை கேம்களில் சிக்கல்களை ஏற்படுத்தலாம்.</translation>
     </message>
 </context>
 <context>

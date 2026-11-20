@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Modalità mouse assoluta</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Invia la posizione del mouse anziché il movimento. Ideale per il desktop remoto; la modalità relativa è più adatta alla maggior parte dei giochi.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Mostra il cursore remoto localmente</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Usa il puntatore locale per mostrare il cursore remoto. La forma del cursore dipende dal supporto dell&apos;host. Richiede la modalità mouse assoluta.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Impostazioni audio</translation>
@@ -2594,6 +2614,10 @@
         <location filename="../streaming/session.cpp" line="4143"/>
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Impossibile inizializzare il decoder video. Controlla le impostazioni di streaming e prova di nuovo.</translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>La modalità assoluta del mouse può causare problemi nei giochi.</translation>
     </message>
 </context>
 <context>

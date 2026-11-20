@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Absolutt musemodus</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Sender museposisjonen i stedet for bevegelsen. Passer best for eksternt skrivebord; relativ modus er bedre for de fleste spill.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Vis ekstern markør lokalt</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Bruker den lokale pekeren til å vise den eksterne markøren. Markørformen avhenger av støtte på verten. Krever absolutt musemodus.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Lydinnstillinger</translation>
@@ -2594,6 +2614,10 @@
         <location filename="../streaming/session.cpp" line="4143"/>
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Kunne ikke starte videodekoder. Sjekk strømmeinnstillingene dine og prøv igjen.</translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Absolutt musemodus kan forårsake problemer i spill.</translation>
     </message>
 </context>
 <context>

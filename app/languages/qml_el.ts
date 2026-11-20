@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Απόλυτη λειτουργία ποντικιού</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Στέλνει τη θέση του ποντικιού αντί για την κίνησή του. Είναι ιδανική για απομακρυσμένη επιφάνεια εργασίας· η σχετική λειτουργία είναι καλύτερη για τα περισσότερα παιχνίδια.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Τοπική εμφάνιση του απομακρυσμένου δρομέα</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Χρησιμοποιεί τον τοπικό δείκτη για την εμφάνιση του απομακρυσμένου δρομέα. Το σχήμα του δρομέα εξαρτάται από την υποστήριξη του κεντρικού υπολογιστή. Απαιτείται η απόλυτη λειτουργία ποντικιού.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Ρυθμίσεις ήχου</translation>
@@ -2594,6 +2614,10 @@
         <location filename="../streaming/session.cpp" line="4143"/>
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Αδυναμία αρχικοποίησης του αποκωδικοποιητή βίντεο. Ελέγξτε τις ρυθμίσεις ροής και δοκιμάστε ξανά.</translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Η απόλυτη λειτουργία ποντικιού μπορεί να προκαλέσει προβλήματα στα παιχνίδια.</translation>
     </message>
 </context>
 <context>

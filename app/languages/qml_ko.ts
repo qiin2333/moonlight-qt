@@ -1721,6 +1721,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>절대 마우스 모드</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>마우스 이동량 대신 위치를 전송합니다. 원격 데스크톱에 적합하며 대부분의 게임에는 상대 모드가 더 적합합니다.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>원격 커서를 로컬에 표시</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>로컬 포인터로 원격 커서를 표시합니다. 커서 모양은 호스트 지원 여부에 따라 달라집니다. 절대 마우스 모드가 필요합니다.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="43"/>
         <source>Audio Settings</source>
         <translation>오디오 설정</translation>
@@ -3976,6 +3996,10 @@
         <location filename="../streaming/session.cpp" line="5486"/>
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>비디오 디코더를 초기화 할 수 없습니다. 스트리밍 설정을 확인하고 다시 시도하십시오.</translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>절대 마우스 모드는 게임에서 문제를 일으킬 수 있습니다.</translation>
     </message>
 </context>
 <context>

@@ -72,6 +72,7 @@ public:
 private:
     QString m_Host;
     QString m_AppName;
+    QMap<QString, StreamingPreferences::MouseMode> m_MouseModeMap;
     QMap<QString, StreamingPreferences::WindowMode> m_WindowModeMap;
     QMap<QString, StreamingPreferences::AudioConfig> m_AudioConfigMap;
     QMap<QString, StreamingPreferences::VideoCodecConfig> m_VideoCodecMap;

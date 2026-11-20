@@ -1405,6 +1405,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>绝对鼠标模式</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>发送鼠标位置而非移动量。适合远程桌面；相对模式更适合大多数游戏。</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>在本地显示远程光标</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>使用本地指针显示远程光标。光标形状取决于主机是否支持。需要启用绝对鼠标模式。</translation>
+    </message>
+    <message>
         <source>Audio Settings</source>
         <translation>音频设置</translation>
     </message>
@@ -3321,6 +3341,10 @@
     <message>
         <source>This USB device is in use by macOS and cannot be forwarded.</source>
         <translation>此 USB 设备正由 macOS 使用，无法转发。</translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>绝对鼠标模式可能导致部分游戏出现问题。</translation>
     </message>
 </context>
 <context>

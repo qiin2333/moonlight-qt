@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Absoluter Mausmodus</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Sendet die Mausposition statt der Bewegung. Ideal für den Remote-Desktop; der relative Modus eignet sich besser für die meisten Spiele.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Remote-Cursor lokal anzeigen</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Zeigt den Remote-Cursor mit dem lokalen Mauszeiger an. Die Cursorform hängt von der Unterstützung durch den Host ab. Erfordert den absoluten Mausmodus.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Audio Einstellungen</translation>
@@ -2594,6 +2614,10 @@
         <location filename="../streaming/session.cpp" line="4143"/>
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Videodecoder konnte nicht initialisiert werden. Bitte prüfen Sie Ihre Streaming-Einstellungen und versuchen Sie es erneut.</translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Der absolute Mausmodus kann in Spielen zu Problemen führen.</translation>
     </message>
 </context>
 <context>

@@ -67,7 +67,8 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         setCaptureActive(false);
 
         // Toggle mouse mode
-        m_AbsoluteMouseMode = !m_AbsoluteMouseMode;
+        m_MouseMode =
+            StreamingPreferences::toggleMouseInputMode(m_MouseMode, m_LastAbsoluteMouseMode);
         synchronizeLocalCursorMode();
 
         // Recapture input
@@ -78,13 +79,12 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected show mouse combo");
 
-        if (!SDL_GetRelativeMouseMode()) {
-            // 切换本地鼠标光标可见性状态
-            m_MouseCursorCapturedVisibilityState = !m_MouseCursorCapturedVisibilityState;
+        if (isAbsoluteMouseMode()) {
+            m_MouseMode = StreamingPreferences::toggleMouseCursorMode(m_MouseMode);
+            m_LastAbsoluteMouseMode = m_MouseMode;
             synchronizeLocalCursorMode();
             applyCapturedCursorState();
-        }
-        else {
+        } else {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Cursor can only be shown in remote desktop mouse mode");
         }

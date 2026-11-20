@@ -8,6 +8,7 @@
 #endif
 #include "backend/computermanager.h"
 #include "cursorshapeclassifier.h"
+#include "remotecursorupdate.h"
 
 #include "SDL_compat.h"
 
@@ -135,17 +136,6 @@ struct DualSenseOutputReport{
 
 #define GAMEPAD_HAPTIC_SIMPLE_HIFREQ_MOTOR_WEIGHT 0.33
 #define GAMEPAD_HAPTIC_SIMPLE_LOWFREQ_MOTOR_WEIGHT 0.8
-
-struct RemoteCursorUpdate {
-    bool hasShape;
-    bool visible;
-    uint32_t shapeId;
-    uint16_t width;
-    uint16_t height;
-    int16_t hotspotX;
-    int16_t hotspotY;
-    QByteArray bgra;
-};
 
 class SdlInputHandler
 {
@@ -306,6 +296,10 @@ public:
     void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
 
 private:
+    bool isAbsoluteMouseMode() const
+    {
+        return StreamingPreferences::isAbsoluteMouseMode(m_MouseMode);
+    }
     void getWindowCoordinateSize(int* width, int* height) const;
 
     qreal getRemoteCursorScale() const;
@@ -462,7 +456,8 @@ private:
     QString m_OldIgnoreDevicesExcept;
     QStringList m_IgnoreDeviceGuids;
     StreamingPreferences::CaptureSysKeysMode m_CaptureSystemKeysMode;
-    int m_MouseCursorCapturedVisibilityState;
+    StreamingPreferences::MouseMode m_MouseMode;
+    StreamingPreferences::MouseMode m_LastAbsoluteMouseMode;
     std::atomic<int> m_LocalCursorMode;
     bool m_RemoteCursorVisible;
     SDL_Cursor* m_RemoteCursor;
@@ -489,7 +484,6 @@ private:
     SDL_TimerID m_LongPressTimer;
     int m_StreamWidth;
     int m_StreamHeight;
-    bool m_AbsoluteMouseMode;
     bool m_AbsoluteTouchMode;
     bool m_DisabledTouchFeedback;
 

@@ -840,7 +840,11 @@ void Session::clCursorUpdate(const LI_CURSOR_UPDATE* update)
     bool queueCursorEvent = false;
     {
         std::lock_guard<std::mutex> lock(session->m_CursorUpdateMutex);
-        session->m_PendingCursorUpdate = pending;
+        if (session->m_PendingCursorUpdate != nullptr) {
+            session->m_PendingCursorUpdate->coalesce(*pending);
+        } else {
+            session->m_PendingCursorUpdate = pending;
+        }
         if (!session->m_CursorUpdateEventQueued) {
             session->m_CursorUpdateEventQueued = true;
             queueCursorEvent = true;
@@ -2022,8 +2026,9 @@ bool Session::validateLaunch(SDL_Window* testWindow)
         return false;
     }
 
-    if (m_Preferences->absoluteMouseMode && !m_App.isAppCollectorGame) {
-        emitLaunchWarning(tr("Your selection to enable remote desktop mouse mode may cause problems in games."));
+    if (StreamingPreferences::isAbsoluteMouseMode(m_Preferences->mouseMode) &&
+        !m_App.isAppCollectorGame) {
+        emitLaunchWarning(tr("Absolute mouse mode may cause problems in games."));
     }
 
     if (m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_SOFTWARE) {
@@ -4957,7 +4962,7 @@ void Session::exec()
     // We still capture in windowed absolute mode because it doesn't
     // constrain the motion of the cursor. This allows the user to
     // easily reposition or resize the window.
-    if (m_IsFullScreen || m_Preferences->absoluteMouseMode) {
+    if (m_IsFullScreen || StreamingPreferences::isAbsoluteMouseMode(m_Preferences->mouseMode)) {
         // HACK: For Wayland, we wait until we get the first SDL_WINDOWEVENT_ENTER
         // event where it seems to work consistently on GNOME. For other platforms,
         // especially where SDL may call SDL_RecreateWindow(), we must only capture

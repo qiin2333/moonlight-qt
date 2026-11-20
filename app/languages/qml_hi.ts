@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>निरपेक्ष माउस मोड</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>माउस की गति के बजाय उसकी स्थिति भेजता है। रिमोट डेस्कटॉप के लिए उपयुक्त; अधिकांश गेम के लिए सापेक्ष मोड बेहतर है।</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>रिमोट कर्सर स्थानीय रूप से दिखाएँ</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>रिमोट कर्सर दिखाने के लिए स्थानीय पॉइंटर का उपयोग करता है। कर्सर का आकार होस्ट के समर्थन पर निर्भर करता है। निरपेक्ष माउस मोड आवश्यक है।</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation type="unfinished"></translation>
@@ -2594,6 +2614,10 @@
         <location filename="../streaming/session.cpp" line="4143"/>
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>एब्सोल्यूट माउस मोड गेम में समस्याएँ पैदा कर सकता है।</translation>
     </message>
 </context>
 <context>
