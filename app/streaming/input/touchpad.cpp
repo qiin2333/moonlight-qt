@@ -173,6 +173,7 @@ bool SdlInputHandler::useMacSystemDrag(const SDL_TouchFingerEvent* event)
     if (!isCaptureActive()) return false;
     if (m_MacSystemDragContacts.isEmpty()) {
         if (event->type != SDL_FINGERDOWN || m_MacTouchpadGestureContacts.size() != 2 ||
+            event->touchId != m_MacTouchpadGestureDevice ||
             m_MacTouchpadGestureContacts.contains(event->fingerId)) {
             return false;
         }
@@ -185,8 +186,11 @@ bool SdlInputHandler::useMacSystemDrag(const SDL_TouchFingerEvent* event)
         m_MacSystemDragDevice = event->touchId;
         if (transferPress) {
             // AppKit can deliver mouse-down just before the third SDL contact.
-            m_MacTouchpadSuppressedMouseButtons &= ~left;
-            LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, m_SwapMouseButtons ? BUTTON_RIGHT : BUTTON_LEFT);
+            const int button = m_SwapMouseButtons ? BUTTON_RIGHT : BUTTON_LEFT;
+            if (LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, button) == 0) {
+                m_MacTouchpadSuppressedMouseButtons &= ~left;
+                m_MacSystemDragButton = button;
+            }
         }
     }
     if (event->touchId != m_MacSystemDragDevice) return false;
@@ -198,8 +202,16 @@ bool SdlInputHandler::useMacSystemDrag(const SDL_TouchFingerEvent* event)
 #endif
 void SdlInputHandler::updateMacTouchpadGesture(const SDL_TouchFingerEvent* event)
 {
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    if (!m_MacTouchpadGestureContacts.isEmpty() && event->touchId != m_MacTouchpadGestureDevice) {
+        return;
+    }
+#endif
     if (event->type == SDL_FINGERDOWN &&
             m_MacTouchpadGestureContacts.isEmpty()) {
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+        m_MacTouchpadGestureDevice = event->touchId;
+#endif
         m_MacTouchpadGestureStartTimestamp = event->timestamp;
         m_MacTouchpadGesturePrimaryFinger = event->fingerId;
         m_MacTouchpadGestureStartX = event->x;
@@ -306,6 +318,25 @@ bool SdlInputHandler::sendMacTouchpadButtonState(bool down)
 bool SdlInputHandler::shouldSuppressMacTouchpadMouseButtonEvent(
         const SDL_MouseButtonEvent* event)
 {
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    if (event->button == SDL_BUTTON_LEFT) {
+        if (event->state == SDL_RELEASED) {
+            if (m_MacSystemDragButton != 0) {
+                LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, m_MacSystemDragButton);
+                m_MacSystemDragButton = 0;
+                return true;
+            }
+            if (m_MacSystemDragAwaitingButtonUp) {
+                m_MacSystemDragAwaitingButtonUp = false;
+                return true;
+            }
+        } else if (event->state == SDL_PRESSED) {
+            // A new press supersedes an up event that SDL may never deliver.
+            m_MacSystemDragAwaitingButtonUp = false;
+        }
+    }
+#endif
+
     if (!m_NativeTouchpadEnabled ||
             m_NativeTouchpadTransport == NTT_UNKNOWN ||
             event->button < SDL_BUTTON_LEFT ||
@@ -395,6 +426,12 @@ void SdlInputHandler::resetMacTouchpadState()
 #if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
     m_MacSystemDragContacts.clear();
     m_MacSystemDragDevice = 0;
+    m_MacTouchpadGestureDevice = 0;
+    if (m_MacSystemDragButton != 0) {
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, m_MacSystemDragButton);
+        m_MacSystemDragButton = 0;
+        m_MacSystemDragAwaitingButtonUp = true;
+    }
 #endif
 
     if (m_MacTouchpadButtonDown) {

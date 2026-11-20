@@ -545,6 +545,9 @@ private:
     bool useMacSystemDrag(const SDL_TouchFingerEvent* event);
     QSet<SDL_FingerID> m_MacSystemDragContacts;
     SDL_TouchID m_MacSystemDragDevice = 0;
+    SDL_TouchID m_MacTouchpadGestureDevice = 0;
+    int m_MacSystemDragButton = 0;
+    bool m_MacSystemDragAwaitingButtonUp = false;
 #endif
     QSet<SDL_FingerID> m_MacTouchpadGestureContacts;
     float m_MacTouchpadGestureStartX;
