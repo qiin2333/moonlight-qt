@@ -19,7 +19,6 @@ Column {
 
     signal languageChanged()
 
-    readonly property bool hasMacWindowsKeys: typeof StreamingPreferences.macWindowsKeys === "string"
     property string category: ""
     // 关闭捕获时保留用户上次选择的作用范围，重新开启后恢复原模式。
     property int captureSysKeysSelection: StreamingPreferences.CSK_FULLSCREEN
@@ -434,7 +433,6 @@ Column {
         }
 
         ToggleRow {
-            applicable: !settingsPage.hasMacWindowsKeys
             title: qsTr("Swap Alt and Win keys")
             searchKeywords: "Swap Alt and Win keys"
             checked: StreamingPreferences.swapWinAltKeys
@@ -486,52 +484,6 @@ Column {
             model: ListModel {
                 ListElement { text: qsTr("in fullscreen"); val: StreamingPreferences.CSK_FULLSCREEN }
                 ListElement { text: qsTr("always"); val: StreamingPreferences.CSK_ALWAYS }
-            }
-        }
-    }
-
-    SettingsCard {
-        id: macKeys
-        readonly property bool applicable: settingsPage.hasMacWindowsKeys
-        searchCategory: "input"
-        visible: settingsPage.category === "input" && settingsPage.hasMacWindowsKeys
-        title: qsTr("远控 Windows 按键映射")
-        readonly property string mapping: settingsPage.hasMacWindowsKeys ? StreamingPreferences.macWindowsKeys : "CWABD"
-
-        function assignKey(index, key) {
-            const keys = mapping.split("")
-            const previous = keys.indexOf(key)
-            keys[previous] = keys[index]
-            keys[index] = key
-            StreamingPreferences.macWindowsKeys = keys.join("")
-        }
-
-        ListModel {
-            id: modifiersModel
-            ListElement { text: "Ctrl"; val: "C" }
-            ListElement { text: "Win"; val: "W" }
-            ListElement { text: "Alt"; val: "A" }
-        }
-        ListModel {
-            id: deleteModel
-            ListElement { text: "Backspace"; val: "B" }
-            ListElement { text: "Delete"; val: "D" }
-        }
-
-        Repeater {
-            model: settingsPage.hasMacWindowsKeys ? ["Command (⌘)", "Option (⌥)", "Control (⌃)", "Delete", "Fn + Delete"] : []
-            ChoiceRow {
-                title: modelData
-                selectedValue: macKeys.mapping.charAt(index)
-                model: index < 3 ? modifiersModel : deleteModel
-                onValueActivated: function(value) { macKeys.assignKey(index, value) }
-            }
-        }
-        SettingsRow {
-            title: qsTr("还原默认按键映射")
-            HardButton {
-                text: qsTr("还原默认")
-                onClicked: StreamingPreferences.macWindowsKeys = "CWABD"
             }
         }
     }
