@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>フローティングボタン（デフォルト）</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>有効になっている間は Mac キーボード マッピングによって制御されます。</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Macのキーボードマッピング</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Mac キーボード マッピングを有効にする</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>すべてのリモート ホストの Mac キーをマップします。変更は次のストリームに適用されます。</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>すでに使用されているキーを選択すると、2 つのマッピングが入れ替わります。</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>一部の macOS ショートカットはシステム キーボード キャプチャを必要とする場合がありますが、それでも macOS によって処理される場合があります。</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>デフォルトのキーマッピングを復元する</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>デフォルトに戻す</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

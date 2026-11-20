@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Lebegő gomb (alapértelmezett)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Engedélyezett állapotban Mac billentyűzet-leképezés vezérli.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mac billentyűzet leképezés</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Mac billentyűzet-leképezés engedélyezése</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Mac-billentyűk leképezése az összes távoli gazdagéphez. A módosítások a következő adatfolyamra vonatkoznak.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Egy már használatban lévő kulcs kiválasztása felcseréli a két leképezést.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Egyes macOS-parancsikonokhoz rendszerbillentyűzet rögzítésére lehet szükség, és továbbra is a macOS kezelheti azokat.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Az alapértelmezett kulcsleképezések visszaállítása</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Alapértékek visszaállítása</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

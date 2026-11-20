@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Плавающая кнопка (по умолчанию)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Управляется раскладкой клавиатуры Mac, когда она включена.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Раскладка клавиатуры Mac</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Включить раскладку клавиатуры Mac</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Сопоставьте ключи Mac для всех удаленных хостов. Изменения применяются к следующему потоку.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Выбор уже используемого ключа меняет местами два сопоставления.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Некоторые сочетания клавиш macOS могут потребовать захвата системной клавиатуры и по-прежнему могут обрабатываться macOS.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Восстановить сопоставления клавиш по умолчанию</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Восстановить настройки по умолчанию</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

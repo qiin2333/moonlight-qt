@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Botão flutuante (padrão)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Controlado pelo mapeamento do teclado Mac enquanto ativado.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mapeamento de teclado Mac</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Habilitar mapeamento de teclado Mac</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Mapeie as chaves do Mac para todos os hosts remotos. As alterações se aplicam ao próximo fluxo.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Selecionar uma chave já em uso troca os dois mapeamentos.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Alguns atalhos do macOS podem exigir a captura do teclado do sistema e ainda podem ser controlados pelo macOS.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Restaurar mapeamentos de teclas padrão</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Restaurar padrões</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

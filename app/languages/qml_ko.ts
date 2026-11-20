@@ -2406,6 +2406,38 @@
         <source>The performance overlay is not supported on Steam Link or Raspberry Pi.</source>
         <translation>Steam Link 또는 Raspberry Pi에서는 성능 오버레이가 지원되지 않습니다.</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>활성화된 동안 Mac 키보드 매핑으로 제어됩니다.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mac 키보드 매핑</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Mac 키보드 매핑 활성화</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>모든 원격 호스트에 대해 Mac 키를 매핑합니다. 변경 사항은 다음 스트림에 적용됩니다.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>이미 사용 중인 키를 선택하면 두 매핑이 교체됩니다.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>일부 macOS 단축키에는 시스템 키보드 캡처가 필요할 수 있으며 여전히 macOS에서 처리될 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>기본 키 매핑 복원</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>기본값 복원</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

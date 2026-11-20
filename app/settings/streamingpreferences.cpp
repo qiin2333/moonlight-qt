@@ -302,6 +302,17 @@ void StreamingPreferences::reload()
     packetSize = settings.value(SER_PACKETSIZE, 0).toInt();
     swapMouseButtons = settings.value(SER_SWAPMOUSEBUTTONS, false).toBool();
     swapWinAltKeys = settings.value(SER_SWAPWINALTKEYS, false).toBool();
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    macKeyMappingEnabled = settings.value("macKeyMappingEnabled", false).toBool();
+    // Positions are Command, Option, Control, Delete and Fn+Delete.
+    macWindowsKeys = settings.value("macWindowsKeys", defaultMacWindowsKeys()).toString();
+    if (macWindowsKeys.size() != 5 || !macWindowsKeys.left(3).contains('C') ||
+        !macWindowsKeys.left(3).contains('W') || !macWindowsKeys.left(3).contains('A') ||
+        !macWindowsKeys.right(2).contains('B') || !macWindowsKeys.right(2).contains('D')) {
+        macWindowsKeys = defaultMacWindowsKeys();
+    }
+#endif
+
     muteOnFocusLoss = settings.value(SER_MUTEONFOCUSLOSS, false).toBool();
     backgroundGamepad = settings.value(SER_BACKGROUNDGAMEPAD, false).toBool();
     m_PersistedGamepadUiNavigation = settings.value(SER_GAMEPADUINAVIGATION, true).toBool();
@@ -779,6 +790,11 @@ void StreamingPreferences::save()
     settings.setValue(SER_DEFAULTVER, CURRENT_DEFAULT_VER);
     settings.setValue(SER_SWAPMOUSEBUTTONS, swapMouseButtons);
     settings.setValue(SER_SWAPWINALTKEYS, swapWinAltKeys);
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    settings.setValue("macKeyMappingEnabled", macKeyMappingEnabled);
+    settings.setValue("macWindowsKeys", macWindowsKeys);
+#endif
+
     settings.setValue(SER_MUTEONFOCUSLOSS, muteOnFocusLoss);
     settings.setValue(SER_BACKGROUNDGAMEPAD, backgroundGamepad);
     settings.setValue(SER_GAMEPADUINAVIGATION, m_HasGamepadUiNavigationLaunchOverride

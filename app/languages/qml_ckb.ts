@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>دوگمەی هەڵواسراو (بنەڕەت)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>بە نەخشەسازی کیبۆردەکەی ماک کۆنتڕۆڵ دەکرێت لەکاتێکدا چالاک کراوە.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>نەخشەسازی کیبۆردەکەی ماک</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>نەخشەسازی تەختەکلیلی ماک چالاک بکە</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>نەخشەی کلیلی ماک بۆ هەموو هۆستەکانی دوور. گۆڕانکارییەکان بۆ ڕژێمی داهاتوو دەگونجێت.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>هەڵبژاردنی کلیلێک کە پێشتر بەکارهاتووە دوو نەخشەسازییەکە دەگۆڕێتەوە.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>ڕەنگە هەندێک لە کورتە ڕێگاکانی macOS پێویستیان بە گرتنی کیبۆردەکەی سیستەم هەبێت و ڕەنگە هێشتا لەلایەن macOS مامەڵەی لەگەڵدا بکرێت.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>نەخشەسازی کلیلی پێشوەختە بگەڕێنەرەوە</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>گەڕاندنەوەی پێشوەختە</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

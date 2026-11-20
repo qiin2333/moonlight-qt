@@ -5,4 +5,4 @@ CONFIG -= app_bundle
 TARGET = keyboard_state
 INCLUDEPATH += ../../app ../../moonlight-common-c/moonlight-common-c/src
 SOURCES += main.cpp
-HEADERS += ../../app/streaming/input/keyboardstate.h
+HEADERS += ../../app/streaming/input/keyboardstate.h ../../app/streaming/input/mackeymapping.h

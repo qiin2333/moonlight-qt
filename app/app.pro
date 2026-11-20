@@ -326,6 +326,7 @@ HEADERS += \
     streaming/input/input.h \
     streaming/input/gamepadsensorrate.h \
     streaming/input/keyboardstate.h \
+    streaming/input/mackeymapping.h \
     streaming/session.h \
     streaming/videocallbacks.h \
     streaming/filemappingclient.h \

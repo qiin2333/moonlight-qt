@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Kayan düğme (varsayılan)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Etkinleştirildiğinde Mac klavye eşlemesi tarafından kontrol edilir.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mac klavye eşlemesi</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Mac klavye eşlemesini etkinleştir</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Tüm uzak ana bilgisayarlar için Mac anahtarlarını eşleyin. Değişiklikler bir sonraki akışa uygulanır.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Halihazırda kullanımda olan bir anahtarın seçilmesi, iki eşlemenin yerini değiştirir.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Bazı macOS kısayolları sistem klavyesinin yakalanmasını gerektirebilir ve yine de macOS tarafından işlenebilir.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Varsayılan anahtar eşlemelerini geri yükle</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Varsayılanları geri yükle</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

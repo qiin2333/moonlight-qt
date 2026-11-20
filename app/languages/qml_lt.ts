@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Slankusis mygtukas (numatyta)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Kai įjungta, valdoma naudojant „Mac“ klaviatūros atvaizdavimą.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>„Mac“ klaviatūros atvaizdavimas</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Įgalinti „Mac“ klaviatūros atvaizdavimą</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Susieti „Mac“ klavišus visiems nuotoliniams kompiuteriams. Pakeitimai taikomi kitam srautui.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Pasirinkus jau naudojamą raktą, sukeisti du atvaizdai.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Kai kuriems „MacOS“ spartiesiems klavišams gali reikėti užfiksuoti sistemos klaviatūrą ir juos vis tiek gali valdyti „macOS“.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Atkurti numatytuosius klavišų susiejimus</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Atkurti numatytuosius nustatymus</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

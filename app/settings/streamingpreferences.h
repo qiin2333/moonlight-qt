@@ -307,6 +307,14 @@ public:
     bool enableMdns;
     bool quitAppAfter;
     bool absoluteMouseMode;
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    Q_PROPERTY(
+        bool macKeyMappingEnabled MEMBER macKeyMappingEnabled NOTIFY macKeyMappingEnabledChanged)
+    bool macKeyMappingEnabled;
+    Q_PROPERTY(QString macWindowsKeys MEMBER macWindowsKeys NOTIFY macWindowsKeysChanged)
+    QString macWindowsKeys;
+    static QString defaultMacWindowsKeys() { return QStringLiteral("CWABD"); }
+#endif
     bool showLocalCursor;
     bool absoluteTouchMode;
     bool enableNativeTouchpad;
@@ -378,6 +386,10 @@ signals:
     void enableMdnsChanged();
     void quitAppAfterChanged();
     void absoluteMouseModeChanged();
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    void macKeyMappingEnabledChanged();
+    void macWindowsKeysChanged();
+#endif
     void showLocalCursorChanged();
     void absoluteTouchModeChanged();
     void enableNativeTouchpadChanged();

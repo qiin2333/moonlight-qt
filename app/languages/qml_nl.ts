@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Zwevende knop (standaard)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Gecontroleerd door Mac-toetsenbordtoewijzing indien ingeschakeld.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mac-toetsenbordtoewijzing</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Schakel Mac-toetsenbordtoewijzing in</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Wijs Mac-sleutels toe voor alle externe hosts. Wijzigingen zijn van toepassing op de volgende stream.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Als u een sleutel selecteert die al in gebruik is, worden de twee toewijzingen omgewisseld.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Voor sommige macOS-snelkoppelingen is mogelijk een systeemtoetsenbordopname vereist en deze kunnen nog steeds door macOS worden verwerkt.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Herstel standaard sleuteltoewijzingen</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Standaardwaarden herstellen</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

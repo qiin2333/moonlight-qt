@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Nút nổi (mặc định)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Được điều khiển bởi ánh xạ phím Mac khi tính năng này được bật.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Ánh xạ phím Mac</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Bật ánh xạ phím Mac</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Ánh xạ các phím Mac cho tất cả các máy chủ từ xa. Những thay đổi áp dụng cho luồng tiếp theo.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Việc chọn một phím đang được sử dụng sẽ hoán đổi hai ánh xạ.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Một số phím tắt macOS có thể yêu cầu bật tính năng nắm bắt phím tắt hệ thống và vẫn có thể được macOS xử lý.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Khôi phục ánh xạ phím mặc định</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Khôi phục mặc định</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

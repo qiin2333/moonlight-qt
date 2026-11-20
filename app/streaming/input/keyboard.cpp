@@ -3,6 +3,7 @@
 #include <Limelight.h>
 #include "SDL_compat.h"
 #include "keyboardstate.h"
+#include "mackeymapping.h"
 
 #define VK_0 0x30
 #define VK_A 0x41
@@ -221,44 +222,92 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         }
     }
 
-    // Set modifier flags
-    modifiers = 0;
-    if (event->keysym.mod & KMOD_CTRL) {
-        modifiers |= MODIFIER_CTRL;
-    }
-    if (event->keysym.mod & KMOD_ALT) {
-        modifiers |= m_SwapWinAltKeys ? MODIFIER_META : MODIFIER_ALT;
-    }
-    if (event->keysym.mod & KMOD_SHIFT) {
-        modifiers |= MODIFIER_SHIFT;
-    }
-    if (event->keysym.mod & KMOD_GUI) {
-        if (isSystemKeyCaptureActive()) {
-            modifiers |= m_SwapWinAltKeys ? MODIFIER_ALT : MODIFIER_META;
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    short mappedKey = 0;
+    if (m_MacKeyMappingEnabled) {
+        // Local Moonlight hotkeys above always see the physical Mac keyboard.
+        const SDL_Scancode physical = event->keysym.scancode;
+        const SDL_Scancode left[] = { SDL_SCANCODE_LGUI, SDL_SCANCODE_LALT, SDL_SCANCODE_LCTRL };
+        const SDL_Scancode right[] = { SDL_SCANCODE_RGUI, SDL_SCANCODE_RALT, SDL_SCANCODE_RCTRL };
+        const SDL_Keymod masks[] = { KMOD_GUI, KMOD_ALT, KMOD_CTRL };
+        modifiers = (event->keysym.mod & KMOD_SHIFT) ? MODIFIER_SHIFT : 0;
+        for (int i = 0; i < 3; ++i) {
+            const bool isKey = physical == left[i] || physical == right[i];
+            const char target = m_MacWindowsKeys.at(i).toLatin1();
+            if (i == 0 && isKey &&
+                MacKeyMapping::ignoreCommand(target == 'W', isSystemKeyCaptureActive(),
+                                             event->state == SDL_PRESSED,
+                                             m_MacPhysicalKeysDown.contains(physical))) {
+                return;
+            }
+            const bool forwardedCommand =
+                m_MacPhysicalKeysDown.contains(left[0]) || m_MacPhysicalKeysDown.contains(right[0]);
+            if ((event->keysym.mod & masks[i]) &&
+                (i != 0 || target != 'W' || isSystemKeyCaptureActive() || forwardedCommand)) {
+                modifiers |= MacKeyMapping::modifierFlag(target);
+            }
+            if (isKey) {
+                const auto key = MacKeyMapping::modifier(target, physical == right[i]);
+                mappedKey = key.code;
+                if (key.extended) {
+                    modifiers |= MODIFIER_EXTENDED;
+                }
+            }
+        }
+        if (physical == SDL_SCANCODE_BACKSPACE || physical == SDL_SCANCODE_DELETE) {
+            const auto key = MacKeyMapping::deleteKey(
+                m_MacWindowsKeys.at(physical == SDL_SCANCODE_DELETE ? 4 : 3).toLatin1());
+            mappedKey = key.code;
+            if (key.extended) {
+                modifiers |= MODIFIER_EXTENDED;
+            }
+        }
+    } else
+#endif
+    {
+        // Set modifier flags
+        modifiers = 0;
+        if (event->keysym.mod & KMOD_CTRL) {
+            modifiers |= MODIFIER_CTRL;
+        }
+        if (event->keysym.mod & KMOD_ALT) {
+            modifiers |= m_SwapWinAltKeys ? MODIFIER_META : MODIFIER_ALT;
+        }
+        if (event->keysym.mod & KMOD_SHIFT) {
+            modifiers |= MODIFIER_SHIFT;
+        }
+        if (event->keysym.mod & KMOD_GUI) {
+            if (isSystemKeyCaptureActive()) {
+                modifiers |= m_SwapWinAltKeys ? MODIFIER_ALT : MODIFIER_META;
+            }
         }
     }
 
     // Set keycode. We explicitly use scancode here because GFE will try to correct
     // for AZERTY layouts on the host but it depends on receiving VK_ values matching
     // a QWERTY layout to work.
-    if (event->keysym.scancode >= SDL_SCANCODE_1 && event->keysym.scancode <= SDL_SCANCODE_9) {
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    if (mappedKey != 0) {
+        keyCode = mappedKey;
+    } else
+#endif
+        if (event->keysym.scancode >= SDL_SCANCODE_1 && event->keysym.scancode <= SDL_SCANCODE_9) {
         // SDL defines SDL_SCANCODE_0 > SDL_SCANCODE_9, so we need to handle that manually
         keyCode = (event->keysym.scancode - SDL_SCANCODE_1) + VK_0 + 1;
-    }
-    else if (event->keysym.scancode >= SDL_SCANCODE_A && event->keysym.scancode <= SDL_SCANCODE_Z) {
+    } else if (event->keysym.scancode >= SDL_SCANCODE_A &&
+               event->keysym.scancode <= SDL_SCANCODE_Z) {
         keyCode = (event->keysym.scancode - SDL_SCANCODE_A) + VK_A;
-    }
-    else if (event->keysym.scancode >= SDL_SCANCODE_F1 && event->keysym.scancode <= SDL_SCANCODE_F12) {
+    } else if (event->keysym.scancode >= SDL_SCANCODE_F1 &&
+               event->keysym.scancode <= SDL_SCANCODE_F12) {
         keyCode = (event->keysym.scancode - SDL_SCANCODE_F1) + VK_F1;
-    }
-    else if (event->keysym.scancode >= SDL_SCANCODE_F13 && event->keysym.scancode <= SDL_SCANCODE_F24) {
+    } else if (event->keysym.scancode >= SDL_SCANCODE_F13 &&
+               event->keysym.scancode <= SDL_SCANCODE_F24) {
         keyCode = (event->keysym.scancode - SDL_SCANCODE_F13) + VK_F13;
-    }
-    else if (event->keysym.scancode >= SDL_SCANCODE_KP_1 && event->keysym.scancode <= SDL_SCANCODE_KP_9) {
+    } else if (event->keysym.scancode >= SDL_SCANCODE_KP_1 &&
+               event->keysym.scancode <= SDL_SCANCODE_KP_9) {
         // SDL defines SDL_SCANCODE_KP_0 > SDL_SCANCODE_KP_9, so we need to handle that manually
         keyCode = (event->keysym.scancode - SDL_SCANCODE_KP_1) + VK_NUMPAD0 + 1;
-    }
-    else {
+    } else {
         switch (event->keysym.scancode) {
             case SDL_SCANCODE_BACKSPACE:
                 keyCode = 0x08;
@@ -503,6 +552,16 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     keyCode |= 0x8000;
     flags = shouldNotConvertToScanCodeOnServer ? SS_KBE_FLAG_NON_NORMALIZED : 0;
 
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    if (m_MacKeyMappingEnabled && event->state == SDL_RELEASED &&
+        m_MacPhysicalKeysDown.contains(event->keysym.scancode)) {
+        const uint32_t pressedState = m_MacPhysicalKeysDown.value(event->keysym.scancode);
+        keyCode = KeyboardState::code(pressedState);
+        modifiers =
+            (modifiers & ~MODIFIER_EXTENDED) | KeyboardState::extendedModifier(pressedState);
+        flags = KeyboardState::flags(pressedState);
+    }
+#endif
     const uint32_t keyState = KeyboardState::pack(keyCode, modifiers, flags);
 
     // Track the local physical state separately from keys forwarded during this
@@ -545,6 +604,12 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         // later disconnect can release it even if the queued KEY_UP was lost.
         m_ForwardedKeys.insert(keyState);
     }
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    if (m_MacKeyMappingEnabled && mappedKey != 0) {
+        MacKeyMapping::recordSend(m_MacPhysicalKeysDown, m_KeysDown, event->keysym.scancode,
+                                  keyState, event->state == SDL_PRESSED, rc);
+    }
+#endif
 }
 
 void SdlInputHandler::raiseAllKeys(bool clearLocalKeys, bool includeForwardedKeys,
@@ -578,6 +643,11 @@ void SdlInputHandler::raiseAllKeys(bool clearLocalKeys, bool includeForwardedKey
             return rc;
         });
 
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    if (clearLocalKeys) {
+        MacKeyMapping::reconcileReleased(m_MacPhysicalKeysDown, m_KeysDown);
+    }
+#endif
     if (failedCount != 0) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Keeping %d keys marked down for a later retry",
                     failedCount);

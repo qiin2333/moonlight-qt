@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Hõljuv nupp (vaikimisi)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Lubatud ajal juhib Maci klaviatuuri kaardistamine.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Maci klaviatuuri kaardistamine</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Lubage Maci klaviatuuri kaardistamine</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Kaardista Maci võtmed kõigi kaughostide jaoks. Muudatused rakenduvad järgmisele voogudele.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Juba kasutusel oleva võtme valimine vahetab kaks vastendust.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Mõned MacOS-i otseteed võivad vajada süsteemi klaviatuuri jäädvustamist ja neid võib siiski käsitleda macOS.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Taastage vaikeklahvide vastendused</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Taasta vaikeseaded</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

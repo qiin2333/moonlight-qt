@@ -19,6 +19,7 @@ Column {
 
     signal languageChanged()
 
+    readonly property bool hasMacWindowsKeys: typeof StreamingPreferences.macWindowsKeys === "string"
     property string category: ""
     // 关闭捕获时保留用户上次选择的作用范围，重新开启后恢复原模式。
     property int captureSysKeysSelection: StreamingPreferences.CSK_FULLSCREEN
@@ -435,6 +436,10 @@ Column {
         ToggleRow {
             title: qsTr("Swap Alt and Win keys")
             searchKeywords: "Swap Alt and Win keys"
+            controlEnabled: !settingsPage.hasMacWindowsKeys || !StreamingPreferences.macKeyMappingEnabled
+            description: settingsPage.hasMacWindowsKeys && StreamingPreferences.macKeyMappingEnabled
+                         ? qsTr("Controlled by Mac keyboard mapping while enabled.")
+                         : ""
             checked: StreamingPreferences.swapWinAltKeys
             onToggled: function(value) { StreamingPreferences.swapWinAltKeys = value }
         }
@@ -484,6 +489,67 @@ Column {
             model: ListModel {
                 ListElement { text: qsTr("in fullscreen"); val: StreamingPreferences.CSK_FULLSCREEN }
                 ListElement { text: qsTr("always"); val: StreamingPreferences.CSK_ALWAYS }
+            }
+        }
+    }
+
+    SettingsCard {
+        id: macKeys
+        readonly property bool applicable: settingsPage.hasMacWindowsKeys
+        searchCategory: "input"
+        visible: settingsPage.category === "input" && settingsPage.hasMacWindowsKeys
+        title: qsTr("Mac keyboard mapping")
+        readonly property string mapping: settingsPage.hasMacWindowsKeys ? StreamingPreferences.macWindowsKeys : "CWABD"
+
+        ToggleRow {
+            title: qsTr("Enable Mac keyboard mapping")
+            searchKeywords: "Mac keyboard mapping Command Option Control"
+            description: qsTr("Map Mac keys for all remote hosts. Changes apply to the next stream.")
+            checked: settingsPage.hasMacWindowsKeys && StreamingPreferences.macKeyMappingEnabled
+            onToggled: function(value) { StreamingPreferences.macKeyMappingEnabled = value }
+        }
+
+        SettingsRow {
+            title: qsTr("Selecting a key already in use swaps the two mappings.")
+            description: qsTr("Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.")
+        }
+
+        function assignKey(index, key) {
+            const keys = mapping.split("")
+            const previous = keys.indexOf(key)
+            keys[previous] = keys[index]
+            keys[index] = key
+            StreamingPreferences.macWindowsKeys = keys.join("")
+        }
+
+        ListModel {
+            id: modifiersModel
+            ListElement { text: "Ctrl"; val: "C" }
+            ListElement { text: "Win"; val: "W" }
+            ListElement { text: "Alt"; val: "A" }
+        }
+        ListModel {
+            id: deleteModel
+            ListElement { text: "Backspace"; val: "B" }
+            ListElement { text: "Delete"; val: "D" }
+        }
+
+        Repeater {
+            model: settingsPage.hasMacWindowsKeys ? ["Command (⌘)", "Option (⌥)", "Control (⌃)", "Delete", "Fn + Delete"] : []
+            ChoiceRow {
+                title: modelData
+                controlEnabled: settingsPage.hasMacWindowsKeys && StreamingPreferences.macKeyMappingEnabled
+                selectedValue: macKeys.mapping.charAt(index)
+                model: index < 3 ? modifiersModel : deleteModel
+                onValueActivated: function(value) { macKeys.assignKey(index, value) }
+            }
+        }
+        SettingsRow {
+            title: qsTr("Restore default key mappings")
+            HardButton {
+                text: qsTr("Restore defaults")
+                enabled: settingsPage.hasMacWindowsKeys && StreamingPreferences.macKeyMappingEnabled
+                onClicked: StreamingPreferences.macWindowsKeys = "CWABD"
             }
         }
     }
