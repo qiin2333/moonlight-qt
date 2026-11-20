@@ -6,6 +6,7 @@
 #include <QUrl>
 
 bool runClipboardRegression(QTextStream& err);
+bool runFileOfferRegression(QTextStream& err);
 
 namespace {
 bool require(bool condition, const QString& message, QTextStream& err)
@@ -70,6 +71,7 @@ int main(int argc, char* argv[])
                   QStringLiteral("plain image clipboard was misclassified as a file clipboard"), err);
 
     ok &= runClipboardRegression(err);
+    ok &= runFileOfferRegression(err);
 
     if (!ok) {
         return 1;
