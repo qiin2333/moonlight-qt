@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
+#include <limits>
 
 namespace {
 
@@ -158,26 +159,31 @@ public:
     HRESULT STDMETHODCALLTYPE Seek(LARGE_INTEGER move, DWORD origin,
                                    ULARGE_INTEGER* newPosition) override
     {
-        LONGLONG base = 0;
-        switch (origin) {
-        case STREAM_SEEK_SET:
-            base = 0;
-            break;
-        case STREAM_SEEK_CUR:
-            base = static_cast<LONGLONG>(m_Position);
-            break;
-        case STREAM_SEEK_END:
-            base = static_cast<LONGLONG>(m_Size);
-            break;
-        default:
+        std::uint64_t target = 0;
+        if (origin == STREAM_SEEK_SET) {
+            // An absolute position is unsigned.
+            target = static_cast<std::uint64_t>(move.QuadPart);
+        } else if (origin == STREAM_SEEK_CUR || origin == STREAM_SEEK_END) {
+            const std::uint64_t base = origin == STREAM_SEEK_CUR ? m_Position : m_Size;
+            if (move.QuadPart < 0) {
+                // -(x + 1) + 1 avoids negating INT64_MIN.
+                const std::uint64_t back = static_cast<std::uint64_t>(-(move.QuadPart + 1)) + 1;
+                if (back > base) {
+                    return STG_E_INVALIDFUNCTION;
+                }
+                target = base - back;
+            } else {
+                const std::uint64_t forward = static_cast<std::uint64_t>(move.QuadPart);
+                if (forward > std::numeric_limits<std::uint64_t>::max() - base) {
+                    return STG_E_INVALIDFUNCTION;
+                }
+                target = base + forward;
+            }
+        } else {
             return STG_E_INVALIDFUNCTION;
         }
-        const LONGLONG target = base + move.QuadPart;
-        if (target < 0) {
-            return STG_E_INVALIDFUNCTION;
-        }
-        // Positions past the end are legal; reads there return nothing.
-        m_Position = std::min<std::uint64_t>(static_cast<std::uint64_t>(target), m_Size);
+        // Positions past the end are legal and kept; reads there return nothing.
+        m_Position = target;
         if (newPosition != nullptr) {
             newPosition->QuadPart = m_Position;
         }
@@ -208,7 +214,11 @@ public:
             ULONG put = 0;
             hr = target->Write(buffer.get(), got, &put);
             totalWritten += put;
-            if (FAILED(hr) || put != got) {
+            if (SUCCEEDED(hr) && put != got) {
+                // The counts must match on success: a short write is a failure.
+                hr = STG_E_WRITEFAULT;
+            }
+            if (FAILED(hr)) {
                 break;
             }
             left -= got;
@@ -554,10 +564,16 @@ bool ownsClipboard()
 
 void clearIfOwned()
 {
-    if (ownsClipboard()) {
-        OleSetClipboard(nullptr);
+    // Another program may hold the clipboard open for a moment: retry, and keep
+    // tracking the object if the files are still there, so a later call can
+    // clear them. ownsClipboard() lets go of it once another program owns it.
+    for (int attempt = 0; attempt < 10 && ownsClipboard(); ++attempt) {
+        if (SUCCEEDED(OleSetClipboard(nullptr))) {
+            releaseCurrent();
+            return;
+        }
+        Sleep(20);
     }
-    releaseCurrent();
 }
 
 } // namespace VirtualFileClipboard

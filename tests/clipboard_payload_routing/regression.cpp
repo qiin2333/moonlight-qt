@@ -316,6 +316,17 @@ public:
                             !offers[0].contains(dir.path().toUtf8()) &&
                             !offers[0].contains(QDir::toNativeSeparators(dir.path()).toUtf8()),
                         "a copied file is offered by name only", err);
+            // Text copied in between makes the same files a new copy, offered again.
+            auto* between = new QMimeData;
+            between->setText(QStringLiteral("between"));
+            cb->setMimeData(between);
+            auto* again = new QMimeData;
+            again->setUrls({ QUrl::fromLocalFile(path) });
+            cb->setMimeData(again);
+            ok &= check(offers.size() == 2,
+                        "the same files copied again after text are offered again", err);
+            sent.clear();
+            offers.clear();
 #else
             ok &= check(offers.isEmpty(), "files are offered on Windows only", err);
 #endif

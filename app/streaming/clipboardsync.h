@@ -308,7 +308,9 @@ private:
     void applyInboundFileOffer(const QByteArray& payload);
     // Files copied here: offer them to the host, and serve its chunk requests.
     // Returns false when the clipboard holds no local files.
-    bool offerLocalFiles(const QMimeData* mime);
+    static QStringList localFilePaths(const QMimeData* mime);
+    bool isRepeatedFileCopy(const QStringList& paths) const;
+    bool offerLocalFiles(const QStringList& paths);
     void serveFilePull(const QByteArray& payload);
     void applyInboundPng(const QByteArray& payload);
 

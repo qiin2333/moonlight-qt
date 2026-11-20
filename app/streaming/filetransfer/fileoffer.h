@@ -96,7 +96,8 @@ public:
         QByteArray bytes;
         // Empty on success, otherwise the word sent to the host:
         // "not_found" (no such offer or entry), "gone" (cannot open or read),
-        // "changed" (the size differs from the offer), "range" (offset past the end).
+        // "changed" (its size or modification time differs from the offer, so it
+        // may be another file), "range" (offset past the end).
         QByteArray error;
     };
     // Reads at most `length` bytes of entry `index` from `offset`.
@@ -109,6 +110,7 @@ private:
     {
         QString localPath;
         quint64 size = 0;
+        qint64 mtimeMs = 0; // with the size, what tells a replaced or edited file
         bool dir = false;
     };
     struct Offer
@@ -119,6 +121,8 @@ private:
     };
     void expire();
     static bool isLink(const QFileInfo& info);
+    // False when the folder cannot be listed (an empty folder can).
+    static bool canList(const QString& folder);
 
     std::deque<Offer> m_Offers;
     QElapsedTimer m_Clock;

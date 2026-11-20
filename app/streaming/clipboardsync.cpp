@@ -763,10 +763,10 @@ void ClipboardSync::applyInboundFileOffer(const QByteArray& payload)
 #endif
 }
 
-bool ClipboardSync::offerLocalFiles(const QMimeData* mime)
+QStringList ClipboardSync::localFilePaths(const QMimeData* mime)
 {
-#ifdef Q_OS_WIN
     QStringList paths;
+#ifdef Q_OS_WIN
     if (mime != nullptr && mime->hasUrls()) {
         for (const QUrl& url : mime->urls()) {
             if (url.isLocalFile()) {
@@ -774,13 +774,26 @@ bool ClipboardSync::offerLocalFiles(const QMimeData* mime)
             }
         }
     }
+#else
+    Q_UNUSED(mime);
+#endif
+    return paths;
+}
+
+bool ClipboardSync::isRepeatedFileCopy(const QStringList& paths) const
+{
+    // Explorer can announce one copy more than once. Any other clipboard change
+    // in between (beginClipboardChange) forgets the last offer, so a later copy
+    // of the same files is offered again.
+    return !paths.isEmpty() && paths == m_LastOfferedPaths && m_LastOfferedAtMs >= 0 &&
+           m_Clock.elapsed() - m_LastOfferedAtMs < 2000;
+}
+
+bool ClipboardSync::offerLocalFiles(const QStringList& paths)
+{
+#ifdef Q_OS_WIN
     if (paths.isEmpty()) {
         return false;
-    }
-    // Explorer can announce one copy more than once.
-    if (paths == m_LastOfferedPaths && m_LastOfferedAtMs >= 0 &&
-        m_Clock.elapsed() - m_LastOfferedAtMs < 2000) {
-        return true;
     }
     m_LastOfferedPaths = paths;
     m_LastOfferedAtMs = m_Clock.elapsed();
@@ -804,7 +817,7 @@ bool ClipboardSync::offerLocalFiles(const QMimeData* mime)
     }
     return true;
 #else
-    Q_UNUSED(mime);
+    Q_UNUSED(paths);
     return false;
 #endif
 }
@@ -1259,10 +1272,16 @@ void ClipboardSync::onLocalClipboardChanged()
             }
         }
     }
+    const QStringList filePaths = localFilePaths(mime);
     if (finderOrigin) {
+        // A repeated announcement of the same copy must not cancel its offer
+        // while that is still uploading (a long list goes as a blob).
+        if (isRepeatedFileCopy(filePaths)) {
+            return;
+        }
         beginClipboardChange();
         m_HaveClipboardSnapshot = false;
-        if (!offerLocalFiles(mime)) {
+        if (!offerLocalFiles(filePaths)) {
             ClipboardLog::debug("ClipboardSync: Finder file clipboard detected; sync skipped");
         }
         return;
@@ -1276,9 +1295,12 @@ void ClipboardSync::onLocalClipboardChanged()
     QString imageSourceDescription;
     const bool havePng = extractClipboardPng(mime, png, &imageSourceDescription);
     if (hasFileReferences(mime) && !havePng) {
+        if (isRepeatedFileCopy(filePaths)) {
+            return;
+        }
         beginClipboardChange();
         m_HaveClipboardSnapshot = false;
-        if (!offerLocalFiles(mime)) {
+        if (!offerLocalFiles(filePaths)) {
             ClipboardLog::debug(
                 "ClipboardSync: file clipboard without transferable image; sync skipped");
         }
@@ -1496,6 +1518,9 @@ void ClipboardSync::beginClipboardChange(quint32 token)
     m_CurrentToken = token;
     m_OutgoingToken = 0;
     m_LastOutboundRef.clear();
+    // Newer clipboard content: a copy of the same files after it is a new copy.
+    m_LastOfferedPaths.clear();
+    m_LastOfferedAtMs = -1;
     const auto replies = m_BlobReplies.values();
     for (QNetworkReply* reply : replies) {
         reply->abort();

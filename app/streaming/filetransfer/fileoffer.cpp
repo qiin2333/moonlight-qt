@@ -21,6 +21,13 @@
 #include <QUrl>
 #include <QRandomGenerator>
 
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -61,14 +68,37 @@ bool readUnsigned(const QJsonValue& value, quint64& out)
 bool isReservedName(const QString& component)
 {
     static const QSet<QString> reserved = {
-        QStringLiteral("CON"),  QStringLiteral("PRN"),    QStringLiteral("AUX"),
-        QStringLiteral("NUL"),  QStringLiteral("COM1"),   QStringLiteral("COM2"),
-        QStringLiteral("COM3"), QStringLiteral("COM4"),   QStringLiteral("COM5"),
-        QStringLiteral("COM6"), QStringLiteral("COM7"),   QStringLiteral("COM8"),
-        QStringLiteral("COM9"), QStringLiteral("LPT1"),   QStringLiteral("LPT2"),
-        QStringLiteral("LPT3"), QStringLiteral("LPT4"),   QStringLiteral("LPT5"),
-        QStringLiteral("LPT6"), QStringLiteral("LPT7"),   QStringLiteral("LPT8"),
-        QStringLiteral("LPT9"), QStringLiteral("CONIN$"), QStringLiteral("CONOUT$"),
+        QStringLiteral("CON"),
+        QStringLiteral("PRN"),
+        QStringLiteral("AUX"),
+        QStringLiteral("NUL"),
+        QStringLiteral("COM1"),
+        QStringLiteral("COM2"),
+        QStringLiteral("COM3"),
+        QStringLiteral("COM4"),
+        QStringLiteral("COM5"),
+        QStringLiteral("COM6"),
+        QStringLiteral("COM7"),
+        QStringLiteral("COM8"),
+        QStringLiteral("COM9"),
+        QStringLiteral("LPT1"),
+        QStringLiteral("LPT2"),
+        QStringLiteral("LPT3"),
+        QStringLiteral("LPT4"),
+        QStringLiteral("LPT5"),
+        QStringLiteral("LPT6"),
+        QStringLiteral("LPT7"),
+        QStringLiteral("LPT8"),
+        QStringLiteral("LPT9"),
+        QStringLiteral("CONIN$"),
+        QStringLiteral("CONOUT$"),
+        // Windows also reserves COM and LPT with a superscript digit.
+        QStringLiteral("COM\u00B9"),
+        QStringLiteral("COM\u00B2"),
+        QStringLiteral("COM\u00B3"),
+        QStringLiteral("LPT\u00B9"),
+        QStringLiteral("LPT\u00B2"),
+        QStringLiteral("LPT\u00B3"),
     };
     const QString base = component.section(QLatin1Char('.'), 0, 0).trimmed().toUpper();
     return reserved.contains(base);
@@ -213,6 +243,22 @@ constexpr qint64 REPLY_BUFFER = 1 * 1024 * 1024;
 // A paste that sees no byte for this long fails instead of hanging the target.
 constexpr std::chrono::seconds STALL_TIMEOUT{ 60 };
 
+// "bytes <offset>-<total - 1>/<total>": the range a resumed read asked for.
+bool isContentRange(const QByteArray& header, quint64 offset, quint64 total)
+{
+    static const QRegularExpression pattern(
+        QStringLiteral("^bytes (\\d{1,20})-(\\d{1,20})/(\\d{1,20})$"));
+    const QRegularExpressionMatch match = pattern.match(QString::fromLatin1(header.trimmed()));
+    if (!match.hasMatch() || total == 0) {
+        return false;
+    }
+    bool okFirst = false, okLast = false, okTotal = false;
+    const quint64 first = match.captured(1).toULongLong(&okFirst);
+    const quint64 last = match.captured(2).toULongLong(&okLast);
+    const quint64 size = match.captured(3).toULongLong(&okTotal);
+    return okFirst && okLast && okTotal && first == offset && last == total - 1 && size == total;
+}
+
 struct StreamState
 {
     std::mutex mutex;
@@ -222,6 +268,7 @@ struct StreamState
     qint64 buffered = 0;   // bytes waiting in chunks
     quint64 expected = 0;  // bytes this response must carry
     quint64 received = 0;
+    quint64 delivered = 0; // bytes handed to the reader
     bool done = false;
     bool failed = false;
 
@@ -349,13 +396,23 @@ struct FileOfferDownloader::Core
         const int wanted = offset != 0 ? 206 : 200;
         const QSslCertificate pinned = host.serverCertificate;
 
-        QObject::connect(reply, &QNetworkReply::metaDataChanged, reply, [st, reply, wanted]() {
-            const QVariant status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
-            if (status.isValid() && status.toInt() != wanted) {
-                ClipboardLog::warn("FileOffer: download answered HTTP %d", status.toInt());
-                failStream(st);
-            }
-        });
+        const quint64 total = offset + st->expected;
+        QObject::connect(
+            reply, &QNetworkReply::metaDataChanged, reply, [st, reply, wanted, offset, total]() {
+                const QVariant status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+                if (status.isValid() && status.toInt() != wanted) {
+                    ClipboardLog::warn("FileOffer: download answered HTTP %d", status.toInt());
+                    failStream(st);
+                    return;
+                }
+                // A resumed read must be exactly the rest of the file.
+                if (status.isValid() && wanted == 206 &&
+                    !isContentRange(reply->rawHeader("Content-Range"), offset, total)) {
+                    ClipboardLog::warn("FileOffer: resumed download answered another range (%s)",
+                                       reply->rawHeader("Content-Range").constData());
+                    failStream(st);
+                }
+            });
         QObject::connect(reply, &QNetworkReply::readyRead, reply, [st]() { pump(st); });
         QObject::connect(reply, &QNetworkReply::finished, reply, [st, reply, wanted, pinned]() {
             const bool transportOk =
@@ -428,8 +485,17 @@ public:
             return 0;
         }
         std::unique_lock<std::mutex> lock(m_State->mutex);
-        const bool ready = m_State->changed.wait_for(lock, STALL_TIMEOUT, [this]() {
-            return m_State->buffered > 0 || m_State->done || m_State->failed;
+        // The last byte of the file waits until the response has been checked
+        // (status, length, certificate): a paste target that has every byte
+        // reads no further, so a failure found after it would never reach it.
+        const auto releasable = [this]() -> qint64 {
+            const bool last =
+                m_State->delivered + static_cast<quint64>(m_State->buffered) >= m_State->expected;
+            return m_State->done || !last ? m_State->buffered
+                                          : std::max<qint64>(0, m_State->buffered - 1);
+        };
+        const bool ready = m_State->changed.wait_for(lock, STALL_TIMEOUT, [&]() {
+            return releasable() > 0 || m_State->done || m_State->failed;
         });
         if (!ready) {
             m_State->failed = true;
@@ -441,16 +507,20 @@ public:
                 Qt::QueuedConnection);
             return -1;
         }
-        if (m_State->buffered == 0) {
-            return m_State->failed ? -1 : 0;
+        if (m_State->failed) {
+            return -1;
+        }
+        const qint64 allowed = std::min<qint64>(releasable(), static_cast<qint64>(size));
+        if (allowed == 0) {
+            return 0; // done, nothing left
         }
 
         auto* out = static_cast<char*>(buffer);
         std::int64_t copied = 0;
-        while (copied < size && !m_State->chunks.empty()) {
+        while (copied < allowed && !m_State->chunks.empty()) {
             const QByteArray& front = m_State->chunks.front();
             const qint64 available = front.size() - m_State->headOffset;
-            const qint64 take = std::min<qint64>(available, static_cast<qint64>(size) - copied);
+            const qint64 take = std::min<qint64>(available, allowed - copied);
             std::memcpy(out + copied, front.constData() + m_State->headOffset,
                         static_cast<size_t>(take));
             copied += take;
@@ -461,6 +531,7 @@ public:
             }
         }
         m_State->buffered -= copied;
+        m_State->delivered += static_cast<quint64>(copied);
         const bool refill = m_State->buffered < LOW_WATER && !m_State->done && !m_State->failed;
         lock.unlock();
         if (refill) {
@@ -553,6 +624,12 @@ bool LocalFileOffers::add(const QStringList& paths, QByteArray& json, QString* e
         item.localPath = info.absoluteFilePath();
         item.dir = dir;
         item.size = dir ? 0 : static_cast<quint64>(std::max<qint64>(info.size(), 0));
+        item.mtimeMs = info.lastModified().toMSecsSinceEpoch();
+        if (dir && !canList(item.localPath)) {
+            // Listed as empty, the host would paste a folder missing everything in it.
+            failure = QStringLiteral("cannot read folder: ") + item.localPath;
+            return false;
+        }
         offer.items.push_back(item);
         total += item.size;
         files.append(QJsonObject{
@@ -623,6 +700,25 @@ bool LocalFileOffers::add(const QStringList& paths, QByteArray& json, QString* e
     return true;
 }
 
+bool LocalFileOffers::canList(const QString& folder)
+{
+#ifdef Q_OS_WIN
+    // QDir lists a folder it may not open as empty; ask Windows directly.
+    const std::wstring pattern =
+        QDir::toNativeSeparators(folder + QStringLiteral("/*")).toStdWString();
+    WIN32_FIND_DATAW data;
+    const HANDLE find = FindFirstFileExW(pattern.c_str(), FindExInfoBasic, &data,
+                                         FindExSearchNameMatch, nullptr, 0);
+    if (find == INVALID_HANDLE_VALUE) {
+        return GetLastError() == ERROR_FILE_NOT_FOUND;
+    }
+    FindClose(find);
+    return true;
+#else
+    return QDir(folder).isReadable();
+#endif
+}
+
 bool LocalFileOffers::isLink(const QFileInfo& info)
 {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 4, 0)
@@ -650,7 +746,8 @@ LocalFileOffers::Chunk LocalFileOffers::read(const QString& id, qint64 index, qu
         out.error = "gone";
         return out;
     }
-    if (static_cast<quint64>(file.size()) != item.size) {
+    if (static_cast<quint64>(file.size()) != item.size ||
+        QFileInfo(item.localPath).lastModified().toMSecsSinceEpoch() != item.mtimeMs) {
         out.error = "changed";
         return out;
     }

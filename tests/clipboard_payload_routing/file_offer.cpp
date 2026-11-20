@@ -4,8 +4,8 @@
 #include "streaming/filetransfer/fileoffer.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
-#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -158,9 +158,9 @@ ReadResult readAll(VirtualFiles::Source& source, std::size_t index, std::uint64_
         }
         finished = true;
     });
-    QElapsedTimer timer;
-    timer.start();
-    while (!finished && timer.elapsed() < 20000) {
+    // The loopback server runs on this thread: keep it serving until the reader
+    // is done (a stalled download ends on the reader's own timeout).
+    while (!finished) {
         QCoreApplication::processEvents();
         QThread::msleep(1);
     }
@@ -203,9 +203,11 @@ bool runLocalFileOffers(QTextStream& err)
     ok &= check(writeFile(root.filePath("a.txt"), "hello") &&
                     writeFile(root.filePath("dir/b.bin"), big),
                 "fixture files", err);
+    // A link inside a copied folder is left out (only checked where one can be made).
+    bool linked = false;
 #ifndef Q_OS_WIN
-    // A link inside a copied folder is left out.
-    QFile::link(root.filePath("a.txt"), root.filePath("dir/link.txt"));
+    linked = QFile::link(root.filePath("a.txt"), root.filePath("dir/link.txt"));
+    ok &= check(linked, "link fixture", err);
 #endif
 
     LocalFileOffers local;
@@ -221,7 +223,9 @@ bool runLocalFileOffers(QTextStream& err)
                     offer.entries[2].size == static_cast<quint64>(big.size()) &&
                     offer.entries[3].path == u"dir\\sub" &&
                     offer.totalSize == static_cast<quint64>(big.size()) + 5,
-                "folders listed before their contents, links left out", err);
+                linked ? "folders listed before their contents, links left out"
+                       : "folders listed before their contents",
+                err);
 
     auto chunk = local.read(offer.id, 2, 0, LocalFileOffers::MAX_CHUNK);
     ok &= check(chunk.error.isEmpty() && chunk.bytes == big.left(LocalFileOffers::MAX_CHUNK),
@@ -239,6 +243,17 @@ bool runLocalFileOffers(QTextStream& err)
     ok &= check(local.read(offer.id, 9, 0, 1).error == "not_found", "no such entry", err);
     ok &= check(local.read(kId, 0, 0, 1).error == "not_found", "no such offer", err);
 
+    {
+        // Same size, another modification time: possibly another file.
+        QFile same(root.filePath("a.txt"));
+        same.open(QIODevice::ReadWrite);
+        same.write("HELLO");
+        same.setFileTime(QDateTime::currentDateTime().addSecs(-3600),
+                         QFileDevice::FileModificationTime);
+        same.close();
+        ok &= check(local.read(offer.id, 0, 0, 5).error == "changed",
+                    "a file rewritten with the same size", err);
+    }
     writeFile(root.filePath("a.txt"), "changed!");
     ok &= check(local.read(offer.id, 0, 0, 5).error == "changed", "a file that changed size", err);
     QFile::remove(root.filePath("a.txt"));
@@ -302,6 +317,10 @@ bool runFileOfferRegression(QTextStream& err)
     ok &=
         check(!parses(offerJson({ file("lpt1", 1) })), "reserved name in lower case rejected", err);
     ok &= check(!parses(offerJson({ file("a.", 1) })), "trailing dot rejected", err);
+    ok &= check(!parses(offerJson({ file(QStringLiteral("COM\u00B9.txt"), 1) })),
+                "superscript device name rejected", err);
+    ok &= check(!parses(offerJson({ file(QStringLiteral("lpt\u00B3"), 1) })),
+                "superscript device name in lower case rejected", err);
     ok &=
         check(!parses(offerJson({ file("dir/a.txt", 1) })), "file before its folder rejected", err);
     ok &= check(!parses(offerJson({ file("A.txt", 1), file("a.TXT", 1) })),
@@ -378,13 +397,16 @@ bool runFileOfferRegression(QTextStream& err)
         FileOfferDownloader source(host, offer);
         const ReadResult whole = readAll(source, 0);
         ok &= check(!whole.failed && whole.bytes == big, "whole file arrives intact", err);
-        ok &= check(server.ranges.value(0).isEmpty(), "first read sends no Range", err);
+        ok &= check(server.ranges.size() == 1 && server.ranges.value(0).isEmpty(),
+                    "first read sends one request, without Range", err);
 
+        const int requests = server.ranges.size();
         const ReadResult tail = readAll(source, 0, 1000000);
         ok &= check(!tail.failed && tail.bytes == big.mid(1000000), "resumed read gets the rest",
                     err);
         ok &=
-            check(server.ranges.last() == "bytes=1000000-", "resumed read asks for bytes=N-", err);
+            check(server.ranges.size() == requests + 1 && server.ranges.last() == "bytes=1000000-",
+                  "resumed read asks for bytes=N-", err);
 
         const ReadResult tiny = readAll(source, 1, 0, 1);
         ok &= check(!tiny.failed && tiny.bytes == "hello", "one-byte reads", err);
@@ -413,6 +435,23 @@ bool runFileOfferRegression(QTextStream& err)
                    "\r\n\r\n" + body;
         };
         ok &= check(readAll(source, 0, 10).failed, "a resumed read answered with 200 fails", err);
+
+        server.respond = [](int, const QByteArray& body, qint64 offset) {
+            // A 206 of the right length, but the wrong range.
+            const QByteArray part = body.left(body.size() - offset);
+            return "HTTP/1.1 206 Partial Content\r\nContent-Length: " +
+                   QByteArray::number(part.size()) + "\r\nContent-Range: bytes 0-" +
+                   QByteArray::number(part.size() - 1) + "/" + QByteArray::number(body.size()) +
+                   "\r\n\r\n" + part;
+        };
+        ok &= check(readAll(source, 0, 10).failed, "a resumed read of another range fails", err);
+
+        server.respond = [](int, const QByteArray&, qint64) {
+            // The five bytes, then more than the Content-Length said.
+            return QByteArray("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhelloEXTRA");
+        };
+        const ReadResult extra = readAll(source, 1, 0, 1);
+        ok &= check(extra.bytes.size() <= 5, "no more bytes than the file has", err);
         server.respond = nullptr;
     }
     {

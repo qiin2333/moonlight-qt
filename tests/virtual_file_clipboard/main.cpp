@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -185,6 +186,27 @@ int main()
         check(!source->opens.empty() &&
                   source->opens.back() == std::make_pair(std::size_t(2), std::uint64_t(50000)),
               "a seek reopens at the new offset");
+
+        // Past the end is a position like any other: going back from it lands where expected.
+        to.QuadPart = static_cast<LONGLONG>(big.size()) + 1000;
+        check(SUCCEEDED(medium.pstm->Seek(to, STREAM_SEEK_SET, &now)) &&
+                  now.QuadPart == big.size() + 1000,
+              "seek past the end keeps the position");
+        to.QuadPart = -2000;
+        check(SUCCEEDED(medium.pstm->Seek(to, STREAM_SEEK_CUR, &now)) &&
+                  now.QuadPart == big.size() - 1000,
+              "seek back from past the end");
+        // An absolute position is unsigned: -1 is 2^64 - 1, and one more overflows.
+        to.QuadPart = -1;
+        check(SUCCEEDED(medium.pstm->Seek(to, STREAM_SEEK_SET, &now)) &&
+                  now.QuadPart == (std::numeric_limits<ULONGLONG>::max)(),
+              "an absolute seek is unsigned");
+        to.QuadPart = 1;
+        check(medium.pstm->Seek(to, STREAM_SEEK_CUR, &now) == STG_E_INVALIDFUNCTION,
+              "a seek that overflows is refused");
+        to.QuadPart = -static_cast<LONGLONG>(big.size()) - 1;
+        check(medium.pstm->Seek(to, STREAM_SEEK_END, &now) == STG_E_INVALIDFUNCTION,
+              "a seek before the start is refused");
         ReleaseStgMedium(&medium);
     }
 
