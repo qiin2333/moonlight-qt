@@ -9,7 +9,8 @@ SOURCES += main.cpp \
     ../../app/backend/usbforwardingbackend.cpp \
     ../../app/backend/usbforwardingenvironment.cpp \
     ../../app/backend/usbforwardinglocalserver.cpp \
-    ../../app/settings/streamingpreferences.cpp
+    ../../app/settings/streamingpreferences.cpp \
+    ../../app/settings/mousemode.cpp
 HEADERS += \
     ../../app/backend/usbforwardingbackend.h \
     ../../app/backend/usbforwardingenvironment.h \
