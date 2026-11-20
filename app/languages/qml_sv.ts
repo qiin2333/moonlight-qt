@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Flytande knapp (standard)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Styrs av Mac-tangentbordsmappning medan den är aktiverad.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mappning av Mac-tangentbord</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Aktivera Mac-tangentbordsmappning</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Karta Mac-nycklar för alla fjärrvärdar. Ändringar gäller för nästa stream.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Att välja en nyckel som redan används byter ut de två mappningarna.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Vissa macOS-genvägar kan kräva systemtangentbordsfångst och kan fortfarande hanteras av macOS.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Återställ standard nyckelmappningar</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Återställ standardinställningar</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

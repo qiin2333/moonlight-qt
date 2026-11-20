@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>לחצן צף (ברירת מחדל)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>נשלט על ידי מיפוי מקלדת Mac בזמן מופעל.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>מיפוי מקלדת מק</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>אפשר מיפוי מקלדת Mac</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>מפה מקשי Mac עבור כל המארחים המרוחקים. השינויים חלים על הזרם הבא.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>בחירה במפתח שכבר נמצא בשימוש מחליפה את שני המיפויים.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>מקשי קיצור מסוימים של macOS עשויים לדרוש לכידת מקלדת המערכת וייתכן ש-macOS עדיין יטופלו.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>שחזר מיפוי מפתח ברירת מחדל</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>שחזר ברירת מחדל</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

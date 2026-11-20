@@ -303,12 +303,12 @@ void StreamingPreferences::reload()
     swapMouseButtons = settings.value(SER_SWAPMOUSEBUTTONS, false).toBool();
     swapWinAltKeys = settings.value(SER_SWAPWINALTKEYS, false).toBool();
 #if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    macKeyMappingEnabled = settings.value("macKeyMappingEnabled", false).toBool();
     // Positions are Command, Option, Control, Delete and Fn+Delete.
     macWindowsKeys = settings.value("macWindowsKeys", defaultMacWindowsKeys()).toString();
-    if (macWindowsKeys.size() != 5 ||
-        !macWindowsKeys.left(3).contains('C') || !macWindowsKeys.left(3).contains('W') ||
-        !macWindowsKeys.left(3).contains('A') || !macWindowsKeys.right(2).contains('B') ||
-        !macWindowsKeys.right(2).contains('D')) {
+    if (macWindowsKeys.size() != 5 || !macWindowsKeys.left(3).contains('C') ||
+        !macWindowsKeys.left(3).contains('W') || !macWindowsKeys.left(3).contains('A') ||
+        !macWindowsKeys.right(2).contains('B') || !macWindowsKeys.right(2).contains('D')) {
         macWindowsKeys = defaultMacWindowsKeys();
     }
 #endif
@@ -791,6 +791,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPMOUSEBUTTONS, swapMouseButtons);
     settings.setValue(SER_SWAPWINALTKEYS, swapWinAltKeys);
 #if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    settings.setValue("macKeyMappingEnabled", macKeyMappingEnabled);
     settings.setValue("macWindowsKeys", macWindowsKeys);
 #endif
 

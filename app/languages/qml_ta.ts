@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>மிதக்கும் பொத்தான் (இயல்புநிலை)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>இயக்கப்பட்டிருக்கும் போது Mac விசைப்பலகை மேப்பிங் மூலம் கட்டுப்படுத்தப்படுகிறது.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>மேக் விசைப்பலகை மேப்பிங்</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Mac விசைப்பலகை மேப்பிங்கை இயக்கு</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>அனைத்து ரிமோட் ஹோஸ்ட்களுக்கான மேப் மேக் விசைகள். மாற்றங்கள் அடுத்த ஸ்ட்ரீமில் பொருந்தும்.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>ஏற்கனவே பயன்பாட்டில் உள்ள விசையைத் தேர்ந்தெடுப்பது இரண்டு மேப்பிங்குகளையும் மாற்றுகிறது.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>சில மேகோஸ் ஷார்ட்கட்களுக்கு சிஸ்டம் கீபோர்டு கேப்சர் தேவைப்படலாம் மற்றும் மேகோஸால் இன்னும் கையாளப்படலாம்.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>இயல்புநிலை விசை வரைபடங்களை மீட்டமைக்கவும்</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>இயல்புநிலைகளை மீட்டமை</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

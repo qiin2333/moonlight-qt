@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>ปุ่มลอย (ค่าเริ่มต้น)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>ควบคุมโดยการจับคู่แป้นพิมพ์ Mac ในขณะที่เปิดใช้งาน</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>การแมปแป้นพิมพ์ Mac</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>เปิดใช้งานการแมปแป้นพิมพ์ Mac</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>แมปคีย์ Mac สำหรับโฮสต์ระยะไกลทั้งหมด การเปลี่ยนแปลงมีผลกับสตรีมถัดไป</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>การเลือกคีย์ที่ใช้งานอยู่แล้วจะสลับการแมปทั้งสองรายการ</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>ทางลัด macOS บางตัวอาจต้องใช้การจับภาพแป้นพิมพ์ของระบบและ macOS อาจยังคงจัดการอยู่</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>คืนค่าการแมปคีย์เริ่มต้น</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>คืนค่าเริ่มต้น</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

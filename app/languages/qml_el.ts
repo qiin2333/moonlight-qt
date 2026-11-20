@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Αιωρούμενο κουμπί (προεπιλογή)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Ελέγχεται από αντιστοίχιση πληκτρολογίου Mac ενώ είναι ενεργοποιημένη.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Χαρτογράφηση πληκτρολογίου Mac</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Ενεργοποίηση αντιστοίχισης πληκτρολογίου Mac</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Αντιστοίχιση πλήκτρων Mac για όλους τους απομακρυσμένους κεντρικούς υπολογιστές. Οι αλλαγές ισχύουν για την επόμενη ροή.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Η επιλογή ενός κλειδιού που χρησιμοποιείται ήδη αλλάζει τις δύο αντιστοιχίσεις.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Ορισμένες συντομεύσεις macOS ενδέχεται να απαιτούν λήψη από το πληκτρολόγιο συστήματος και ενδέχεται να εξακολουθούν να αντιμετωπίζονται από το macOS.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Επαναφορά προεπιλεγμένων αντιστοιχίσεων κλειδιών</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Επαναφορά προεπιλογών</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

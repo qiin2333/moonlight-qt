@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Flytende knapp (standard)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Styres av Mac-tastaturkartlegging mens den er aktivert.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mac-tastaturkartlegging</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Aktiver Mac-tastaturkartlegging</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Kartlegg Mac-nøkler for alle eksterne verter. Endringer gjelder for neste strøm.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Ved å velge en nøkkel som allerede er i bruk, byttes de to tilordningene.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Noen macOS-snarveier kan kreve systemtastaturopptak og kan fortsatt håndteres av macOS.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Gjenopprett standard nøkkeltilordninger</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Gjenopprett standardinnstillinger</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

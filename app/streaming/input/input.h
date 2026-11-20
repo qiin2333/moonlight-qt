@@ -440,7 +440,9 @@ private:
     bool m_SwapMouseButtons;
     bool m_SwapWinAltKeys;
 #if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    const bool m_MacKeyMappingEnabled;
     const QString m_MacWindowsKeys;
+    QHash<int, uint32_t> m_MacPhysicalKeysDown;
 #endif
 
     bool m_ReverseScrollDirection;

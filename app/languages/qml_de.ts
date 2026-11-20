@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Schwebende Schaltfläche (Standard)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Wird bei Aktivierung durch die Mac-Tastaturbelegung gesteuert.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mac-Tastaturbelegung</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Aktivieren Sie die Mac-Tastaturzuordnung</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Ordnen Sie Mac-Tasten für alle Remote-Hosts zu. Änderungen gelten für den nächsten Stream.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Durch Auswahl eines bereits verwendeten Schlüssels werden die beiden Zuordnungen vertauscht.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Einige macOS-Verknüpfungen erfordern möglicherweise die Erfassung der Systemtastatur und werden möglicherweise weiterhin von macOS verarbeitet.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Standardschlüsselzuordnungen wiederherstellen</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Standardeinstellungen wiederherstellen</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

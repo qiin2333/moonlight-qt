@@ -1397,6 +1397,38 @@
         <source>Floating button (default)</source>
         <translation>Plovoucí tlačítko (výchozí)</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>Je-li povoleno, ovládá se mapováním klávesnice Mac.</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mapování klávesnice Mac</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>Povolit mapování klávesnice Mac</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>Mapujte klíče Mac pro všechny vzdálené hostitele. Změny se použijí na další stream.</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>Výběrem již používaného klíče dojde k záměně dvou mapování.</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>Některé klávesové zkratky macOS mohou vyžadovat zachycení systémové klávesnice a stále je může macOS zpracovávat.</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>Obnovte výchozí mapování klíčů</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Obnovit výchozí</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

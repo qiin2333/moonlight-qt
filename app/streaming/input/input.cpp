@@ -93,7 +93,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_EnableDualSenseHaptics(enablePhysicalDualSenseHaptics),
       m_SwapMouseButtons(prefs.swapMouseButtons), m_SwapWinAltKeys(prefs.swapWinAltKeys),
 #if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
-      m_MacWindowsKeys(prefs.macWindowsKeys),
+      m_MacKeyMappingEnabled(prefs.macKeyMappingEnabled), m_MacWindowsKeys(prefs.macWindowsKeys),
 #endif
       m_ReverseScrollDirection(prefs.reverseScrollDirection),
       m_SwapFaceButtons(prefs.swapFaceButtons), m_GamepadQuitCombo(prefs.gamepadQuitCombo),

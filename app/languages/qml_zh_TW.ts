@@ -1534,6 +1534,38 @@
         <source>Floating button (default)</source>
         <translation>浮動按鈕（預設）</translation>
     </message>
+    <message>
+        <source>Controlled by Mac keyboard mapping while enabled.</source>
+        <translation>啟用 Mac 鍵盤映射時由該映射控制。</translation>
+    </message>
+    <message>
+        <source>Mac keyboard mapping</source>
+        <translation>Mac 鍵盤映射</translation>
+    </message>
+    <message>
+        <source>Enable Mac keyboard mapping</source>
+        <translation>啟用 Mac 鍵盤映射</translation>
+    </message>
+    <message>
+        <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
+        <translation>將 Mac 按鍵映射套用至所有遠端主機。變更將於下次串流時生效。</translation>
+    </message>
+    <message>
+        <source>Selecting a key already in use swaps the two mappings.</source>
+        <translation>選取已使用的按鍵會交換兩個映射。</translation>
+    </message>
+    <message>
+        <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
+        <translation>部分 macOS 快捷鍵可能需要啟用系統鍵盤擷取，且仍可能由 macOS 處理。</translation>
+    </message>
+    <message>
+        <source>Restore default key mappings</source>
+        <translation>還原預設按鍵映射</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>還原預設值</translation>
+    </message>
 </context>
 <context>
     <name>NvHTTP</name>

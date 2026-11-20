@@ -434,9 +434,12 @@ Column {
         }
 
         ToggleRow {
-            applicable: !settingsPage.hasMacWindowsKeys
             title: qsTr("Swap Alt and Win keys")
             searchKeywords: "Swap Alt and Win keys"
+            controlEnabled: !settingsPage.hasMacWindowsKeys || !StreamingPreferences.macKeyMappingEnabled
+            description: settingsPage.hasMacWindowsKeys && StreamingPreferences.macKeyMappingEnabled
+                         ? qsTr("Controlled by Mac keyboard mapping while enabled.")
+                         : ""
             checked: StreamingPreferences.swapWinAltKeys
             onToggled: function(value) { StreamingPreferences.swapWinAltKeys = value }
         }
@@ -495,8 +498,21 @@ Column {
         readonly property bool applicable: settingsPage.hasMacWindowsKeys
         searchCategory: "input"
         visible: settingsPage.category === "input" && settingsPage.hasMacWindowsKeys
-        title: qsTr("远控 Windows 按键映射")
+        title: qsTr("Mac keyboard mapping")
         readonly property string mapping: settingsPage.hasMacWindowsKeys ? StreamingPreferences.macWindowsKeys : "CWABD"
+
+        ToggleRow {
+            title: qsTr("Enable Mac keyboard mapping")
+            searchKeywords: "Mac keyboard mapping Command Option Control"
+            description: qsTr("Map Mac keys for all remote hosts. Changes apply to the next stream.")
+            checked: settingsPage.hasMacWindowsKeys && StreamingPreferences.macKeyMappingEnabled
+            onToggled: function(value) { StreamingPreferences.macKeyMappingEnabled = value }
+        }
+
+        SettingsRow {
+            title: qsTr("Selecting a key already in use swaps the two mappings.")
+            description: qsTr("Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.")
+        }
 
         function assignKey(index, key) {
             const keys = mapping.split("")
@@ -522,15 +538,17 @@ Column {
             model: settingsPage.hasMacWindowsKeys ? ["Command (⌘)", "Option (⌥)", "Control (⌃)", "Delete", "Fn + Delete"] : []
             ChoiceRow {
                 title: modelData
+                controlEnabled: settingsPage.hasMacWindowsKeys && StreamingPreferences.macKeyMappingEnabled
                 selectedValue: macKeys.mapping.charAt(index)
                 model: index < 3 ? modifiersModel : deleteModel
                 onValueActivated: function(value) { macKeys.assignKey(index, value) }
             }
         }
         SettingsRow {
-            title: qsTr("还原默认按键映射")
+            title: qsTr("Restore default key mappings")
             HardButton {
-                text: qsTr("还原默认")
+                text: qsTr("Restore defaults")
+                enabled: settingsPage.hasMacWindowsKeys && StreamingPreferences.macKeyMappingEnabled
                 onClicked: StreamingPreferences.macWindowsKeys = "CWABD"
             }
         }
