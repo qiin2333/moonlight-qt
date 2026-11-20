@@ -270,6 +270,8 @@ jobs:
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat clipboard_helper_lifecycle clipboard_helper_lifecycle
         if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat virtual_file_clipboard virtual_file_clipboard
+        if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat overlay_button_position overlay_button_position
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat file_mapping_websocket_framing file_mapping_websocket_framing

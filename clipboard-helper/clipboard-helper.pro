@@ -32,3 +32,12 @@ unix:!macx {
     target.path = $$PREFIX/$$BINDIR/
     INSTALLS += target
 }
+
+# Files the host copied (clipboard kind 4)
+SOURCES += ../app/streaming/filetransfer/fileoffer.cpp
+HEADERS += ../app/streaming/filetransfer/fileoffer.h ../app/streaming/filetransfer/virtualfilesource.h
+win32 {
+    SOURCES += ../app/streaming/filetransfer/virtualfileclipboard_win.cpp
+    HEADERS += ../app/streaming/filetransfer/virtualfileclipboard_win.h
+    LIBS += -lole32 -lshell32 -luser32
+}

@@ -1,5 +1,8 @@
 #include "streaming/clipboardsync.h"
 #include "streaming/clipboardipc.h"
+#ifdef Q_OS_WIN
+#include "streaming/filetransfer/virtualfileclipboard_win.h"
+#endif
 
 #include <QByteArray>
 #include <QCoreApplication>
@@ -319,6 +322,11 @@ int main(int argc, char* argv[])
 
     stdinThread.start();
     int rc = app.exec();
+#ifdef Q_OS_WIN
+    // Files the host offered can no longer be fetched once the session ends;
+    // take them off the clipboard while this GUI thread still owns OLE.
+    VirtualFileClipboard::clearIfOwned();
+#endif
     // Flush any protocol lines still queued, stop the writer, then wind the
     // engine thread down (the queued engine stop is best-effort at exit).
     writer.stopAndDrain();

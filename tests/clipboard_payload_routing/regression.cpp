@@ -15,6 +15,7 @@
 #include <QSslConfiguration>
 #include <QSslSocket>
 #include <QTcpServer>
+#include <QDir>
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
@@ -299,13 +300,25 @@ public:
             cb->clear();
             ClipboardSync sync;
             QList<QByteArray> sent;
-            QObject::connect(&sync, &ClipboardSync::outboundFrame,
-                             [&](QByteArray b) { sent.append(b); });
+            QList<QByteArray> offers; // file offers (kind 4): names and sizes only
+            QObject::connect(&sync, &ClipboardSync::outboundFrame, [&](QByteArray b) {
+                (b.size() > 1 && b[1] == ClipboardSync::KIND_FILE_OFFER ? offers : sent).append(b);
+            });
             sync.start();
             auto* file = new QMimeData;
             file->setUrls({ QUrl::fromLocalFile(path) });
             cb->setMimeData(file);
             ok &= check(sent.isEmpty(), "file URL cannot upload image file", err);
+#ifdef Q_OS_WIN
+            // Windows offers copied files to the host; the offer names the
+            // file but never carries its local path.
+            ok &= check(offers.size() == 1 && offers[0].contains("private.png") &&
+                            !offers[0].contains(dir.path().toUtf8()) &&
+                            !offers[0].contains(QDir::toNativeSeparators(dir.path()).toUtf8()),
+                        "a copied file is offered by name only", err);
+#else
+            ok &= check(offers.isEmpty(), "files are offered on Windows only", err);
+#endif
             auto* html = new QMimeData;
             html->setHtml("<img src='" + QUrl::fromLocalFile(path).toString() + "'>");
             cb->setMimeData(html);
