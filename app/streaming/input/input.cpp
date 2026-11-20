@@ -100,13 +100,13 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_PointerRegionLockToggledByUser(false), m_FakeMouseCaptureActive(false),
       m_KeyboardCaptureActive(false), m_CaptureSystemKeysMode(prefs.captureSysKeysMode),
       m_MouseCursorCapturedVisibilityState(prefs.showLocalCursor ? SDL_ENABLE : SDL_DISABLE),
-      m_LocalCursorMode(prefs.absoluteMouseMode && prefs.showLocalCursor ? LI_CURSOR_MODE_LOCAL
+      m_LocalCursorMode(prefs.initialAbsoluteMouseMode() && prefs.showLocalCursor ? LI_CURSOR_MODE_LOCAL
                                                                          : LI_CURSOR_MODE_VIDEO),
       m_RemoteCursorVisible(true), m_RemoteCursor(nullptr),
       m_LastCursorClass(NativeCursorShape::Unknown), m_HasLastCursorShape(false),
       m_RemoteCursorScale(1.0), m_RemoteCursorHideTimer(0), m_LongPressTimer(0),
       m_StreamWidth(streamWidth), m_StreamHeight(streamHeight),
-      m_AbsoluteMouseMode(prefs.absoluteMouseMode), m_AbsoluteTouchMode(prefs.absoluteTouchMode),
+      m_AbsoluteMouseMode(prefs.initialAbsoluteMouseMode()), m_AbsoluteTouchMode(prefs.absoluteTouchMode),
       m_DisabledTouchFeedback(false),
 #ifdef HAVE_WINDOWS_PEN_INPUT
       m_WindowsPenWindow(nullptr), m_WindowsPenSubclassContext(nullptr), m_WindowsPenPointerId(0),

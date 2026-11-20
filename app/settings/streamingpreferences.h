@@ -309,6 +309,14 @@ public:
     bool absoluteMouseMode;
     bool showLocalCursor;
     bool absoluteTouchMode;
+    bool initialAbsoluteMouseMode() const {
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+        return absoluteMouseMode || showLocalCursor;
+#else
+        return absoluteMouseMode;
+#endif
+    }
+
     bool enableNativeTouchpad;
     DualSenseHapticsMode dualSenseHapticsMode;
     bool framePacing;
