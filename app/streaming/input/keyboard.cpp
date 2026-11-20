@@ -221,6 +221,39 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         }
     }
 
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    // Local Moonlight hotkeys above always see the physical Mac keyboard.
+    const SDL_Scancode physical = event->keysym.scancode;
+    const SDL_Scancode left[] = { SDL_SCANCODE_LGUI, SDL_SCANCODE_LALT, SDL_SCANCODE_LCTRL };
+    const SDL_Scancode right[] = { SDL_SCANCODE_RGUI, SDL_SCANCODE_RALT, SDL_SCANCODE_RCTRL };
+    const SDL_Keymod masks[] = { KMOD_GUI, KMOD_ALT, KMOD_CTRL };
+    short mappedKey = 0;
+    modifiers = (event->keysym.mod & KMOD_SHIFT) ? MODIFIER_SHIFT : 0;
+    for (int i = 0; i < 3; ++i) {
+        const bool isKey = physical == left[i] || physical == right[i];
+        if (i == 0 && !isSystemKeyCaptureActive()) {
+            if (isKey) return;
+            continue;
+        }
+        const char target = m_MacWindowsKeys.at(i).toLatin1();
+        const bool win = target == 'W';
+        const bool ctrl = target == 'C';
+        if (event->keysym.mod & masks[i]) {
+            modifiers |= win ? MODIFIER_META : ctrl ? MODIFIER_CTRL : MODIFIER_ALT;
+        }
+        if (isKey) {
+            const bool rightSide = physical == right[i];
+            mappedKey = (win ? 0x5B : ctrl ? 0xA2 : 0xA4) + rightSide;
+            if (win || rightSide) modifiers |= MODIFIER_EXTENDED;
+        }
+    }
+    if (physical == SDL_SCANCODE_BACKSPACE || physical == SDL_SCANCODE_DELETE) {
+        const bool forward = m_MacWindowsKeys.at(physical == SDL_SCANCODE_DELETE ? 4 : 3) == 'D';
+        mappedKey = forward ? 0x2E : 0x08;
+        if (forward) modifiers |= MODIFIER_EXTENDED;
+    }
+
+#else
     // Set modifier flags
     modifiers = 0;
     if (event->keysym.mod & KMOD_CTRL) {
@@ -238,9 +271,17 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         }
     }
 
+#endif
+
     // Set keycode. We explicitly use scancode here because GFE will try to correct
     // for AZERTY layouts on the host but it depends on receiving VK_ values matching
     // a QWERTY layout to work.
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    if (mappedKey != 0) {
+        keyCode = mappedKey;
+    }
+    else
+#endif
     if (event->keysym.scancode >= SDL_SCANCODE_1 && event->keysym.scancode <= SDL_SCANCODE_9) {
         // SDL defines SDL_SCANCODE_0 > SDL_SCANCODE_9, so we need to handle that manually
         keyCode = (event->keysym.scancode - SDL_SCANCODE_1) + VK_0 + 1;

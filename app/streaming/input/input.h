@@ -439,6 +439,10 @@ private:
     bool m_EnableDualSenseHaptics;
     bool m_SwapMouseButtons;
     bool m_SwapWinAltKeys;
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    const QString m_MacWindowsKeys;
+#endif
+
     bool m_ReverseScrollDirection;
     bool m_SwapFaceButtons;
     StreamingPreferences::GamepadQuitCombo m_GamepadQuitCombo;
