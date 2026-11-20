@@ -174,7 +174,7 @@ public:
                 target = base - back;
             } else {
                 const std::uint64_t forward = static_cast<std::uint64_t>(move.QuadPart);
-                if (forward > std::numeric_limits<std::uint64_t>::max() - base) {
+                if (forward > (std::numeric_limits<std::uint64_t>::max)() - base) {
                     return STG_E_INVALIDFUNCTION;
                 }
                 target = base + forward;
