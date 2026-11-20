@@ -26,6 +26,9 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <io.h>
+#else
+#include <sys/stat.h>
 #endif
 
 #include <algorithm>
@@ -630,6 +633,14 @@ bool LocalFileOffers::add(const QStringList& paths, QByteArray& json, QString* e
             failure = QStringLiteral("cannot read folder: ") + item.localPath;
             return false;
         }
+        if (!dir) {
+            // Opened once now: a file that cannot be read fails here, not at the paste.
+            QFile file(item.localPath);
+            if (!file.open(QIODevice::ReadOnly) || !identityOf(file, item.volume, item.fileId)) {
+                failure = QStringLiteral("cannot read file: ") + item.localPath;
+                return false;
+            }
+        }
         offer.items.push_back(item);
         total += item.size;
         files.append(QJsonObject{
@@ -700,6 +711,31 @@ bool LocalFileOffers::add(const QStringList& paths, QByteArray& json, QString* e
     return true;
 }
 
+bool LocalFileOffers::identityOf(QFile& file, quint64& volume, quint64& fileId)
+{
+    const int fd = file.handle();
+    if (fd < 0) {
+        return false;
+    }
+#ifdef Q_OS_WIN
+    const auto handle = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+    BY_HANDLE_FILE_INFORMATION info;
+    if (handle == INVALID_HANDLE_VALUE || !GetFileInformationByHandle(handle, &info)) {
+        return false;
+    }
+    volume = info.dwVolumeSerialNumber;
+    fileId = (static_cast<quint64>(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+#else
+    struct stat st;
+    if (fstat(fd, &st) != 0) {
+        return false;
+    }
+    volume = static_cast<quint64>(st.st_dev);
+    fileId = static_cast<quint64>(st.st_ino);
+#endif
+    return true;
+}
+
 bool LocalFileOffers::canList(const QString& folder)
 {
 #ifdef Q_OS_WIN
@@ -746,7 +782,14 @@ LocalFileOffers::Chunk LocalFileOffers::read(const QString& id, qint64 index, qu
         out.error = "gone";
         return out;
     }
-    if (static_cast<quint64>(file.size()) != item.size ||
+    quint64 volume = 0;
+    quint64 fileId = 0;
+    if (!identityOf(file, volume, fileId)) {
+        out.error = "gone";
+        return out;
+    }
+    if (volume != item.volume || fileId != item.fileId ||
+        static_cast<quint64>(file.size()) != item.size ||
         QFileInfo(item.localPath).lastModified().toMSecsSinceEpoch() != item.mtimeMs) {
         out.error = "changed";
         return out;

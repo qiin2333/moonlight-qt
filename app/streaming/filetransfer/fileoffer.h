@@ -67,6 +67,7 @@ private:
     std::shared_ptr<Core> m_Core;
 };
 
+class QFile;
 class QFileInfo;
 
 // Files copied on this client, offered to the host the other way round: the
@@ -110,7 +111,12 @@ private:
     {
         QString localPath;
         quint64 size = 0;
-        qint64 mtimeMs = 0; // with the size, what tells a replaced or edited file
+        qint64 mtimeMs = 0; // with the size, what tells an edited file
+        // The file itself (volume serial and file index on Windows, device and
+        // inode elsewhere), checked through the handle each read opens: a file
+        // put in its place, even with the same size and time, is not served.
+        quint64 volume = 0;
+        quint64 fileId = 0;
         bool dir = false;
     };
     struct Offer
@@ -123,6 +129,8 @@ private:
     static bool isLink(const QFileInfo& info);
     // False when the folder cannot be listed (an empty folder can).
     static bool canList(const QString& folder);
+    // The identity of the open file behind `file`, or false when it cannot be read.
+    static bool identityOf(QFile& file, quint64& volume, quint64& fileId);
 
     std::deque<Offer> m_Offers;
     QElapsedTimer m_Clock;

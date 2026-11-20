@@ -244,6 +244,27 @@ bool runLocalFileOffers(QTextStream& err)
     ok &= check(local.read(kId, 0, 0, 1).error == "not_found", "no such offer", err);
 
     {
+        // Another file put in its place, with the same size and modification
+        // time, between two chunks: the second chunk is refused.
+        ok &= check(local.read(offer.id, 2, 0, 16).error.isEmpty(), "first chunk before the swap",
+                    err);
+        const QString target = root.filePath("dir/b.bin");
+        const QDateTime mtime = QFileInfo(target).lastModified();
+        const QString swap = root.filePath("dir/swap.tmp");
+        writeFile(swap, QByteArray(big.size(), 'z'));
+        QFile swapped(swap);
+        swapped.open(QIODevice::ReadWrite);
+        swapped.setFileTime(mtime, QFileDevice::FileModificationTime);
+        swapped.close();
+        QFile::remove(target);
+        QFile::rename(swap, target);
+        ok &= check(QFileInfo(target).size() == big.size() &&
+                        QFileInfo(target).lastModified() == mtime,
+                    "replacement fixture has the same size and time", err);
+        ok &= check(local.read(offer.id, 2, 16, 16).error == "changed",
+                    "a file replaced with the same size and time is refused", err);
+    }
+    {
         // Same size, another modification time: possibly another file.
         QFile same(root.filePath("a.txt"));
         same.open(QIODevice::ReadWrite);
