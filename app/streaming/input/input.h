@@ -541,6 +541,14 @@ private:
     Uint32 m_MacTouchpadLastTapTimestamp;
     Uint32 m_MacTouchpadGestureStartTimestamp;
     SDL_FingerID m_MacTouchpadGesturePrimaryFinger;
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    bool useMacSystemDrag(const SDL_TouchFingerEvent* event);
+    QSet<SDL_FingerID> m_MacSystemDragContacts;
+    SDL_TouchID m_MacSystemDragDevice = 0;
+    SDL_TouchID m_MacTouchpadGestureDevice = 0;
+    int m_MacSystemDragButton = 0;
+    bool m_MacSystemDragAwaitingButtonUp = false;
+#endif
     QSet<SDL_FingerID> m_MacTouchpadGestureContacts;
     float m_MacTouchpadGestureStartX;
     float m_MacTouchpadGestureStartY;

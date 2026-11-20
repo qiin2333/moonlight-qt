@@ -974,6 +974,11 @@ void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
 #if SDL_VERSION_ATLEAST(2, 0, 10)
     SDL_TouchDeviceType deviceType = SDL_GetTouchDeviceType(event->touchId);
     if (deviceType == SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE && m_NativeTouchpadEnabled) {
+#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+        if (useMacSystemDrag(event)) {
+            return;
+        }
+#endif
         handleNativeTouchpadEvent(event);
         return;
     }
