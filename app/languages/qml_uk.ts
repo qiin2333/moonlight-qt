@@ -1399,27 +1399,27 @@
     </message>
     <message>
         <source>Controlled by Mac keyboard mapping while enabled.</source>
-        <translation>Керується розкладкою клавіатури Mac, коли ввімкнено.</translation>
+        <translation>Коли ввімкнено, керується налаштуванням зіставлення клавіш Mac.</translation>
     </message>
     <message>
         <source>Mac keyboard mapping</source>
-        <translation>Відображення клавіатури Mac</translation>
+        <translation>Зіставлення клавіш Mac</translation>
     </message>
     <message>
         <source>Enable Mac keyboard mapping</source>
-        <translation>Увімкнути розкладку клавіатури Mac</translation>
+        <translation>Увімкнути зіставлення клавіш Mac</translation>
     </message>
     <message>
         <source>Map Mac keys for all remote hosts. Changes apply to the next stream.</source>
-        <translation>Зіставте ключі Mac для всіх віддалених хостів. Зміни застосовуються до наступного потоку.</translation>
+        <translation>Зіставте клавіші Mac для всіх віддалених хостів. Зміни набудуть чинності під час наступного сеансу трансляції.</translation>
     </message>
     <message>
         <source>Selecting a key already in use swaps the two mappings.</source>
-        <translation>Вибір ключа, який уже використовується, міняє місцями два зіставлення.</translation>
+        <translation>Вибір клавіші, яка вже використовується, міняє місцями два призначення.</translation>
     </message>
     <message>
         <source>Some macOS shortcuts may require system keyboard capture and may still be handled by macOS.</source>
-        <translation>Для деяких ярликів macOS може знадобитися захоплення системної клавіатури, і вони все одно можуть оброблятися macOS.</translation>
+        <translation>Для деяких комбінацій клавіш macOS може знадобитися перехоплення системних клавіш, але macOS усе одно може їх обробляти.</translation>
     </message>
     <message>
         <source>Restore default key mappings</source>
