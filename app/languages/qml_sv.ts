@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Absolut musläge</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Skickar musens position i stället för dess rörelse. Passar bäst för fjärrskrivbord; relativt läge är bättre för de flesta spel.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Visa fjärrmarkören lokalt</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Använder den lokala pekaren för att visa fjärrmarkören. Markörens form beror på stöd hos värddatorn. Kräver absolut musläge.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Ljudinställningar</translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Släpp musen</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Växla Sunshine-markör</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Fånga mus</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Mus</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Det går inte att initiera videoavkodningen. Kontrollera dina strömningsinställningar och försök igen.</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Absolut musläge kan orsaka problem i spel.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Det gick inte att läsa in bakgrundsbilden. Prova en annan bild.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Musläge: Absolut</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Musläge: Relativt</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Markör: Lokal</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Markör: Värdvideo</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Musen har fångats.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Musen släppt. Klicka på streamen för att återuppta kontrollen.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Växla till absolut musläge för att använda en lokal markör.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Begärde växling av Sunshine-videomarkör.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Det gick inte att skicka begäran om att växla markör.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Släpp modifieringstangenterna innan du använder den här åtgärden.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Det gick inte att skicka begäran om markörläge.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Den här värdenheten stöder inte synkronisering av markörform.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Om skrivbordsmarkören saknas trycker du på Ctrl+Alt+Shift+N för att växla Sunshine-videomarkören.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Tryck på Ctrl+Alt+Shift+O för att öppna överläggsmenyn.</translation>
     </message>
 </context>
 </TS>

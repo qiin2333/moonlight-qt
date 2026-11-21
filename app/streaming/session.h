@@ -254,6 +254,7 @@ private:
     void requestRuntimeBitrateChange(int bitrateKbps);
     void startRuntimeBitrateWorker();
     void showStreamingToast(const QString& message, int durationMs = 2000);
+    bool supportsSunshineCursorShortcut() const;
     void processQtOverlayEvents();
     void updateFileMappingMenuState();
     void updateRemoteUsbMenuState();

@@ -187,5 +187,46 @@ int main(int argc, char **argv)
     panel.dismissOnOutsideClick(QPoint(-100, -100));
     for (int i = 0; i < 40 && panel.isVisible(); i++) QTest::qWait(50);
     if (panel.isVisible()) qFatal("outside click after slider use failed to dismiss");
+
+    // Mouse submenu groups M/C/N/Z. The Sunshine-only action is disabled for
+    // other hosts and dispatches normally after Sunshine is detected.
+    int mouseActions = 0;
+    OverlayMenuPanel::MenuAction lastMouseAction = OverlayMenuPanel::MenuAction::MenuActionMax;
+    panel.setActionCallback([&](OverlayMenuPanel::MenuAction action) {
+        ++mouseActions;
+        lastMouseAction = action;
+    });
+    panel.updateMouseState(false, false, false, true);
+    panel.showAtCursor(0, 0, 1600, 1200, QPoint(400, 400), false);
+    QTest::qWait(240);
+    // USB is available, so the Mouse entry follows it at top-level row 5.
+    QTest::mouseClick(&panel, Qt::LeftButton, Qt::NoModifier,
+                      QPoint(140, 8 + 32 + 4 + 5 * 38 + 19));
+    QTest::qWait(180);
+    QTest::mouseClick(&panel, Qt::LeftButton, Qt::NoModifier,
+                      QPoint(140, 8 + 32 + 4 + 2 * 38 + 19));
+    if (mouseActions != 0 || !panel.isMenuVisible())
+        qFatal("unsupported host cursor action fired");
+
+    panel.updateMouseState(false, false, true, true);
+    const OverlayMenuPanel::MenuAction expectedMouseActions[] = {
+        OverlayMenuPanel::MenuAction::ToggleMouseMode,
+        OverlayMenuPanel::MenuAction::ToggleCursorHide,
+        OverlayMenuPanel::MenuAction::ToggleHostCursor, OverlayMenuPanel::MenuAction::UngrabInput
+    };
+    for (int row = 0; row < 4; ++row) {
+        if (row != 0) {
+            panel.showAtCursor(0, 0, 1600, 1200, QPoint(400, 400), false);
+            QTest::qWait(180);
+            QTest::mouseClick(&panel, Qt::LeftButton, Qt::NoModifier,
+                              QPoint(140, 8 + 32 + 4 + 5 * 38 + 19));
+            QTest::qWait(180);
+        }
+        QTest::mouseClick(&panel, Qt::LeftButton, Qt::NoModifier,
+                          QPoint(140, 8 + 32 + 4 + row * 38 + 19));
+        if (mouseActions != row + 1 || lastMouseAction != expectedMouseActions[row])
+            qFatal("mouse submenu did not dispatch the expected action");
+        QTest::qWait(180);
+    }
     return 0;
 }

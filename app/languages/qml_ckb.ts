@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>دۆخی ڕەهای مشک</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>شوێنی مشک دەنێرێت لە جیاتی جوڵەکەی. بۆ مێزی کاری دوور باشترە؛ دۆخی ڕێژەیی بۆ زۆربەی یارییەکان باشترە.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>نیشاندانی نیشاندەری دوور لە ناوخۆ</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>نیشاندەری ناوخۆ بۆ پیشاندانی نیشاندەری دوور بەکاربهێنە. شێوەی نیشاندەر بە پشتگیریی میواندار پەیوەستە. پێویستی بە دۆخی ڕەهای مشک هەیە.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation type="unfinished"></translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>ئازادکردنی ماوس</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>گۆڕینی نیشاندەری Sunshine</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>گرتنی ماوس</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>ماوس</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>دۆخی ڕەهای ماوس لەوانەیە کێشە لە یارییەکاندا دروست بکات.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>ناتوانرێت وێنەی پاشبنەما بار بکرێت. وێنەیەکی تر تاقی بکەرەوە.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>شێوازی مۆس: ڕەها</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>شێوازی مۆس: ڕێژەیی</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>نیشاندەر: ناوخۆیی</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>نیشاندەر: ڤیدیۆی میواندار</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>مۆس گیراوە.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>مۆسی خاوێن کراوەتەوە. کلیک لەسەر ستریمەکە بکە بۆ دەستپێکردنەوەی کۆنترۆڵ.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>بۆ بەکارهێنانی نیشاندەری ناوخۆیی بگۆڕە بۆ شێوازی مۆسی مەرجدار.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>گۆڕینی نیشانەی ڤیدیۆی Sunshine داوا کرا.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>ناردنی داوای گۆڕینی نیشاندەر سەرنەکەوت.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>پێش بەکارهێنانی ئەم کردارە، پەنجە لەسەر کلیلی گۆڕین بەرز بکەرەوە.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>ناردنی داوای شێوازی نیشانە نەسەركەوت.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>ئەم خاوەنماڵە پشتگیری لە هاوکاتکردنی شێوەی نیشاندەر ناکات.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>ئەگەر نیشاندەری دێسکتۆپ نەبوو، Ctrl+Alt+Shift+N پەس بکە بۆ گۆڕینی نیشاندەری ڤیدیۆی Sunshine.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>بۆ کردنەوەی لیستی سەرشاشە، Ctrl+Alt+Shift+O دابگرە.</translation>
     </message>
 </context>
 </TS>

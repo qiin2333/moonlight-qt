@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Modo absoluto do rato</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Envia a posição do rato em vez do movimento. Ideal para o ambiente de trabalho remoto; o modo relativo é melhor para a maioria dos jogos.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Mostrar o cursor remoto localmente</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Utiliza o ponteiro local para mostrar o cursor remoto. A forma do cursor depende do suporte do anfitrião. Requer o modo absoluto do rato.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Configurações de Áudio</translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Libertar rato</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Alternar cursor do Sunshine</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Capturar mouse</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Rato</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Impossivel inicializar o decodificador de vídeo. Por favor verificar suas configurações de streaming e tente novamente.</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>O modo mouse absoluto pode causar problemas nos jogos.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Não foi possível carregar a imagem de fundo. Experimente outra imagem.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Modo do mouse: absoluto</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Modo do mouse: relativo</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Cursor: local</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Cursor: vídeo do host</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Mouse capturado.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Mouse liberado. Clique na transmissão para retomar o controle.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Alterne para o modo de mouse absoluto para usar um cursor local.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Foi solicitada a alternância do cursor de vídeo do Sunshine.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Falha ao enviar a solicitação de alternância do cursor.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Solte as teclas modificadoras antes de usar esta ação.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Falha ao enviar solicitação de modo do cursor.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Este host não oferece suporte à sincronização do formato do cursor.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Se o cursor do ambiente de trabalho não aparecer, prima Ctrl+Alt+Shift+N para alternar o cursor de vídeo do Sunshine.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Prima Ctrl+Alt+Shift+O para abrir o menu sobreposto.</translation>
     </message>
 </context>
 </TS>

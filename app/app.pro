@@ -246,6 +246,7 @@ SOURCES += \
     settings/devicelocalsettings.cpp \
     settings/mappingfetcher.cpp \
     settings/streamingpreferences.cpp \
+    settings/mousemode.cpp \
     streaming/input/abstouch.cpp \
     streaming/input/cursorshapeclassifier.cpp \
     streaming/input/gamepad.cpp \
@@ -326,6 +327,8 @@ HEADERS += \
     streaming/input/input.h \
     streaming/input/gamepadsensorrate.h \
     streaming/input/keyboardstate.h \
+    streaming/input/mousemodestatus.h \
+    streaming/input/remotecursorupdate.h \
     streaming/session.h \
     streaming/videocallbacks.h \
     streaming/filemappingclient.h \

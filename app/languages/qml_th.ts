@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>โหมดเมาส์สัมบูรณ์</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>ส่งตำแหน่งเมาส์แทนการเคลื่อนที่ เหมาะสำหรับเดสก์ท็อประยะไกล ส่วนโหมดสัมพัทธ์เหมาะกับเกมส่วนใหญ่</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>แสดงเคอร์เซอร์ระยะไกลบนเครื่องนี้</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>ใช้ตัวชี้บนเครื่องนี้แสดงเคอร์เซอร์ระยะไกล รูปร่างเคอร์เซอร์ขึ้นอยู่กับการรองรับของโฮสต์ ต้องใช้โหมดเมาส์สัมบูรณ์</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation type="unfinished"></translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>ปล่อยเมาส์</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>เปิด/ปิดเคอร์เซอร์ Sunshine</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>จับภาพเมาส์</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>เมาส์</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>ไม่สามารถเริ่มการถอดรหัสวิดีโอ โปรดตรวจสอบการตั้งค่าการสตรีมแล้วลองใหม่</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>โหมดเมาส์สัมบูรณ์อาจทำให้เกิดปัญหาในเกมได้</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>ไม่สามารถโหลดรูปพื้นหลังได้ โปรดลองใช้รูปอื่น</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>โหมดเมาส์: แบบสัมบูรณ์</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>โหมดเมาส์: แบบสัมพัทธ์</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>เคอร์เซอร์: แบบภายใน</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>เคอร์เซอร์: วิดีโอของโฮสต์</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>จับเมาส์แล้ว</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>ปล่อยเมาส์แล้ว คลิกสตรีมเพื่อกลับมาควบคุมต่อ</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>เปลี่ยนเป็นโหมดเมาส์แบบสัมบูรณ์เพื่อใช้เคอร์เซอร์ในเครื่อง</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>ขอสลับเคอร์เซอร์วิดีโอ Sunshine</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>ส่งคำขอสลับเคอร์เซอร์ไม่สำเร็จ</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>ปล่อยปุ่มปรับแต่งก่อนใช้การดำเนินการนี้</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>ส่งคำขอโหมดเคอร์เซอร์ไม่สำเร็จ</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>โฮสต์นี้ไม่รองรับการซิงค์รูปทรงเคอร์เซอร์</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>หากไม่มีเคอร์เซอร์บนเดสก์ท็อป ให้กด Ctrl+Alt+Shift+N เพื่อสลับเคอร์เซอร์วิดีโอของ Sunshine</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>กด Ctrl+Alt+Shift+O เพื่อเปิดเมนูโอเวอร์เลย์</translation>
     </message>
 </context>
 </TS>
