@@ -8,6 +8,7 @@
 #endif
 #include "backend/computermanager.h"
 #include "cursorshapeclassifier.h"
+#include "macosdragbuttonstate.h"
 #include "remotecursorupdate.h"
 
 #include "SDL_compat.h"
@@ -556,8 +557,7 @@ private:
     QSet<SDL_FingerID> m_MacSystemDragContacts;
     SDL_TouchID m_MacSystemDragDevice = 0;
     SDL_TouchID m_MacTouchpadGestureDevice = 0;
-    int m_MacSystemDragButton = 0;
-    bool m_MacSystemDragAwaitingButtonUp = false;
+    MacSystemDragButtonState m_MacSystemDragButton;
 #endif
     QSet<SDL_FingerID> m_MacTouchpadGestureContacts;
     float m_MacTouchpadGestureStartX;

@@ -114,9 +114,9 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
 #if defined(HAVE_MACOS_NATIVE_TOUCHPAD) && defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
     // AppKit may also deliver the press after the drag has taken ownership.
     if (action == BUTTON_ACTION_PRESS && event->button == SDL_BUTTON_LEFT &&
-            !m_MacSystemDragContacts.isEmpty()) {
+        !m_MacSystemDragContacts.isEmpty()) {
         if (LiSendMouseButtonEvent(action, button) == 0) {
-            m_MacSystemDragButton = button;
+            m_MacSystemDragButton.recordPress(button);
         }
         return;
     }
