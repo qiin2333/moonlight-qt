@@ -29,8 +29,11 @@ void testMacSystemDragButtonState()
     };
 
     state.recordPress(rightButton);
+    require(state.activeButton() == rightButton, "a queued press must retain its mapped button");
     releaseResult = -1;
     state.releaseForReset(sendRelease);
+    require(state.activeButton() == 0,
+            "a failed release must not be mistaken for a new active press");
     require(releases == QVector<int>{ rightButton },
             "capture loss must attempt to release the original mapped button");
     releaseResult = 0;
@@ -38,6 +41,16 @@ void testMacSystemDragButtonState()
     require(releases == QVector<int>({ rightButton, rightButton }),
             "the matching physical release must retry the original mapped button");
     require(!state.handleButtonUp(sendRelease), "successful physical release must clear ownership");
+
+    releases.clear();
+    state.recordPress(rightButton);
+    const int earlyPress = state.activeButton();
+    state.releaseForReset(sendRelease);
+    require(state.allowButtonDown(sendRelease), "a queued handoff release must allow re-press");
+    state.recordPress(earlyPress);
+    require(state.handleButtonUp(sendRelease), "a transferred early press must own its release");
+    require(releases == QVector<int>({ rightButton, rightButton }),
+            "the handoff and final release must keep the original mapped button");
 
     releases.clear();
     state.recordPress(rightButton);

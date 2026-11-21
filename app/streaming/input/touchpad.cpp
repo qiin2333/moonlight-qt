@@ -191,6 +191,11 @@ bool SdlInputHandler::useMacSystemDrag(const SDL_TouchFingerEvent* event)
     if (!isCaptureActive())
         return false;
     if (m_MacSystemDragContacts.isEmpty()) {
+        // A software-pointer long press already owns its mouse button. Let
+        // that gesture finish normally instead of releasing it mid-drag.
+        if (m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER && m_DragButton != 0) {
+            return false;
+        }
         if (event->type != SDL_FINGERDOWN || m_MacTouchpadGestureContacts.size() != 2 ||
             event->touchId != m_MacTouchpadGestureDevice ||
             m_MacTouchpadGestureContacts.contains(event->fingerId)) {
@@ -200,12 +205,17 @@ bool SdlInputHandler::useMacSystemDrag(const SDL_TouchFingerEvent* event)
         auto contacts = m_MacTouchpadGestureContacts;
         const Uint32 left = SDL_BUTTON(SDL_BUTTON_LEFT);
         const bool transferPress = (m_MacTouchpadSuppressedMouseButtons & left) != 0;
+        const int fallbackButton = m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER
+                                       ? m_MacSystemDragButton.activeButton()
+                                       : 0;
         cancelNativeTouchpadContacts();
         m_MacSystemDragContacts = contacts;
         m_MacSystemDragDevice = event->touchId;
-        if (transferPress) {
+        if (transferPress || fallbackButton != 0) {
             // AppKit can deliver mouse-down just before the third SDL contact.
-            const int button = m_SwapMouseButtons ? BUTTON_RIGHT : BUTTON_LEFT;
+            const int button = fallbackButton != 0
+                                   ? fallbackButton
+                                   : (m_SwapMouseButtons ? BUTTON_RIGHT : BUTTON_LEFT);
             const auto sendRelease = [](int heldButton) {
                 return LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, heldButton);
             };

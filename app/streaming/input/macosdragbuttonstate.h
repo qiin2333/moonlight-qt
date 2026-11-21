@@ -14,6 +14,7 @@ public:
     }
 
     bool hasPendingRelease() const { return m_ReleasePending; }
+    int activeButton() const { return m_ReleasePending ? 0 : m_Button; }
 
     template <typename SendRelease> void retryPendingRelease(SendRelease sendRelease)
     {
