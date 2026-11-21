@@ -432,7 +432,8 @@ Column {
             title: qsTr("Display remote cursor locally")
             searchKeywords: "Display remote cursor locally show local cursor pointer"
             description: qsTr("Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.") + " " +
-                         qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.")
+                         qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.") + "\n\n" +
+                         qsTranslate("MouseModeStatus", "If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.")
             controlEnabled: StreamingPreferences.mouseMode !== StreamingPreferences.MM_RELATIVE
             checked: StreamingPreferences.mouseMode === StreamingPreferences.MM_ABSOLUTE_LOCAL
             onToggled: function(value) {

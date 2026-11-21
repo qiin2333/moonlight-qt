@@ -1534,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Освобождаване на мишката</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1585,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Превключване на курсора на Sunshine</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Заснемане на мишката</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Мишка</translation>
     </message>
 </context>
 <context>
@@ -2893,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Фоновото изображение не може да се зареди. Опитайте с друго изображение.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Режим на мишката: абсолютен</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Режим на мишката: относителен</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Курсор: локален</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Курсор: видео на хоста</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Мишката е заловена.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Мишката е освободена. Щракнете върху потока, за да възобновите управлението.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Превключете към абсолютен режим на мишката, за да използвате локален курсор.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Заявено превключване на видеокурсора на Sunshine.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Неуспешно изпращане на заявка за превключване на курсора.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Освободете модифициращите клавиши, преди да използвате това действие.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Неуспешно изпращане на заявка за режим на курсора.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Този хост не поддържа синхронизиране на формата на курсора.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Ако курсорът на работния плот липсва, натиснете Ctrl+Alt+Shift+N, за да превключите видеокурсора на Sunshine.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Натиснете Ctrl+Alt+Shift+O, за да отворите менюто на наслагването.</translation>
     </message>
 </context>
 </TS>

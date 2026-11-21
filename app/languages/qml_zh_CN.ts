@@ -2242,6 +2242,18 @@
         <source>Select</source>
         <translation>选择</translation>
     </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>切换 Sunshine 光标</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>捕获鼠标</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>鼠标</translation>
+    </message>
 </context>
 <context>
     <name>PcView</name>
@@ -4148,6 +4160,65 @@
     <message>
         <source>OK</source>
         <translation>确定</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>鼠标模式：绝对</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>鼠标模式：相对</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>光标：本地</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>光标：主机画面</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>鼠标已捕获。</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>鼠标已释放。点击串流画面可恢复控制。</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>切换到绝对鼠标模式后才能使用本地光标。</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>已请求切换 Sunshine 视频光标。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>无法发送主机光标切换请求。</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>请松开修饰键后再执行此操作。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>无法发送光标模式请求。</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>此主机不支持光标形状同步。</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>如果远程桌面没有光标，可按 Ctrl+Alt+Shift+N 切换 Sunshine 视频光标。</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>按 Ctrl+Alt+Shift+O 打开悬浮菜单。</translation>
     </message>
 </context>
 </TS>

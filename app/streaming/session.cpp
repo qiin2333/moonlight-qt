@@ -2819,6 +2819,10 @@ void Session::showQtOverlayMenu(std::optional<QPoint> pointerGlobalPosition,
             menuPlacementActionForPreference(m_Preferences->overlayMenuPosition));
     updateFileMappingMenuState();
     updateRemoteUsbMenuState();
+    const auto mouseMode = m_InputHandler->getMouseMode();
+    m_MenuPanel->updateMouseState(mouseMode != StreamingPreferences::MM_RELATIVE,
+                                  mouseMode == StreamingPreferences::MM_ABSOLUTE_LOCAL,
+                                  supportsSunshineCursorShortcut(), m_WasCapturedBeforeMenu);
 
     // Show menu based on user preference
     switch (m_Preferences->overlayMenuPosition) {
@@ -2959,6 +2963,15 @@ void Session::syncQtOverlayWindowsWithSdlWindowState()
 
 void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
 {
+    // Reconnect pumps Qt events while the control stream is being replaced.
+    // Avoid sending mouse actions or replacing the reconnect notification.
+    if ((m_ConnectionInterrupted || m_SuppressConnectionErrorDialog) &&
+        (action == OverlayMenuPanel::MenuAction::ToggleMouseMode ||
+         action == OverlayMenuPanel::MenuAction::ToggleCursorHide ||
+         action == OverlayMenuPanel::MenuAction::ToggleHostCursor ||
+         action == OverlayMenuPanel::MenuAction::UngrabInput)) {
+        return;
+    }
     if (const auto placement = menuPlacementForAction(action)) {
         m_Preferences->setOverlayMenuPosition(*placement);
         m_Preferences->save();
@@ -2988,10 +3001,23 @@ void Session::dispatchQtMenuAction(OverlayMenuPanel::MenuAction action)
     case OverlayMenuPanel::MenuAction::ToggleCursorHide:
         combo = SdlInputHandler::KeyComboToggleCursorHide;
         break;
+    case OverlayMenuPanel::MenuAction::ToggleHostCursor:
+        m_InputHandler->requestHostCursorToggle();
+        return;
     case OverlayMenuPanel::MenuAction::ToggleMinimize:
         combo = SdlInputHandler::KeyComboToggleMinimize;
         break;
     case OverlayMenuPanel::MenuAction::UngrabInput:
+        // Opening the menu has already released capture. Keep it released
+        // when the user explicitly selects Ungrab, rather than recapturing
+        // it when the menu's close animation finishes.
+        if (m_MenuPanel && m_MenuPanel->isClosing() && m_WasCapturedBeforeMenu) {
+            m_WasCapturedBeforeMenu = false;
+            m_InputHandler->raiseAllKeys();
+            showStreamingToast(QCoreApplication::translate(
+                "MouseModeStatus", "Mouse released. Click the stream to resume control."));
+            return;
+        }
         combo = SdlInputHandler::KeyComboUngrabInput;
         break;
     case OverlayMenuPanel::MenuAction::PasteText:
@@ -3145,6 +3171,17 @@ void Session::showStreamingToast(const QString& message, int durationMs)
     m_Toast->showToast(parentRect.x(), parentRect.y(),
                        parentRect.width(), parentRect.height(),
                        message, durationMs);
+}
+
+bool Session::supportsSunshineCursorShortcut() const
+{
+    if (m_Computer == nullptr) {
+        return false;
+    }
+    // Match common-c's Sunshine family detection without assuming that every
+    // non-NVIDIA host implements Sunshine's keyboard shortcuts.
+    const QVector<int> version = NvHTTP::parseQuad(m_Computer->appVersion);
+    return version.size() >= 4 && version.at(3) < 0;
 }
 
 void Session::processQtOverlayEvents()
@@ -5365,6 +5402,7 @@ void Session::exec()
                 }
                 m_InputHandler->notifyFocusGained();
                 syncQtOverlayWindowsWithSdlWindowState();
+                m_InputHandler->showRelativeOverlayHintIfNeeded();
                 break;
             case SDL_WINDOWEVENT_LEAVE:
                 m_InputHandler->notifyMouseLeave();
@@ -5391,6 +5429,7 @@ void Session::exec()
             // Capture the mouse on SDL_WINDOWEVENT_ENTER if needed
             if (needsFirstEnterCapture && event.window.event == SDL_WINDOWEVENT_ENTER) {
                 m_InputHandler->setCaptureActive(true);
+                m_InputHandler->showRelativeOverlayHintIfNeeded();
                 needsFirstEnterCapture = false;
             }
 
@@ -5569,6 +5608,7 @@ void Session::exec()
                 // is set up, this ensures the window re-creation is already done.
                 if (needsPostDecoderCreationCapture) {
                     m_InputHandler->setCaptureActive(true);
+                    m_InputHandler->showRelativeOverlayHintIfNeeded();
                     needsPostDecoderCreationCapture = false;
                 }
             }

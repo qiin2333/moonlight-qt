@@ -1534,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Frigjør mus</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1585,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Slå Sunshine-markøren av/på</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Fang musen</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Mus</translation>
     </message>
 </context>
 <context>
@@ -2893,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Kan ikke laste inn bakgrunnsbildet. Prøv et annet bilde.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Musemodus: Absolutt</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Musemodus: Relativ</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Markør: Lokal</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Markør: Vertsvideo</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Musen er tatt over.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Musen er sluppet. Klikk på strømmen for å gjenoppta kontrollen.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Bytt til absolutt musemodus for å bruke en lokal markør.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Forespurte veksling av Sunshine-videomarkør.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Kunne ikke sende forespørsel om å veksle markør.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Slipp modifikasjonstastene før du bruker denne handlingen.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Kunne ikke sende forespørsel om markørmodus.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Denne verten støtter ikke synkronisering av markørform.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Hvis skrivebordsmarkøren mangler, trykker du på Ctrl+Alt+Shift+N for å slå Sunshine-videomarkøren på eller av.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Trykk Ctrl+Alt+Shift+O for å åpne overleggsmenyen.</translation>
     </message>
 </context>
 </TS>

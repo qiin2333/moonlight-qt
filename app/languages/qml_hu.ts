@@ -1534,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Egér elengedése</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1585,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Sunshine kurzor be- és kikapcsolása</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Egér rögzítése</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Egér</translation>
     </message>
 </context>
 <context>
@@ -2893,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>A háttérkép nem tölthető be. Próbáljon másik képet.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Egérmód: Abszolút</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Egérmód: Relatív</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Kurzor: Helyi</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Kurzor: Host videó</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Egér rögzítve.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Az egér feloldva. Kattintson a közvetítésre az irányítás folytatásához.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Váltson abszolút egérmódra a helyi kurzor használatához.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Sunshine videókurzor átkapcsolása kérve.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Nem sikerült elküldeni a kurzor átváltására vonatkozó kérést.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Engedje fel a módosító billentyűket, mielőtt ezt a műveletet végrehajtaná.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Nem sikerült elküldeni a kurzormódra vonatkozó kérést.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Ez a gazdagép nem támogatja a kurzor alakjának szinkronizálását.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Ha az asztali kurzor hiányzik, nyomja meg a Ctrl+Alt+Shift+N billentyűkombinációt a Sunshine videokurzor be- vagy kikapcsolásához.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>A fedvénymenü megnyitásához nyomd meg a Ctrl+Alt+Shift+O billentyűket.</translation>
     </message>
 </context>
 </TS>

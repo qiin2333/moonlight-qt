@@ -1534,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>マウスのキャプチャを解除</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1585,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Sunshineカーソルの切り替え</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>マウスのキャプチャ</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>マウス</translation>
     </message>
 </context>
 <context>
@@ -2893,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>背景画像を読み込めません。別の画像をお試しください。</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>マウスモード：絶対</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>マウスモード：相対</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>カーソル：ローカル</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>カーソル：ホストビデオ</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>マウスがキャプチャされました。</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>マウスが解放されました。ストリームをクリックしてコントロールを再開してください。</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>ローカルカーソルを使用するには、絶対マウスモードに切り替えてください。</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Sunshineビデオカーソルの切り替えをリクエストしました。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>カーソル切り替えリクエストの送信に失敗しました。</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>このアクションを使用する前に、修飾キーを離してください。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>カーソルモードのリクエストを送信できませんでした。</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>このホストは、カーソル形状の同期をサポートしていません。</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>デスクトップカーソルが表示されない場合は、Ctrl+Alt+Shift+Nを押してSunshineビデオカーソルを切り替えてください。</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Ctrl+Alt+Shift+O でオーバーレイメニューを開きます。</translation>
     </message>
 </context>
 </TS>

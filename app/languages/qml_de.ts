@@ -1534,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Maus freigeben</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1585,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Sunshine-Cursor ein-/ausschalten</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Maus erfassen</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Maus</translation>
     </message>
 </context>
 <context>
@@ -2893,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Das Hintergrundbild konnte nicht geladen werden. Versuchen Sie ein anderes Bild.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Mausmodus: Absolut</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Mausmodus: Relativ</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Cursor: Lokal</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Cursor: Host-Video</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Maus erfasst.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Maus freigegeben. Klicken Sie auf den Stream, um die Steuerung wieder aufzunehmen.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Wechseln Sie in den absoluten Mausmodus, um einen lokalen Cursor zu verwenden.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Umschaltung des Sunshine-Videocursors angefordert.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Die Anfrage zum Umschalten des Cursors konnte nicht gesendet werden.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Lassen Sie die Modifikatortasten los, bevor Sie diese Aktion ausführen.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Die Anforderung für den Mauszeigermodus konnte nicht gesendet werden.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Dieser Host unterstützt keine Synchronisierung der Cursorform.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Wenn der Desktop-Cursor fehlt, drücken Sie Strg+Alt+Umschalt+N, um den Sunshine-Videocursor ein- oder auszuschalten.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Drücke Ctrl+Alt+Shift+O, um das Overlay-Menü zu öffnen.</translation>
     </message>
 </context>
 </TS>

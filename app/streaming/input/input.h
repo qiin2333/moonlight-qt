@@ -245,9 +245,11 @@ public:
     // 显示器变化后按新的 backing 比例重建远端光标（只有 macOS 需要）
     void refreshRemoteCursorScale();
 
-    void synchronizeLocalCursorMode();
+    int synchronizeLocalCursorMode();
 
     int getLocalCursorMode() const;
+
+    StreamingPreferences::MouseMode getMouseMode() const { return m_MouseMode; }
 
     static
     QString getUnmappedGamepads();
@@ -270,6 +272,17 @@ public:
 
     // 公开 performSpecialKeyCombo 以便从悬浮菜单调用
     void performSpecialKeyCombo(KeyCombo combo);
+
+    // The Sunshine shortcut needs actual modifier key events, not only the
+    // modifier bitmask. Only the overlay invokes this synthetic chord.
+    void requestHostCursorToggle();
+
+    void showMouseModeNotification(bool includeMouseMode, int cursorResult);
+
+    // The first relative capture may happen at startup or on a windowed click.
+    void showRelativeOverlayHintIfNeeded();
+
+    bool appendRelativeOverlayHint(QString& message);
 
     // Toggle gamepad mouse emulation for the first connected gamepad
     bool toggleGamepadMouseEmulation();
@@ -458,6 +471,9 @@ private:
     StreamingPreferences::CaptureSysKeysMode m_CaptureSystemKeysMode;
     StreamingPreferences::MouseMode m_MouseMode;
     StreamingPreferences::MouseMode m_LastAbsoluteMouseMode;
+    bool m_HostCursorHintShown = false;
+    bool m_CursorFallbackHintShown = false;
+    bool m_OverlayShortcutHintShown = false;
     std::atomic<int> m_LocalCursorMode;
     bool m_RemoteCursorVisible;
     SDL_Cursor* m_RemoteCursor;

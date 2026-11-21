@@ -1534,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>சுட்டியை விடுவி</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1585,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Sunshine கர்சரை மாற்றவும்</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>மவுஸைப் பிடிக்கவும்</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>சுட்டி</translation>
     </message>
 </context>
 <context>
@@ -2893,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>பின்னணிப் படத்தை ஏற்ற முடியவில்லை. வேறொரு படத்தை முயற்சிக்கவும்.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>மவுஸ் பயன்முறை: முழுமையானது</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>மவுஸ் பயன்முறை: ஒப்பீட்டு</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>கர்சர்: உள்ளூர்</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>கர்சர்: ஹோஸ்ட் வீடியோ</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>மவுஸ் பிடிக்கப்பட்டது.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>மவுஸ் விடுவிக்கப்பட்டது. கட்டுப்பாட்டைத் தொடர ஸ்ட்ரீமைக் கிளிக் செய்யவும்.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>உள்ளூர் கர்சரைப் பயன்படுத்த முழுமையான மவுஸ் பயன்முறைக்கு மாறவும்.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Sunshine வீடியோ கர்சர் நிலை மாற்றத்தைக் கோரப்பட்டது.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>கர்சர் நிலைமாற்றக் கோரிக்கையை அனுப்ப முடியவில்லை.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>இந்தச் செயலைப் பயன்படுத்துவதற்கு முன்பு மாற்றியமைக்கும் விசங்களை விடுங்கள்.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>கர்சர் பயன்முறை கோரிக்கையை அனுப்ப முடியவில்லை.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>இந்த ஹோஸ்ட் கர்சர் வடிவ ஒத்திசைவை ஆதரிக்காது.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>டெஸ்க்டாப் கர்சர் காணப்படாவிட்டால், Sunshine வீடியோ கர்சரை மாற்ற, Ctrl+Alt+Shift+N ஐ அழுத்தவும்.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>மேலடுக்கு பட்டியலைத் திறக்க Ctrl+Alt+Shift+O அழுத்தவும்.</translation>
     </message>
 </context>
 </TS>

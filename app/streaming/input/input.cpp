@@ -620,7 +620,7 @@ bool SdlInputHandler::tryUseNativeRemoteCursor(const RemoteCursorUpdate& update)
     return true;
 }
 
-void SdlInputHandler::synchronizeLocalCursorMode()
+int SdlInputHandler::synchronizeLocalCursorMode()
 {
     const int cursorMode = m_MouseMode == StreamingPreferences::MM_ABSOLUTE_LOCAL
                                ? LI_CURSOR_MODE_LOCAL
@@ -644,6 +644,7 @@ void SdlInputHandler::synchronizeLocalCursorMode()
         cancelPendingRemoteCursorHide();
         m_RemoteCursorVisible = true;
     }
+    return result;
 }
 
 qreal SdlInputHandler::getRemoteCursorScale() const

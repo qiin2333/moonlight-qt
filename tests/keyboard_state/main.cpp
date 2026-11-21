@@ -91,5 +91,61 @@ int main(int argc, char** argv)
         return 0;
     });
     require(calls == 0, "empty state must not send spurious releases");
+
+    // Sunshine only recognizes N after three real modifier down events. The
+    // menu shortcut must not disturb unrelated held keys or leave modifiers down.
+    QSet<uint32_t> chordLocal{ enter };
+    QSet<uint32_t> chordForwarded;
+    QVector<QPair<int, int>> chordEvents;
+    auto recordChord = [&](short key, char action) {
+        chordEvents.append(
+            qMakePair(static_cast<int>(static_cast<uint16_t>(key)), static_cast<int>(action)));
+        return 0;
+    };
+    auto result =
+        KeyboardState::sendHostCursorShortcut(chordLocal, chordForwarded, false, recordChord);
+    require(result == KeyboardState::ShortcutResult::Queued && chordEvents.size() == 8,
+            "host cursor shortcut must send all four downs and ups");
+    const int expectedKeys[] = { 0x80A2, 0x80A4, 0x80A0, 0x804E, 0x804E, 0x80A0, 0x80A4, 0x80A2 };
+    for (int i = 0; i < chordEvents.size(); ++i) {
+        require(chordEvents[i].first == expectedKeys[i] &&
+                    chordEvents[i].second == (i < 4 ? KEY_ACTION_DOWN : KEY_ACTION_UP),
+                "host cursor shortcut key ordering is incorrect");
+    }
+    require(chordLocal.size() == 1 && chordLocal.contains(enter),
+            "shortcut must preserve unrelated held keys");
+    require(chordForwarded.size() == 4, "shortcut downs must enter the connection ledger");
+
+    chordEvents.clear();
+    result = KeyboardState::sendHostCursorShortcut(chordLocal, chordForwarded, true, recordChord);
+    require(result == KeyboardState::ShortcutResult::ModifierHeld && chordEvents.isEmpty(),
+            "shortcut must not interfere with physical modifiers");
+    const auto heldShift = KeyboardState::pack(static_cast<short>(0x80A1), 0, 0);
+    chordLocal.insert(heldShift);
+    result = KeyboardState::sendHostCursorShortcut(chordLocal, chordForwarded, false, recordChord);
+    require(result == KeyboardState::ShortcutResult::ModifierHeld && chordEvents.isEmpty() &&
+                chordLocal.contains(heldShift),
+            "shortcut must not release a tracked modifier");
+    chordLocal.remove(heldShift);
+
+    chordEvents.clear();
+    result = KeyboardState::sendHostCursorShortcut(
+        chordLocal, chordForwarded, false, [&](short key, char action) {
+            recordChord(key, action);
+            return static_cast<uint16_t>(key) == 0x804E && action == KEY_ACTION_DOWN ? -1 : 0;
+        });
+    require(result == KeyboardState::ShortcutResult::Failed && chordEvents.size() == 7 &&
+                chordLocal.size() == 1 && chordLocal.contains(enter),
+            "failed N down must still release all queued modifiers");
+
+    chordEvents.clear();
+    result = KeyboardState::sendHostCursorShortcut(
+        chordLocal, chordForwarded, false, [&](short key, char action) {
+            recordChord(key, action);
+            return static_cast<uint16_t>(key) == 0x80A4 && action == KEY_ACTION_UP ? -1 : 0;
+        });
+    require(result == KeyboardState::ShortcutResult::Failed &&
+                chordLocal.contains(KeyboardState::pack(static_cast<short>(0x80A4), 0, 0)),
+            "failed modifier release must remain pending for cleanup");
     return 0;
 }

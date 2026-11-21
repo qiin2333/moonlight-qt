@@ -1675,7 +1675,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>釋放滑鼠</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1726,6 +1726,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>切換 Sunshine 游標</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>擷取滑鼠</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>滑鼠</translation>
     </message>
 </context>
 <context>
@@ -3094,5 +3106,64 @@
     <message><source>Pipw image is unavailable</source><translation>Pipw 圖片無法使用</translation></message>
     <message><source>This background image is unavailable. Please try another image.</source><translation>這張背景圖片無法使用，請換一張再試。</translation></message>
     <message><source>Unable to load the background image. Please try another image.</source><translation>無法載入背景圖片，請換一張再試。</translation></message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>滑鼠模式：絕對</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>滑鼠模式：相對</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>游標：本機</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>游標：主機畫面</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>已擷取滑鼠。</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>已釋放滑鼠。按一下串流畫面即可恢復控制。</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>切換至絕對滑鼠模式後才能使用本機游標。</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>已請求切換 Sunshine 影片游標。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>無法傳送主機游標切換請求。</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>請放開修飾鍵後再執行此操作。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>無法傳送游標模式請求。</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>此主機不支援游標形狀同步。</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>如果遠端桌面沒有游標，可按 Ctrl+Alt+Shift+N 切換 Sunshine 影片游標。</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>按 Ctrl+Alt+Shift+O 開啟懸浮選單。</translation>
+    </message>
 </context>
 </TS>

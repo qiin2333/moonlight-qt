@@ -1,5 +1,6 @@
 #include "settings/streamingpreferences.h"
 #include "streaming/input/remotecursorupdate.h"
+#include "streaming/input/mousemodestatus.h"
 
 #include <QCoreApplication>
 #include <QSettings>
@@ -77,6 +78,18 @@ int main(int argc, char** argv)
             "a hidden host cursor should also be hidden locally");
     require(!P::showHostCursorLocally(P::MM_ABSOLUTE_VIDEO, true, true),
             "video cursor mode must not display a second local cursor");
+
+    bool hintShown = false;
+    require(!MouseModeStatus::takeOverlayShortcutHint(false, true, hintShown) && !hintShown,
+            "absolute mode must not consume the relative overlay hint");
+    require(!MouseModeStatus::takeOverlayShortcutHint(true, false, hintShown) && !hintShown,
+            "a disabled overlay must not consume or show the shortcut hint");
+    require(MouseModeStatus::takeOverlayShortcutHint(true, true, hintShown) && hintShown,
+            "first relative capture with an enabled overlay must show the hint");
+    require(!MouseModeStatus::takeOverlayShortcutHint(true, true, hintShown),
+            "the overlay shortcut hint must be shown only once per session");
+    require(MouseModeStatus::overlayShortcutHint().contains(QStringLiteral("Ctrl+Alt+Shift+O")),
+            "the overlay hint must name the menu shortcut");
 
     RemoteCursorUpdate shape;
     shape.hasShape = true;

@@ -2627,6 +2627,18 @@
         <source>Back</source>
         <translation>뒤로</translation>
     </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Sunshine 커서 전환</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>마우스 캡처</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>마우스</translation>
+    </message>
 </context>
 <context>
     <name>PcView</name>
@@ -4798,6 +4810,65 @@
         <location filename="../gui/main.qml" line="1042"/>
         <source>Learn more</source>
         <translation>자세히 알아보기</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>마우스 모드: 절대</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>마우스 모드: 상대</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>커서: 로컬</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>커서: 호스트 동영상</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>마우스 캡처됨.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>마우스가 해제되었습니다. 제어를 재개하려면 스트림을 클릭하세요.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>로컬 커서를 사용하려면 절대 마우스 모드로 전환하세요.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Sunshine 비디오 커서 전환을 요청했습니다.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>커서 전환 요청을 보내지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>이 작업을 사용하기 전에 모디파이어 키를 해제하세요.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>커서 모드 요청을 보내지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>이 호스트는 커서 모양 동기화를 지원하지 않습니다.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>데스크톱 커서가 없는 경우, Ctrl+Alt+Shift+N 키를 눌러 Sunshine 비디오 커서를 전환하세요.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Ctrl+Alt+Shift+O를 눌러 오버레이 메뉴를 여세요.</translation>
     </message>
 </context>
 </TS>

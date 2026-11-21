@@ -1534,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Liberigi muson</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1585,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Ŝanĝi la Sunshine-kursoron</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Preni la muson</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Muso</translation>
     </message>
 </context>
 <context>
@@ -2893,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Ne eblas ŝargi la fonbildon. Provu alian bildon.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Musreĝimo: Absoluta</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Musreĝimo: Relativa</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Kursoro: Loka</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Kursoro: Ĉefkomputila video</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Muso kaptita.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Muso liberigita. Klaku la fluon por rekomenci kontrolon.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Ŝanĝu al absoluta musreĝimo por uzi lokan kursoron.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Petis ŝanĝon de la kursoro de Sunshine-video.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Malsukcesis sendi peton pri ŝaltado de kursoro.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Liberigu modifilajn klavojn antaŭ ol uzi ĉi tiun agon.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Malsukcesis sendi peton pri kursora reĝimo.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Ĉi tiu gastiganto ne subtenas sinkronigon de la formo de la kursoro.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Se la labortabla kursoro mankas, premu Ctrl+Alt+Shift+N por ŝanĝi la Sunshine-videokursoron.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Premu Ctrl+Alt+Shift+O por malfermi la surmetan menuon.</translation>
     </message>
 </context>
 </TS>

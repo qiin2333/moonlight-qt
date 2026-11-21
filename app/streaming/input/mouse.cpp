@@ -68,6 +68,7 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
             // event to the host when clicking into our window (since
             // the pressed event was consumed by this code).
             setCaptureActive(true);
+            showRelativeOverlayHintIfNeeded();
         }
 
         // Not capturing
