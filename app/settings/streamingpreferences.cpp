@@ -32,7 +32,6 @@
 #define SER_WINDOWMODE "windowmode"
 #define SER_MDNS "mdns"
 #define SER_QUITAPPAFTER "quitAppAfter"
-#define SER_ABSMOUSEMODE "mouseacceleration"
 #define SER_ABSTOUCHMODE "abstouchmode"
 #define SER_NATIVETOUCHPAD "nativeTouchpad"
 #define SER_DUALSENSEHAPTICSMODE "dualSenseHapticsMode"
@@ -71,7 +70,6 @@
 #define SER_SCREENCOMBINATIONMODE "screencombinationmode"
 #define SER_LEGACY_CUSTOMSCREENMODE "customscreenmode"
 #define SER_LEGACY_CUSTOMVDDSCREENMODE "customvddscreenmode"
-#define SER_SHOWLOCALCURSOR "showLocalCursor"
 #define SER_MICROPHONE "microphone"
 #define SER_OVERLAYMENUPLACEMENT "overlaymenuplacement"
 #define SER_LEGACY_OVERLAYMENUPOS "overlaymenuposition"
@@ -255,8 +253,9 @@ void StreamingPreferences::reload()
     multiController = settings.value(SER_MULTICONT, true).toBool();
     enableMdns = settings.value(SER_MDNS, true).toBool();
     quitAppAfter = settings.value(SER_QUITAPPAFTER, false).toBool();
-    absoluteMouseMode = settings.value(SER_ABSMOUSEMODE, false).toBool();
-    showLocalCursor = settings.value(SER_SHOWLOCALCURSOR, false).toBool();
+    mouseMode = loadMouseMode(settings);
+    m_HasMouseModeLaunchOverride = false;
+    m_PersistedMouseMode = mouseMode;
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
     enableNativeTouchpad = settings.value(SER_NATIVETOUCHPAD, false).toBool();
 #ifdef Q_OS_WIN32
@@ -702,6 +701,30 @@ void StreamingPreferences::setGamepadUiNavigationLaunchOverride(bool enabled)
     emit enableGamepadUiNavigationChanged();
 }
 
+void StreamingPreferences::setMouseModeLaunchOverride(MouseMode mode)
+{
+    if (!m_HasMouseModeLaunchOverride) {
+        m_PersistedMouseMode = mouseMode;
+    }
+    m_HasMouseModeLaunchOverride = true;
+    if (mouseMode != mode) {
+        mouseMode = mode;
+        emit mouseModeChanged();
+    }
+}
+
+void StreamingPreferences::setMouseMode(MouseMode mode)
+{
+    if (mode < MM_RELATIVE || mode > MM_ABSOLUTE_LOCAL) {
+        return;
+    }
+    m_HasMouseModeLaunchOverride = false;
+    if (mouseMode != mode) {
+        mouseMode = mode;
+        emit mouseModeChanged();
+    }
+}
+
 void StreamingPreferences::setGamepadUiNavigationEnabled(bool enabled)
 {
     // An explicit change from the settings page ends the temporary launch
@@ -735,8 +758,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_MULTICONT, multiController);
     settings.setValue(SER_MDNS, enableMdns);
     settings.setValue(SER_QUITAPPAFTER, quitAppAfter);
-    settings.setValue(SER_ABSMOUSEMODE, absoluteMouseMode);
-    settings.setValue(SER_SHOWLOCALCURSOR, showLocalCursor);
+    saveMouseMode(settings, m_HasMouseModeLaunchOverride ? m_PersistedMouseMode : mouseMode);
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
     settings.setValue(SER_NATIVETOUCHPAD, enableNativeTouchpad);
     settings.setValue(SER_DUALSENSEHAPTICSMODE, dualSenseHapticsMode);

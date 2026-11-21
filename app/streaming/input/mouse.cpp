@@ -25,7 +25,7 @@ void SdlInputHandler::notifyMouseLeave()
         //
         // On macOS and X11, capturing the mouse allows us to receive mouse motion outside the
         // window (button up already worked without capture).
-        if (m_AbsoluteMouseMode && isCaptureActive()) {
+        if (isAbsoluteMouseMode() && isCaptureActive()) {
             // NB: Not using SDL_GetGlobalMouseState() because we want our state not the system's
             Uint32 mouseState = SDL_GetMouseState(nullptr, nullptr);
             for (Uint32 button = SDL_BUTTON_LEFT; button <= SDL_BUTTON_X2; button++) {
@@ -68,12 +68,13 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
             // event to the host when clicking into our window (since
             // the pressed event was consumed by this code).
             setCaptureActive(true);
+            showRelativeOverlayHintIfNeeded();
         }
 
         // Not capturing
         return;
-    }
-    else if (m_AbsoluteMouseMode && !isMouseInVideoRegion(event->x, event->y) && event->state == SDL_PRESSED) {
+    } else if (isAbsoluteMouseMode() && !isMouseInVideoRegion(event->x, event->y) &&
+               event->state == SDL_PRESSED) {
         // Ignore button presses outside the video region, but allow button releases
         return;
     }
@@ -157,7 +158,7 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
     // We should not reference the original event anymore
     event = nullptr;
 
-    if (m_AbsoluteMouseMode) {
+    if (isAbsoluteMouseMode()) {
         int windowWidth, windowHeight;
         getWindowCoordinateSize(&windowWidth, &windowHeight);
 
@@ -212,8 +213,7 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
         }
 
         m_MouseWasInVideoRegion = mouseInVideoRegion;
-    }
-    else {
+    } else {
         LiSendMouseMoveEvent(xrel, yrel);
     }
 }
@@ -249,7 +249,7 @@ void SdlInputHandler::handleMouseWheelEvent(SDL_MouseWheelEvent* event)
     }
 #endif
 
-    if (m_AbsoluteMouseMode) {
+    if (isAbsoluteMouseMode()) {
         int mouseX, mouseY;
         SDL_GetMouseState(&mouseX, &mouseY);
         if (!isMouseInVideoRegion(mouseX, mouseY)) {

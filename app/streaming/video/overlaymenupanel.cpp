@@ -1,5 +1,6 @@
 #include "overlaymenupanel.h"
 #include "uifont.h"
+#include "streaming/input/mousemodestatus.h"
 
 #include <QScreen>
 #include <QGuiApplication>
@@ -129,12 +130,12 @@ OverlayMenuPanel::OverlayMenuPanel(QWindow* parent, OverlayWindowMode windowMode
 
     // Reuse the same bundled Fluent 24 Regular assets as settings/toolbars.
     // Keep QIcon instances alive so Qt can cache rasterizations for each DPI.
-    for (const QString &name : {QStringLiteral("tb-settings"), QStringLiteral("menu-position"),
-             QStringLiteral("menu-bitrate"), QStringLiteral("menu-files"),
-             QStringLiteral("cat-peripherals"), QStringLiteral("cat-display"),
-             QStringLiteral("menu-microphone"), QStringLiteral("cat-gamepad"),
-             QStringLiteral("menu-close"), QStringLiteral("menu-next"),
-             QStringLiteral("tb-back")}) {
+    for (const QString& name : { QStringLiteral("tb-settings"), QStringLiteral("menu-position"),
+                                 QStringLiteral("menu-bitrate"), QStringLiteral("menu-files"),
+                                 QStringLiteral("cat-peripherals"), QStringLiteral("cat-input"),
+                                 QStringLiteral("cat-display"), QStringLiteral("menu-microphone"),
+                                 QStringLiteral("cat-gamepad"), QStringLiteral("menu-close"),
+                                 QStringLiteral("menu-next"), QStringLiteral("tb-back") }) {
         m_MenuIcons.insert(name, QIcon(QStringLiteral(":/res/fluent/%1.svg").arg(name)));
     }
 
@@ -241,7 +242,7 @@ void OverlayMenuPanel::buildMenuLevels()
         top.items.push_back(
             { tr("USB Devices"),
               m_RemoteUsbNeedsActivation ? tr("Activate device") : m_RemoteUsbDetail,
-              MenuItemType::SubMenu, MenuAction::MenuActionMax, 4, true, false,
+              MenuItemType::SubMenu, MenuAction::MenuActionMax, 5, true, false,
 #ifdef MOONLIGHT_ENABLE_FUNCTION_TESTS
               false });
 #else
@@ -254,6 +255,8 @@ void OverlayMenuPanel::buildMenuLevels()
                          MenuItemType::Action,
                          MenuAction::OpenStylusReplayPanel, 0, true, false, true});
 #endif
+    top.items.push_back({ tr("Mouse"), QString(), MenuItemType::SubMenu, MenuAction::MenuActionMax,
+                          4, true, false, false });
     top.items.push_back({tr("Toggle Fullscreen"), QString(), MenuItemType::Action,
                          MenuAction::ToggleFullScreen, 0, true, false, false});
     top.items.push_back({tr("Microphone"),    QString(),  MenuItemType::Toggle,
@@ -284,14 +287,8 @@ void OverlayMenuPanel::buildMenuLevels()
     }
     shortcuts.items.push_back({ tr("Performance Stats"), statsDetail, MenuItemType::Action,
                                 MenuAction::ToggleStatsOverlay, 0, true, false, true });
-    shortcuts.items.push_back({tr("Mouse Mode"),          "Ctrl+Alt+Shift+M", MenuItemType::Action,
-                               MenuAction::ToggleMouseMode,       0, true, false, false});
-    shortcuts.items.push_back({tr("Show/Hide Cursor"),    "Ctrl+Alt+Shift+C", MenuItemType::Action,
-                               MenuAction::ToggleCursorHide,      0, true, false, false});
-    shortcuts.items.push_back({tr("Minimize"),            "Ctrl+Alt+Shift+D", MenuItemType::Action,
-                               MenuAction::ToggleMinimize,        0, true, false, true});
-    shortcuts.items.push_back({tr("Ungrab Mouse"),        "Ctrl+Alt+Shift+Z", MenuItemType::Action,
-                               MenuAction::UngrabInput,           0, true, false, false});
+    shortcuts.items.push_back({ tr("Minimize"), "Ctrl+Alt+Shift+D", MenuItemType::Action,
+                                MenuAction::ToggleMinimize, 0, true, false, true });
     shortcuts.items.push_back({tr("Paste Clipboard"),     "Ctrl+Alt+Shift+V", MenuItemType::Action,
                                MenuAction::PasteText,             0, true, false, false});
     shortcuts.items.push_back({tr("Pointer Region Lock"), "Ctrl+Alt+Shift+L", MenuItemType::Action,
@@ -328,7 +325,24 @@ void OverlayMenuPanel::buildMenuLevels()
                                MenuAction::SetMenuPlacementDisabled, 0, true, false, false});
     m_MenuLevels.push_back(placement);
 
-    // === Level 4: Remote USB devices ===
+    // === Level 4: Mouse actions. Shortcut details are rendered as a second line. ===
+    MenuLevel mouse;
+    mouse.title = tr("Mouse");
+    mouse.items.push_back({ MouseModeStatus::mouseMode(m_AbsoluteMouse), "Ctrl+Alt+Shift+M",
+                            MenuItemType::Action, MenuAction::ToggleMouseMode, 0, true, false,
+                            false });
+    mouse.items.push_back({ MouseModeStatus::cursorMode(m_LocalCursor), "Ctrl+Alt+Shift+C",
+                            MenuItemType::Action, MenuAction::ToggleCursorHide, 0, true, false,
+                            false });
+    mouse.items.push_back({ tr("Toggle Sunshine cursor"), "Ctrl+Alt+Shift+N", MenuItemType::Action,
+                            MenuAction::ToggleHostCursor, 0, m_SunshineCursorShortcut, false,
+                            false });
+    mouse.items.push_back({ m_MouseCaptured ? tr("Ungrab Mouse") : tr("Capture Mouse"),
+                            "Ctrl+Alt+Shift+Z", MenuItemType::Action, MenuAction::UngrabInput, 0,
+                            true, false, false });
+    m_MenuLevels.push_back(std::move(mouse));
+
+    // === Level 5: Remote USB devices ===
     if (m_RemoteUsbAvailable) {
         MenuLevel usb;
         usb.title = tr("USB Devices");
@@ -398,6 +412,24 @@ void OverlayMenuPanel::buildMenuLevels()
     // Rebuilds (gamepad set / USB refresh) wipe derived details; re-stamp
     // the bitrate state so the scrubber row and preset checkmarks survive.
     refreshBitrateDetails();
+}
+
+void OverlayMenuPanel::updateMouseState(bool absolute, bool localCursor, bool sunshineHost,
+                                        bool captured)
+{
+    if (m_AbsoluteMouse == absolute && m_LocalCursor == localCursor &&
+        m_SunshineCursorShortcut == sunshineHost && m_MouseCaptured == captured) {
+        return;
+    }
+    m_AbsoluteMouse = absolute;
+    m_LocalCursor = localCursor;
+    m_SunshineCursorShortcut = sunshineHost;
+    m_MouseCaptured = captured;
+    buildMenuLevels();
+    if (m_Visible) {
+        repositionWindow();
+        forceRepaint();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -670,8 +702,8 @@ void OverlayMenuPanel::updateRemoteUsbState(
     m_RemoteUsbDetail = detail;
     const int previousLevel = m_CurrentLevel;
     buildMenuLevels();
-    if (m_Visible && previousLevel == 4 && m_MenuLevels.size() > 4) {
-        m_CurrentLevel = 4;
+    if (m_Visible && previousLevel == 5 && m_MenuLevels.size() > 5) {
+        m_CurrentLevel = 5;
     }
     if (m_Visible) {
         repositionWindow();
@@ -1138,7 +1170,10 @@ void OverlayMenuPanel::paintOverlay(QPainter& p)
             case 1: return QStringLiteral("tb-settings");
             case 2: return QStringLiteral("menu-bitrate");
             case 3: return QStringLiteral("menu-position");
-            case 4: return QStringLiteral("cat-peripherals");
+            case 4:
+                return QStringLiteral("cat-input");
+            case 5:
+                return QStringLiteral("cat-peripherals");
             }
         }
         switch (item.action) {
@@ -1174,8 +1209,8 @@ void OverlayMenuPanel::paintOverlay(QPainter& p)
         }
         const bool activationPrompt =
             m_RemoteUsbNeedsActivation &&
-            ((m_CurrentLevel == 0 && item.type == MenuItemType::SubMenu && item.targetLevel == 4) ||
-             (m_CurrentLevel == 4 && item.action == MenuAction::SelectRemoteUsbDevice &&
+            ((m_CurrentLevel == 0 && item.type == MenuItemType::SubMenu && item.targetLevel == 5) ||
+             (m_CurrentLevel == 5 && item.action == MenuAction::SelectRemoteUsbDevice &&
               item.enabled));
         if (activationPrompt) {
             p.fillRect(QRect(4, itemY + 4, 4, m_ItemHeight - 8), MenuAccent);

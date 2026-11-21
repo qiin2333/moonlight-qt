@@ -1721,6 +1721,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>절대 마우스 모드</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>마우스 이동량 대신 위치를 전송합니다. 원격 데스크톱에 적합하며 대부분의 게임에는 상대 모드가 더 적합합니다.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>원격 커서를 로컬에 표시</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>로컬 포인터로 원격 커서를 표시합니다. 커서 모양은 호스트 지원 여부에 따라 달라집니다. 절대 마우스 모드가 필요합니다.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="43"/>
         <source>Audio Settings</source>
         <translation>오디오 설정</translation>
@@ -2606,6 +2626,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="1344"/>
         <source>Back</source>
         <translation>뒤로</translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Sunshine 커서 전환</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>마우스 캡처</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>마우스</translation>
     </message>
 </context>
 <context>
@@ -3977,6 +4009,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>비디오 디코더를 초기화 할 수 없습니다. 스트리밍 설정을 확인하고 다시 시도하십시오.</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>절대 마우스 모드는 게임에서 문제를 일으킬 수 있습니다.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -4774,6 +4810,65 @@
         <location filename="../gui/main.qml" line="1042"/>
         <source>Learn more</source>
         <translation>자세히 알아보기</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>마우스 모드: 절대</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>마우스 모드: 상대</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>커서: 로컬</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>커서: 호스트 동영상</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>마우스 캡처됨.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>마우스가 해제되었습니다. 제어를 재개하려면 스트림을 클릭하세요.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>로컬 커서를 사용하려면 절대 마우스 모드로 전환하세요.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Sunshine 비디오 커서 전환을 요청했습니다.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>커서 전환 요청을 보내지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>이 작업을 사용하기 전에 모디파이어 키를 해제하세요.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>커서 모드 요청을 보내지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>이 호스트는 커서 모양 동기화를 지원하지 않습니다.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>데스크톱 커서가 없는 경우, Ctrl+Alt+Shift+N 키를 눌러 Sunshine 비디오 커서를 전환하세요.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Ctrl+Alt+Shift+O를 눌러 오버레이 메뉴를 여세요.</translation>
     </message>
 </context>
 </TS>

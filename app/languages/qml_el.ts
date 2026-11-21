@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Απόλυτη λειτουργία ποντικιού</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Στέλνει τη θέση του ποντικιού αντί για την κίνησή του. Είναι ιδανική για απομακρυσμένη επιφάνεια εργασίας· η σχετική λειτουργία είναι καλύτερη για τα περισσότερα παιχνίδια.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Τοπική εμφάνιση του απομακρυσμένου δρομέα</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Χρησιμοποιεί τον τοπικό δείκτη για την εμφάνιση του απομακρυσμένου δρομέα. Το σχήμα του δρομέα εξαρτάται από την υποστήριξη του κεντρικού υπολογιστή. Απαιτείται η απόλυτη λειτουργία ποντικιού.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Ρυθμίσεις ήχου</translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Απελευθέρωση ποντικιού</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Εναλλαγή δρομέα Sunshine</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Καταγραφή ποντικιού</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Ποντίκι</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Αδυναμία αρχικοποίησης του αποκωδικοποιητή βίντεο. Ελέγξτε τις ρυθμίσεις ροής και δοκιμάστε ξανά.</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Η απόλυτη λειτουργία ποντικιού μπορεί να προκαλέσει προβλήματα στα παιχνίδια.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Δεν ήταν δυνατή η φόρτωση της εικόνας φόντου. Δοκιμάστε άλλη εικόνα.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Λειτουργία ποντικιού: Απόλυτη</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Λειτουργία ποντικιού: Σχετική</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Δείκτης: Τοπικός</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Δείκτης: Βίντεο κεντρικού υπολογιστή</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Το ποντίκι καταγράφηκε.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Το ποντίκι απελευθερώθηκε. Κάντε κλικ στη ροή για να ανακτήσετε τον έλεγχο.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Μεταβείτε στην απόλυτη λειτουργία ποντικιού για να χρησιμοποιήσετε έναν τοπικό δείκτη.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Ζητήθηκε εναλλαγή του δείκτη βίντεο του Sunshine.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Αποτυχία αποστολής αιτήματος εναλλαγής του δείκτη.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Αφήστε τα πλήκτρα τροποποίησης πριν χρησιμοποιήσετε αυτήν την ενέργεια.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Αποτυχία αποστολής αιτήματος λειτουργίας δείκτη.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Αυτός ο κεντρικός υπολογιστής δεν υποστηρίζει τον συγχρονισμό του σχήματος του δρομέα.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Εάν λείπει ο δείκτης της επιφάνειας εργασίας, πατήστε Ctrl+Alt+Shift+N για να ενεργοποιήσετε/απενεργοποιήσετε τον δείκτη βίντεο του Sunshine.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Πατήστε Ctrl+Alt+Shift+O για να ανοίξετε το μενού επικάλυψης.</translation>
     </message>
 </context>
 </TS>

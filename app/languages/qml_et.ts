@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Absoluutne hiirerežiim</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Saadab hiire liikumise asemel selle asukoha. Sobib kaugtöölauale; suhteline režiim on enamiku mängude jaoks parem.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Kuva kaugkursor kohalikult</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Kasutab kaugkursori kuvamiseks kohalikku kursorit. Kursori kuju sõltub hosti toest. Vajab absoluutset hiirerežiimi.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation type="unfinished"></translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Vabasta hiir</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Lülita Sunshine'i kursor sisse/välja</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Jäädvusta hiir</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Hiir</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Absoluutne hiirerežiim võib mängudes probleeme tekitada.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Taustapilti ei saa laadida. Proovige mõnda muud pilti.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Hiire režiim: absoluutne</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Hiire režiim: suhteline</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Kursor: kohalik</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Kursor: hosti video</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Hiir on hõivatud.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Hiir vabastatud. Juhtimise jätkamiseks klõpsake voogu.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Lülitu absoluutsele hiirerežiimile, et kasutada kohalikku kursorit.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Taotleti Sunshine'i videokursori ümberlülitamist.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Kursori ümberlülitamise taotluse saatmine nurjus.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Enne selle toimingu kasutamist vabastage modifikaatoriklahvid.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Kursori režiimi päringu saatmine nurjus.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>See host ei toeta kursori kuju sünkroonimist.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Kui töölaua kursor puudub, vajutage Sunshine'i videokursori sisse- ja väljalülitamiseks klahvikombinatsiooni Ctrl+Alt+Shift+N.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Ülekattemenüü avamiseks vajuta Ctrl+Alt+Shift+O.</translation>
     </message>
 </context>
 </TS>

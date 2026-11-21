@@ -22,6 +22,8 @@ Column {
     property string category: ""
     // 关闭捕获时保留用户上次选择的作用范围，重新开启后恢复原模式。
     property int captureSysKeysSelection: StreamingPreferences.CSK_FULLSCREEN
+    // Remember the absolute cursor choice while this settings page is open.
+    property int lastAbsoluteMouseMode: StreamingPreferences.MM_ABSOLUTE_LOCAL
 
     function applyLocalBackgroundImage(fileUrl) {
         var validationError = localBackgroundImageUtils.validateLocalBackgroundImage(fileUrl)
@@ -407,22 +409,39 @@ Column {
         title: qsTr("Mouse")
 
         ToggleRow {
-            title: qsTr("Optimize mouse for remote desktop instead of games")
-            searchKeywords: "Optimize mouse for remote desktop instead of games"
-            description: qsTr("This enables seamless mouse control without capturing the client's mouse cursor. It is ideal for remote desktop usage but will not work in most games.") + " " +
+            title: qsTr("Absolute mouse mode")
+            searchKeywords: "Absolute mouse mode relative mouse mode remote desktop games"
+            description: qsTr("Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.") + " " +
                          qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+M.") + "\n\n" +
                          qsTr("NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.")
-            checked: StreamingPreferences.absoluteMouseMode
-            onToggled: function(value) { StreamingPreferences.absoluteMouseMode = value }
+            checked: StreamingPreferences.mouseMode !== StreamingPreferences.MM_RELATIVE
+            onToggled: function(value) {
+                if (value) {
+                    StreamingPreferences.mouseMode = settingsPage.lastAbsoluteMouseMode
+                }
+                else {
+                    settingsPage.lastAbsoluteMouseMode = StreamingPreferences.mouseMode === StreamingPreferences.MM_ABSOLUTE_VIDEO
+                                                      ? StreamingPreferences.MM_ABSOLUTE_VIDEO
+                                                      : StreamingPreferences.MM_ABSOLUTE_LOCAL
+                    StreamingPreferences.mouseMode = StreamingPreferences.MM_RELATIVE
+                }
+            }
         }
 
         ToggleRow {
-            title: qsTr("Show local cursor")
-            searchKeywords: "Show local cursor"
-            description: qsTr("This makes the client's mouse cursor visible in the stream.") + " " +
-                         qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.")
-            checked: StreamingPreferences.showLocalCursor
-            onToggled: function(value) { StreamingPreferences.showLocalCursor = value }
+            title: qsTr("Display remote cursor locally")
+            searchKeywords: "Display remote cursor locally show local cursor pointer"
+            description: qsTr("Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.") + " " +
+                         qsTr("You can toggle this while streaming using Ctrl+Alt+Shift+C.") + "\n\n" +
+                         qsTranslate("MouseModeStatus", "If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.")
+            controlEnabled: StreamingPreferences.mouseMode !== StreamingPreferences.MM_RELATIVE
+            checked: StreamingPreferences.mouseMode === StreamingPreferences.MM_ABSOLUTE_LOCAL
+            onToggled: function(value) {
+                if (StreamingPreferences.mouseMode !== StreamingPreferences.MM_RELATIVE) {
+                    StreamingPreferences.mouseMode = value ? StreamingPreferences.MM_ABSOLUTE_LOCAL
+                                                          : StreamingPreferences.MM_ABSOLUTE_VIDEO
+                }
+            }
         }
 
         ToggleRow {
