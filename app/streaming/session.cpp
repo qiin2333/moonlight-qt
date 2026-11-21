@@ -3178,9 +3178,16 @@ bool Session::supportsSunshineCursorShortcut() const
     if (m_Computer == nullptr) {
         return false;
     }
+
+    QString appVersion;
+    {
+        QReadLocker locker(&m_Computer->lock);
+        appVersion = m_Computer->appVersion;
+    }
+
     // Match common-c's Sunshine family detection without assuming that every
     // non-NVIDIA host implements Sunshine's keyboard shortcuts.
-    const QVector<int> version = NvHTTP::parseQuad(m_Computer->appVersion);
+    const QVector<int> version = NvHTTP::parseQuad(appVersion);
     return version.size() >= 4 && version.at(3) < 0;
 }
 
