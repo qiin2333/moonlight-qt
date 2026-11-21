@@ -3,6 +3,7 @@
 #include <Limelight.h>
 #include "SDL_compat.h"
 #include "keyboardstate.h"
+#include "mousemodestatus.h"
 
 #define VK_0 0x30
 #define VK_A 0x41
@@ -38,6 +39,17 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         // Force raise all keys to ensure they aren't stuck,
         // since we won't get their key up events.
         raiseAllKeys();
+        if (!Session::get()->m_ConnectionInterrupted &&
+            !Session::get()->m_SuppressConnectionErrorDialog) {
+            const bool captured = isCaptureActive();
+            QString message =
+                captured
+                    ? QCoreApplication::translate("MouseModeStatus", "Mouse captured.")
+                    : QCoreApplication::translate(
+                          "MouseModeStatus", "Mouse released. Click the stream to resume control.");
+            const bool showHint = captured && appendRelativeOverlayHint(message);
+            Session::get()->showStreamingToast(message, showHint ? 5000 : 2000);
+        }
         break;
 
     case KeyComboToggleFullScreen:
@@ -59,7 +71,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
                                                             !Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug));
         break;
 
-    case KeyComboToggleMouseMode:
+    case KeyComboToggleMouseMode: {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected mouse mode toggle combo");
 
@@ -67,26 +79,38 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         setCaptureActive(false);
 
         // Toggle mouse mode
-        m_AbsoluteMouseMode = !m_AbsoluteMouseMode;
-        synchronizeLocalCursorMode();
+        m_MouseMode =
+            StreamingPreferences::toggleMouseInputMode(m_MouseMode, m_LastAbsoluteMouseMode);
+        const int cursorResult = synchronizeLocalCursorMode();
 
         // Recapture input
         setCaptureActive(true);
+        showMouseModeNotification(true, cursorResult);
         break;
+    }
 
     case KeyComboToggleCursorHide:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected show mouse combo");
 
-        if (!SDL_GetRelativeMouseMode()) {
-            // 切换本地鼠标光标可见性状态
-            m_MouseCursorCapturedVisibilityState = !m_MouseCursorCapturedVisibilityState;
-            synchronizeLocalCursorMode();
-            applyCapturedCursorState();
-        }
-        else {
+        if (isAbsoluteMouseMode()) {
+            m_MouseMode = StreamingPreferences::toggleMouseCursorMode(m_MouseMode);
+            m_LastAbsoluteMouseMode = m_MouseMode;
+            const int cursorResult = synchronizeLocalCursorMode();
+            if (isCaptureActive()) {
+                applyCapturedCursorState();
+            }
+            showMouseModeNotification(false, cursorResult);
+        } else {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Cursor can only be shown in remote desktop mouse mode");
+            if (!Session::get()->m_ConnectionInterrupted &&
+                !Session::get()->m_SuppressConnectionErrorDialog) {
+                Session::get()->showStreamingToast(
+                    QCoreApplication::translate(
+                        "MouseModeStatus", "Switch to absolute mouse mode to use a local cursor."),
+                    3500);
+            }
         }
         break;
 
@@ -175,6 +199,101 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
     default:
         Q_UNREACHABLE();
     }
+}
+
+void SdlInputHandler::showMouseModeNotification(bool includeMouseMode, int cursorResult)
+{
+    Session* session = Session::get();
+    if (session == nullptr || session->m_ConnectionInterrupted ||
+        session->m_SuppressConnectionErrorDialog) {
+        return;
+    }
+
+    const bool absolute = isAbsoluteMouseMode();
+    const bool local = m_MouseMode == StreamingPreferences::MM_ABSOLUTE_LOCAL;
+    QString message = MouseModeStatus::cursorMode(local);
+    if (includeMouseMode) {
+        message = MouseModeStatus::mouseMode(absolute) + QStringLiteral(" · ") + message;
+    }
+    const bool showOverlayHint = appendRelativeOverlayHint(message);
+    int duration = showOverlayHint ? 5000 : 2000;
+    if (cursorResult != LI_CURSOR_MODE_OK && cursorResult != LI_CURSOR_MODE_ERR_UNSUPPORTED) {
+        message +=
+            QStringLiteral("\n") +
+            QCoreApplication::translate("MouseModeStatus", "Failed to send cursor mode request.");
+        duration = showOverlayHint ? 5000 : 4000;
+    } else if (local && cursorResult == LI_CURSOR_MODE_ERR_UNSUPPORTED &&
+               !m_CursorFallbackHintShown) {
+        m_CursorFallbackHintShown = true;
+        message +=
+            QStringLiteral("\n") +
+            QCoreApplication::translate("MouseModeStatus",
+                                        "This host does not support cursor shape synchronization.");
+        duration = 4000;
+    } else if (!local && !showOverlayHint && session->supportsSunshineCursorShortcut() &&
+               !m_HostCursorHintShown) {
+        m_HostCursorHintShown = true;
+        message += QStringLiteral("\n") +
+                   QCoreApplication::translate(
+                       "MouseModeStatus", "If the desktop cursor is missing, press "
+                                          "Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.");
+        duration = 5000;
+    }
+    session->showStreamingToast(message, duration);
+}
+
+bool SdlInputHandler::appendRelativeOverlayHint(QString& message)
+{
+    Session* session = Session::get();
+    if (session == nullptr || session->m_Toast == nullptr || !session->isStreamingWindowVisible() ||
+        !session->isStreamingWindowFocused() || !session->qtOverlayParentGeometry().isValid()) {
+        return false;
+    }
+    if (!MouseModeStatus::takeOverlayShortcutHint(!isAbsoluteMouseMode(),
+                                                  session->m_Preferences->overlayMenuPosition !=
+                                                      StreamingPreferences::OMP_DISABLED,
+                                                  m_OverlayShortcutHintShown)) {
+        return false;
+    }
+    message += QStringLiteral("\n") + MouseModeStatus::overlayShortcutHint();
+    return true;
+}
+
+void SdlInputHandler::showRelativeOverlayHintIfNeeded()
+{
+    Session* session = Session::get();
+    if (session == nullptr || session->m_ConnectionInterrupted ||
+        session->m_SuppressConnectionErrorDialog || !isCaptureActive()) {
+        return;
+    }
+    QString message = MouseModeStatus::mouseMode(false);
+    if (appendRelativeOverlayHint(message)) {
+        session->showStreamingToast(message, 5000);
+    }
+}
+
+void SdlInputHandler::requestHostCursorToggle()
+{
+    Session* session = Session::get();
+    if (session == nullptr || session->m_ConnectionInterrupted ||
+        session->m_SuppressConnectionErrorDialog || !session->supportsSunshineCursorShortcut()) {
+        return;
+    }
+    const bool modifiersHeld = (SDL_GetModState() & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT)) != 0;
+    const auto result = KeyboardState::sendHostCursorShortcut(
+        m_KeysDown, m_ForwardedKeys, modifiersHeld,
+        [](short key, char action) { return LiSendKeyboardEvent2(key, action, 0, 0); });
+    const QString message =
+        result == KeyboardState::ShortcutResult::Queued
+            ? QCoreApplication::translate("MouseModeStatus",
+                                          "Requested Sunshine video cursor toggle.")
+        : result == KeyboardState::ShortcutResult::ModifierHeld
+            ? QCoreApplication::translate("MouseModeStatus",
+                                          "Release modifier keys before using this action.")
+            : QCoreApplication::translate("MouseModeStatus",
+                                          "Failed to send cursor toggle request.");
+    session->showStreamingToast(message,
+                                result == KeyboardState::ShortcutResult::Queued ? 2000 : 4000);
 }
 
 void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
@@ -544,6 +663,19 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         // the client. Keep the key in the connection ledger until cleanup so a
         // later disconnect can release it even if the queued KEY_UP was lost.
         m_ForwardedKeys.insert(keyState);
+    }
+    if (event->state == SDL_PRESSED && event->keysym.scancode == SDL_SCANCODE_N &&
+        (event->keysym.mod & KMOD_CTRL) && (event->keysym.mod & KMOD_ALT) &&
+        (event->keysym.mod & KMOD_SHIFT) && Session::get() != nullptr &&
+        Session::get()->supportsSunshineCursorShortcut() &&
+        !Session::get()->m_ConnectionInterrupted &&
+        !Session::get()->m_SuppressConnectionErrorDialog) {
+        const QString message =
+            rc == 0 ? QCoreApplication::translate("MouseModeStatus",
+                                                  "Requested Sunshine video cursor toggle.")
+                    : QCoreApplication::translate("MouseModeStatus",
+                                                  "Failed to send cursor toggle request.");
+        Session::get()->showStreamingToast(message, rc == 0 ? 2000 : 4000);
     }
 }
 

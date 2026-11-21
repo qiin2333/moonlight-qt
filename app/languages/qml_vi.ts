@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Chế độ chuột tuyệt đối</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Gửi vị trí thay vì chuyển động của chuột. Phù hợp với màn hình máy tính từ xa; chế độ tương đối tốt hơn cho hầu hết trò chơi.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Hiển thị con trỏ từ xa trên máy này</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Dùng con trỏ cục bộ để hiển thị con trỏ từ xa. Hình dạng con trỏ phụ thuộc vào khả năng hỗ trợ của máy chủ. Cần bật chế độ chuột tuyệt đối.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Cài đặt âm thanh</translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Thả chuột</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Chuyển đổi con trỏ Sunshine</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Bắt chuột</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Chuột</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Không thể khởi tạo trình giải mã video. Vui lòng kiểm tra cài đặt stream của bạn và thử lại.</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Chế độ chuột tuyệt đối có thể gây ra vấn đề trong trò chơi.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Không thể tải ảnh nền. Hãy thử ảnh khác.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Chế độ chuột: Tuyệt đối</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Chế độ chuột: Tương đối</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Con trỏ: Cục bộ</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Con trỏ: Video máy chủ</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Đã bắt chuột.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Đã thả chuột. Nhấp vào màn hình truyền để tiếp tục điều khiển.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Chuyển sang chế độ chuột tuyệt đối để dùng con trỏ cục bộ.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Đã yêu cầu chuyển đổi con trỏ video Sunshine.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Không thể gửi yêu cầu chuyển đổi con trỏ.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Hãy thả các phím bổ trợ trước khi thực hiện thao tác này.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Không thể gửi yêu cầu chế độ con trỏ.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Máy chủ này không hỗ trợ đồng bộ hình dạng con trỏ.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Nếu không thấy con trỏ trên màn hình nền, hãy nhấn Ctrl+Alt+Shift+N để chuyển đổi con trỏ video Sunshine.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Nhấn Ctrl+Alt+Shift+O để mở menu lớp phủ.</translation>
     </message>
 </context>
 </TS>

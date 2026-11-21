@@ -13,6 +13,7 @@
     <file alias="menu-next.svg">../../app/res/fluent/menu-next.svg</file>
     <file alias="tb-settings.svg">../../app/res/fluent/tb-settings.svg</file>
     <file alias="cat-peripherals.svg">../../app/res/fluent/cat-peripherals.svg</file>
+    <file alias="cat-input.svg">../../app/res/fluent/cat-input.svg</file>
     <file alias="cat-display.svg">../../app/res/fluent/cat-display.svg</file>
     <file alias="cat-gamepad.svg">../../app/res/fluent/cat-gamepad.svg</file>
     <file alias="tb-back.svg">../../app/res/fluent/tb-back.svg</file>

@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>निरपेक्ष माउस मोड</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>माउस की गति के बजाय उसकी स्थिति भेजता है। रिमोट डेस्कटॉप के लिए उपयुक्त; अधिकांश गेम के लिए सापेक्ष मोड बेहतर है।</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>रिमोट कर्सर स्थानीय रूप से दिखाएँ</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>रिमोट कर्सर दिखाने के लिए स्थानीय पॉइंटर का उपयोग करता है। कर्सर का आकार होस्ट के समर्थन पर निर्भर करता है। निरपेक्ष माउस मोड आवश्यक है।</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation type="unfinished"></translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>माउस छोड़ें</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Sunshine कर्सर टॉगल करें</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>माउस कैप्चर करें</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>माउस</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>एब्सोल्यूट माउस मोड गेम में समस्याएँ पैदा कर सकता है।</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>पृष्ठभूमि चित्र लोड नहीं किया जा सकता। किसी दूसरे चित्र का उपयोग करें।</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>माउस मोड: एब्सल्यूट</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>माउस मोड: रिलेटिव</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>कर्सर: लोकल</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>कर्सर: होस्ट वीडियो</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>माउस कैप्चर किया गया।</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>माउस छोड़ा गया। कंट्रोल फिर से शुरू करने के लिए स्ट्रीम पर क्लिक करें।</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>लोकल कर्सर का इस्तेमाल करने के लिए एब्सल्यूट माउस मोड पर स्विच करें।</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Sunshine वीडियो कर्सर टॉगल का अनुरोध किया गया।</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>कर्सर टॉगल अनुरोध भेजना विफल रहा।</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>इस एक्शन का इस्तेमाल करने से पहले मॉडिफ़ायर की को छोड़ें।</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>कर्सर मोड का अनुरोध भेजने में विफल रहा।</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>यह होस्ट कर्सर के आकार के सिंक्रोनाइज़ेशन को सपोर्ट नहीं करता है।</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>अगर डेस्कटॉप कर्सर मौजूद नहीं है, तो Sunshine वीडियो कर्सर को टॉगल करने के लिए Ctrl+Alt+Shift+N दबाएँ।</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>ओवरले मेनू खोलने के लिए Ctrl+Alt+Shift+O दबाएँ।</translation>
     </message>
 </context>
 </TS>

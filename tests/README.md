@@ -29,6 +29,8 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | ds5_ir_renderer | DualSense IR 渲染、PCM 边界和控制报文 | Windows |
 | ds5_haptics_worker | 生产发送线程的状态顺序、阻塞写入、设备切换、停止屏障和短效果排空 | Windows |
 | keyboard_state | 扩展键区分、国际键标志、失焦松键失败重试 | Windows |
+| mouse_mode | 鼠标模式旧配置迁移、持久化及快捷键状态转换 | Windows |
+| cli_mouse_mode | 鼠标模式命令行参数、旧参数兼容和冲突 | Windows |
 | gamepad_sensor_rate | 低传感器频率周期存储、禁用值、全频率范围限速上界 | Windows |
 | pen_history_selection | 手写笔历史选择 | Windows |
 | stylus_replay | 手写笔录制回放 | Windows |

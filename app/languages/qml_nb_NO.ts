@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Absolutt musemodus</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Sender museposisjonen i stedet for bevegelsen. Passer best for eksternt skrivebord; relativ modus er bedre for de fleste spill.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Vis ekstern markør lokalt</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Bruker den lokale pekeren til å vise den eksterne markøren. Markørformen avhenger av støtte på verten. Krever absolutt musemodus.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Lydinnstillinger</translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Frigjør mus</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Slå Sunshine-markøren av/på</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Fang musen</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Mus</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Kunne ikke starte videodekoder. Sjekk strømmeinnstillingene dine og prøv igjen.</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Absolutt musemodus kan forårsake problemer i spill.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Kan ikke laste inn bakgrunnsbildet. Prøv et annet bilde.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Musemodus: Absolutt</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Musemodus: Relativ</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Markør: Lokal</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Markør: Vertsvideo</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Musen er tatt over.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Musen er sluppet. Klikk på strømmen for å gjenoppta kontrollen.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Bytt til absolutt musemodus for å bruke en lokal markør.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Forespurte veksling av Sunshine-videomarkør.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Kunne ikke sende forespørsel om å veksle markør.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Slipp modifikasjonstastene før du bruker denne handlingen.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Kunne ikke sende forespørsel om markørmodus.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Denne verten støtter ikke synkronisering av markørform.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Hvis skrivebordsmarkøren mangler, trykker du på Ctrl+Alt+Shift+N for å slå Sunshine-videomarkøren på eller av.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Trykk Ctrl+Alt+Shift+O for å åpne overleggsmenyen.</translation>
     </message>
 </context>
 </TS>

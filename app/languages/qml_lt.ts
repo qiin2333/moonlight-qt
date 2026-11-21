@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Absoliutus pelės režimas</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Siunčia pelės padėtį, o ne judėjimą. Tinka nuotoliniam darbalaukiui; daugumai žaidimų geriau naudoti santykinį režimą.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Rodyti nuotolinį žymeklį vietoje</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>Nuotolinis žymeklis rodomas naudojant vietinį žymeklį. Žymeklio forma priklauso nuo pagrindinio kompiuterio palaikymo. Reikalingas absoliutus pelės režimas.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation type="unfinished"></translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Atlaisvinti pelę</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Perjungti „Sunshine“ žymeklį</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Perimti pelės valdymą</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Pelė</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Absoliutus pelės režimas gali sukelti problemų žaidimuose.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Nepavyko įkelti fono paveikslėlio. Pabandykite kitą paveikslėlį.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Pelės režimas: absoliutus</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Pelės režimas: santykinis</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Žymeklis: vietinis</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Žymeklis: pagrindinio kompiuterio vaizdo įrašas</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Pelė užfiksuota.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Pelė atleista. Spustelėkite transliaciją, kad vėl perimtumėte valdymą.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Perjunkite į absoliutųjį pelės režimą, kad galėtumėte naudoti vietinį žymeklį.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Prašoma perjungti „Sunshine“ vaizdo žymeklį.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Nepavyko išsiųsti žymeklio perjungimo užklausos.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Prieš naudodami šį veiksmą, atleiskite modifikatoriaus klavišus.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Nepavyko išsiųsti žymeklio režimo užklausos.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Šis pagrindinis kompiuteris nepalaiko žymeklio formos sinchronizavimo.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Jei darbalaukio žymeklio nėra, paspauskite Ctrl+Alt+Shift+N, kad perjungtumėte „Sunshine“ vaizdo žymeklį.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Paspauskite Ctrl+Alt+Shift+O, kad atvertumėte perdangos meniu.</translation>
     </message>
 </context>
 </TS>

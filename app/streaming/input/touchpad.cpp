@@ -542,7 +542,7 @@ void SdlInputHandler::handleWindowsTouchpadFrame(uint64_t deviceId,
                                                  uint16_t deviceWidthMm,
                                                  uint16_t deviceHeightMm)
 {
-    if (!isCaptureActive() || m_AbsoluteMouseMode) {
+    if (!isCaptureActive() || isAbsoluteMouseMode()) {
         cancelWindowsTouchpadContacts();
         return;
     }
@@ -748,10 +748,8 @@ void SdlInputHandler::sendWindowsTouchpadMouseButton(bool down)
 
 bool SdlInputHandler::shouldSuppressWindowsTouchpadMouseEvent(Uint32 mouseId)
 {
-    if (m_LastWindowsTouchpadFrameTicks == 0 ||
-            m_NativeTouchpadTransport == NTT_UNKNOWN ||
-            m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER ||
-            m_AbsoluteMouseMode) {
+    if (m_LastWindowsTouchpadFrameTicks == 0 || m_NativeTouchpadTransport == NTT_UNKNOWN ||
+        m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER || isAbsoluteMouseMode()) {
         return false;
     }
 

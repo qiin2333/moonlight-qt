@@ -99,15 +99,18 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_PendingMouseButtonsAllUpOnVideoRegionLeave(false), m_PointerRegionLockActive(false),
       m_PointerRegionLockToggledByUser(false), m_FakeMouseCaptureActive(false),
       m_KeyboardCaptureActive(false), m_CaptureSystemKeysMode(prefs.captureSysKeysMode),
-      m_MouseCursorCapturedVisibilityState(prefs.showLocalCursor ? SDL_ENABLE : SDL_DISABLE),
-      m_LocalCursorMode(prefs.absoluteMouseMode && prefs.showLocalCursor ? LI_CURSOR_MODE_LOCAL
-                                                                         : LI_CURSOR_MODE_VIDEO),
+      m_MouseMode(prefs.mouseMode),
+      m_LastAbsoluteMouseMode(prefs.mouseMode == StreamingPreferences::MM_ABSOLUTE_VIDEO
+                                  ? StreamingPreferences::MM_ABSOLUTE_VIDEO
+                                  : StreamingPreferences::MM_ABSOLUTE_LOCAL),
+      m_LocalCursorMode(prefs.mouseMode == StreamingPreferences::MM_ABSOLUTE_LOCAL
+                            ? LI_CURSOR_MODE_LOCAL
+                            : LI_CURSOR_MODE_VIDEO),
       m_RemoteCursorVisible(true), m_RemoteCursor(nullptr),
       m_LastCursorClass(NativeCursorShape::Unknown), m_HasLastCursorShape(false),
       m_RemoteCursorScale(1.0), m_RemoteCursorHideTimer(0), m_LongPressTimer(0),
       m_StreamWidth(streamWidth), m_StreamHeight(streamHeight),
-      m_AbsoluteMouseMode(prefs.absoluteMouseMode), m_AbsoluteTouchMode(prefs.absoluteTouchMode),
-      m_DisabledTouchFeedback(false),
+      m_AbsoluteTouchMode(prefs.absoluteTouchMode), m_DisabledTouchFeedback(false),
 #ifdef HAVE_WINDOWS_PEN_INPUT
       m_WindowsPenWindow(nullptr), m_WindowsPenSubclassContext(nullptr), m_WindowsPenPointerId(0),
       m_WindowsPenFallbackPointerId(UINT32_MAX), m_WindowsPenSuppressedPointerId(UINT32_MAX),
@@ -449,16 +452,13 @@ int SdlInputHandler::getLocalCursorMode() const
 
 int SdlInputHandler::getCapturedCursorVisibilityState() const
 {
-    if (m_MouseCursorCapturedVisibilityState == SDL_DISABLE) {
-        return SDL_DISABLE;
-    }
-
-    if (getLocalCursorMode() == LI_CURSOR_MODE_LOCAL &&
-        (LiGetHostFeatureFlags() & LI_FF_CURSOR_SHAPE) != 0) {
-        return m_RemoteCursorVisible ? SDL_ENABLE : SDL_DISABLE;
-    }
-
-    return SDL_ENABLE;
+    // Older hosts may not send cursor shapes. Preserve the existing fallback
+    // that displays a generic local pointer when local cursor mode is selected.
+    return StreamingPreferences::showHostCursorLocally(
+               m_MouseMode, (LiGetHostFeatureFlags() & LI_FF_CURSOR_SHAPE) != 0,
+               m_RemoteCursorVisible)
+               ? SDL_ENABLE
+               : SDL_DISABLE;
 }
 
 void SdlInputHandler::applyCapturedCursorState()
@@ -620,11 +620,11 @@ bool SdlInputHandler::tryUseNativeRemoteCursor(const RemoteCursorUpdate& update)
     return true;
 }
 
-void SdlInputHandler::synchronizeLocalCursorMode()
+int SdlInputHandler::synchronizeLocalCursorMode()
 {
-    const int cursorMode = m_AbsoluteMouseMode &&
-                           m_MouseCursorCapturedVisibilityState == SDL_ENABLE ?
-                               LI_CURSOR_MODE_LOCAL : LI_CURSOR_MODE_VIDEO;
+    const int cursorMode = m_MouseMode == StreamingPreferences::MM_ABSOLUTE_LOCAL
+                               ? LI_CURSOR_MODE_LOCAL
+                               : LI_CURSOR_MODE_VIDEO;
     m_LocalCursorMode.store(cursorMode, std::memory_order_relaxed);
     const int result = LiSetCursorMode(cursorMode);
     if (result != LI_CURSOR_MODE_OK &&
@@ -644,6 +644,7 @@ void SdlInputHandler::synchronizeLocalCursorMode()
         cancelPendingRemoteCursorHide();
         m_RemoteCursorVisible = true;
     }
+    return result;
 }
 
 qreal SdlInputHandler::getRemoteCursorScale() const
@@ -809,7 +810,7 @@ void SdlInputHandler::notifyFocusLost()
     // This lets user to interact with our window's title bar and with the buttons in it.
     // Doing this while the window is full-screen breaks the transition out of FS
     // (desktop and exclusive), so we must check for that before releasing mouse capture.
-    if (!isStreamWindowFullscreen(m_Window) && !m_AbsoluteMouseMode) {
+    if (!isStreamWindowFullscreen(m_Window) && !isAbsoluteMouseMode()) {
         setCaptureActive(false);
     }
 
@@ -890,7 +891,7 @@ void SdlInputHandler::setCaptureActive(bool active)
 {
     if (active) {
         // If we're in relative mode, try to activate SDL's relative mouse mode
-        if (m_AbsoluteMouseMode || SDL_SetRelativeMouseMode(SDL_TRUE) < 0) {
+        if (isAbsoluteMouseMode() || SDL_SetRelativeMouseMode(SDL_TRUE) < 0) {
             m_FakeMouseCaptureActive = true;
             // Relative mouse mode didn't work or was disabled, so apply the
             // cursor shape and visibility directly.
@@ -898,7 +899,7 @@ void SdlInputHandler::setCaptureActive(bool active)
         }
 
         // Synchronize the client and host cursor when activating absolute capture
-        if (m_AbsoluteMouseMode) {
+        if (isAbsoluteMouseMode()) {
             int mouseX, mouseY;
             int windowX, windowY;
 

@@ -8,6 +8,7 @@
 #endif
 #include "backend/computermanager.h"
 #include "cursorshapeclassifier.h"
+#include "remotecursorupdate.h"
 
 #include "SDL_compat.h"
 
@@ -136,17 +137,6 @@ struct DualSenseOutputReport{
 #define GAMEPAD_HAPTIC_SIMPLE_HIFREQ_MOTOR_WEIGHT 0.33
 #define GAMEPAD_HAPTIC_SIMPLE_LOWFREQ_MOTOR_WEIGHT 0.8
 
-struct RemoteCursorUpdate {
-    bool hasShape;
-    bool visible;
-    uint32_t shapeId;
-    uint16_t width;
-    uint16_t height;
-    int16_t hotspotX;
-    int16_t hotspotY;
-    QByteArray bgra;
-};
-
 class SdlInputHandler
 {
 public:
@@ -255,9 +245,11 @@ public:
     // 显示器变化后按新的 backing 比例重建远端光标（只有 macOS 需要）
     void refreshRemoteCursorScale();
 
-    void synchronizeLocalCursorMode();
+    int synchronizeLocalCursorMode();
 
     int getLocalCursorMode() const;
+
+    StreamingPreferences::MouseMode getMouseMode() const { return m_MouseMode; }
 
     static
     QString getUnmappedGamepads();
@@ -280,6 +272,17 @@ public:
 
     // 公开 performSpecialKeyCombo 以便从悬浮菜单调用
     void performSpecialKeyCombo(KeyCombo combo);
+
+    // The Sunshine shortcut needs actual modifier key events, not only the
+    // modifier bitmask. Only the overlay invokes this synthetic chord.
+    void requestHostCursorToggle();
+
+    void showMouseModeNotification(bool includeMouseMode, int cursorResult);
+
+    // The first relative capture may happen at startup or on a windowed click.
+    void showRelativeOverlayHintIfNeeded();
+
+    bool appendRelativeOverlayHint(QString& message);
 
     // Toggle gamepad mouse emulation for the first connected gamepad
     bool toggleGamepadMouseEmulation();
@@ -306,6 +309,10 @@ public:
     void setGamepadMouse(bool enabled) { m_GamepadMouse = enabled; }
 
 private:
+    bool isAbsoluteMouseMode() const
+    {
+        return StreamingPreferences::isAbsoluteMouseMode(m_MouseMode);
+    }
     void getWindowCoordinateSize(int* width, int* height) const;
 
     qreal getRemoteCursorScale() const;
@@ -462,7 +469,11 @@ private:
     QString m_OldIgnoreDevicesExcept;
     QStringList m_IgnoreDeviceGuids;
     StreamingPreferences::CaptureSysKeysMode m_CaptureSystemKeysMode;
-    int m_MouseCursorCapturedVisibilityState;
+    StreamingPreferences::MouseMode m_MouseMode;
+    StreamingPreferences::MouseMode m_LastAbsoluteMouseMode;
+    bool m_HostCursorHintShown = false;
+    bool m_CursorFallbackHintShown = false;
+    bool m_OverlayShortcutHintShown = false;
     std::atomic<int> m_LocalCursorMode;
     bool m_RemoteCursorVisible;
     SDL_Cursor* m_RemoteCursor;
@@ -489,7 +500,6 @@ private:
     SDL_TimerID m_LongPressTimer;
     int m_StreamWidth;
     int m_StreamHeight;
-    bool m_AbsoluteMouseMode;
     bool m_AbsoluteTouchMode;
     bool m_DisabledTouchFeedback;
 
