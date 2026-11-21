@@ -5276,6 +5276,9 @@ void Session::exec()
 
     SDL_Event event;
     for (;;) {
+#if defined(HAVE_MACOS_NATIVE_TOUCHPAD) && defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+        m_InputHandler->retryPendingMacSystemDragRelease();
+#endif
         hideGuiWindowWhenSettled(false);
         processSunshineAbrFeedback();
 #ifdef Q_OS_WIN32
@@ -5301,6 +5304,11 @@ void Session::exec()
         // issues that could cause indefinite timeouts, delayed joystick detection,
         // and other problems.
         int waitTimeoutMs = (m_ClipboardHelper != nullptr && m_ClipboardHelper->isRunning()) ? 100 : 1000;
+#if defined(HAVE_MACOS_NATIVE_TOUCHPAD) && defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+        if (m_InputHandler->hasPendingMacSystemDragRelease()) {
+            waitTimeoutMs = qMin(waitTimeoutMs, MACOS_SYSTEM_DRAG_RELEASE_RETRY_MS);
+        }
+#endif
         if (qtUiNeedsEventProcessing()) {
             waitTimeoutMs = qMin(waitTimeoutMs, static_cast<int>(QT_UI_EVENT_PUMP_INTERVAL_MS));
         }

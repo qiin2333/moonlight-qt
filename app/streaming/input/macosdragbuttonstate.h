@@ -9,6 +9,17 @@ public:
     {
         m_Button = button;
         m_ReleasePending = false;
+        m_PendingAwaitButtonUp = false;
+        m_AwaitingButtonUp = false;
+    }
+
+    bool hasPendingRelease() const { return m_ReleasePending; }
+
+    template <typename SendRelease> void retryPendingRelease(SendRelease sendRelease)
+    {
+        if (m_ReleasePending) {
+            tryRelease(sendRelease, m_PendingAwaitButtonUp);
+        }
     }
 
     template <typename SendRelease> void releaseForReset(SendRelease sendRelease)
@@ -36,6 +47,9 @@ public:
         // Preserve ordering if a previous release failed. Otherwise the new
         // press could overwrite the only record of the held host button.
         if (m_ReleasePending && !tryRelease(sendRelease, false)) {
+            // This new press is suppressed, so consume its eventual up if a
+            // background retry succeeds before the physical button is raised.
+            m_PendingAwaitButtonUp = true;
             return false;
         }
         m_AwaitingButtonUp = false;
@@ -47,15 +61,18 @@ private:
     {
         if (sendRelease(m_Button) != 0) {
             m_ReleasePending = true;
+            m_PendingAwaitButtonUp = awaitButtonUp;
             return false;
         }
         m_Button = 0;
         m_ReleasePending = false;
+        m_PendingAwaitButtonUp = false;
         m_AwaitingButtonUp = awaitButtonUp;
         return true;
     }
 
     int m_Button = 0;
     bool m_ReleasePending = false;
+    bool m_PendingAwaitButtonUp = false;
     bool m_AwaitingButtonUp = false;
 };

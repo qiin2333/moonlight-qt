@@ -129,6 +129,7 @@ struct DualSenseOutputReport{
 #define MACOS_TOUCHPAD_TAP_MAX_DURATION_MS 500
 #define MACOS_TOUCHPAD_CLICK_CORRELATION_TIMEOUT_MS 250
 #define MACOS_TOUCHPAD_TAP_MAX_MOVEMENT 0.01f
+#define MACOS_SYSTEM_DRAG_RELEASE_RETRY_MS 250
 #endif
 
 #define GAMEPAD_HAPTIC_METHOD_NONE 0
@@ -211,6 +212,14 @@ public:
 #endif
 
     void flushPendingTouchpadFrameEvent();
+
+#if defined(HAVE_MACOS_NATIVE_TOUCHPAD) && defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    bool hasPendingMacSystemDragRelease() const
+    {
+        return m_MacSystemDragButton.hasPendingRelease();
+    }
+    void retryPendingMacSystemDragRelease();
+#endif
 
     // 去抖窗口到期，把主机要求的隐藏落实下去
     void flushPendingRemoteCursorHide();
@@ -558,6 +567,8 @@ private:
     SDL_TouchID m_MacSystemDragDevice = 0;
     SDL_TouchID m_MacTouchpadGestureDevice = 0;
     MacSystemDragButtonState m_MacSystemDragButton;
+    Uint32 m_MacSystemDragLastRetry = 0;
+    bool m_MacSystemDragRetryScheduled = false;
 #endif
     QSet<SDL_FingerID> m_MacTouchpadGestureContacts;
     float m_MacTouchpadGestureStartX;

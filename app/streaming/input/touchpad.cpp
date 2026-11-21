@@ -168,6 +168,24 @@ void SdlInputHandler::handleNativeTouchpadEvent(SDL_TouchFingerEvent* event)
 
 #ifdef HAVE_MACOS_NATIVE_TOUCHPAD
 #if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+void SdlInputHandler::retryPendingMacSystemDragRelease()
+{
+    if (!m_MacSystemDragButton.hasPendingRelease()) {
+        m_MacSystemDragRetryScheduled = false;
+        return;
+    }
+
+    const Uint32 now = SDL_GetTicks();
+    if (m_MacSystemDragRetryScheduled &&
+        now - m_MacSystemDragLastRetry < MACOS_SYSTEM_DRAG_RELEASE_RETRY_MS) {
+        return;
+    }
+    m_MacSystemDragLastRetry = now;
+    m_MacSystemDragRetryScheduled = true;
+    m_MacSystemDragButton.retryPendingRelease(
+        [](int button) { return LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, button); });
+}
+
 bool SdlInputHandler::useMacSystemDrag(const SDL_TouchFingerEvent* event)
 {
     if (!isCaptureActive())

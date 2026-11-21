@@ -50,6 +50,43 @@ void testMacSystemDragButtonState()
             "a later cleanup must retry without duplicating the physical release");
 
     releases.clear();
+    state.recordPress(rightButton);
+    releaseResult = -1;
+    state.releaseForReset(sendRelease);
+    require(state.hasPendingRelease(), "failed cleanup must schedule an automatic retry");
+    state.retryPendingRelease(sendRelease);
+    require(state.hasPendingRelease(), "failed automatic retry must preserve ownership");
+    releaseResult = 0;
+    state.retryPendingRelease(sendRelease);
+    require(!state.hasPendingRelease(), "successful automatic retry must clear pending state");
+    require(state.handleButtonUp(sendRelease), "automatic cleanup retry must consume physical up");
+    require(releases == QVector<int>({ rightButton, rightButton, rightButton }),
+            "physical up after automatic cleanup must not send another release");
+
+    releases.clear();
+    state.recordPress(leftButton);
+    releaseResult = -1;
+    require(state.handleButtonUp(sendRelease), "a failed physical up must retain ownership");
+    releaseResult = 0;
+    state.retryPendingRelease(sendRelease);
+    require(!state.handleButtonUp(sendRelease),
+            "automatic retry after physical up must not consume a later unrelated up");
+    require(releases == QVector<int>({ leftButton, leftButton }),
+            "automatic retry must release the button whose physical up failed");
+
+    releases.clear();
+    state.recordPress(rightButton);
+    releaseResult = -1;
+    require(state.handleButtonUp(sendRelease), "the old physical up must be consumed");
+    require(!state.allowButtonDown(sendRelease), "a new press must wait for the pending release");
+    releaseResult = 0;
+    state.retryPendingRelease(sendRelease);
+    require(state.handleButtonUp(sendRelease),
+            "automatic retry must consume the up of the suppressed new press");
+    require(releases == QVector<int>({ rightButton, rightButton, rightButton }),
+            "the suppressed new press must not cause an extra release");
+
+    releases.clear();
     state.recordPress(leftButton);
     state.releaseForReset(sendRelease);
     require(state.handleButtonUp(sendRelease), "cleanup must consume the matching physical up");
