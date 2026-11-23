@@ -611,10 +611,44 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
             case SDL_SCANCODE_LANG2:
                 keyCode = 0x1D;
                 break;
+            // Media and volume keys, as the Windows virtual-key codes that hosts already handle.
+            // They go to the host only while system keys are captured; otherwise the client
+            // OS keeps them, as before.
+            case SDL_SCANCODE_MUTE:
+            case SDL_SCANCODE_AUDIOMUTE:
+            case SDL_SCANCODE_VOLUMEDOWN:
+            case SDL_SCANCODE_VOLUMEUP:
+            case SDL_SCANCODE_AUDIONEXT:
+            case SDL_SCANCODE_AUDIOPREV:
+            case SDL_SCANCODE_AUDIOSTOP:
+            case SDL_SCANCODE_AUDIOPLAY:
+                if (!isSystemKeyCaptureActive()) {
+                    return;
+                }
+                switch (event->keysym.scancode) {
+                case SDL_SCANCODE_VOLUMEDOWN: keyCode = 0xAE; break;  // VK_VOLUME_DOWN
+                case SDL_SCANCODE_VOLUMEUP:   keyCode = 0xAF; break;  // VK_VOLUME_UP
+                case SDL_SCANCODE_AUDIONEXT:  keyCode = 0xB0; break;  // VK_MEDIA_NEXT_TRACK
+                case SDL_SCANCODE_AUDIOPREV:  keyCode = 0xB1; break;  // VK_MEDIA_PREV_TRACK
+                case SDL_SCANCODE_AUDIOSTOP:  keyCode = 0xB2; break;  // VK_MEDIA_STOP
+                case SDL_SCANCODE_AUDIOPLAY:  keyCode = 0xB3; break;  // VK_MEDIA_PLAY_PAUSE
+                default:                      keyCode = 0xAD; break;  // VK_VOLUME_MUTE
+                }
+                break;
             default:
+                // Play/Pause (E0 22 on Windows) has no SDL2 scancode when SDL2 runs on SDL3 (sdl2-compat):
+                // only the key symbol comes through, as SDL2's SDLK_AUDIOPLAY or SDL3's SDLK_MEDIA_PLAY_PAUSE.
+                if (event->keysym.scancode == SDL_SCANCODE_UNKNOWN &&
+                    (event->keysym.sym == SDLK_AUDIOPLAY || event->keysym.sym == 0x4000010F)) {
+                    if (!isSystemKeyCaptureActive()) {
+                        return;
+                    }
+                    keyCode = 0xB3;  // VK_MEDIA_PLAY_PAUSE
+                    break;
+                }
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                            "Unhandled button event: %d",
-                             event->keysym.scancode);
+                            "Unhandled button event: %d (key %d)",
+                             event->keysym.scancode, event->keysym.sym);
                 return;
         }
     }
