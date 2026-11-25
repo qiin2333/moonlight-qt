@@ -343,12 +343,8 @@ int PyrowaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
         return DR_NEED_IDR;
     }
 
-    const uint64_t decodeStartUs = LiGetMicroseconds();
     {
         QMutexLocker locker(&m_VideoStatsMutex);
-        if (m_VideoStats.measurementStartUs == 0) {
-            m_VideoStats.measurementStartUs = decodeStartUs;
-        }
         if (m_LastFrameNumber != 0 && du->frameNumber > m_LastFrameNumber + 1) {
             m_VideoStats.networkDroppedFrames += du->frameNumber - (m_LastFrameNumber + 1);
             m_VideoStats.totalFrames += du->frameNumber - (m_LastFrameNumber + 1);
@@ -356,7 +352,6 @@ int PyrowaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
         m_LastFrameNumber = du->frameNumber;
         m_VideoStats.receivedFrames++;
         m_VideoStats.totalFrames++;
-        m_VideoStats.totalReassemblyTimeUs += du->enqueueTimeUs - du->receiveTimeUs;
         if (du->frameHostProcessingLatency != 0) {
             m_VideoStats.framesWithHostProcessingLatency++;
             m_VideoStats.totalHostProcessingLatency += du->frameHostProcessingLatency;

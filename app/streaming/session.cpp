@@ -1040,8 +1040,7 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
 #ifdef HAVE_PYROWAVE
     if (videoFormat == VIDEO_FORMAT_PYROWAVE) {
         chosenDecoder = new PyrowaveVideoDecoder(testOnly);
-        if (chosenDecoder->initialize(&params) &&
-            (params.hdrMode == 0 || chosenDecoder->isHdrSupported())) {
+        if (chosenDecoder->initialize(&params)) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "PyroWave video decoder chosen");
             return true;
         }
@@ -1260,11 +1259,6 @@ bool Session::populateDecoderProperties(SDL_Window* window)
     }
 
     m_VideoCallbacks.capabilities = decoder->getDecoderCapabilities();
-#ifdef HAVE_PYROWAVE
-    if (m_Preferences->enableYUV444) {
-        m_VideoCallbacks.capabilities &= ~CAPABILITY_PYROWAVE;
-    }
-#endif
     if (m_VideoCallbacks.capabilities & CAPABILITY_PULL_RENDERER) {
         // It is an error to pass a push callback when in pull mode
         m_VideoCallbacks.submitDecodeUnit = nullptr;
