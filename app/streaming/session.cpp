@@ -1034,8 +1034,7 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
     if (videoFormat == VIDEO_FORMAT_PYROWAVE) {
         chosenDecoder = new PyrowaveVideoDecoder(testOnly);
         if (chosenDecoder->initialize(&params)) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "PyroWave video decoder chosen");
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "PyroWave video decoder chosen");
             return true;
         }
         delete chosenDecoder;
@@ -1818,38 +1817,38 @@ bool Session::initialize(QQuickWindow* qtWindow)
     // behind the existing host negotiation and leave HDR/4:4:4 on the mature
     // codec paths until their color contract is exposed by the decoder.
     int pyrowaveColorRangeOverride;
-    const bool pyrowaveFullRange =
-        !Utils::getEnvironmentVariableOverride("COLOR_RANGE_OVERRIDE", &pyrowaveColorRangeOverride) ||
-        pyrowaveColorRangeOverride == COLOR_RANGE_FULL;
+    const bool pyrowaveFullRange = !Utils::getEnvironmentVariableOverride(
+                                       "COLOR_RANGE_OVERRIDE", &pyrowaveColorRangeOverride) ||
+                                   pyrowaveColorRangeOverride == COLOR_RANGE_FULL;
     int pyrowaveColorSpaceOverride;
-    const bool pyrowaveRec709 =
-        !Utils::getEnvironmentVariableOverride("COLOR_SPACE_OVERRIDE", &pyrowaveColorSpaceOverride) ||
-        pyrowaveColorSpaceOverride == COLORSPACE_REC_709;
-    const bool pyrowaveRequested = m_Preferences->enablePyrowave ||
-            m_Preferences->pyrowaveForcedByEnvironment();
+    const bool pyrowaveRec709 = !Utils::getEnvironmentVariableOverride(
+                                    "COLOR_SPACE_OVERRIDE", &pyrowaveColorSpaceOverride) ||
+                                pyrowaveColorSpaceOverride == COLORSPACE_REC_709;
+    const bool pyrowaveRequested =
+        m_Preferences->enablePyrowave || m_Preferences->pyrowaveForcedByEnvironment();
     if (pyrowaveRequested &&
-            (m_Preferences->videoCodecConfig != StreamingPreferences::VCC_AUTO ||
-             m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_SOFTWARE ||
-             (m_Preferences->rendererSelection != StreamingPreferences::RS_AUTO &&
-              m_Preferences->rendererSelection != StreamingPreferences::RS_VULKAN) ||
-             m_Preferences->enableHdr || m_Preferences->enableYUV444 ||
-             !pyrowaveFullRange || !pyrowaveRec709)) {
-        emitLaunchWarning(tr("PyroWave requires automatic video codec, hardware decoding, an automatic or Vulkan renderer, and SDR 4:2:0 BT.709 full-range video. Using another codec for this session."));
-    }
-    else if (pyrowaveRequested) {
+        (m_Preferences->videoCodecConfig != StreamingPreferences::VCC_AUTO ||
+         m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_SOFTWARE ||
+         (m_Preferences->rendererSelection != StreamingPreferences::RS_AUTO &&
+          m_Preferences->rendererSelection != StreamingPreferences::RS_VULKAN) ||
+         m_Preferences->enableHdr || m_Preferences->enableYUV444 || !pyrowaveFullRange ||
+         !pyrowaveRec709)) {
+        emitLaunchWarning(tr("PyroWave requires automatic video codec, hardware decoding, an "
+                             "automatic or Vulkan renderer, and SDR 4:2:0 BT.709 full-range video. "
+                             "Using another codec for this session."));
+    } else if (pyrowaveRequested) {
         IVideoDecoder* pyrowaveDecoder = nullptr;
-        if (chooseDecoder(m_Preferences->videoDecoderSelection,
-                          m_Preferences->rendererSelection,
-                          testWindow, VIDEO_FORMAT_PYROWAVE,
-                          m_StreamConfig.width, m_StreamConfig.height, m_StreamConfig.fps,
-                          false, false, false, false, true, pyrowaveDecoder)) {
+        if (chooseDecoder(m_Preferences->videoDecoderSelection, m_Preferences->rendererSelection,
+                          testWindow, VIDEO_FORMAT_PYROWAVE, m_StreamConfig.width,
+                          m_StreamConfig.height, m_StreamConfig.fps, false, false, false, false,
+                          true, pyrowaveDecoder)) {
             delete pyrowaveDecoder;
             m_SupportedVideoFormats.prepend(VIDEO_FORMAT_PYROWAVE);
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "PyroWave support detected; advertising experimental format");
-        }
-        else {
-            emitLaunchWarning(tr("PyroWave could not initialize on this device. Using another codec for this session."));
+        } else {
+            emitLaunchWarning(tr("PyroWave could not initialize on this device. Using another "
+                                 "codec for this session."));
         }
     }
 #endif
@@ -5715,16 +5714,17 @@ void Session::exec()
             // The negotiated format can change after reconnecting. Report it
             // only after the decoder is ready and only when it changes.
             if ((m_StreamConfig.supportedVideoFormats & VIDEO_FORMAT_PYROWAVE) &&
-                    m_ActiveVideoFormat != lastReportedPyrowaveFormat) {
+                m_ActiveVideoFormat != lastReportedPyrowaveFormat) {
                 lastReportedPyrowaveFormat = m_ActiveVideoFormat;
                 if (m_ActiveVideoFormat == VIDEO_FORMAT_PYROWAVE) {
                     showStreamingToast(tr("Using PyroWave video"), 3000);
-                }
-                else {
-                    const QString codec = (m_ActiveVideoFormat & VIDEO_FORMAT_MASK_AV1) ? QStringLiteral("AV1") :
-                            (m_ActiveVideoFormat & VIDEO_FORMAT_MASK_H265) ? QStringLiteral("HEVC") :
-                            QStringLiteral("H.264");
-                    showStreamingToast(tr("PyroWave negotiation failed. Using %1 video.").arg(codec), 4500);
+                } else {
+                    const QString codec =
+                        (m_ActiveVideoFormat & VIDEO_FORMAT_MASK_AV1)    ? QStringLiteral("AV1")
+                        : (m_ActiveVideoFormat & VIDEO_FORMAT_MASK_H265) ? QStringLiteral("HEVC")
+                                                                         : QStringLiteral("H.264");
+                    showStreamingToast(
+                        tr("PyroWave negotiation failed. Using %1 video.").arg(codec), 4500);
                 }
             }
 #endif

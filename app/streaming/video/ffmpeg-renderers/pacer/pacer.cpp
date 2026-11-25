@@ -33,17 +33,10 @@ static_assert(PACER_MAX_OUTSTANDING_FRAMES == MAX_QUEUED_FRAMES + 2,
 // V-sync happens.
 #define TIMER_SLACK_MS 3
 
-Pacer::Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats, QMutex* videoStatsMutex) :
-    m_RenderThread(nullptr),
-    m_VsyncThread(nullptr),
-    m_DeferredFreeFrame(nullptr),
-    m_Stopping(false),
-    m_VsyncSource(nullptr),
-    m_VsyncRenderer(renderer),
-    m_MaxVideoFps(0),
-    m_DisplayFps(0),
-    m_VideoStats(videoStats),
-    m_VideoStatsMutex(videoStatsMutex)
+Pacer::Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats, QMutex* videoStatsMutex)
+    : m_RenderThread(nullptr), m_VsyncThread(nullptr), m_DeferredFreeFrame(nullptr),
+      m_Stopping(false), m_VsyncSource(nullptr), m_VsyncRenderer(renderer), m_MaxVideoFps(0),
+      m_DisplayFps(0), m_VideoStats(videoStats), m_VideoStatsMutex(videoStatsMutex)
 {
 
 }

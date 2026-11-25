@@ -12,17 +12,9 @@ extern "C" {
 }
 
 PyrowaveVideoDecoder::PyrowaveVideoDecoder(bool testOnly)
-    : m_TestOnly(testOnly),
-      m_Width(0),
-      m_Height(0),
-      m_Device(nullptr),
-      m_Decoder(nullptr),
-      m_Renderer(nullptr),
-      m_Pacer(nullptr),
-      m_OverlayRegistered(false),
-      m_DecoderThread(nullptr),
-      m_LastFrameNumber(0),
-      m_LastOverlayUpdateUs(0)
+    : m_TestOnly(testOnly), m_Width(0), m_Height(0), m_Device(nullptr), m_Decoder(nullptr),
+      m_Renderer(nullptr), m_Pacer(nullptr), m_OverlayRegistered(false), m_DecoderThread(nullptr),
+      m_LastFrameNumber(0), m_LastOverlayUpdateUs(0)
 {
     SDL_zero(m_VideoStats);
     SDL_zero(m_LastOverlayStats);
@@ -64,13 +56,10 @@ bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
 
     // This first integration is intentionally limited to the contract that
     // can be represented by the existing renderer color path.
-    if (params->width <= 0 || params->height <= 0 ||
-            params->width > 16384 || params->height > 16384 ||
-            (params->width & 1) != 0 || (params->height & 1) != 0) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Invalid PyroWave dimensions: %dx%d",
-                     params->width,
-                     params->height);
+    if (params->width <= 0 || params->height <= 0 || params->width > 16384 ||
+        params->height > 16384 || (params->width & 1) != 0 || (params->height & 1) != 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Invalid PyroWave dimensions: %dx%d",
+                     params->width, params->height);
         return false;
     }
 
@@ -78,8 +67,7 @@ bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
     m_Height = params->height;
 
     if (pyrowave_create_default_device(&m_Device) != PYROWAVE_SUCCESS || m_Device == nullptr) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Unable to create a Vulkan device for PyroWave");
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unable to create a Vulkan device for PyroWave");
         return false;
     }
 
@@ -90,9 +78,9 @@ bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
     decoderInfo.chroma = PYROWAVE_CHROMA_SUBSAMPLING_420;
     decoderInfo.fragment_path = pyrowave_decoder_device_prefers_fragment_path(m_Device);
 
-    if (pyrowave_decoder_create(&decoderInfo, &m_Decoder) != PYROWAVE_SUCCESS || m_Decoder == nullptr) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Unable to create the PyroWave decoder");
+    if (pyrowave_decoder_create(&decoderInfo, &m_Decoder) != PYROWAVE_SUCCESS ||
+        m_Decoder == nullptr) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unable to create the PyroWave decoder");
         return false;
     }
 
@@ -108,11 +96,10 @@ bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
     // for a live session.
     if (!m_TestOnly) {
         m_Pacer = new Pacer(m_Renderer, &m_VideoStats, &m_VideoStatsMutex);
-        if (!m_Pacer->initialize(params->window,
-                                 params->frameRate,
+        if (!m_Pacer->initialize(params->window, params->frameRate,
                                  params->enableFramePacing ||
-                                 (params->enableVsync &&
-                                  (m_Renderer->getRendererAttributes() & RENDERER_ATTRIBUTE_FORCE_PACING)))) {
+                                     (params->enableVsync && (m_Renderer->getRendererAttributes() &
+                                                              RENDERER_ATTRIBUTE_FORCE_PACING)))) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Unable to initialize the PyroWave frame pacer");
             return false;
@@ -198,7 +185,7 @@ bool PyrowaveVideoDecoder::copyDecodeUnit(PDECODE_UNIT du, QByteArray& payload) 
     int offset = 0;
     for (PLENTRY entry = du->bufferList; entry != nullptr; entry = entry->next) {
         if (entry->data == nullptr || entry->length <= 0 || offset < 0 ||
-                entry->length > payload.size() - offset) {
+            entry->length > payload.size() - offset) {
             return false;
         }
 
@@ -232,8 +219,10 @@ bool PyrowaveVideoDecoder::createFrame(AVFrame** frame)
     buffers.row_stride_in_bytes[1] = static_cast<size_t>(output->linesize[1]);
     buffers.row_stride_in_bytes[2] = static_cast<size_t>(output->linesize[2]);
     buffers.plane_size_in_bytes[0] = buffers.row_stride_in_bytes[0] * static_cast<size_t>(m_Height);
-    buffers.plane_size_in_bytes[1] = buffers.row_stride_in_bytes[1] * static_cast<size_t>((m_Height + 1) / 2);
-    buffers.plane_size_in_bytes[2] = buffers.row_stride_in_bytes[2] * static_cast<size_t>((m_Height + 1) / 2);
+    buffers.plane_size_in_bytes[1] =
+        buffers.row_stride_in_bytes[1] * static_cast<size_t>((m_Height + 1) / 2);
+    buffers.plane_size_in_bytes[2] =
+        buffers.row_stride_in_bytes[2] * static_cast<size_t>((m_Height + 1) / 2);
     buffers.width = m_Width;
     buffers.height = m_Height;
     buffers.format = PYROWAVE_CPU_BUFFER_FORMAT_YUV420P;
@@ -273,13 +262,15 @@ void PyrowaveVideoDecoder::updatePerformanceOverlay(uint64_t nowUs)
     const uint32_t rendered = stats.renderedFrames - m_LastOverlayStats.renderedFrames;
     const uint32_t total = stats.totalFrames - m_LastOverlayStats.totalFrames;
     const uint32_t lost = stats.networkDroppedFrames - m_LastOverlayStats.networkDroppedFrames;
-    const uint32_t hostSamples = stats.framesWithHostProcessingLatency - m_LastOverlayStats.framesWithHostProcessingLatency;
+    const uint32_t hostSamples =
+        stats.framesWithHostProcessingLatency - m_LastOverlayStats.framesWithHostProcessingLatency;
     const uint64_t decodeTime = stats.totalDecodeTimeUs - m_LastOverlayStats.totalDecodeTimeUs;
     const uint64_t renderTime = stats.totalRenderTimeUs - m_LastOverlayStats.totalRenderTimeUs;
-    const uint32_t hostTime = stats.totalHostProcessingLatency - m_LastOverlayStats.totalHostProcessingLatency;
+    const uint32_t hostTime =
+        stats.totalHostProcessingLatency - m_LastOverlayStats.totalHostProcessingLatency;
 
     if (Session::get() != nullptr &&
-            Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug)) {
+        Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug)) {
         uint32_t rtt = 0, variance = 0;
         char rttString[32];
         char bandwidthString[32];
@@ -288,28 +279,25 @@ void PyrowaveVideoDecoder::updatePerformanceOverlay(uint64_t nowUs)
         char encodeString[48] = {};
         if (LiGetEstimatedRttInfo(&rtt, &variance)) {
             SDL_snprintf(rttString, sizeof(rttString), "**%u** ± %ums", rtt, variance);
-        }
-        else {
+        } else {
             SDL_snprintf(rttString, sizeof(rttString), "N/A");
         }
         if (!std::isnan(bandwidthMbps)) {
-            SDL_snprintf(bandwidthString, sizeof(bandwidthString), "**%.2f** {16}Mbps{18}", bandwidthMbps);
-        }
-        else {
+            SDL_snprintf(bandwidthString, sizeof(bandwidthString), "**%.2f** {16}Mbps{18}",
+                         bandwidthMbps);
+        } else {
             SDL_snprintf(bandwidthString, sizeof(bandwidthString), "N/A");
         }
         if (decoded != 0) {
             SDL_snprintf(decodeString, sizeof(decodeString), "**%.2f**ms",
                          static_cast<double>(decodeTime) / decoded / 1000.0);
-        }
-        else {
+        } else {
             SDL_snprintf(decodeString, sizeof(decodeString), "N/A");
         }
         if (rendered != 0) {
             SDL_snprintf(renderString, sizeof(renderString), "**%.2f**ms",
                          static_cast<double>(renderTime) / rendered / 1000.0);
-        }
-        else {
+        } else {
             SDL_snprintf(renderString, sizeof(renderString), "N/A");
         }
         if (hostSamples != 0) {
@@ -321,10 +309,10 @@ void PyrowaveVideoDecoder::updatePerformanceOverlay(uint64_t nowUs)
                      " {18}%dx%d@%.0f PyroWave SDR "
                      " {18}FPS  %.1f {14}Rx{18} · %.1f {14}De{18} · %.1f {14}Rd{18} \n"
                      " Network %s Loss %.2f%% Bandwidth %s {16}|  {18}Render %s · Decode %s %s",
-                     m_Width, m_Height, total / elapsedSeconds,
-                     received / elapsedSeconds, decoded / elapsedSeconds, rendered / elapsedSeconds,
-                     rttString, total != 0 ? 100.0 * lost / total : 0.0, bandwidthString,
-                     renderString, decodeString, encodeString);
+                     m_Width, m_Height, total / elapsedSeconds, received / elapsedSeconds,
+                     decoded / elapsedSeconds, rendered / elapsedSeconds, rttString,
+                     total != 0 ? 100.0 * lost / total : 0.0, bandwidthString, renderString,
+                     decodeString, encodeString);
         Session::get()->getOverlayManager().updateOverlayText(Overlay::OverlayDebug, text);
     }
 
@@ -360,8 +348,7 @@ int PyrowaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
 
     QByteArray payload;
     if (!copyDecodeUnit(du, payload)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Invalid PyroWave decode unit for frame %d",
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Invalid PyroWave decode unit for frame %d",
                     du->frameNumber);
         updatePerformanceOverlay(LiGetMicroseconds());
         return DR_NEED_IDR;
@@ -370,21 +357,17 @@ int PyrowaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
     // Every transport decode unit is a complete independent frame. Discard
     // any state left behind by a malformed or incomplete previous frame.
     pyrowave_decoder_clear(m_Decoder);
-    if (pyrowave_decoder_push_packet(m_Decoder,
-                                     payload.constData(),
+    if (pyrowave_decoder_push_packet(m_Decoder, payload.constData(),
                                      static_cast<size_t>(payload.size())) != PYROWAVE_SUCCESS ||
-            !pyrowave_decoder_decode_is_ready(m_Decoder, false)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "PyroWave rejected frame %d",
-                    du->frameNumber);
+        !pyrowave_decoder_decode_is_ready(m_Decoder, false)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "PyroWave rejected frame %d", du->frameNumber);
         updatePerformanceOverlay(LiGetMicroseconds());
         return DR_NEED_IDR;
     }
 
     AVFrame* frame = nullptr;
     if (!createFrame(&frame)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "PyroWave failed to decode frame %d",
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "PyroWave failed to decode frame %d",
                     du->frameNumber);
         updatePerformanceOverlay(LiGetMicroseconds());
         return DR_NEED_IDR;

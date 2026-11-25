@@ -9,8 +9,14 @@
 
 // Display environment detection is unrelated to the preference being tested.
 namespace WMUtils {
-bool isRunningWayland() { return false; }
-bool isGpuSlow() { return false; }
+bool isRunningWayland()
+{
+    return false;
+}
+bool isGpuSlow()
+{
+    return false;
+}
 }
 
 static bool require(bool condition, const char* message)
@@ -40,7 +46,8 @@ int main(int argc, char* argv[])
     auto* prefs = StreamingPreferences::get();
     bool ok = true;
     ok &= require(!prefs->enablePyrowave, "PyroWave defaults to disabled");
-    ok &= require(!prefs->pyrowaveForcedByEnvironment(), "environment override defaults to disabled");
+    ok &=
+        require(!prefs->pyrowaveForcedByEnvironment(), "environment override defaults to disabled");
     qputenv("MOONLIGHT_ENABLE_PYROWAVE", "1");
     ok &= require(prefs->pyrowaveForcedByEnvironment(), "environment override enables PyroWave");
     qputenv("MOONLIGHT_ENABLE_PYROWAVE", "0");
@@ -55,9 +62,8 @@ int main(int argc, char* argv[])
     ok &= require(index >= 0, "preference is available to QML");
     if (index >= 0) {
         int changes = 0;
-        const QMetaObject::Connection connection =
-                QObject::connect(prefs, &StreamingPreferences::enablePyrowaveChanged,
-                                 [&changes]() { ++changes; });
+        const QMetaObject::Connection connection = QObject::connect(
+            prefs, &StreamingPreferences::enablePyrowaveChanged, [&changes]() { ++changes; });
         const QMetaProperty property = prefs->metaObject()->property(index);
         ok &= require(property.isWritable() && property.hasNotifySignal(),
                       "QML preference has writable and observable state");
@@ -84,7 +90,8 @@ int main(int argc, char* argv[])
     ok &= require(!prefs->pyrowaveColorOverridesCompatible(), "BT.601 override is incompatible");
     qputenv("COLOR_SPACE_OVERRIDE", QByteArray::number(COLORSPACE_REC_709));
     qputenv("COLOR_RANGE_OVERRIDE", QByteArray::number(COLOR_RANGE_LIMITED));
-    ok &= require(!prefs->pyrowaveColorOverridesCompatible(), "limited range override is incompatible");
+    ok &= require(!prefs->pyrowaveColorOverridesCompatible(),
+                  "limited range override is incompatible");
 
     if (ok) {
         QTextStream(stdout) << "pyrowave_preferences=passed\n";
