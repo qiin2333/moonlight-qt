@@ -228,6 +228,8 @@ jobs:
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat ds5_haptics_worker ds5_haptics_worker_test
         if errorlevel 1 exit /b %ERRORLEVEL%
+        call scripts\run-test.bat ds5_bt_haptics ds5_bt_haptics_test
+        if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat pen_history_selection pen_history_selection_test
         if errorlevel 1 exit /b %ERRORLEVEL%
         call scripts\run-test.bat stylus_replay stylus_replay_test

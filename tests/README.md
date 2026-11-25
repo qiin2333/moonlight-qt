@@ -28,6 +28,7 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | usb_forwarding_backend_sysfs | Linux sysfs 枚举 → 设备表解析（夹具目录，跳过 hub/接口/根 hub） | Linux |
 | ds5_ir_renderer | DualSense IR 渲染、PCM 边界和控制报文 | Windows |
 | ds5_haptics_worker | 生产发送线程的状态顺序、阻塞写入、设备切换、停止屏障和短效果排空 | Windows |
+| ds5_bt_haptics | 蓝牙 DualSense 触觉报文 0x34：CRC、报文布局、48 kHz → ~2.1 kHz 降采样 | Windows |
 | keyboard_state | 扩展键区分、国际键标志、失焦松键失败重试 | Windows |
 | mouse_mode | 鼠标模式旧配置迁移、持久化及快捷键状态转换 | Windows |
 | cli_mouse_mode | 鼠标模式命令行参数、旧参数兼容和冲突 | Windows |

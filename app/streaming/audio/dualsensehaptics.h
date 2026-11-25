@@ -27,6 +27,9 @@ public:
     bool hasControl(std::uint16_t controllerNumber) const;
     bool submitEffect(std::uint16_t controllerNumber, const void* effect, std::size_t size);
     void setControllerTarget(int controllerNumber, int joystickInstanceId = -1);
+    // Gain for a Bluetooth DualSense (1.0 = unity); takes effect when its
+    // haptics output is next opened.
+    static void setBluetoothGain(float gain);
     void reset();
     bool submit(const LI_DS5_HAPTICS_IR_FRAME_V2& frame, bool& startedNative);
 

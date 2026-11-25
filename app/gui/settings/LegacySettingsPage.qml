@@ -539,7 +539,9 @@ Column {
             title: qsTr("DualSense haptics")
             searchKeywords: "DualSense haptics"
             description: selectedValue === StreamingPreferences.DSHM_PHYSICAL
-                ? qsTr("Sends the original authored PCM to channels 3 and 4 of a USB-connected DualSense. The endpoint is checked before connecting. Changes apply to the next stream.")
+                ? (Qt.platform.os === "windows"
+                   ? qsTr("Sends the original authored PCM to the DualSense: over USB to channels 3 and 4 of its audio endpoint, over Bluetooth as HID haptics reports. The controller is checked before connecting. Changes apply to the next stream.")
+                   : qsTr("Sends the original authored PCM to channels 3 and 4 of a USB-connected DualSense. The endpoint is checked before connecting. Changes apply to the next stream."))
                 : qsTr("Receives a compact analyzed haptics signal and renders it through the connected controller's vibration motors. Changes apply to the next stream.")
             selectedValue: StreamingPreferences.dualSenseHapticsMode
             onValueActivated: function(value) { StreamingPreferences.dualSenseHapticsMode = value }
@@ -548,6 +550,48 @@ Column {
                 id: dualSenseHapticsModeListModel
                 ListElement { text: qsTr("Physical DualSense (native HD haptics)"); val: StreamingPreferences.DSHM_PHYSICAL }
                 ListElement { text: qsTr("Simulated DualSense (analyzed vibration)"); val: StreamingPreferences.DSHM_EMULATED }
+            }
+        }
+
+        SettingsRow {
+            id: btHapticsGainRow
+            visible: Qt.platform.os === "windows" &&
+                     StreamingPreferences.dualSenseHapticsMode === StreamingPreferences.DSHM_PHYSICAL
+            title: qsTr("Bluetooth haptics strength")
+            searchKeywords: "Bluetooth haptics strength DualSense gain"
+            searchFocusTarget: btHapticsGainSlider
+            description: qsTr("Amplifies native haptics for a DualSense connected over Bluetooth, where they are sent as 8-bit samples. Over USB haptics are played unchanged. Changes apply to the next stream.")
+
+            Row {
+                width: Math.min(360, Math.max(220, btHapticsGainRow.width - Theme.spaceMd * 2))
+                height: Math.max(btHapticsGainSlider.implicitHeight,
+                                 btHapticsGainValue.implicitHeight)
+                spacing: Theme.spaceSm
+
+                HardSlider {
+                    id: btHapticsGainSlider
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - btHapticsGainValue.width - parent.spacing
+                    from: 50
+                    to: 400
+                    stepSize: 25
+                    snapMode: Slider.SnapAlways
+                    value: StreamingPreferences.dualSenseBtHapticsGain
+                    Accessible.name: btHapticsGainRow.title
+                    onMoved: StreamingPreferences.dualSenseBtHapticsGain = Math.round(value)
+                }
+
+                Text {
+                    id: btHapticsGainValue
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 52
+                    text: Math.round(btHapticsGainSlider.value) + "%"
+                    color: Theme.accent
+                    font.family: Theme.fontMono
+                    font.pointSize: Theme.fontBody
+                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignRight
+                }
             }
         }
     }
