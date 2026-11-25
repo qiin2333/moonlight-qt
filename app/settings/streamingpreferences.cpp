@@ -174,6 +174,10 @@ StreamingPreferences::StreamingPreferences(QQmlEngine* qmlEngine)
       m_PersistedGamepadUiNavigation(true)
 {
     reload();
+    connect(this, &StreamingPreferences::enableHdrChanged, this,
+            &StreamingPreferences::pyrowaveCompatibilityChanged);
+    connect(this, &StreamingPreferences::hdrModeChanged, this,
+            &StreamingPreferences::pyrowaveCompatibilityChanged);
 }
 
 StreamingPreferences* StreamingPreferences::get(QQmlEngine *qmlEngine)
@@ -229,10 +233,15 @@ bool StreamingPreferences::pyrowaveForcedByEnvironment() const
 
 bool StreamingPreferences::pyrowaveColorOverridesCompatible() const
 {
+    if (enableHdr && hdrMode != HDR_PQ && hdrMode != HDR_HLG) {
+        return false;
+    }
+
+    const int expectedColorSpace = enableHdr ? COLORSPACE_REC_2020 : COLORSPACE_REC_709;
     int colorSpace;
     int colorRange;
     return (!Utils::getEnvironmentVariableOverride("COLOR_SPACE_OVERRIDE", &colorSpace) ||
-            colorSpace == COLORSPACE_REC_709) &&
+            colorSpace == expectedColorSpace) &&
            (!Utils::getEnvironmentVariableOverride("COLOR_RANGE_OVERRIDE", &colorRange) ||
             colorRange == COLOR_RANGE_FULL);
 }

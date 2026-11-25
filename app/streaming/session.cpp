@@ -982,13 +982,14 @@ void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlag
     }
 }
 
-
 bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
-                            StreamingPreferences::RendererSelection renderer,
-                            SDL_Window* window, int videoFormat, int width, int height,
-                            int frameRate, bool enableVsync, bool enableFramePacing, bool enableVideoEnhancement, bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder)
+                            StreamingPreferences::RendererSelection renderer, SDL_Window* window,
+                            int videoFormat, int width, int height, int frameRate, bool enableVsync,
+                            bool enableFramePacing, bool enableVideoEnhancement,
+                            bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder,
+                            int hdrMode)
 {
-    DECODER_PARAMETERS params;
+    DECODER_PARAMETERS params = {};
 
     // We should never have vsync enabled for test-mode.
     // It introduces unnecessary delay for renderers that may
@@ -999,6 +1000,12 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
     params.height = height;
     params.frameRate = frameRate;
     params.videoFormat = videoFormat;
+    // Legacy 10-bit probes default to PQ, while an 8-bit fallback is always
+    // SDR even when the original session requested HDR. PyroWave carries the
+    // selected signal mode separately from its single format ID.
+    params.hdrMode = videoFormat == VIDEO_FORMAT_PYROWAVE      ? hdrMode
+                     : (videoFormat & VIDEO_FORMAT_MASK_10BIT) ? (hdrMode == 2 ? 2 : 1)
+                                                               : 0;
     params.window = window;
     params.enableVsync = enableVsync;
     params.enableFramePacing = enableFramePacing;
@@ -1033,7 +1040,8 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
 #ifdef HAVE_PYROWAVE
     if (videoFormat == VIDEO_FORMAT_PYROWAVE) {
         chosenDecoder = new PyrowaveVideoDecoder(testOnly);
-        if (chosenDecoder->initialize(&params)) {
+        if (chosenDecoder->initialize(&params) &&
+            (params.hdrMode == 0 || chosenDecoder->isHdrSupported())) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "PyroWave video decoder chosen");
             return true;
         }
@@ -1219,16 +1227,13 @@ void Session::getDecoderInfo(SDL_Window* window,
 }
 
 Session::DecoderAvailability
-Session::getDecoderAvailability(SDL_Window* window,
-                                StreamingPreferences::VideoDecoderSelection vds,
-                                int videoFormat, int width, int height, int frameRate)
+Session::getDecoderAvailability(SDL_Window* window, StreamingPreferences::VideoDecoderSelection vds,
+                                int videoFormat, int width, int height, int frameRate, int hdrMode)
 {
     IVideoDecoder* decoder;
 
-    if (!chooseDecoder(vds,
-                       StreamingPreferences::RS_PROBE_ONLY,
-                       window, videoFormat, width, height, frameRate,
-                       false, false, false, false, true, decoder)) {
+    if (!chooseDecoder(vds, StreamingPreferences::RS_PROBE_ONLY, window, videoFormat, width, height,
+                       frameRate, false, false, false, false, true, decoder, hdrMode)) {
         return DecoderAvailability::None;
     }
 
@@ -1247,20 +1252,16 @@ bool Session::populateDecoderProperties(SDL_Window* window)
     // here because this is operating on the real streaming window, and
     // instantiating Metal or AVSBDL renderers can interfere with MoltenVK's
     // attempt to change the window's colorspace, causing washed out colors.
-    if (!chooseDecoder(m_Preferences->videoDecoderSelection,
-                       m_Preferences->rendererSelection,
-                       window,
-                       m_SupportedVideoFormats.first(),
-                       m_StreamConfig.width,
-                       m_StreamConfig.height,
-                       m_StreamConfig.fps,
-                       false, false, false, false, true, decoder)) {
+    if (!chooseDecoder(m_Preferences->videoDecoderSelection, m_Preferences->rendererSelection,
+                       window, m_SupportedVideoFormats.first(), m_StreamConfig.width,
+                       m_StreamConfig.height, m_StreamConfig.fps, false, false, false, false, true,
+                       decoder, m_StreamConfig.hdrMode)) {
         return false;
     }
 
     m_VideoCallbacks.capabilities = decoder->getDecoderCapabilities();
 #ifdef HAVE_PYROWAVE
-    if (m_StreamConfig.hdrMode != 0 || m_Preferences->enableYUV444) {
+    if (m_Preferences->enableYUV444) {
         m_VideoCallbacks.capabilities &= ~CAPABILITY_PYROWAVE;
     }
 #endif
@@ -1812,47 +1813,6 @@ bool Session::initialize(QQuickWindow* qtWindow)
     m_SupportedVideoFormats.append(VIDEO_FORMAT_H264_HIGH8_444);
     m_SupportedVideoFormats.append(VIDEO_FORMAT_H264);
 
-#ifdef HAVE_PYROWAVE
-    // PyroWave is currently wired for the 8-bit YUV420 SDR contract. Keep it
-    // behind the existing host negotiation and leave HDR/4:4:4 on the mature
-    // codec paths until their color contract is exposed by the decoder.
-    int pyrowaveColorRangeOverride;
-    const bool pyrowaveFullRange = !Utils::getEnvironmentVariableOverride(
-                                       "COLOR_RANGE_OVERRIDE", &pyrowaveColorRangeOverride) ||
-                                   pyrowaveColorRangeOverride == COLOR_RANGE_FULL;
-    int pyrowaveColorSpaceOverride;
-    const bool pyrowaveRec709 = !Utils::getEnvironmentVariableOverride(
-                                    "COLOR_SPACE_OVERRIDE", &pyrowaveColorSpaceOverride) ||
-                                pyrowaveColorSpaceOverride == COLORSPACE_REC_709;
-    const bool pyrowaveRequested =
-        m_Preferences->enablePyrowave || m_Preferences->pyrowaveForcedByEnvironment();
-    if (pyrowaveRequested &&
-        (m_Preferences->videoCodecConfig != StreamingPreferences::VCC_AUTO ||
-         m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_SOFTWARE ||
-         (m_Preferences->rendererSelection != StreamingPreferences::RS_AUTO &&
-          m_Preferences->rendererSelection != StreamingPreferences::RS_VULKAN) ||
-         m_Preferences->enableHdr || m_Preferences->enableYUV444 || !pyrowaveFullRange ||
-         !pyrowaveRec709)) {
-        emitLaunchWarning(tr("PyroWave requires automatic video codec, hardware decoding, an "
-                             "automatic or Vulkan renderer, and SDR 4:2:0 BT.709 full-range video. "
-                             "Using another codec for this session."));
-    } else if (pyrowaveRequested) {
-        IVideoDecoder* pyrowaveDecoder = nullptr;
-        if (chooseDecoder(m_Preferences->videoDecoderSelection, m_Preferences->rendererSelection,
-                          testWindow, VIDEO_FORMAT_PYROWAVE, m_StreamConfig.width,
-                          m_StreamConfig.height, m_StreamConfig.fps, false, false, false, false,
-                          true, pyrowaveDecoder)) {
-            delete pyrowaveDecoder;
-            m_SupportedVideoFormats.prepend(VIDEO_FORMAT_PYROWAVE);
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "PyroWave support detected; advertising experimental format");
-        } else {
-            emitLaunchWarning(tr("PyroWave could not initialize on this device. Using another "
-                                 "codec for this session."));
-        }
-    }
-#endif
-
     switch (m_Preferences->videoCodecConfig)
     {
     case StreamingPreferences::VCC_AUTO:
@@ -2006,6 +1966,40 @@ bool Session::initialize(QQuickWindow* qtWindow)
         // Set the HDR mode (PQ or HLG) based on user preference
         m_StreamConfig.hdrMode = static_cast<int>(m_Preferences->hdrMode);
     }
+
+#ifdef HAVE_PYROWAVE
+    // Probe after ordering the legacy formats: PyroWave uses one format ID
+    // for both SDR and HDR and must not be classified by the legacy 10-bit mask.
+    const bool pyrowaveRequested =
+        m_Preferences->enablePyrowave || m_Preferences->pyrowaveForcedByEnvironment();
+    if (pyrowaveRequested &&
+        (m_Preferences->videoCodecConfig != StreamingPreferences::VCC_AUTO ||
+         m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_SOFTWARE ||
+         (m_Preferences->rendererSelection != StreamingPreferences::RS_AUTO &&
+          m_Preferences->rendererSelection != StreamingPreferences::RS_VULKAN) ||
+         m_Preferences->enableYUV444 || !m_Preferences->pyrowaveColorOverridesCompatible())) {
+        emitLaunchWarning(
+            tr("PyroWave requires automatic video codec, hardware decoding, an "
+               "automatic or Vulkan renderer, and full-range 4:2:0 video with "
+               "BT.709 SDR or BT.2020 HDR10/HLG. Using another codec for this session."));
+    } else if (pyrowaveRequested) {
+        IVideoDecoder* pyrowaveDecoder = nullptr;
+        if (chooseDecoder(m_Preferences->videoDecoderSelection, m_Preferences->rendererSelection,
+                          testWindow, VIDEO_FORMAT_PYROWAVE, m_StreamConfig.width,
+                          m_StreamConfig.height, m_StreamConfig.fps, false, false, false, false,
+                          true, pyrowaveDecoder, m_StreamConfig.hdrMode)) {
+            delete pyrowaveDecoder;
+            m_SupportedVideoFormats.prepend(VIDEO_FORMAT_PYROWAVE);
+            // Leave dynamic HDR opt-in fields at their defaults. This decoder
+            // consumes the base HDR signal, not frame-bound dynamic metadata.
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "PyroWave support detected; advertising experimental format");
+        } else {
+            emitLaunchWarning(tr("PyroWave could not initialize on this device. Using another "
+                                 "codec for this session."));
+        }
+    }
+#endif
 
     switch (m_Preferences->windowMode)
     {
@@ -2200,16 +2194,25 @@ bool Session::validateLaunch(SDL_Window* testWindow)
     }
 
     if (m_Preferences->enableHdr) {
+        // Legacy server codec masks do not describe the independently
+        // negotiated PyroWave HDR path. Still filter legacy fallback formats,
+        // but do not report HDR as unavailable while PyroWave remains viable.
+        const bool pyrowaveHdr = (m_SupportedVideoFormats & VIDEO_FORMAT_PYROWAVE) != 0;
         if (m_Preferences->videoCodecConfig == StreamingPreferences::VCC_FORCE_H264) {
             emitLaunchWarning(tr("HDR is not supported using the H.264 codec."));
             m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_MASK_10BIT);
         }
         else if (!(m_SupportedVideoFormats & VIDEO_FORMAT_MASK_10BIT)) {
-            emitLaunchWarning(tr("This PC's GPU doesn't support 10-bit HEVC or AV1 decoding for HDR streaming."));
+            if (!pyrowaveHdr) {
+                emitLaunchWarning(tr("This PC's GPU doesn't support 10-bit HEVC or AV1 decoding "
+                                     "for HDR streaming."));
+            }
         }
         // Check that the server GPU supports HDR
         else if (m_SupportedVideoFormats.maskByServerCodecModes(m_Computer->serverCodecModeSupport & SCM_MASK_10BIT) == 0) {
-            emitLaunchWarning(tr("Your host PC doesn't support HDR streaming."));
+            if (!pyrowaveHdr) {
+                emitLaunchWarning(tr("Your host PC doesn't support HDR streaming."));
+            }
             m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_MASK_10BIT);
         }
         else if (m_Preferences->videoCodecConfig != StreamingPreferences::VCC_AUTO) { // Auto was already checked during init
@@ -2257,7 +2260,10 @@ bool Session::validateLaunch(SDL_Window* testWindow)
         // Check for compatibility between server and client codecs
         if ((m_SupportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) && // Ignore this check if we already failed one above
             !(m_SupportedVideoFormats.maskByServerCodecModes(m_Computer->serverCodecModeSupport) & VIDEO_FORMAT_MASK_10BIT)) {
-            emitLaunchWarning(tr("Your host PC and client PC don't support the same HDR video codecs."));
+            if (!pyrowaveHdr) {
+                emitLaunchWarning(
+                    tr("Your host PC and client PC don't support the same HDR video codecs."));
+            }
             m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_MASK_10BIT);
         }
     }
@@ -2356,13 +2362,12 @@ bool Session::validateLaunch(SDL_Window* testWindow)
     }
 
     if (m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_HARDWARE &&
-            !(m_SupportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) && // HDR was already checked for hardware decode support above
-            getDecoderAvailability(testWindow,
-                                   m_Preferences->videoDecoderSelection,
-                                   m_SupportedVideoFormats.front(),
-                                   m_StreamConfig.width,
-                                   m_StreamConfig.height,
-                                   m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+        !(m_SupportedVideoFormats &
+          VIDEO_FORMAT_MASK_10BIT) && // HDR was already checked for hardware decode support above
+        getDecoderAvailability(testWindow, m_Preferences->videoDecoderSelection,
+                               m_SupportedVideoFormats.front(), m_StreamConfig.width,
+                               m_StreamConfig.height, m_StreamConfig.fps,
+                               m_StreamConfig.hdrMode) != DecoderAvailability::Hardware) {
         if (m_Preferences->videoCodecConfig == StreamingPreferences::VCC_AUTO) {
             emit displayLaunchError(tr("Your selection to force hardware decoding cannot be satisfied due to missing hardware decoding support on this PC's GPU."));
         }
@@ -5663,15 +5668,12 @@ void Session::exec()
                 // Choose a new decoder (hopefully the same one, but possibly
                 // not if a GPU was removed or something).
                 if (!chooseDecoder(m_Preferences->videoDecoderSelection,
-                                   m_Preferences->rendererSelection,
-                                   m_Window, m_ActiveVideoFormat, m_ActiveVideoWidth,
-                                   m_ActiveVideoHeight, m_ActiveVideoFrameRate,
-                                   enableVsync,
-                                   enableVsync && m_Preferences->framePacing,
+                                   m_Preferences->rendererSelection, m_Window, m_ActiveVideoFormat,
+                                   m_ActiveVideoWidth, m_ActiveVideoHeight, m_ActiveVideoFrameRate,
+                                   enableVsync, enableVsync && m_Preferences->framePacing,
                                    m_Preferences->videoEnhancement,
-                                   m_Preferences->ignoreAspectRatio,
-                                   false,
-                                   s_ActiveSession->m_VideoDecoder)) {
+                                   m_Preferences->ignoreAspectRatio, false,
+                                   s_ActiveSession->m_VideoDecoder, m_StreamConfig.hdrMode)) {
                     SDL_UnlockMutex(m_DecoderLock);
                     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                                  "Failed to recreate decoder after reset");

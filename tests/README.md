@@ -13,6 +13,8 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | 目录 | 验证内容 | CI 平台 |
 |---|---|---|
 | derive_version | scripts/derive-version.py 版本号推导 | Ubuntu(unittest) |
+| pyrowave_preferences | PyroWave 启用/禁用构建下的设置通知、保存、环境变量及 SDR/HDR 色彩覆盖 | Ubuntu(Qt) |
+| pyrowave_color_contract | SDR/HDR10/HLG 位深、色彩匹配与静态 HDR 元数据；使用固定版本的 PyroWave 头文件和真实 libavutil，无需 GPU | Ubuntu |
 | cursor_shape_classification | 光标位图 → 形状分类器的判定矩阵 | Windows |
 | clipboard_payload_routing | 剪贴板状态、复合内容、文件保护、IPC 分帧和本地 TLS 传输回归（offscreen） | Windows |
 | clipboard_helper_lifecycle | helper 异常退出、响应超时和进程管道背压 | Windows |
@@ -46,7 +48,6 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 
 | 目录 | 说明 |
 |---|---|
-| pyrowave_preferences | PyroWave 设置的默认值、保存、环境变量及色彩覆盖；使用 Qt 单独构建 |
 | pyrowave_roundtrip | PyroWave Metal 编码、传输重组与 Vulkan 像素解码；需要 macOS 和独立构建的 PyroWave 库 |
 | usb_forwarding_tunnel | USB/IP 隧道手动联调探针:需要 10 个 CLI 参数和真实 usbipd 服务端,不能进 CI。用法看 main.cpp 头注释 |
 | `file-mapping/smoke/` | 文件映射冒烟二进制,复用 app 源码,手工构建运行。刻意**不注册**进 moonlight-qt.pro 的 SUBDIRS:它链接 app 后端与 OpenSSL,注册会给全部平台构建(含 SteamLink 老工具链)平添失败面,而它没有自动化验证价值 |

@@ -54,8 +54,12 @@ bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
         return false;
     }
 
-    // This first integration is intentionally limited to the contract that
-    // can be represented by the existing renderer color path.
+    if (!PyrowaveColor::describe(params->hdrMode, m_ColorContract)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unsupported PyroWave HDR mode: %d",
+                     params->hdrMode);
+        return false;
+    }
+
     if (params->width <= 0 || params->height <= 0 || params->width > 16384 ||
         params->height > 16384 || (params->width & 1) != 0 || (params->height & 1) != 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Invalid PyroWave dimensions: %dx%d",
@@ -76,7 +80,8 @@ bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
     decoderInfo.width = m_Width;
     decoderInfo.height = m_Height;
     decoderInfo.chroma = PYROWAVE_CHROMA_SUBSAMPLING_420;
-    decoderInfo.fragment_path = pyrowave_decoder_device_prefers_fragment_path(m_Device);
+    decoderInfo.fragment_path =
+        m_ColorContract.useFragmentPath(pyrowave_decoder_device_prefers_fragment_path(m_Device));
 
     if (pyrowave_decoder_create(&decoderInfo, &m_Decoder) != PYROWAVE_SUCCESS ||
         m_Decoder == nullptr) {
@@ -88,6 +93,10 @@ bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
     if (!m_Renderer->initialize(params)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Unable to initialize the Vulkan renderer for PyroWave");
+        return false;
+    }
+    if (m_ColorContract.hdrMode != 0 && !isHdrSupported()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Vulkan renderer cannot handle PyroWave HDR");
         return false;
     }
 
@@ -135,9 +144,8 @@ bool PyrowaveVideoDecoder::isAlwaysFullScreen()
 
 bool PyrowaveVideoDecoder::isHdrSupported()
 {
-    // HDR output needs the 10-bit PyroWave color contract, which is not yet
-    // exposed by this initial 8-bit decoder integration.
-    return false;
+    return m_Renderer != nullptr &&
+           (m_Renderer->getRendererAttributes() & RENDERER_ATTRIBUTE_HDR_SUPPORT) != 0;
 }
 
 int PyrowaveVideoDecoder::getDecoderCapabilities()
@@ -162,6 +170,8 @@ int PyrowaveVideoDecoder::decoderThreadProc(void* context)
 
 int PyrowaveVideoDecoder::getDecoderColorspace()
 {
+    // This preference also applies to legacy-codec fallback. common-c selects
+    // BT.2020 separately once PyroWave HDR is negotiated, and frames carry it explicitly.
     return COLORSPACE_REC_709;
 }
 
@@ -196,14 +206,14 @@ bool PyrowaveVideoDecoder::copyDecodeUnit(PDECODE_UNIT du, QByteArray& payload) 
     return offset == payload.size();
 }
 
-bool PyrowaveVideoDecoder::createFrame(AVFrame** frame)
+bool PyrowaveVideoDecoder::createFrame(const pyrowave_color_metadata& metadata, AVFrame** frame)
 {
     AVFrame* output = av_frame_alloc();
     if (output == nullptr) {
         return false;
     }
 
-    output->format = AV_PIX_FMT_YUV420P;
+    PyrowaveColor::applyToFrame(m_ColorContract, metadata, output);
     output->width = m_Width;
     output->height = m_Height;
     if (av_frame_get_buffer(output, 32) < 0) {
@@ -225,9 +235,16 @@ bool PyrowaveVideoDecoder::createFrame(AVFrame** frame)
         buffers.row_stride_in_bytes[2] * static_cast<size_t>((m_Height + 1) / 2);
     buffers.width = m_Width;
     buffers.height = m_Height;
-    buffers.format = PYROWAVE_CPU_BUFFER_FORMAT_YUV420P;
+    buffers.format = m_ColorContract.cpuFormat;
 
     if (pyrowave_decoder_decode_cpu_buffer_synchronous(m_Decoder, &buffers) != PYROWAVE_SUCCESS) {
+        av_frame_free(&output);
+        return false;
+    }
+
+    SS_HDR_METADATA hdrMetadata;
+    if (m_ColorContract.hdrMode != 0 && LiGetHdrMetadata(&hdrMetadata) &&
+        !PyrowaveColor::attachHdrMetadata(output, hdrMetadata)) {
         av_frame_free(&output);
         return false;
     }
@@ -306,13 +323,13 @@ void PyrowaveVideoDecoder::updatePerformanceOverlay(uint64_t nowUs)
         }
         char text[512];
         SDL_snprintf(text, sizeof(text),
-                     " {18}%dx%d@%.0f PyroWave SDR "
+                     " {18}%dx%d@%.0f PyroWave %s "
                      " {18}FPS  %.1f {14}Rx{18} · %.1f {14}De{18} · %.1f {14}Rd{18} \n"
                      " Network %s Loss %.2f%% Bandwidth %s {16}|  {18}Render %s · Decode %s %s",
-                     m_Width, m_Height, total / elapsedSeconds, received / elapsedSeconds,
-                     decoded / elapsedSeconds, rendered / elapsedSeconds, rttString,
-                     total != 0 ? 100.0 * lost / total : 0.0, bandwidthString, renderString,
-                     decodeString, encodeString);
+                     m_Width, m_Height, total / elapsedSeconds, m_ColorContract.label,
+                     received / elapsedSeconds, decoded / elapsedSeconds, rendered / elapsedSeconds,
+                     rttString, total != 0 ? 100.0 * lost / total : 0.0, bandwidthString,
+                     renderString, decodeString, encodeString);
         Session::get()->getOverlayManager().updateOverlayText(Overlay::OverlayDebug, text);
     }
 
@@ -365,8 +382,21 @@ int PyrowaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
         return DR_NEED_IDR;
     }
 
+    pyrowave_color_metadata metadata = {};
+    if (!pyrowave_decoder_get_color_metadata(m_Decoder, &metadata) ||
+        !PyrowaveColor::matches(m_ColorContract, metadata)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "PyroWave frame %d does not match negotiated %s full-range colors "
+                    "(primaries=%d transfer=%d matrix=%d range=%d siting=%u)",
+                    du->frameNumber, m_ColorContract.label, static_cast<int>(metadata.primaries),
+                    static_cast<int>(metadata.transfer), static_cast<int>(metadata.transform),
+                    static_cast<int>(metadata.range), metadata.chroma_siting);
+        updatePerformanceOverlay(LiGetMicroseconds());
+        return DR_NEED_IDR;
+    }
+
     AVFrame* frame = nullptr;
-    if (!createFrame(&frame)) {
+    if (!createFrame(metadata, &frame)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "PyroWave failed to decode frame %d",
                     du->frameNumber);
         updatePerformanceOverlay(LiGetMicroseconds());
@@ -375,10 +405,6 @@ int PyrowaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
 
     frame->pts = static_cast<int64_t>(du->rtpTimestamp);
     frame->pkt_dts = static_cast<int64_t>(LiGetMicroseconds());
-    frame->color_range = AVCOL_RANGE_JPEG;
-    frame->colorspace = AVCOL_SPC_BT709;
-    frame->color_primaries = AVCOL_PRI_BT709;
-    frame->color_trc = AVCOL_TRC_BT709;
 
     {
         QMutexLocker locker(&m_VideoStatsMutex);

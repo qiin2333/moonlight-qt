@@ -1957,12 +1957,12 @@
         <translation>已由 MOONLIGHT_ENABLE_PYROWAVE=1 启用。请从启动环境中移除此变量后再更改设置。</translation>
     </message>
     <message>
-        <source>Attempts PyroWave when both this device and the host support it. Otherwise, the stream uses the preferred video codec. Requires automatic codec selection, automatic or Vulkan rendering, hardware decoding, and SDR YUV 4:2:0.</source>
-        <translation>本机和主机均支持时尝试使用 PyroWave，否则使用首选视频编码。需要自动选择编码、自动或 Vulkan 渲染、硬件解码以及 SDR YUV 4:2:0。</translation>
+        <source>Attempts PyroWave when both this device and the host support it. Otherwise, the stream uses the preferred video codec. Supports SDR, HDR10 and HLG in YUV 4:2:0. Requires automatic codec selection, automatic or Vulkan rendering, and hardware decoding.</source>
+        <translation>本机和主机均支持时尝试使用 PyroWave，否则使用首选视频编码。支持 YUV 4:2:0 的 SDR、HDR10 和 HLG，需要自动选择编码、自动或 Vulkan 渲染以及硬件解码。</translation>
     </message>
     <message>
-        <source>Custom color overrides must use BT.709 and full range for PyroWave.</source>
-        <translation>使用 PyroWave 时，自定义色彩覆盖必须设为 BT.709 和全范围。</translation>
+        <source>Custom color overrides must use full range and match the stream: BT.709 for SDR, BT.2020 for HDR.</source>
+        <translation>自定义色彩覆盖必须使用全范围，并与串流匹配：SDR 使用 BT.709，HDR 使用 BT.2020。</translation>
     </message>
     <message>
         <source>Current video settings are incompatible; the preferred video codec will be used.</source>
@@ -3059,8 +3059,8 @@
 <context>
     <name>Session</name>
     <message>
-        <source>PyroWave requires automatic video codec, hardware decoding, an automatic or Vulkan renderer, and SDR 4:2:0 BT.709 full-range video. Using another codec for this session.</source>
-        <translation>PyroWave 需要自动选择视频编码、硬件解码、自动或 Vulkan 渲染器，以及 SDR 4:2:0 BT.709 全范围画面。本次串流将使用其他编码。</translation>
+        <source>PyroWave requires automatic video codec, hardware decoding, an automatic or Vulkan renderer, and full-range 4:2:0 video with BT.709 SDR or BT.2020 HDR10/HLG. Using another codec for this session.</source>
+        <translation>PyroWave 需要自动选择视频编码、硬件解码、自动或 Vulkan 渲染器，以及全范围 4:2:0 的 BT.709 SDR 或 BT.2020 HDR10/HLG 画面。本次串流将使用其他编码。</translation>
     </message>
     <message>
         <source>PyroWave could not initialize on this device. Using another codec for this session.</source>

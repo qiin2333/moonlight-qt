@@ -5,20 +5,13 @@
 
 #include "ffmpeg-renderers/pacer/pacer.h"
 #include "ffmpeg-renderers/plvk.h"
+#include "pyrowavecolor.h"
 
 #include <QByteArray>
 #include <QMutex>
 
-extern "C" {
-#include <libavutil/frame.h>
-}
-
-#include <pyrowave.h>
-
-// PyroWave is an optional experimental decoder.  The current Moonlight
-// integration deliberately starts with the stable 8-bit YUV420 SDR contract;
-// HDR and 4:4:4 remain on the negotiated legacy codec paths until their
-// application-side color contract is wired through this class.
+// PyroWave is an optional experimental decoder for full-range YUV420:
+// 8-bit BT.709 SDR or 10-bit BT.2020 PQ/HLG. Frames currently use CPU readback.
 class PyrowaveVideoDecoder : public IVideoDecoder
 {
 public:
@@ -40,13 +33,14 @@ public:
 
 private:
     static int decoderThreadProc(void* context);
-    bool createFrame(AVFrame** frame);
+    bool createFrame(const pyrowave_color_metadata& metadata, AVFrame** frame);
     bool copyDecodeUnit(PDECODE_UNIT du, QByteArray& payload) const;
     void updatePerformanceOverlay(uint64_t nowUs);
 
     bool m_TestOnly;
     int m_Width;
     int m_Height;
+    PyrowaveColor::Contract m_ColorContract;
     pyrowave_device m_Device;
     pyrowave_decoder m_Decoder;
     PlVkRenderer* m_Renderer;

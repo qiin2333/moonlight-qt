@@ -93,6 +93,40 @@ int main(int argc, char* argv[])
     ok &= require(!prefs->pyrowaveColorOverridesCompatible(),
                   "limited range override is incompatible");
 
+    qunsetenv("COLOR_RANGE_OVERRIDE");
+    qunsetenv("COLOR_SPACE_OVERRIDE");
+    int compatibilityChanges = 0;
+    const auto compatibilityConnection =
+        QObject::connect(prefs, &StreamingPreferences::pyrowaveCompatibilityChanged,
+                         [&compatibilityChanges]() { ++compatibilityChanges; });
+    const QMetaProperty compatibility = prefs->metaObject()->property(
+        prefs->metaObject()->indexOfProperty("pyrowaveColorOverridesCompatible"));
+    ok &= require(compatibility.hasNotifySignal() && !compatibility.isConstant(),
+                  "color compatibility updates when HDR settings change");
+    prefs->hdrMode = StreamingPreferences::HDR_PQ;
+    ok &= require(prefs->setProperty("enableHdr", true) && compatibilityChanges == 1,
+                  "enabling HDR notifies the compatibility binding");
+    ok &= require(prefs->pyrowaveColorOverridesCompatible(), "HDR10 defaults are compatible");
+    qputenv("COLOR_SPACE_OVERRIDE", QByteArray::number(COLORSPACE_REC_709));
+    ok &= require(!prefs->pyrowaveColorOverridesCompatible(), "HDR rejects a BT.709 override");
+    qputenv("COLOR_SPACE_OVERRIDE", QByteArray::number(COLORSPACE_REC_2020));
+    ok &= require(prefs->pyrowaveColorOverridesCompatible(), "HDR10 accepts BT.2020 full range");
+    ok &= require(prefs->setProperty("hdrMode", StreamingPreferences::HDR_HLG) &&
+                      compatibilityChanges == 2,
+                  "changing HDR mode notifies the compatibility binding");
+    ok &= require(prefs->pyrowaveColorOverridesCompatible(), "HLG accepts BT.2020 full range");
+    qputenv("COLOR_RANGE_OVERRIDE", QByteArray::number(COLOR_RANGE_LIMITED));
+    ok &= require(!prefs->pyrowaveColorOverridesCompatible(), "HDR rejects limited range");
+    qunsetenv("COLOR_RANGE_OVERRIDE");
+    prefs->hdrMode = static_cast<StreamingPreferences::HdrMode>(3);
+    ok &= require(!prefs->pyrowaveColorOverridesCompatible(), "unknown HDR modes are rejected");
+    prefs->hdrMode = StreamingPreferences::HDR_PQ;
+    ok &= require(prefs->setProperty("enableHdr", false) && compatibilityChanges == 3,
+                  "disabling HDR notifies the compatibility binding");
+    ok &= require(!prefs->pyrowaveColorOverridesCompatible(), "SDR rejects a BT.2020 override");
+    qunsetenv("COLOR_SPACE_OVERRIDE");
+    QObject::disconnect(compatibilityConnection);
+
     if (ok) {
         QTextStream(stdout) << "pyrowave_preferences=passed\n";
     }

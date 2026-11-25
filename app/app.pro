@@ -520,6 +520,10 @@ libplacebo {
         SOURCES += streaming/video/ffmpeg-renderers/plvk_objc.mm
     }
 }
+pyrowave:!config_pyrowave {
+    warning(AlkaidLab PyroWave high-bit-depth and color metadata API not found; PyroWave decoder disabled)
+    CONFIG -= pyrowave
+}
 pyrowave:libplacebo:ffmpeg:!config_SL {
     message(PyroWave decoder enabled)
 
@@ -527,7 +531,7 @@ pyrowave:libplacebo:ffmpeg:!config_SL {
     PKGCONFIG += pyrowave-shared
     DEFINES += HAVE_PYROWAVE
     SOURCES += streaming/video/pyrowave.cpp
-    HEADERS += streaming/video/pyrowave.h
+    HEADERS += streaming/video/pyrowave.h streaming/video/pyrowavecolor.h
 }
 config_EGL {
     message(EGL renderer selected)

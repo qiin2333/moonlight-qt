@@ -260,7 +260,8 @@ public:
     Q_PROPERTY(bool enablePyrowave MEMBER enablePyrowave NOTIFY enablePyrowaveChanged)
     Q_PROPERTY(bool pyrowaveAvailable READ pyrowaveAvailable CONSTANT)
     Q_PROPERTY(bool pyrowaveForcedByEnvironment READ pyrowaveForcedByEnvironment CONSTANT)
-    Q_PROPERTY(bool pyrowaveColorOverridesCompatible READ pyrowaveColorOverridesCompatible CONSTANT)
+    Q_PROPERTY(bool pyrowaveColorOverridesCompatible READ pyrowaveColorOverridesCompatible NOTIFY
+                   pyrowaveCompatibilityChanged)
     Q_PROPERTY(bool enableHdr MEMBER enableHdr NOTIFY enableHdrChanged)
     Q_PROPERTY(HdrMode hdrMode MEMBER hdrMode NOTIFY hdrModeChanged)
     Q_PROPERTY(HdrBrightnessMode hdrBrightnessMode MEMBER hdrBrightnessMode NOTIFY hdrBrightnessModeChanged)
@@ -410,6 +411,7 @@ signals:
     void audioConfigChanged();
     void videoCodecConfigChanged();
     void enablePyrowaveChanged();
+    void pyrowaveCompatibilityChanged();
     void enableHdrChanged();
     void hdrModeChanged();
     void hdrBrightnessModeChanged();

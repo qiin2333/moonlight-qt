@@ -23,3 +23,6 @@ CONFIG += debug_and_release
 load(configure)
 qtCompileTest(SL)
 qtCompileTest(EGL)
+unix:!config_SL:!disable-pyrowave:packagesExist(pyrowave-shared) {
+    qtCompileTest(pyrowave)
+}
