@@ -15,6 +15,7 @@
 #include <QTextStream>
 #include <QThread>
 #include <QTimer>
+#include <QUrlQuery>
 
 #include <atomic>
 #include <future>
@@ -62,6 +63,8 @@ struct ServerState
     std::atomic<int> redirectStatus{ 302 };
     std::atomic<bool> plaintext{ false };
     std::atomic<int> serverInfoStatus{ 200 };
+    std::atomic<int> launchHdrMode{ -1 };
+    std::atomic<bool> launchHdrMetadata{ false };
     std::atomic<quint16> advertisedHttpsPort{ 0 };
     std::atomic<RpcReplyMode> rpcReplyMode{ RpcReplyMode::None };
 };
@@ -211,6 +214,17 @@ protected:
                                                   : serverPort()) +
                            "</HttpsPort></root>";
                 }
+                if (headers.startsWith("GET /launch?") || headers.startsWith("GET /resume?")) {
+                    const QUrlQuery query(QUrl::fromEncoded(headers.split(' ').at(1)));
+                    m_State.launchHdrMode =
+                        query.hasQueryItem(QStringLiteral("hdrMode"))
+                            ? query.queryItemValue(QStringLiteral("hdrMode")).toInt()
+                            : -1;
+                    m_State.launchHdrMetadata =
+                        query.hasQueryItem(QStringLiteral("clientHdrCapMetaDataId"));
+                    body = "<root "
+                           "status_code=\"200\"><sessionUrl0>rtsp://example</sessionUrl0></root>";
+                }
                 const bool keepAlive = m_State.keepAlive.load();
                 socket->write(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " +
@@ -286,6 +300,48 @@ int main(int argc, char* argv[])
     host.serverCert = QSslCertificate(fixture("server.pem"));
     host.uuid = QStringLiteral("test-host");
     bool ok = true;
+    {
+        NvHTTP http(host.activeAddress, port, host.serverCert);
+        STREAM_CONFIGURATION stream = {};
+        stream.width = 1920;
+        stream.height = 1080;
+        stream.fps = 60;
+        stream.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
+        RemoteStreamConfig remote(false, 0, 0, false, 0, 0, 0);
+        QString sessionUrl;
+        auto checkLaunch = [&](const QString& verb, int formats, int hdrMode, int expectedMode) {
+            stream.supportedVideoFormats = formats;
+            stream.hdrMode = hdrMode;
+            server.state.launchHdrMode = -2;
+            server.state.launchHdrMetadata = false;
+            try {
+                http.startApp(verb, false, 1, &stream, false, false, 0, false, sessionUrl, -1,
+                              std::nullopt, QString(), remote);
+                return sessionUrl == QStringLiteral("rtsp://example") &&
+                       server.state.launchHdrMode == expectedMode &&
+                       server.state.launchHdrMetadata == (expectedMode >= 0);
+            } catch (const std::exception&) {
+                return false;
+            }
+        };
+        for (const QString& verb : { QStringLiteral("launch"), QStringLiteral("resume") }) {
+            ok &=
+                require(checkLaunch(verb, VIDEO_FORMAT_PYROWAVE | VIDEO_FORMAT_H264, 1, 1),
+                        verb + QStringLiteral(" sends HDR10 for PyroWave with SDR fallback"), err);
+            ok &= require(checkLaunch(verb, VIDEO_FORMAT_PYROWAVE | VIDEO_FORMAT_H264, 2, 2),
+                          verb + QStringLiteral(" sends HLG for PyroWave with SDR fallback"), err);
+            ok &= require(checkLaunch(verb, VIDEO_FORMAT_PYROWAVE | VIDEO_FORMAT_H264, 0, -1),
+                          verb + QStringLiteral(" leaves HDR fields out for SDR PyroWave"), err);
+            ok &= require(checkLaunch(verb, VIDEO_FORMAT_H265_MAIN10, 1, 1),
+                          verb + QStringLiteral(" retains HDR fields for legacy Main10"), err);
+            ok &=
+                require(checkLaunch(verb, VIDEO_FORMAT_H265_MAIN10, 0, 0),
+                        verb + QStringLiteral(" retains existing Main10 mode-zero behavior"), err);
+            ok &=
+                require(checkLaunch(verb, VIDEO_FORMAT_H264, 1, -1),
+                        verb + QStringLiteral(" leaves HDR fields out for SDR-only fallback"), err);
+        }
+    }
     FileMappingClient::Capability capability;
     {
         FileMappingClient client(&host);
