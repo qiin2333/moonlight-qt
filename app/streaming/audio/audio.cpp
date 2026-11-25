@@ -56,8 +56,12 @@ IAudioRenderer* Session::createAudioRenderer(const POPUS_MULTISTREAM_CONFIGURATI
 #endif
 
 #if defined(HAVE_COREAUDIO)
-    // Prefer CoreAudio on macOS for spatial audio
-    TRY_INIT_RENDERER(CoreAudioRenderer, opusConfig)
+    // Prefer CoreAudio on macOS for spatial audio. CoreAudio always follows
+    // the default output, so leave a device picked with SDL_AUDIO_DEVICE_NAME
+    // to SDL.
+    if (SDL_getenv("SDL_AUDIO_DEVICE_NAME") == nullptr) {
+        TRY_INIT_RENDERER(CoreAudioRenderer, opusConfig)
+    }
 #endif
 
     // Default to SDL
