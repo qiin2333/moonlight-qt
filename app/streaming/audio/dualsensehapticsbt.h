@@ -239,6 +239,18 @@ public:
         return ok;
     }
 
+    // End of a stream: pad the partial report with silence and send it, so short
+    // effects and stream tails are not left waiting for samples that never come.
+    template <typename Send> bool flush(Send send)
+    {
+        if (m_Pending.empty())
+            return true;
+        m_Pending.resize(AudioBytesPerReport, 0);
+        m_Builder.build(m_Report.data(), m_Pending.data());
+        m_Pending.clear();
+        return send(m_Report.data());
+    }
+
     std::size_t pendingFrames() const { return m_Pending.size() / 2; }
 
 private:

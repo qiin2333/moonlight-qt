@@ -154,13 +154,21 @@ void testDownsampler()
         ds.process(pcm.data(), 48000, out);
         check(peak(out, 0) <= 4, "3 kHz is filtered out");
     }
-    // Clipping instead of wrap-around.
+    // Clipping instead of wrap-around: a held +/-32000 at 400% is +/-500 before
+    // conversion, which would wrap to -12/+12 instead of saturating.
     {
         Downsampler ds(4.0f);
         std::vector<std::int8_t> out;
-        const auto pcm = sine(100, 32000, 48000);
+        std::vector<std::int16_t> pcm(48000 * 2);
+        for (std::size_t i = 0; i < 48000; i++) {
+            pcm[i * 2] = 32000;
+            pcm[i * 2 + 1] = -32000;
+        }
         ds.process(pcm.data(), 48000, out);
-        check(peak(out, 0) == 128 || peak(out, 0) == 127, "loud input clips");
+        bool saturated = out.size() > 200;
+        for (std::size_t i = 200; i < out.size(); i += 2)
+            saturated = saturated && out[i] == 127 && out[i + 1] == -128;
+        check(saturated, "loud input saturates with its sign");
     }
 }
 
@@ -192,6 +200,31 @@ void testAssembler()
         return false;
     });
     check(!ok && calls == 1, "send failure stops the push");
+
+    // Stream end: a short effect (480 frames -> ~21 output frames) is padded
+    // with silence and sent; nothing is sent when no partial report is left.
+    ReportAssembler shortEffect;
+    std::vector<std::vector<std::uint8_t>> flushed;
+    const auto collect = [&](const std::uint8_t* report) {
+        flushed.emplace_back(report, report + ReportLength);
+        return true;
+    };
+    shortEffect.push(pcm.data(), 480, collect);
+    check(flushed.empty() && shortEffect.pendingFrames() > 0, "short effect is held back");
+    const std::size_t held = shortEffect.pendingFrames();
+    check(shortEffect.flush(collect) && flushed.size() == 1, "flush sends the partial report");
+    check(shortEffect.pendingFrames() == 0, "flush empties the assembler");
+    if (flushed.size() == 1) {
+        const auto& r = flushed[0];
+        check(outputReportCrc(r.data(), CrcOffset) == storedCrc(r.data()), "flushed report CRC");
+        bool audible = false, silentTail = true;
+        for (std::size_t i = 0; i < held * 2; i++)
+            audible = audible || r[AudioOffset + i] != 0;
+        for (std::size_t i = held * 2; i < AudioBytesPerReport; i++)
+            silentTail = silentTail && r[AudioOffset + i] == 0;
+        check(audible && silentTail, "flushed report carries the effect, then silence");
+    }
+    check(shortEffect.flush(collect) && flushed.size() == 1, "empty flush sends nothing");
 }
 
 } // namespace

@@ -329,6 +329,9 @@ public:
         m_Started = false;
     }
 
+    // The audio device plays everything it was given; nothing is held back.
+    bool finishStream() { return true; }
+
     WriteResult tryWrite(const Packet& packet)
     {
         if (!m_AudioClient || !m_RenderClient || packet.frameCount == 0)
@@ -472,14 +475,15 @@ public:
                 return false;
             }
             m_Device = handle;
-            m_Report.assign(device.outputReportLength, 0);
+            m_Write = std::make_unique<WriteSlot>();
+            m_Write->buffer.assign(device.outputReportLength, 0);
             return true;
         });
         if (!found)
             return false;
 
-        m_WriteEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-        if (m_WriteEvent == nullptr) {
+        m_Write->event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (m_Write->event == nullptr) {
             close();
             return false;
         }
@@ -491,7 +495,7 @@ public:
             SDL_LOG_CATEGORY_APPLICATION,
             "DualSense haptics endpoint ready: Bluetooth HID report 0x34 "
             "(%u-byte output reports, %u frames per report, ~%.0f Hz signed 8-bit, gain %.1f)",
-            static_cast<unsigned>(m_Report.size()),
+            static_cast<unsigned>(m_Write->buffer.size()),
             static_cast<unsigned>(dualsense_haptics::bt::FramesPerReport),
             dualsense_haptics::bt::InputRate * dualsense_haptics::bt::FramesPerReport /
                 dualsense_haptics::bt::InputFramesPerReport,
@@ -503,15 +507,21 @@ public:
     {
         m_Started = false;
         if (m_Device != INVALID_HANDLE_VALUE) {
-            CancelIoEx(m_Device, nullptr);
+            if (m_Write && m_Write->pending) {
+                CancelIoEx(m_Device, &m_Write->overlapped);
+                if (!completePendingWrite(CloseWaitMs)) {
+                    // The driver ignored the cancel and may still touch the
+                    // OVERLAPPED and buffer, so they must never be freed.
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                                "Bluetooth DualSense haptics write did not finish after "
+                                "cancellation; abandoning its buffer");
+                    m_Write.release();
+                }
+            }
             CloseHandle(m_Device);
             m_Device = INVALID_HANDLE_VALUE;
         }
-        if (m_WriteEvent != nullptr) {
-            CloseHandle(m_WriteEvent);
-            m_WriteEvent = nullptr;
-        }
-        m_Report.clear();
+        m_Write.reset();
         m_Assembler.reset();
     }
 
@@ -536,6 +546,14 @@ public:
         m_Assembler.reset();
     }
 
+    // The host ended the stream: send the partial report instead of holding it
+    // back until the next stream discards it.
+    bool finishStream()
+    {
+        return isOpen() && m_Assembler.flush(
+                               [this](const std::uint8_t* report) { return writeReport(report); });
+    }
+
     WriteResult tryWrite(const Packet& packet)
     {
         if (!isOpen())
@@ -554,46 +572,87 @@ private:
     // went away (powered off, out of range) and the endpoint must be reopened.
     static constexpr int MaxConsecutiveFailures = 3;
     static constexpr DWORD WriteTimeoutMs = 100;
+    static constexpr DWORD CancelWaitMs = 20;
+    static constexpr DWORD CloseWaitMs = 500;
 
-    bool writeReport(const std::uint8_t* report)
+    // One overlapped write at a time. The OVERLAPPED and buffer belong to the
+    // write until the driver completes it, so the worker never waits unbounded:
+    // a write that ignores cancellation keeps the slot busy (later reports fail
+    // until it completes) and close() abandons the slot rather than free it.
+    struct WriteSlot
     {
-        std::copy_n(report, dualsense_haptics::bt::ReportLength, m_Report.begin());
+        OVERLAPPED overlapped{};
+        std::vector<std::uint8_t> buffer;
+        HANDLE event = nullptr;
+        bool pending = false;
+
+        WriteSlot() = default;
+        WriteSlot(const WriteSlot&) = delete;
+        WriteSlot& operator=(const WriteSlot&) = delete;
+        ~WriteSlot()
+        {
+            if (event != nullptr)
+                CloseHandle(event);
+        }
+    };
+
+    // Wait up to timeoutMs for the write in flight; true once the slot is free.
+    bool completePendingWrite(DWORD timeoutMs)
+    {
+        if (WaitForSingleObject(m_Write->event, timeoutMs) != WAIT_OBJECT_0)
+            return false;
+        DWORD written = 0;
+        GetOverlappedResult(m_Device, &m_Write->overlapped, &written, FALSE);
+        m_Write->pending = false;
+        return true;
+    }
+
+    bool issueWrite(const std::uint8_t* report)
+    {
+        if (m_Write->pending && !completePendingWrite(0))
+            return false;
+
+        std::copy_n(report, dualsense_haptics::bt::ReportLength, m_Write->buffer.begin());
         // Bytes past the report stay zero: Windows wants the collection's
         // longest output report length on every write.
 
-        OVERLAPPED overlapped{};
-        overlapped.hEvent = m_WriteEvent;
-        ResetEvent(m_WriteEvent);
+        m_Write->overlapped = OVERLAPPED{};
+        m_Write->overlapped.hEvent = m_Write->event;
+        ResetEvent(m_Write->event);
         DWORD written = 0;
-        bool ok = WriteFile(m_Device, m_Report.data(), static_cast<DWORD>(m_Report.size()), nullptr,
-                            &overlapped) != FALSE;
-        if (!ok && GetLastError() == ERROR_IO_PENDING) {
-            if (WaitForSingleObject(m_WriteEvent, WriteTimeoutMs) == WAIT_OBJECT_0) {
-                ok = GetOverlappedResult(m_Device, &overlapped, &written, FALSE) != FALSE;
-            } else {
-                CancelIoEx(m_Device, &overlapped);
-                GetOverlappedResult(m_Device, &overlapped, &written, TRUE);
-                ok = false;
-            }
-        } else if (ok) {
-            ok = GetOverlappedResult(m_Device, &overlapped, &written, FALSE) != FALSE;
-        }
+        if (WriteFile(m_Device, m_Write->buffer.data(), static_cast<DWORD>(m_Write->buffer.size()),
+                      nullptr, &m_Write->overlapped))
+            return GetOverlappedResult(m_Device, &m_Write->overlapped, &written, FALSE) != FALSE;
+        if (GetLastError() != ERROR_IO_PENDING)
+            return false;
 
-        if (ok) {
+        m_Write->pending = true;
+        if (WaitForSingleObject(m_Write->event, WriteTimeoutMs) == WAIT_OBJECT_0) {
+            m_Write->pending = false;
+            return GetOverlappedResult(m_Device, &m_Write->overlapped, &written, FALSE) != FALSE;
+        }
+        CancelIoEx(m_Device, &m_Write->overlapped);
+        completePendingWrite(CancelWaitMs);
+        return false;
+    }
+
+    bool writeReport(const std::uint8_t* report)
+    {
+        if (issueWrite(report)) {
             m_ConsecutiveFailures = 0;
             return true;
         }
+        const DWORD error = GetLastError();
         if (++m_ConsecutiveFailures < MaxConsecutiveFailures)
             return true;
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Bluetooth DualSense stopped accepting haptics reports: %lu",
-                    static_cast<unsigned long>(GetLastError()));
+                    static_cast<unsigned long>(error));
         return false;
     }
 
     HANDLE m_Device = INVALID_HANDLE_VALUE;
-    HANDLE m_WriteEvent = nullptr;
-    std::vector<std::uint8_t> m_Report;
+    std::unique_ptr<WriteSlot> m_Write;
     dualsense_haptics::bt::ReportAssembler m_Assembler;
     int m_ConsecutiveFailures = 0;
     bool m_Started = false;
@@ -661,6 +720,12 @@ public:
             m_Usb.reset();
         else if (m_Active == Active::Bluetooth)
             m_Bt.reset();
+    }
+    bool finishStream()
+    {
+        return m_Active == Active::Usb         ? m_Usb.finishStream()
+               : m_Active == Active::Bluetooth ? m_Bt.finishStream()
+                                               : true;
     }
     WriteResult tryWrite(const Packet& packet)
     {
@@ -980,6 +1045,9 @@ public:
         m_Started = false;
     }
 
+    // The queue plays everything it was given; nothing is held back.
+    bool finishStream() { return true; }
+
     WriteResult tryWrite(const Packet& packet)
     {
         if (m_Queue == nullptr || packet.frameCount == 0)
@@ -1234,11 +1302,14 @@ struct DualSenseHapticsRenderer::Impl
             // short prebuffer and samples already queued in the OS audio device.
             if (!prebuffer.empty() && !startPrebufferedStream())
                 failEndpoint();
+            else
+                finishStream();
             return;
         }
         if (action == dualsense_haptics::PcmStreamTracker::Action::ResetAndAccept) {
             resetAudioStream();
         }
+        const bool streamEnd = packet.flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_END;
 
         if (!endpoint.isOpen()) {
             const auto now = std::chrono::steady_clock::now();
@@ -1275,7 +1346,6 @@ struct DualSenseHapticsRenderer::Impl
                 return;
             }
 
-            const bool streamEnd = packet.flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_END;
             prebufferedFrames += packet.frameCount;
             prebuffer.emplace_back(std::move(packet));
             if (!dualsense_haptics::isPrebufferFull(prebufferedFrames, endpoint.bufferFrames()) &&
@@ -1284,10 +1354,21 @@ struct DualSenseHapticsRenderer::Impl
 
             if (!startPrebufferedStream()) {
                 failEndpoint();
+                return;
             }
         } else if (!writePacket(packet)) {
             failEndpoint();
+            return;
         }
+        if (streamEnd)
+            finishStream();
+    }
+
+    // Send whatever the endpoint still holds back for a stream that just ended.
+    void finishStream()
+    {
+        if (endpoint.isStarted() && !endpoint.finishStream())
+            failEndpoint();
     }
 
     void run()
