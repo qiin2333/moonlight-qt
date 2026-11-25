@@ -87,6 +87,25 @@ On macOS, use:
 python3 setup-deps.py
 ```
 
+PyroWave decoding is optional and experimental. In Unix builds using pkg-config,
+qmake detects `pyrowave-shared` when installed alongside FFmpeg and libplacebo.
+macOS builds using bundled dependencies also detect PyroWave via pkg-config.
+Enable “Try PyroWave decoding (Experimental)” under Compatibility and diagnostics → Video pipeline,
+or set `MOONLIGHT_ENABLE_PYROWAVE=1` at runtime. This tries it with automatic codec
+selection and the automatic or Vulkan renderer for SDR, 8-bit YUV420, BT.709,
+full-range streams. Other `COLOR_SPACE_OVERRIDE` or `COLOR_RANGE_OVERRIDE`
+values select a conventional codec. Frames currently pass through CPU readback before Vulkan rendering;
+performance remains to be verified. Negotiation failure falls back to the
+preferred conventional codec.
+The negotiated codec is reported when streaming starts and in the performance
+overlay. Use `CONFIG+=disable-pyrowave` to omit this path from the build.
+
+After installing PyroWave, verify that the package is visible with:
+
+```bash
+pkg-config --modversion pyrowave-shared
+```
+
 ### Windows
 
 Requirements:

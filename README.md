@@ -87,6 +87,22 @@ macOS 可使用：
 python3 setup-deps.py
 ```
 
+PyroWave 解码是可选的实验路径。在使用 pkg-config 的 Unix 构建中，安装
+`pyrowave-shared`，并确保 FFmpeg 和 libplacebo 可用，qmake 会自动编译该路径。
+macOS 预构建依赖模式也会通过 pkg-config 检测 PyroWave。可在设置的“兼容性与诊断 → 视频处理”
+中启用“尝试 PyroWave 解码（实验性）”，也可设置 `MOONLIGHT_ENABLE_PYROWAVE=1`。
+启用后会在自动编码格式、自动或 Vulkan 渲染器下
+为 SDR、8-bit YUV420、BT.709、full-range 串流尝试协商 PyroWave。指定其他
+`COLOR_SPACE_OVERRIDE` 或 `COLOR_RANGE_OVERRIDE` 时会使用传统编码。当前使用 CPU readback
+后再由 Vulkan renderer 显示，性能有待验证。协商失败时回退到原有的首选编码；如需关闭
+编译可传入 `CONFIG+=disable-pyrowave`。串流开始时会提示协商结果，开启性能统计后也可查看实际编码。
+
+安装后可以用下面的命令确认 pkg-config 是否能找到它：
+
+```bash
+pkg-config --modversion pyrowave-shared
+```
+
 ### Windows
 
 要求：

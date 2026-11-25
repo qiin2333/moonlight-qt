@@ -257,6 +257,10 @@ public:
     Q_PROPERTY(bool showPerformanceOverlay MEMBER showPerformanceOverlay NOTIFY showPerformanceOverlayChanged)
     Q_PROPERTY(AudioConfig audioConfig MEMBER audioConfig NOTIFY audioConfigChanged)
     Q_PROPERTY(VideoCodecConfig videoCodecConfig MEMBER videoCodecConfig NOTIFY videoCodecConfigChanged)
+    Q_PROPERTY(bool enablePyrowave MEMBER enablePyrowave NOTIFY enablePyrowaveChanged)
+    Q_PROPERTY(bool pyrowaveAvailable READ pyrowaveAvailable CONSTANT)
+    Q_PROPERTY(bool pyrowaveForcedByEnvironment READ pyrowaveForcedByEnvironment CONSTANT)
+    Q_PROPERTY(bool pyrowaveColorOverridesCompatible READ pyrowaveColorOverridesCompatible CONSTANT)
     Q_PROPERTY(bool enableHdr MEMBER enableHdr NOTIFY enableHdrChanged)
     Q_PROPERTY(HdrMode hdrMode MEMBER hdrMode NOTIFY hdrModeChanged)
     Q_PROPERTY(HdrBrightnessMode hdrBrightnessMode MEMBER hdrBrightnessMode NOTIFY hdrBrightnessModeChanged)
@@ -359,6 +363,10 @@ public:
     int packetSize;
     AudioConfig audioConfig;
     VideoCodecConfig videoCodecConfig;
+    bool enablePyrowave;
+    bool pyrowaveAvailable() const;
+    bool pyrowaveForcedByEnvironment() const;
+    bool pyrowaveColorOverridesCompatible() const;
     bool enableHdr;
     HdrMode hdrMode;
     HdrBrightnessMode hdrBrightnessMode;
@@ -401,6 +409,7 @@ signals:
     void dualSenseHapticsModeChanged();
     void audioConfigChanged();
     void videoCodecConfigChanged();
+    void enablePyrowaveChanged();
     void enableHdrChanged();
     void hdrModeChanged();
     void hdrBrightnessModeChanged();
