@@ -118,18 +118,15 @@ jobs:
         fi
         echo "格式检查基线: $BASE (event=$EVENT_NAME)"
         # git clang-format --diff 只对 diff 触及的行重排并报告结果,不改工作区。
-        # 无需格式化时输出 "none" / "no modified files to format" 等固定文案。
-        OUTPUT=$(git clang-format --diff --style file --extensions c,cpp,h,mm "$BASE" 2>&1)
-        case "$OUTPUT" in
-          none|*"no modified files to format"|*"clang-format did not modify any files")
-            echo "格式检查通过"
-            ;;
-          *)
-            echo "$OUTPUT"
-            echo "::error::C++ 改动行未通过 clang-format。本地执行 pip install clang-format==21.1.8 后跑 git clang-format 即可自动修复"
-            exit 1
-            ;;
-        esac
+        # 在 if 条件中捕获退出码，避免 bash -e 提前退出并吞掉 diff 或错误输出。
+        if OUTPUT=$(git clang-format --diff --style file --extensions c,cpp,h,mm "$BASE" 2>&1); then
+          echo "格式检查通过"
+        else
+          FORMAT_STATUS=$?
+          echo "$OUTPUT"
+          echo "::error::C++ 格式检查失败，详见上方输出。格式问题请使用 clang-format 21.1.8 修复"
+          exit "$FORMAT_STATUS"
+        fi
 
 
   build-windows:

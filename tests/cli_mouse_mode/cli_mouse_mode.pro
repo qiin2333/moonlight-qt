@@ -4,7 +4,8 @@ CONFIG -= app_bundle
 TEMPLATE = app
 TARGET = cli_mouse_mode
 
-INCLUDEPATH += $$PWD/../../app
+INCLUDEPATH += $$PWD/../../app \
+    $$PWD/../../moonlight-common-c/moonlight-common-c/src
 SOURCES += main.cpp \
     $$PWD/../../app/cli/commandlineparser.cpp \
     $$PWD/../../app/settings/streamingpreferences.cpp \
