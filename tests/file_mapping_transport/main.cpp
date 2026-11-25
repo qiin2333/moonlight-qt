@@ -52,6 +52,36 @@ enum class RpcReplyMode
     Stale
 };
 
+enum class HdrCapabilities
+{
+    Missing,
+    Complete,
+    Invalid
+};
+
+HdrCapabilities readHdrCapabilities(const QUrlQuery& query)
+{
+    const QUrlQuery expected(
+        QStringLiteral("clientHdrCapVersion=0&clientHdrCapSupportedFlagsInUint32=0&"
+                       "clientHdrCapMetaDataId=NV_STATIC_METADATA_TYPE_1&"
+                       "clientHdrCapDisplayData=0x0x0x0x0x0x0x0x0x0x0"));
+    int present = 0;
+    for (const auto& field : expected.queryItems()) {
+        const auto values = query.allQueryItemValues(field.first);
+        if (!values.isEmpty()) {
+            if (values.size() != 1 || values.first() != field.second) {
+                return HdrCapabilities::Invalid;
+            }
+            ++present;
+        }
+    }
+    if (present == 0) {
+        return HdrCapabilities::Missing;
+    }
+    return present == expected.queryItems().size() ? HdrCapabilities::Complete
+                                                   : HdrCapabilities::Invalid;
+}
+
 struct ServerState
 {
     std::atomic<int> requests{ 0 };
@@ -64,7 +94,7 @@ struct ServerState
     std::atomic<bool> plaintext{ false };
     std::atomic<int> serverInfoStatus{ 200 };
     std::atomic<int> launchHdrMode{ -1 };
-    std::atomic<bool> launchHdrMetadata{ false };
+    std::atomic<HdrCapabilities> launchHdrCapabilities{ HdrCapabilities::Invalid };
     std::atomic<quint16> advertisedHttpsPort{ 0 };
     std::atomic<RpcReplyMode> rpcReplyMode{ RpcReplyMode::None };
 };
@@ -216,12 +246,11 @@ protected:
                 }
                 if (headers.startsWith("GET /launch?") || headers.startsWith("GET /resume?")) {
                     const QUrlQuery query(QUrl::fromEncoded(headers.split(' ').at(1)));
-                    m_State.launchHdrMode =
-                        query.hasQueryItem(QStringLiteral("hdrMode"))
-                            ? query.queryItemValue(QStringLiteral("hdrMode")).toInt()
-                            : -1;
-                    m_State.launchHdrMetadata =
-                        query.hasQueryItem(QStringLiteral("clientHdrCapMetaDataId"));
+                    const auto modes = query.allQueryItemValues(QStringLiteral("hdrMode"));
+                    bool parsed = false;
+                    const int mode = modes.size() == 1 ? modes.first().toInt(&parsed) : -2;
+                    m_State.launchHdrMode = modes.isEmpty() ? -1 : parsed ? mode : -2;
+                    m_State.launchHdrCapabilities = readHdrCapabilities(query);
                     body = "<root "
                            "status_code=\"200\"><sessionUrl0>rtsp://example</sessionUrl0></root>";
                 }
@@ -313,13 +342,16 @@ int main(int argc, char* argv[])
             stream.supportedVideoFormats = formats;
             stream.hdrMode = hdrMode;
             server.state.launchHdrMode = -2;
-            server.state.launchHdrMetadata = false;
+            server.state.launchHdrCapabilities = HdrCapabilities::Invalid;
+            sessionUrl.clear();
             try {
                 http.startApp(verb, false, 1, &stream, false, false, 0, false, sessionUrl, -1,
                               std::nullopt, QString(), remote);
                 return sessionUrl == QStringLiteral("rtsp://example") &&
                        server.state.launchHdrMode == expectedMode &&
-                       server.state.launchHdrMetadata == (expectedMode >= 0);
+                       server.state.launchHdrCapabilities == (expectedMode >= 0
+                                                                  ? HdrCapabilities::Complete
+                                                                  : HdrCapabilities::Missing);
             } catch (const std::exception&) {
                 return false;
             }
@@ -332,6 +364,11 @@ int main(int argc, char* argv[])
                           verb + QStringLiteral(" sends HLG for PyroWave with SDR fallback"), err);
             ok &= require(checkLaunch(verb, VIDEO_FORMAT_PYROWAVE | VIDEO_FORMAT_H264, 0, -1),
                           verb + QStringLiteral(" leaves HDR fields out for SDR PyroWave"), err);
+            ok &= require(checkLaunch(verb, VIDEO_FORMAT_PYROWAVE, 2, 2),
+                          verb + QStringLiteral(" sends HDR fields without a legacy format"), err);
+            ok &= require(checkLaunch(verb, VIDEO_FORMAT_PYROWAVE | VIDEO_FORMAT_H265_MAIN10, 2, 2),
+                          verb + QStringLiteral(" sends each HDR field once with Main10 fallback"),
+                          err);
             ok &= require(checkLaunch(verb, VIDEO_FORMAT_H265_MAIN10, 1, 1),
                           verb + QStringLiteral(" retains HDR fields for legacy Main10"), err);
             ok &=

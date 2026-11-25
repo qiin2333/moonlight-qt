@@ -50,8 +50,14 @@ int main(int argc, char* argv[])
         require(!prefs->pyrowaveForcedByEnvironment(), "environment override defaults to disabled");
     qputenv("MOONLIGHT_ENABLE_PYROWAVE", "1");
     ok &= require(prefs->pyrowaveForcedByEnvironment(), "environment override enables PyroWave");
+    ok &=
+        require(!prefs->enablePyrowave, "environment opt-in does not change the saved preference");
     qputenv("MOONLIGHT_ENABLE_PYROWAVE", "0");
     ok &= require(!prefs->pyrowaveForcedByEnvironment(), "zero does not enable PyroWave");
+    qputenv("MOONLIGHT_ENABLE_PYROWAVE", "2");
+    ok &= require(!prefs->pyrowaveForcedByEnvironment(), "only the explicit opt-in is accepted");
+    qputenv("MOONLIGHT_ENABLE_PYROWAVE", "true");
+    ok &= require(!prefs->pyrowaveForcedByEnvironment(), "non-numeric opt-in is ignored");
     qunsetenv("MOONLIGHT_ENABLE_PYROWAVE");
 #ifdef HAVE_PYROWAVE
     ok &= require(prefs->pyrowaveAvailable(), "enabled build exposes PyroWave");
@@ -92,6 +98,12 @@ int main(int argc, char* argv[])
     qputenv("COLOR_RANGE_OVERRIDE", QByteArray::number(COLOR_RANGE_LIMITED));
     ok &= require(!prefs->pyrowaveColorOverridesCompatible(),
                   "limited range override is incompatible");
+    qputenv("COLOR_SPACE_OVERRIDE", "invalid");
+    ok &= require(!prefs->pyrowaveColorOverridesCompatible(),
+                  "an invalid color space does not bypass a valid limited range restriction");
+    qputenv("COLOR_RANGE_OVERRIDE", "invalid");
+    ok &= require(prefs->pyrowaveColorOverridesCompatible(),
+                  "non-numeric color overrides leave the defaults in effect");
 
     qunsetenv("COLOR_RANGE_OVERRIDE");
     qunsetenv("COLOR_SPACE_OVERRIDE");
@@ -120,11 +132,12 @@ int main(int argc, char* argv[])
     qunsetenv("COLOR_RANGE_OVERRIDE");
     prefs->hdrMode = static_cast<StreamingPreferences::HdrMode>(3);
     ok &= require(!prefs->pyrowaveColorOverridesCompatible(), "unknown HDR modes are rejected");
-    prefs->hdrMode = StreamingPreferences::HDR_PQ;
     ok &= require(prefs->setProperty("enableHdr", false) && compatibilityChanges == 3,
                   "disabling HDR notifies the compatibility binding");
     ok &= require(!prefs->pyrowaveColorOverridesCompatible(), "SDR rejects a BT.2020 override");
     qunsetenv("COLOR_SPACE_OVERRIDE");
+    ok &= require(prefs->pyrowaveColorOverridesCompatible(),
+                  "a stale HDR mode does not block SDR with default colors");
     QObject::disconnect(compatibilityConnection);
 
     if (ok) {

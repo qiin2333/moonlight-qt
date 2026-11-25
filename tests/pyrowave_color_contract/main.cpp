@@ -26,6 +26,14 @@ static void checkColorModes()
     const AVColorTransferCharacteristic transfers[] = { AVCOL_TRC_BT709, AVCOL_TRC_SMPTE2084,
                                                         AVCOL_TRC_ARIB_STD_B67 };
     const char* labels[] = { "SDR", "HDR10", "HLG" };
+    const pyrowave_color_metadata bitstreamColors[] = {
+        { PYROWAVE_COLOR_PRIMARIES_BT709, PYROWAVE_TRANSFER_BT709, PYROWAVE_YCBCR_BT709,
+          PYROWAVE_YCBCR_FULL, 0 },
+        { PYROWAVE_COLOR_PRIMARIES_BT2020, PYROWAVE_TRANSFER_PQ, PYROWAVE_YCBCR_BT2020,
+          PYROWAVE_YCBCR_FULL, 0 },
+        { PYROWAVE_COLOR_PRIMARIES_BT2020, PYROWAVE_TRANSFER_HLG, PYROWAVE_YCBCR_BT2020,
+          PYROWAVE_YCBCR_FULL, 0 },
+    };
     for (int mode = 0; mode <= 2; mode++) {
         PyrowaveColor::Contract color;
         check(PyrowaveColor::describe(mode, color), "negotiated mode is supported");
@@ -37,22 +45,23 @@ static void checkColorModes()
         check(color.useFragmentPath(true) == (mode == 0),
               "HDR avoids unsupported fragment P10 conversion");
         check(!color.useFragmentPath(false), "compute preference is preserved");
-        check(PyrowaveColor::matches(color, color.metadata), "matching bitstream is accepted");
+        const auto& bitstream = bitstreamColors[mode];
+        check(PyrowaveColor::matches(color, bitstream), "negotiated bitstream colors are accepted");
 
-        auto wrong = color.metadata;
+        auto wrong = bitstream;
         wrong.primaries =
             mode == 0 ? PYROWAVE_COLOR_PRIMARIES_BT2020 : PYROWAVE_COLOR_PRIMARIES_BT709;
         check(!PyrowaveColor::matches(color, wrong), "mismatched primaries are rejected");
-        wrong = color.metadata;
+        wrong = bitstream;
         wrong.transfer = mode == 1 ? PYROWAVE_TRANSFER_HLG : PYROWAVE_TRANSFER_PQ;
         check(!PyrowaveColor::matches(color, wrong), "PQ/HLG/SDR transfer mismatch is rejected");
-        wrong = color.metadata;
+        wrong = bitstream;
         wrong.transform = mode == 0 ? PYROWAVE_YCBCR_BT2020 : PYROWAVE_YCBCR_BT709;
         check(!PyrowaveColor::matches(color, wrong), "mismatched matrix is rejected");
-        wrong = color.metadata;
+        wrong = bitstream;
         wrong.range = PYROWAVE_YCBCR_LIMITED;
         check(!PyrowaveColor::matches(color, wrong), "unnegotiated limited range is rejected");
-        wrong = color.metadata;
+        wrong = bitstream;
         wrong.chroma_siting = 2;
         check(!PyrowaveColor::matches(color, wrong), "unknown chroma siting is rejected");
 
@@ -60,7 +69,7 @@ static void checkColorModes()
         if (!check(frame != nullptr, "frame allocation")) {
             continue;
         }
-        PyrowaveColor::applyToFrame(color, color.metadata, frame);
+        PyrowaveColor::applyToFrame(color, bitstream, frame);
         const AVPixFmtDescriptor* descriptor = av_pix_fmt_desc_get(color.pixelFormat);
         check(descriptor != nullptr && descriptor->comp[0].depth == (mode == 0 ? 8 : 10),
               "AVFrame pixel format matches readback precision");
@@ -71,7 +80,7 @@ static void checkColorModes()
                   frame->color_trc == transfers[mode],
               "renderer receives the matching matrix, primaries and transfer");
         check(frame->chroma_location == AVCHROMA_LOC_CENTER, "center chroma is signalled");
-        auto left = color.metadata;
+        auto left = bitstream;
         left.chroma_siting = 1;
         check(PyrowaveColor::matches(color, left), "valid left chroma siting is accepted");
         PyrowaveColor::applyToFrame(color, left, frame);
@@ -127,7 +136,6 @@ static void checkStaticMetadata()
     check(PyrowaveColor::attachHdrMetadata(frame, metadata), "static metadata is attached");
     auto* masteringSideData =
         av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
-    auto* lightSideData = av_frame_get_side_data(frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
     if (check(masteringSideData != nullptr, "mastering side data exists")) {
         const auto* mastering =
             reinterpret_cast<AVMasteringDisplayMetadata*>(masteringSideData->data);
@@ -139,14 +147,24 @@ static void checkStaticMetadata()
                   mastering->max_luminance.num == 1000 && mastering->max_luminance.den == 1 &&
                   mastering->has_luminance && mastering->has_primaries,
               "mastering luminance and validity flags are correct");
-        metadata.maxDisplayLuminance = 2000;
-        check(PyrowaveColor::attachHdrMetadata(frame, metadata) &&
-                  mastering->max_luminance.num == 1000 && frame->nb_side_data == 2,
-              "existing frame metadata takes precedence");
     }
+
+    metadata.maxDisplayLuminance = 2000;
+    metadata.maxContentLightLevel = 1800;
+    metadata.maxFrameAverageLightLevel = 700;
+    check(PyrowaveColor::attachHdrMetadata(frame, metadata) && frame->nb_side_data == 2,
+          "reattaching metadata does not add duplicate side data");
+    masteringSideData = av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
+    if (check(masteringSideData != nullptr, "mastering side data is retained")) {
+        const auto* mastering =
+            reinterpret_cast<const AVMasteringDisplayMetadata*>(masteringSideData->data);
+        check(mastering->max_luminance.num == 1000, "existing mastering data takes precedence");
+    }
+    const auto* lightSideData = av_frame_get_side_data(frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
     if (check(lightSideData != nullptr, "content-light side data exists")) {
         const auto* light = reinterpret_cast<AVContentLightMetadata*>(lightSideData->data);
-        check(light->MaxCLL == 900 && light->MaxFALL == 350, "content light levels are preserved");
+        check(light->MaxCLL == 900 && light->MaxFALL == 350,
+              "existing content light levels take precedence");
     }
     av_frame_free(&frame);
 
@@ -170,10 +188,54 @@ static void checkStaticMetadata()
     }
 }
 
+static void checkPartialMetadata()
+{
+    AVFrame* frame = av_frame_alloc();
+    if (!check(frame != nullptr, "partial metadata frame allocation")) {
+        return;
+    }
+
+    SS_HDR_METADATA metadata = {};
+    metadata.maxFrameAverageLightLevel = 350;
+    check(PyrowaveColor::attachHdrMetadata(frame, metadata), "MaxFALL alone is accepted");
+    const auto* light = av_frame_get_side_data(frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
+    if (check(light != nullptr, "MaxFALL alone creates content light side data")) {
+        const auto* levels = reinterpret_cast<const AVContentLightMetadata*>(light->data);
+        check(levels->MaxCLL == 0 && levels->MaxFALL == 350, "missing MaxCLL stays zero");
+    }
+    check(frame->nb_side_data == 1, "MaxFALL alone does not create mastering metadata");
+
+    metadata = {};
+    metadata.displayPrimaries[0] = { 35400, 14600 };
+    check(PyrowaveColor::attachHdrMetadata(frame, metadata),
+          "mastering data can be added to a frame that already carries content light data");
+    const auto* sideData = av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
+    if (check(sideData != nullptr, "primaries alone create mastering side data")) {
+        const auto* mastering = reinterpret_cast<const AVMasteringDisplayMetadata*>(sideData->data);
+        check(mastering->has_primaries && !mastering->has_luminance,
+              "primaries can be valid without mastering luminance");
+    }
+    check(frame->nb_side_data == 2, "adding mastering data does not duplicate content light data");
+    av_frame_unref(frame);
+
+    metadata = {};
+    metadata.maxDisplayLuminance = 1000;
+    check(PyrowaveColor::attachHdrMetadata(frame, metadata), "luminance alone is accepted");
+    sideData = av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
+    if (check(sideData != nullptr, "luminance alone creates mastering side data")) {
+        const auto* mastering = reinterpret_cast<const AVMasteringDisplayMetadata*>(sideData->data);
+        check(mastering->has_luminance && !mastering->has_primaries,
+              "luminance can be valid without mastering primaries");
+    }
+    check(frame->nb_side_data == 1, "luminance alone does not create content light side data");
+    av_frame_free(&frame);
+}
+
 int main()
 {
     checkColorModes();
     checkStaticMetadata();
+    checkPartialMetadata();
     if (failures == 0) {
         std::puts("pyrowave_color_contract=passed");
     }
