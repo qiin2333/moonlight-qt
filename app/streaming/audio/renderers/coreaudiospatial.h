@@ -17,24 +17,18 @@ public:
 
     // inputLayout holds an AudioChannelLayout describing the stream's channel order
     bool initialize(AUSpatialMixerOutputType outputType, int sampleRate, int channelCount,
-                    const std::vector<unsigned char>& inputLayout,
-                    UInt32 maxFrames, bool headTracking);
+                    const std::vector<unsigned char>& inputLayout, UInt32 maxFrames,
+                    bool headTracking);
 
     // Renders interleaved input into the non-interleaved stereo buffers in output.
     // Called on the CoreAudio I/O thread.
-    OSStatus render(const float* input,
-                    UInt32 frames,
-                    AudioUnitRenderActionFlags* ioActionFlags,
-                    const AudioTimeStamp* inTimeStamp,
-                    AudioBufferList* output);
+    OSStatus render(const float* input, UInt32 frames, AudioUnitRenderActionFlags* ioActionFlags,
+                    const AudioTimeStamp* inTimeStamp, AudioBufferList* output);
 
 private:
-    static OSStatus inputCallback(void* inRefCon,
-                                  AudioUnitRenderActionFlags* ioActionFlags,
-                                  const AudioTimeStamp* inTimeStamp,
-                                  UInt32 inBusNumber,
-                                  UInt32 inNumberFrames,
-                                  AudioBufferList* ioData);
+    static OSStatus inputCallback(void* inRefCon, AudioUnitRenderActionFlags* ioActionFlags,
+                                  const AudioTimeStamp* inTimeStamp, UInt32 inBusNumber,
+                                  UInt32 inNumberFrames, AudioBufferList* ioData);
 
     AudioUnit m_Mixer;
     int m_ChannelCount;

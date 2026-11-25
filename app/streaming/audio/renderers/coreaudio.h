@@ -44,7 +44,8 @@ public:
     // Bytes waiting to be read. Only meaningful to the reader.
     size_t available() const
     {
-        return m_WritePos.load(std::memory_order_acquire) - m_ReadPos.load(std::memory_order_relaxed);
+        return m_WritePos.load(std::memory_order_acquire) -
+               m_ReadPos.load(std::memory_order_relaxed);
     }
 
     bool read(void* data, size_t bytes)
@@ -69,8 +70,8 @@ private:
 
     // Total bytes ever read and written. 64 bits never wrap in practice, so
     // the fill level is simply their difference.
-    std::atomic<size_t> m_ReadPos { 0 };
-    std::atomic<size_t> m_WritePos { 0 };
+    std::atomic<size_t> m_ReadPos{ 0 };
+    std::atomic<size_t> m_WritePos{ 0 };
 };
 
 class CoreAudioRenderer : public IAudioRenderer
@@ -93,12 +94,9 @@ private:
     AUSpatialMixerOutputType getSpatialMixerOutputType();
     void removeListeners();
 
-    static OSStatus renderCallback(void* inRefCon,
-                                   AudioUnitRenderActionFlags* ioActionFlags,
-                                   const AudioTimeStamp* inTimeStamp,
-                                   UInt32 inBusNumber,
-                                   UInt32 inNumberFrames,
-                                   AudioBufferList* ioData);
+    static OSStatus renderCallback(void* inRefCon, AudioUnitRenderActionFlags* ioActionFlags,
+                                   const AudioTimeStamp* inTimeStamp, UInt32 inBusNumber,
+                                   UInt32 inNumberFrames, AudioBufferList* ioData);
 
     AudioUnit m_OutputUnit;
     AudioDeviceID m_OutputDevice;

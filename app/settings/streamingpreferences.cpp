@@ -342,8 +342,9 @@ void StreamingPreferences::reload()
                                                          static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
     audioConfig = static_cast<AudioConfig>(settings.value(SER_AUDIOCFG,
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
-    spatialAudioConfig = static_cast<SpatialAudioConfig>(settings.value(SER_SPATIALAUDIOCFG,
-                                                  static_cast<int>(SpatialAudioConfig::SAC_AUTO)).toInt());
+    spatialAudioConfig = static_cast<SpatialAudioConfig>(
+        settings.value(SER_SPATIALAUDIOCFG, static_cast<int>(SpatialAudioConfig::SAC_AUTO))
+            .toInt());
     spatialHeadTracking = settings.value(SER_SPATIALHEADTRACKING, false).toBool();
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
                                                   static_cast<int>(VideoCodecConfig::VCC_AUTO)).toInt());
