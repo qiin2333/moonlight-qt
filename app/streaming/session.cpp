@@ -396,7 +396,8 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     Session::clClipboardData,
     Session::clCursorUpdate,
     nullptr,
-    nullptr
+    nullptr,
+    nullptr // ds5HapticsIrExtended (Qt uses the existing IR v2 renderer)
 };
 
 Session* Session::s_ActiveSession;
@@ -884,6 +885,14 @@ void Session::clDs5HapticsState(std::uint16_t controllerNumber, const std::uint8
     if (session != nullptr && session->m_DualSenseHapticsRenderer != nullptr) {
         // Accept on the same receive path as PCM. Device writes belong to the renderer worker.
         session->m_DualSenseHapticsRenderer->updateControl(controllerNumber, state);
+    }
+}
+
+void Session::clDs5OutputExtension(const LI_DS5_OUTPUT_EXTENSION* output)
+{
+    Session* session = s_ActiveSession;
+    if (session != nullptr && session->m_DualSenseHapticsRenderer != nullptr && output != nullptr) {
+        session->m_DualSenseHapticsRenderer->updateOutput(*output);
     }
 }
 
@@ -4600,12 +4609,16 @@ void Session::start()
     k_ConnCallbacks.ds5HapticsPcm = nullptr;
     k_ConnCallbacks.ds5HapticsIrV2 = nullptr;
     LiSetDs5HapticsStateCallback(nullptr);
+    LiSetDs5OutputExtensionCallback(nullptr);
+    LiSetDs5PadAudioOffer(LI_DS5_PAD_AUDIO_OFF);
     if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
         enablePhysicalDualSenseHaptics = true;
         k_ConnCallbacks.ds5HapticsPcm = Session::clDs5HapticsPcm;
 #if SDL_VERSION_ATLEAST(2, 0, 16)
         LiSetDs5HapticsStateCallback(Session::clDs5HapticsState);
+        LiSetDs5OutputExtensionCallback(Session::clDs5OutputExtension);
+        LiSetDs5PadAudioOffer(LI_DS5_PAD_AUDIO_PCM);
 #endif
         if (m_DualSenseHapticsRenderer == nullptr) {
             m_DualSenseHapticsRenderer =
