@@ -48,7 +48,6 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 
 | 目录 | 说明 |
 |---|---|
-| pyrowave_roundtrip | PyroWave Metal 编码、传输重组与 Vulkan 像素解码；需要 macOS 和独立构建的 PyroWave 库 |
 | usb_forwarding_tunnel | USB/IP 隧道手动联调探针:需要 10 个 CLI 参数和真实 usbipd 服务端,不能进 CI。用法看 main.cpp 头注释 |
 | `file-mapping/smoke/` | 文件映射冒烟二进制,复用 app 源码,手工构建运行。刻意**不注册**进 moonlight-qt.pro 的 SUBDIRS:它链接 app 后端与 OpenSSL,注册会给全部平台构建(含 SteamLink 老工具链)平添失败面,而它没有自动化验证价值 |
 
