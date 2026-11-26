@@ -48,6 +48,8 @@ struct Event
     char kind;
     int joystick = -1;
     std::array<std::uint8_t, 47> effect{};
+    std::uint8_t channels = 0;
+    std::vector<std::int16_t> pcm{};
 };
 struct Device
 {
@@ -133,10 +135,15 @@ void MockEndpoint::reset()
 WriteResult MockEndpoint::tryWrite(const Packet& packet)
 {
     std::lock_guard lock(device.mutex);
-    if (packet.pcm.size() != packet.frameCount * 4u)
+    if (packet.pcm.size() != packet.frameCount * packet.channelCount * 2u)
         throw std::runtime_error("PCM payload changed");
     device.frames += packet.frameCount;
-    device.events.push_back({ 'P' });
+    Event event{ 'P' };
+    event.channels = packet.channelCount;
+    event.pcm.resize(packet.frameCount * 4u);
+    dualsense_haptics::writePcmChannels(event.pcm.data(), pcmSamples(packet), packet.frameCount,
+                                        packet.channelCount, [](std::int16_t s) { return s; });
+    device.events.push_back(std::move(event));
     device.changed.notify_all();
     return WriteResult::Ok;
 }
@@ -198,6 +205,11 @@ void blockedControl()
     auto receive = std::async(std::launch::async, [&] {
         const std::uint8_t v2[] = { 2, 4, 0x62, 0, 0, 0x10, 0x23, 1 };
         renderer->updateControl(0, v2);
+        LI_DS5_OUTPUT_EXTENSION audio{};
+        audio.validMask = LI_DS5_OUT_SPEAKER_VOLUME | LI_DS5_OUT_AUDIO_ROUTING;
+        audio.speakerVolume = 100;
+        audio.audioRouting = 0x30;
+        renderer->updateOutput(audio);
         dualsense_haptics::ControlState::Effect led{};
         led[1] = 4;
         led[44] = 99;
@@ -222,7 +234,8 @@ void blockedControl()
     CHECK(previous != events.rend());
     const auto& beforePcm = *previous;
     CHECK(beforePcm.kind == 'H' && beforePcm.joystick == 7);
-    CHECK(beforePcm.effect[0] == 2 && beforePcm.effect[38] == 4 && beforePcm.effect[2] == 0);
+    CHECK(beforePcm.effect[0] == 0xa2 && beforePcm.effect[38] == 4 && beforePcm.effect[2] == 0);
+    CHECK(beforePcm.effect[5] == 100 && beforePcm.effect[7] == 0x30);
     CHECK(beforePcm.effect[1] == 0x66 && beforePcm.effect[9] == 0x10 &&
           beforePcm.effect[36] == 0x23);
     CHECK(beforePcm.effect[39] == 1 && beforePcm.effect[44] == 99);
@@ -281,6 +294,90 @@ void shortEffects()
         CHECK(std::none_of(first, events.end(), [](const auto& e) { return e.kind == 'R'; }));
         CHECK(!renderer.hasControl(0)); // Old hosts keep the SDL compatibility path.
     }
+}
+
+void fourChannelPlayback()
+{
+    for (bool speakerOnly : { false, true }) {
+        clear();
+        DualSenseHapticsRenderer renderer(DualSenseHapticsRenderer::Mode::Physical);
+        renderer.setControllerTarget(0, 7);
+        const std::array<std::int16_t, 8> samples = {
+            100,
+            -200,
+            static_cast<std::int16_t>(speakerOnly ? 0 : 300),
+            static_cast<std::int16_t>(speakerOnly ? 0 : -400),
+            500,
+            -600,
+            0,
+            0
+        };
+        auto pcm = frame(3);
+        pcm.frameCount = 2;
+        pcm.channelCount = 4;
+        pcm.pcmData = reinterpret_cast<const std::uint8_t*>(samples.data());
+        pcm.pcmDataLength = sizeof(samples);
+
+        auto invalid = pcm;
+        invalid.pcmDataLength -= 4;
+        renderer.submit(invalid);
+        invalid.channelCount = 3;
+        renderer.submit(invalid);
+        invalid = pcm;
+        invalid.controllerNumber = 1;
+        renderer.submit(invalid);
+        renderer.submit(pcm);
+        await([] { return device.frames == 2; });
+
+        const auto events = snapshot();
+        CHECK(std::count_if(events.begin(), events.end(),
+                            [](const auto& e) { return e.kind == 'P'; }) == 1);
+        const auto played =
+            std::find_if(events.begin(), events.end(), [](const auto& e) { return e.kind == 'P'; });
+        CHECK(played != events.end() && played->channels == 4);
+        CHECK(played->pcm == std::vector<std::int16_t>(samples.begin(), samples.end()));
+    }
+}
+
+void audioControlsWaitForNativeState()
+{
+    clear();
+    DualSenseHapticsRenderer renderer(DualSenseHapticsRenderer::Mode::Physical);
+    renderer.setControllerTarget(0, 7);
+    LI_DS5_OUTPUT_EXTENSION audio{};
+    audio.validMask = LI_DS5_OUT_SPEAKER_VOLUME | LI_DS5_OUT_AUDIO_ROUTING;
+    audio.speakerVolume = 100;
+    audio.audioRouting = 0x30;
+    renderer.updateOutput(audio);
+    renderer.submit(frame(3));
+    await([] { return device.frames == 240; });
+    auto events = snapshot();
+    CHECK(std::none_of(events.begin(), events.end(), [](const auto& e) { return e.kind == 'H'; }));
+    CHECK(!renderer.hasControl(0));
+
+    const std::uint8_t native[] = { 0, 0, 0x62, 0, 0, 0, 0, 1 };
+    renderer.updateControl(0, native);
+    await([] { return device.events.back().kind == 'H'; });
+    CHECK(renderer.hasControl(0));
+    CHECK(snapshot().back().effect[5] == 100 && snapshot().back().effect[7] == 0x30);
+
+    audio.controllerNumber = 1;
+    audio.audioRouting = 0;
+    renderer.updateOutput(audio);
+    audio.controllerNumber = 0;
+    audio.validMask = LI_DS5_OUT_SPEAKER_VOLUME;
+    audio.speakerVolume = 65;
+    renderer.updateOutput(audio);
+    await([] { return device.events.back().effect[5] == 65; });
+    CHECK(snapshot().back().effect[7] == 0x30);
+
+    renderer.reset();
+    renderer.updateControl(0, native);
+    await([] {
+        const auto& event = device.events.back();
+        return event.kind == 'H' && event.effect[0] == 0 && event.effect[5] == 0;
+    });
+    CHECK(snapshot().back().effect[7] == 0);
 }
 
 void failedControlRetriesBeforePcm()
@@ -377,6 +474,8 @@ int main()
     try {
         blockedControl();
         shortEffects();
+        fourChannelPlayback();
+        audioControlsWaitForNativeState();
         failedControlRetriesBeforePcm();
         failedStopRetriesWithoutResettingAudio();
         resetCancelsControlRetry();

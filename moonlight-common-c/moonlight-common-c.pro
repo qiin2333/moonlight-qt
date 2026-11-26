@@ -61,6 +61,8 @@ SOURCES += \
     $$COMMON_C_DIR/src/CursorStream.c \
     $$COMMON_C_DIR/src/Ds5HapticsStream.c \
     $$COMMON_C_DIR/src/Ds5HapticsIrStream.c \
+    $$COMMON_C_DIR/src/EndpointRefresh.c \
+    $$COMMON_C_DIR/src/EndpointRefreshProtocol.c \
     $$COMMON_C_DIR/src/FakeCallbacks.c \
     $$COMMON_C_DIR/src/InputStream.c \
     $$COMMON_C_DIR/src/MicrophoneStream.c \
@@ -89,6 +91,9 @@ HEADERS += \
     $$COMMON_C_DIR/src/CursorStream.h \
     $$COMMON_C_DIR/src/Ds5HapticsStream.h \
     $$COMMON_C_DIR/src/Ds5HapticsIrStream.h \
+    $$COMMON_C_DIR/src/Ds5ControlExtension.h \
+    $$COMMON_C_DIR/src/EndpointRefresh.h \
+    $$COMMON_C_DIR/src/EndpointRefreshProtocol.h \
     $$COMMON_C_DIR/src/PyrowaveProtocol.h \
     $$COMMON_C_DIR/src/PyrowaveReassembly.h \
     $$COMMON_C_DIR/src/Limelight.h

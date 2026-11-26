@@ -24,6 +24,7 @@ public:
     static bool isAvailable();
     void submit(const LI_DS5_HAPTICS_PCM_FRAME& frame);
     void updateControl(std::uint16_t controllerNumber, const std::uint8_t* state);
+    void updateOutput(const LI_DS5_OUTPUT_EXTENSION& output);
     bool hasControl(std::uint16_t controllerNumber) const;
     bool submitEffect(std::uint16_t controllerNumber, const void* effect, std::size_t size);
     void setControllerTarget(int controllerNumber, int joystickInstanceId = -1);

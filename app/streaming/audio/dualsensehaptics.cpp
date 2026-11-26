@@ -58,6 +58,7 @@ constexpr auto ControlRetryBackoff = std::chrono::milliseconds(50);
 struct Packet
 {
     std::uint8_t flags = 0;
+    std::uint8_t channelCount = 2;
     std::uint16_t controllerNumber = 0;
     std::uint16_t frameCount = 0;
     std::uint32_t sequenceNumber = 0;
@@ -117,9 +118,9 @@ bool isDualSenseName(const QString& name)
 }
 
 using dualsense_haptics::EndpointChannelCount;
-using dualsense_haptics::spreadToHapticsChannels;
+using dualsense_haptics::writePcmChannels;
 
-// The packet's PCM as interleaved 16-bit stereo.
+// Interleaved 16-bit PCM, with either two haptic or four endpoint channels.
 const std::int16_t* pcmSamples(const Packet& packet)
 {
     return reinterpret_cast<const std::int16_t*>(packet.pcm.data());
@@ -342,15 +343,17 @@ public:
             return WriteResult::Failed;
 
         if (m_FloatSamples) {
-            spreadToHapticsChannels(reinterpret_cast<float*>(output), pcmSamples(packet),
-                                    packet.frameCount, [](std::int16_t s) { return s / 32768.0f; });
+            writePcmChannels(reinterpret_cast<float*>(output), pcmSamples(packet),
+                             packet.frameCount, packet.channelCount,
+                             [](std::int16_t s) { return s / 32768.0f; });
         } else if (m_BitsPerSample == 16) {
-            spreadToHapticsChannels(reinterpret_cast<std::int16_t*>(output), pcmSamples(packet),
-                                    packet.frameCount, [](std::int16_t s) { return s; });
+            writePcmChannels(reinterpret_cast<std::int16_t*>(output), pcmSamples(packet),
+                             packet.frameCount, packet.channelCount,
+                             [](std::int16_t s) { return s; });
         } else {
-            spreadToHapticsChannels(
-                reinterpret_cast<std::int32_t*>(output), pcmSamples(packet), packet.frameCount,
-                [](std::int16_t s) { return static_cast<std::int32_t>(s) * 65536; });
+            writePcmChannels(reinterpret_cast<std::int32_t*>(output), pcmSamples(packet),
+                             packet.frameCount, packet.channelCount,
+                             [](std::int16_t s) { return static_cast<std::int32_t>(s) * 65536; });
         }
         return SUCCEEDED(m_RenderClient->ReleaseBuffer(packet.frameCount, 0)) ? WriteResult::Ok
                                                                               : WriteResult::Failed;
@@ -678,8 +681,9 @@ public:
             return m_Started ? WriteResult::WouldBlock : WriteResult::Failed;
         }
 
-        spreadToHapticsChannels(static_cast<float*>(buffer->mAudioData), pcmSamples(packet),
-                                packet.frameCount, [](std::int16_t s) { return s / 32768.0f; });
+        writePcmChannels(static_cast<float*>(buffer->mAudioData), pcmSamples(packet),
+                         packet.frameCount, packet.channelCount,
+                         [](std::int16_t s) { return s / 32768.0f; });
         buffer->mAudioDataByteSize = packet.frameCount * EndpointBytesPerFrame;
         if (AudioQueueEnqueueBuffer(m_Queue, buffer, 0, nullptr) != noErr) {
             bufferDone(this, m_Queue, buffer);
@@ -1069,14 +1073,16 @@ void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
         return;
     }
 
-    if (frame.sampleRate != 48000 || frame.channelCount != 2 || frame.bitsPerSample != 16 ||
-        frame.frameCount > 480 || frame.pcmDataLength != frame.frameCount * 4 ||
+    if (frame.sampleRate != 48000 || (frame.channelCount != 2 && frame.channelCount != 4) ||
+        frame.bitsPerSample != 16 || frame.frameCount > 480 ||
+        frame.pcmDataLength != frame.frameCount * frame.channelCount * sizeof(std::int16_t) ||
         (frame.pcmDataLength != 0 && frame.pcmData == nullptr)) {
         return;
     }
 
     Packet packet;
     packet.flags = frame.flags;
+    packet.channelCount = frame.channelCount;
     packet.controllerNumber = frame.controllerNumber;
     packet.frameCount = frame.frameCount;
     packet.sequenceNumber = frame.sequenceNumber;
@@ -1113,6 +1119,23 @@ void DualSenseHapticsRenderer::updateControl(std::uint16_t controllerNumber,
 #else
     Q_UNUSED(controllerNumber);
     Q_UNUSED(state);
+#endif
+}
+
+void DualSenseHapticsRenderer::updateOutput(const LI_DS5_OUTPUT_EXTENSION& output)
+{
+#ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    {
+        std::lock_guard lock(m_Impl->mutex);
+        if (m_Impl->stopping || !m_Impl->controls.updateOutput(output))
+            return;
+        if (output.controllerNumber != m_Impl->controllerTarget)
+            return;
+        m_Impl->outputDirty = true;
+    }
+    m_Impl->condition.notify_one();
+#else
+    Q_UNUSED(output);
 #endif
 }
 
