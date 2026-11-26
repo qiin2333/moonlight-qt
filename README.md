@@ -87,6 +87,30 @@ macOS 可使用：
 python3 setup-deps.py
 ```
 
+PyroWave 解码是可选的实验路径。Unix 和 macOS 构建通过 pkg-config 检测
+`pyrowave-shared`，同时需要 FFmpeg 和 libplacebo。请使用提供高位深 CPU 输出和颜色信息 API 的
+[AlkaidLab PyroWave 分支](https://github.com/AlkaidLab/pyrowave)；qmake 会编译并链接探测这些接口，
+依赖不兼容时不启用实验解码器。可在设置的“兼容性与诊断 → 视频处理”
+中启用“尝试 PyroWave 解码（实验性）”，也可设置 `MOONLIGHT_ENABLE_PYROWAVE=1`。
+启用后会在自动编码格式、自动或 Vulkan 渲染器下
+为 full-range YUV420 串流尝试协商 PyroWave：支持 8-bit BT.709 SDR，以及使用现有 HDR 设置的
+10-bit BT.2020 HDR10/PQ 和 HLG。自定义 `COLOR_SPACE_OVERRIDE` 必须与信号一致（SDR 为 BT.709，
+HDR 为 BT.2020），`COLOR_RANGE_OVERRIDE` 只接受 full range；不兼容的设置会使用传统编码。
+HDR 使用 compute 解码，避开 fragment 路径无法输出 10-bit CPU 格式的限制；解码颜色信息必须与
+协商一致，静态主机 HDR 元数据会传给渲染器，此解码器暂不广告动态 HDR 能力。
+主机必须实际输出 HDR 信号；关闭主机 HDR 且没有生成 HDR 的处理路径时，会话可能结束，
+暂不支持在 PyroWave 串流中从 HDR 动态切换到 SDR。
+当前使用 CPU readback 后再由 Vulkan renderer 显示，高位深输出每个样本占用的字节数翻倍；
+HDR 显示正确性与持续串流性能仍需在目标 GPU 和显示设备上做端到端验证。
+协商失败时回退到原有的首选编码；如需关闭
+编译可传入 `CONFIG+=disable-pyrowave`。串流开始时会提示协商结果，开启性能统计后也可查看实际编码。
+
+安装后可以用下面的命令确认 pkg-config 是否能找到它：
+
+```bash
+pkg-config --modversion pyrowave-shared
+```
+
 ### Windows
 
 要求：

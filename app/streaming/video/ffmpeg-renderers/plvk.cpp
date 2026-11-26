@@ -427,6 +427,8 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
 {
     m_Window = params->window;
     m_MaxVideoFps = params->frameRate;
+    const bool hdrStream =
+        params->hdrMode != 0 || (params->videoFormat & VIDEO_FORMAT_MASK_10BIT) != 0;
 
     unsigned int instanceExtensionCount = 0;
     if (!SDL_Vulkan_GetInstanceExtensions(params->window, &instanceExtensionCount, nullptr)) {
@@ -489,8 +491,8 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
     //
     // For HDR streaming, we try to find an HDR-capable Vulkan device first then
     // try another search without the HDR requirement if the first attempt fails.
-    if (!chooseVulkanDevice(params, params->videoFormat & VIDEO_FORMAT_MASK_10BIT) &&
-        (!(params->videoFormat & VIDEO_FORMAT_MASK_10BIT) || !chooseVulkanDevice(params, false))) {
+    if (!chooseVulkanDevice(params, hdrStream) &&
+        (!hdrStream || !chooseVulkanDevice(params, false))) {
         return false;
     }
 
@@ -623,7 +625,7 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
     // Set an initial wide colorspace hint to ensure that MoltenVK sets wantsExtendedDynamicRangeContent
     // before we request the first drawable. If we don't do this, our Metal layer ends up stuck in SDR
     // mode even if we later change the colorspace to VK_COLOR_SPACE_HDR10_ST2084_EXT.
-    if (params->videoFormat & VIDEO_FORMAT_MASK_10BIT) {
+    if (hdrStream) {
         pl_color_space wideColorspace = {};
         wideColorspace.primaries = PL_COLOR_PRIM_BT_709;
         wideColorspace.transfer = PL_COLOR_TRC_SCRGB;

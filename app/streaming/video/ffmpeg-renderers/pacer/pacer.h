@@ -33,7 +33,7 @@ public:
 class Pacer
 {
 public:
-    Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats);
+    Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats, QMutex* videoStatsMutex = nullptr);
 
     ~Pacer();
 
@@ -79,5 +79,6 @@ private:
     int m_MaxVideoFps;
     int m_DisplayFps;
     PVIDEO_STATS m_VideoStats;
+    QMutex* m_VideoStatsMutex;
     int m_RendererAttributes;
 };

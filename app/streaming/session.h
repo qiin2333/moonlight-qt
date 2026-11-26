@@ -285,18 +285,16 @@ private:
         Hardware
     };
 
-    static
-    DecoderAvailability getDecoderAvailability(SDL_Window* window,
-                                               StreamingPreferences::VideoDecoderSelection vds,
-                                               int videoFormat, int width, int height, int frameRate);
+    static DecoderAvailability
+    getDecoderAvailability(SDL_Window* window, StreamingPreferences::VideoDecoderSelection vds,
+                           int videoFormat, int width, int height, int frameRate, int hdrMode = 0);
 
-    static
-    bool chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
-                       StreamingPreferences::RendererSelection renderer,
-                       SDL_Window* window, int videoFormat, int width, int height,
-                       int frameRate, bool enableVsync, bool enableFramePacing,
-                       bool enableVideoEnhancement, bool ignoreAspectRatio, bool testOnly,
-                       IVideoDecoder*& chosenDecoder);
+    static bool chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
+                              StreamingPreferences::RendererSelection renderer, SDL_Window* window,
+                              int videoFormat, int width, int height, int frameRate,
+                              bool enableVsync, bool enableFramePacing, bool enableVideoEnhancement,
+                              bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder,
+                              int hdrMode = 0, bool forcePullDecoder = false);
 
     static
     void clStageStarting(int stage);
@@ -341,6 +339,7 @@ private:
     void clDs5HapticsPcm(const LI_DS5_HAPTICS_PCM_FRAME* frame);
 
     static void clDs5HapticsState(std::uint16_t controllerNumber, const std::uint8_t* state);
+    static void clDs5OutputExtension(const LI_DS5_OUTPUT_EXTENSION* output);
 
     static
     void clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame);

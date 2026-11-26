@@ -72,6 +72,52 @@ jobs:
     - name: Check pull renderers report received video
       run: python3 -m unittest discover -s tests/reconnect_video_callbacks -p 'test_*.py'
 
+  pyrowave-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Fetch protocol headers
+      run: git submodule update --init moonlight-common-c/moonlight-common-c
+
+    - name: Fetch pinned AlkaidLab PyroWave headers
+      uses: actions/checkout@v4
+      with:
+        repository: AlkaidLab/pyrowave
+        ref: cc91cbf6363721d19d135d05ca8e3d8665ea6afd
+        path: pyrowave-test-dependency
+        persist-credentials: false
+
+    - name: Install test dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends qt6-base-dev qt6-declarative-dev libavutil-dev libvulkan-dev pkg-config
+
+    - name: Test SDR and HDR color contracts
+      run: |
+        mkdir -p "$RUNNER_TEMP/pyrowave-tests/color"
+        cd "$RUNNER_TEMP/pyrowave-tests/color"
+        qmake6 "$GITHUB_WORKSPACE/tests/pyrowave_color_contract/pyrowave_color_contract.pro" \
+          "PYROWAVE_INCLUDEPATH=$GITHUB_WORKSPACE/pyrowave-test-dependency"
+        make -j2
+        ./pyrowave_color_contract
+
+    - name: Test preferences with and without PyroWave
+      run: |
+        for mode in disabled enabled; do
+          mkdir -p "$RUNNER_TEMP/pyrowave-tests/preferences-$mode"
+          cd "$RUNNER_TEMP/pyrowave-tests/preferences-$mode"
+          qmake6 "$GITHUB_WORKSPACE/tests/pyrowave_preferences/pyrowave_preferences.pro" "CONFIG+=pyrowave-test-$mode"
+          make -j2
+          ./pyrowave_preferences
+        done
+
   cpp-format:
     # C++ 格式门禁:用 git clang-format 只检查相对目标分支**改动过的行**,
     # 不做全量重排 —— 全量重排会让每次 merge 上游都变成格式冲突灾难。
@@ -118,18 +164,15 @@ jobs:
         fi
         echo "格式检查基线: $BASE (event=$EVENT_NAME)"
         # git clang-format --diff 只对 diff 触及的行重排并报告结果,不改工作区。
-        # 无需格式化时输出 "none" / "no modified files to format" 等固定文案。
-        OUTPUT=$(git clang-format --diff --style file --extensions c,cpp,h,mm "$BASE" 2>&1)
-        case "$OUTPUT" in
-          none|*"no modified files to format"|*"clang-format did not modify any files")
-            echo "格式检查通过"
-            ;;
-          *)
-            echo "$OUTPUT"
-            echo "::error::C++ 改动行未通过 clang-format。本地执行 pip install clang-format==21.1.8 后跑 git clang-format 即可自动修复"
-            exit 1
-            ;;
-        esac
+        # 在 if 条件中捕获退出码，避免 bash -e 提前退出并吞掉 diff 或错误输出。
+        if OUTPUT=$(git clang-format --diff --style file --extensions c,cpp,h,mm "$BASE" 2>&1); then
+          echo "格式检查通过"
+        else
+          FORMAT_STATUS=$?
+          echo "$OUTPUT"
+          echo "::error::C++ 格式检查失败，详见上方输出。格式问题请使用 clang-format 21.1.8 修复"
+          exit "$FORMAT_STATUS"
+        fi
 
 
   build-windows:
@@ -873,7 +916,7 @@ jobs:
 
   release:
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_release && github.ref_type == 'tag')
-    needs: [qml-lint, version-tests, cpp-format, build-windows, build-macos, build-linux, build-steamlink]
+    needs: [qml-lint, version-tests, pyrowave-tests, cpp-format, build-windows, build-macos, build-linux, build-steamlink]
     runs-on: ubuntu-latest
 
     steps:

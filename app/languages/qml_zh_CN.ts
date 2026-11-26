@@ -1961,6 +1961,30 @@
         <translation>渲染器</translation>
     </message>
     <message>
+        <source>Try PyroWave decoding (Experimental)</source>
+        <translation>尝试 PyroWave 解码（实验性）</translation>
+    </message>
+    <message>
+        <source>PyroWave support is not included in this build.</source>
+        <translation>当前版本未编入 PyroWave 支持。</translation>
+    </message>
+    <message>
+        <source>Enabled by MOONLIGHT_ENABLE_PYROWAVE=1. Remove it from the launch environment to change this setting.</source>
+        <translation>已由 MOONLIGHT_ENABLE_PYROWAVE=1 启用。请从启动环境中移除此变量后再更改设置。</translation>
+    </message>
+    <message>
+        <source>Attempts PyroWave when both this device and the host support it. Otherwise, the stream uses the preferred video codec. Supports SDR, HDR10 and HLG in YUV 4:2:0. Requires automatic codec selection, automatic or Vulkan rendering, and hardware decoding.</source>
+        <translation>本机和主机均支持时尝试使用 PyroWave，否则使用首选视频编码。支持 YUV 4:2:0 的 SDR、HDR10 和 HLG，需要自动选择编码、自动或 Vulkan 渲染以及硬件解码。</translation>
+    </message>
+    <message>
+        <source>Custom color overrides must use full range and match the stream: BT.709 for SDR, BT.2020 for HDR.</source>
+        <translation>自定义色彩覆盖必须使用全范围，并与串流匹配：SDR 使用 BT.709，HDR 使用 BT.2020。</translation>
+    </message>
+    <message>
+        <source>Current video settings are incompatible; the preferred video codec will be used.</source>
+        <translation>当前视频设置不兼容，将使用首选视频编码。</translation>
+    </message>
+    <message>
         <source>Enable YUV 4:4:4</source>
         <translation>启用 YUV 4:4:4</translation>
     </message>
@@ -3050,6 +3074,22 @@
 </context>
 <context>
     <name>Session</name>
+    <message>
+        <source>PyroWave requires automatic video codec, hardware decoding, an automatic or Vulkan renderer, and full-range 4:2:0 video with BT.709 SDR or BT.2020 HDR10/HLG. Using another codec for this session.</source>
+        <translation>PyroWave 需要自动选择视频编码、硬件解码、自动或 Vulkan 渲染器，以及全范围 4:2:0 的 BT.709 SDR 或 BT.2020 HDR10/HLG 画面。本次串流将使用其他编码。</translation>
+    </message>
+    <message>
+        <source>PyroWave could not initialize on this device. Using another codec for this session.</source>
+        <translation>此设备无法初始化 PyroWave。本次串流将使用其他编码。</translation>
+    </message>
+    <message>
+        <source>Using PyroWave video</source>
+        <translation>正在使用 PyroWave 视频</translation>
+    </message>
+    <message>
+        <source>PyroWave negotiation failed. Using %1 video.</source>
+        <translation>PyroWave 协商失败，正在使用 %1 视频。</translation>
+    </message>
     <message>
         <source>Checking host USB forwarding support</source>
         <translation>正在检查主机 USB 转发支持</translation>

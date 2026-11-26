@@ -102,6 +102,10 @@ unix:if(!macx|disable-prebuilts) {
             PKGCONFIG += libavcodec libavutil libswscale
             CONFIG += ffmpeg
 
+            !disable-pyrowave:packagesExist(pyrowave-shared) {
+                CONFIG += pyrowave
+            }
+
             !disable-libva {
                 packagesExist(libva) {
                     !disable-x11 {
@@ -212,6 +216,12 @@ macx {
     !disable-prebuilts {
         LIBS += -lssl.3 -lcrypto.3 -lavcodec.63 -lavutil.61 -lswscale.10 -lopus.0 -lSDL2 -lSDL2_ttf -lplacebo
         CONFIG += discord-rpc libplacebo
+    }
+
+    # PyroWave is distributed separately from the macOS dependency bundle.
+    # Use its pkg-config metadata when the optional shared library is present.
+    !disable-prebuilts:!disable-pyrowave:packagesExist(pyrowave-shared) {
+        CONFIG += pyrowave
     }
 
     LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework UniformTypeIdentifiers -framework Metal -framework MetalFx -framework QuartzCore -framework GameController -framework CoreHaptics
@@ -509,6 +519,19 @@ libplacebo {
     macx {
         SOURCES += streaming/video/ffmpeg-renderers/plvk_objc.mm
     }
+}
+pyrowave:!config_pyrowave {
+    warning(AlkaidLab PyroWave high-bit-depth and color metadata API not found; PyroWave decoder disabled)
+    CONFIG -= pyrowave
+}
+pyrowave:libplacebo:ffmpeg:!config_SL {
+    message(PyroWave decoder enabled)
+
+    CONFIG += link_pkgconfig
+    PKGCONFIG += pyrowave-shared
+    DEFINES += HAVE_PYROWAVE
+    SOURCES += streaming/video/pyrowave.cpp
+    HEADERS += streaming/video/pyrowave.h streaming/video/pyrowavecolor.h
 }
 config_EGL {
     message(EGL renderer selected)

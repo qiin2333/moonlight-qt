@@ -150,21 +150,84 @@ int main()
     controls.reset();
     CHECK(!controls.has(7));
 
+    LI_DS5_OUTPUT_EXTENSION output{};
+    output.controllerNumber = 7;
+    output.validMask = 0xff;
+    output.speakerVolume = 100;
+    output.headphoneVolume = 127;
+    output.micVolume = 64;
+    output.audioRouting = 0x30;
+    output.muteLed = 1;
+    output.micMute = 1;
+    output.playerLedMask = 0x15;
+    output.lightbarBrightness = 2;
+    CHECK(controls.updateOutput(output));
+    CHECK(!controls.has(7)); // Audio controls alone must not take over SDL rumble.
+    const std::uint8_t powerState[] = { 2, 4, 0x62, 0, 0, 0xa5, 0x23, 1 };
+    CHECK(controls.update(7, powerState));
+    CHECK(controls.mergeEffect(7, led));
+    CHECK(controls.mergeEffect(7, trigger));
+    auto audioEffect = controls.effect(7);
+    CHECK(audioEffect[0] == 0xf6 && audioEffect[1] == 0x77);
+    CHECK(audioEffect[4] == 127 && audioEffect[5] == 100 && audioEffect[6] == 64);
+    CHECK(audioEffect[7] == 0x30 && audioEffect[8] == 1 && audioEffect[9] == 0xb5);
+    CHECK(audioEffect[38] == 5 && audioEffect[42] == 2 && audioEffect[43] == 0x15);
+    CHECK(audioEffect[10] == 5 && audioEffect[11] == 99);
+    CHECK(audioEffect[44] == 11 && audioEffect[45] == 22 && audioEffect[46] == 33);
+
+    output.validMask = LI_DS5_OUT_SPEAKER_VOLUME;
+    output.speakerVolume = 65;
+    CHECK(controls.updateOutput(output));
+    audioEffect = controls.effect(7);
+    CHECK(audioEffect[5] == 65 && audioEffect[4] == 127 && audioEffect[7] == 0x30);
+    output.validMask = LI_DS5_OUT_MIC_MUTE;
+    output.micMute = 0;
+    CHECK(controls.updateOutput(output));
+    CHECK(controls.effect(7)[9] == 0xa5); // Preserve the actuator power-save bits.
+    output.controllerNumber = 16;
+    CHECK(!controls.updateOutput(output));
+    output.controllerNumber = 7;
+    output.validMask = 0x100;
+    CHECK(!controls.updateOutput(output));
+    controls.reset();
+    CHECK(controls.update(7, powerState));
+    audioEffect = controls.effect(7);
+    CHECK(audioEffect[0] == 2 && audioEffect[1] == 0x62 && audioEffect[38] == 4);
+    CHECK(audioEffect[4] == 0 && audioEffect[5] == 0 && audioEffect[7] == 0);
+    CHECK(audioEffect[9] == 0xa5 && audioEffect[42] == 0 && audioEffect[43] == 0);
+
     // Authored left/right PCM goes to channels 3 and 4; the headset pair stays
     // silent.
     const std::int16_t stereo[] = { 100, -200, 300, -400 };
     std::int16_t endpointFrames[8];
     std::fill_n(endpointFrames, 8, std::int16_t{ 1 });
-    dualsense_haptics::spreadToHapticsChannels(endpointFrames, stereo, 2,
-                                               [](std::int16_t s) { return s; });
+    dualsense_haptics::writePcmChannels(endpointFrames, stereo, 2, 2,
+                                        [](std::int16_t s) { return s; });
     const std::int16_t expectedFrames[] = { 0, 0, 100, -200, 0, 0, 300, -400 };
     CHECK(std::equal(endpointFrames, endpointFrames + 8, expectedFrames));
 
     float floatFrames[4];
-    dualsense_haptics::spreadToHapticsChannels(floatFrames, stereo, 1,
-                                               [](std::int16_t s) { return s / 32768.0f; });
+    dualsense_haptics::writePcmChannels(floatFrames, stereo, 1, 2,
+                                        [](std::int16_t s) { return s / 32768.0f; });
     CHECK(floatFrames[0] == 0.0f && floatFrames[1] == 0.0f);
     CHECK(floatFrames[2] == 100 / 32768.0f && floatFrames[3] == -200 / 32768.0f);
+
+    // Four-channel packets preserve each authored speaker/haptic sample, including
+    // both extrema, for every endpoint format. No channel pair is duplicated.
+    const std::int16_t quad[] = { 100, -200, 300, -400, -32768, 32767, 0, 12345 };
+    dualsense_haptics::writePcmChannels(endpointFrames, quad, 2, 4,
+                                        [](std::int16_t s) { return s; });
+    CHECK(std::equal(endpointFrames, endpointFrames + 8, quad));
+    float quadFloat[8];
+    dualsense_haptics::writePcmChannels(quadFloat, quad, 2, 4,
+                                        [](std::int16_t s) { return s / 32768.0f; });
+    std::int32_t quadInt[8];
+    dualsense_haptics::writePcmChannels(
+        quadInt, quad, 2, 4, [](std::int16_t s) { return static_cast<std::int32_t>(s) * 65536; });
+    for (unsigned i = 0; i < 8; ++i) {
+        CHECK(quadFloat[i] == quad[i] / 32768.0f);
+        CHECK(quadInt[i] == static_cast<std::int32_t>(quad[i]) * 65536);
+    }
 
     // Prebuffering stops at 15 ms, or earlier when the endpoint holds less.
     CHECK(!dualsense_haptics::isPrebufferFull(480, 2400));

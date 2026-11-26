@@ -13,6 +13,11 @@ INCLUDEPATH += \
 
 DEFINES += HAS_SOCKLEN_T
 
+# FakeCallbacks.c includes common-c's C11 atomic declarations.
+contains(QMAKE_COMPILER, msvc) {
+    QMAKE_CFLAGS += /std:c11 /experimental:c11atomics
+}
+
 SOURCES += \
     main.cpp \
     $$COMMON_C/src/FakeCallbacks.c

@@ -39,6 +39,9 @@ typedef struct _DECODER_PARAMETERS {
     StreamingPreferences::RendererSelection renderer;
 
     int videoFormat;
+    // Signal transfer: 0 = SDR, 1 = HDR10/PQ, 2 = HLG. PyroWave has no
+    // separate 10-bit format ID, so its signal mode must be carried explicitly.
+    int hdrMode;
     int width;
     int height;
     int frameRate;

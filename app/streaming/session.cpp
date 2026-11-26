@@ -33,6 +33,9 @@
 #ifdef HAVE_FFMPEG
 #include "video/ffmpeg.h"
 #endif
+#ifdef HAVE_PYROWAVE
+#include "video/pyrowave.h"
+#endif
 
 #ifdef Q_OS_DARWIN
 #include "streaming/video/macqteventpumpinputguard.h"
@@ -393,7 +396,8 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
     Session::clClipboardData,
     Session::clCursorUpdate,
     nullptr,
-    nullptr
+    nullptr,
+    nullptr // ds5HapticsIrExtended (Qt uses the existing IR v2 renderer)
 };
 
 Session* Session::s_ActiveSession;
@@ -884,6 +888,14 @@ void Session::clDs5HapticsState(std::uint16_t controllerNumber, const std::uint8
     }
 }
 
+void Session::clDs5OutputExtension(const LI_DS5_OUTPUT_EXTENSION* output)
+{
+    Session* session = s_ActiveSession;
+    if (session != nullptr && session->m_DualSenseHapticsRenderer != nullptr && output != nullptr) {
+        session->m_DualSenseHapticsRenderer->updateOutput(*output);
+    }
+}
+
 void Session::clDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
 {
     if (frame == nullptr) {
@@ -979,13 +991,14 @@ void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlag
     }
 }
 
-
 bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
-                            StreamingPreferences::RendererSelection renderer,
-                            SDL_Window* window, int videoFormat, int width, int height,
-                            int frameRate, bool enableVsync, bool enableFramePacing, bool enableVideoEnhancement, bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder)
+                            StreamingPreferences::RendererSelection renderer, SDL_Window* window,
+                            int videoFormat, int width, int height, int frameRate, bool enableVsync,
+                            bool enableFramePacing, bool enableVideoEnhancement,
+                            bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder,
+                            int hdrMode, bool forcePullDecoder)
 {
-    DECODER_PARAMETERS params;
+    DECODER_PARAMETERS params = {};
 
     // We should never have vsync enabled for test-mode.
     // It introduces unnecessary delay for renderers that may
@@ -996,6 +1009,12 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
     params.height = height;
     params.frameRate = frameRate;
     params.videoFormat = videoFormat;
+    // Legacy 10-bit probes default to PQ, while an 8-bit fallback is always
+    // SDR even when the original session requested HDR. PyroWave carries the
+    // selected signal mode separately from its single format ID.
+    params.hdrMode = videoFormat == VIDEO_FORMAT_PYROWAVE      ? hdrMode
+                     : (videoFormat & VIDEO_FORMAT_MASK_10BIT) ? (hdrMode == 2 ? 2 : 1)
+                                                               : 0;
     params.window = window;
     params.enableVsync = enableVsync;
     params.enableFramePacing = enableFramePacing;
@@ -1013,17 +1032,35 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
                 enableVsync ? "enabled" : "disabled");
 
 #ifdef HAVE_SLVIDEO
-    chosenDecoder = new SLVideoDecoder(testOnly);
-    if (chosenDecoder->initialize(&params)) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "SLVideo video decoder chosen");
-        return true;
+    // The callback contract is selected before the host negotiates a codec. If
+    // the preferred decoder uses pull mode, keep all fallback choices in pull
+    // mode too; SLVideo only consumes push callbacks and would otherwise stall
+    // when the host falls back to H.264.
+    if (!forcePullDecoder) {
+        chosenDecoder = new SLVideoDecoder(testOnly);
+        if (chosenDecoder->initialize(&params)) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "SLVideo video decoder chosen");
+            return true;
+        } else {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load SLVideo decoder");
+            delete chosenDecoder;
+            chosenDecoder = nullptr;
+        }
     }
-    else {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Unable to load SLVideo decoder");
+#endif
+
+#ifdef HAVE_PYROWAVE
+    if (videoFormat == VIDEO_FORMAT_PYROWAVE) {
+        chosenDecoder = new PyrowaveVideoDecoder(testOnly);
+        if (chosenDecoder->initialize(&params)) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "PyroWave video decoder chosen");
+            return true;
+        }
         delete chosenDecoder;
         chosenDecoder = nullptr;
+        // FFmpeg only accepts the legacy video formats. Falling through here
+        // can trip its format assertion when the PyroWave probe fails.
+        return false;
     }
 #endif
 
@@ -1201,16 +1238,13 @@ void Session::getDecoderInfo(SDL_Window* window,
 }
 
 Session::DecoderAvailability
-Session::getDecoderAvailability(SDL_Window* window,
-                                StreamingPreferences::VideoDecoderSelection vds,
-                                int videoFormat, int width, int height, int frameRate)
+Session::getDecoderAvailability(SDL_Window* window, StreamingPreferences::VideoDecoderSelection vds,
+                                int videoFormat, int width, int height, int frameRate, int hdrMode)
 {
     IVideoDecoder* decoder;
 
-    if (!chooseDecoder(vds,
-                       StreamingPreferences::RS_PROBE_ONLY,
-                       window, videoFormat, width, height, frameRate,
-                       false, false, false, false, true, decoder)) {
+    if (!chooseDecoder(vds, StreamingPreferences::RS_PROBE_ONLY, window, videoFormat, width, height,
+                       frameRate, false, false, false, false, true, decoder, hdrMode)) {
         return DecoderAvailability::None;
     }
 
@@ -1229,14 +1263,10 @@ bool Session::populateDecoderProperties(SDL_Window* window)
     // here because this is operating on the real streaming window, and
     // instantiating Metal or AVSBDL renderers can interfere with MoltenVK's
     // attempt to change the window's colorspace, causing washed out colors.
-    if (!chooseDecoder(m_Preferences->videoDecoderSelection,
-                       m_Preferences->rendererSelection,
-                       window,
-                       m_SupportedVideoFormats.first(),
-                       m_StreamConfig.width,
-                       m_StreamConfig.height,
-                       m_StreamConfig.fps,
-                       false, false, false, false, true, decoder)) {
+    if (!chooseDecoder(m_Preferences->videoDecoderSelection, m_Preferences->rendererSelection,
+                       window, m_SupportedVideoFormats.first(), m_StreamConfig.width,
+                       m_StreamConfig.height, m_StreamConfig.fps, false, false, false, false, true,
+                       decoder, m_StreamConfig.hdrMode)) {
         return false;
     }
 
@@ -1943,6 +1973,40 @@ bool Session::initialize(QQuickWindow* qtWindow)
         m_StreamConfig.hdrMode = static_cast<int>(m_Preferences->hdrMode);
     }
 
+#ifdef HAVE_PYROWAVE
+    // Probe after ordering the legacy formats: PyroWave uses one format ID
+    // for both SDR and HDR and must not be classified by the legacy 10-bit mask.
+    const bool pyrowaveRequested =
+        m_Preferences->enablePyrowave || m_Preferences->pyrowaveForcedByEnvironment();
+    if (pyrowaveRequested &&
+        (m_Preferences->videoCodecConfig != StreamingPreferences::VCC_AUTO ||
+         m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_SOFTWARE ||
+         (m_Preferences->rendererSelection != StreamingPreferences::RS_AUTO &&
+          m_Preferences->rendererSelection != StreamingPreferences::RS_VULKAN) ||
+         m_Preferences->enableYUV444 || !m_Preferences->pyrowaveColorOverridesCompatible())) {
+        emitLaunchWarning(
+            tr("PyroWave requires automatic video codec, hardware decoding, an "
+               "automatic or Vulkan renderer, and full-range 4:2:0 video with "
+               "BT.709 SDR or BT.2020 HDR10/HLG. Using another codec for this session."));
+    } else if (pyrowaveRequested) {
+        IVideoDecoder* pyrowaveDecoder = nullptr;
+        if (chooseDecoder(m_Preferences->videoDecoderSelection, m_Preferences->rendererSelection,
+                          testWindow, VIDEO_FORMAT_PYROWAVE, m_StreamConfig.width,
+                          m_StreamConfig.height, m_StreamConfig.fps, false, false, false, false,
+                          true, pyrowaveDecoder, m_StreamConfig.hdrMode)) {
+            delete pyrowaveDecoder;
+            m_SupportedVideoFormats.prepend(VIDEO_FORMAT_PYROWAVE);
+            // Leave dynamic HDR opt-in fields at their defaults. This decoder
+            // consumes the base HDR signal, not frame-bound dynamic metadata.
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "PyroWave support detected; advertising experimental format");
+        } else {
+            emitLaunchWarning(tr("PyroWave could not initialize on this device. Using another "
+                                 "codec for this session."));
+        }
+    }
+#endif
+
     switch (m_Preferences->windowMode)
     {
     default:
@@ -1992,8 +2056,20 @@ bool Session::initialize(QQuickWindow* qtWindow)
     bool ret = validateLaunch(testWindow);
 
     if (ret) {
-        // Video format is now locked in
+        // Retain the best legacy format for hosts that don't negotiate
+        // PyroWave. The remaining formats have already been ordered and
+        // filtered by the usual decoder and host checks above.
         m_StreamConfig.supportedVideoFormats = m_SupportedVideoFormats.front();
+#ifdef HAVE_PYROWAVE
+        if (m_StreamConfig.supportedVideoFormats == VIDEO_FORMAT_PYROWAVE) {
+            for (int format : m_SupportedVideoFormats) {
+                if (format != VIDEO_FORMAT_PYROWAVE) {
+                    m_StreamConfig.supportedVideoFormats |= format;
+                    break;
+                }
+            }
+        }
+#endif
 
         // Populate decoder-dependent properties.
         // Must be done after validateLaunch() since m_StreamConfig is finalized.
@@ -2124,16 +2200,25 @@ bool Session::validateLaunch(SDL_Window* testWindow)
     }
 
     if (m_Preferences->enableHdr) {
+        // Legacy server codec masks do not describe the independently
+        // negotiated PyroWave HDR path. Still filter legacy fallback formats,
+        // but do not report HDR as unavailable while PyroWave remains viable.
+        const bool pyrowaveHdr = (m_SupportedVideoFormats & VIDEO_FORMAT_PYROWAVE) != 0;
         if (m_Preferences->videoCodecConfig == StreamingPreferences::VCC_FORCE_H264) {
             emitLaunchWarning(tr("HDR is not supported using the H.264 codec."));
             m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_MASK_10BIT);
         }
         else if (!(m_SupportedVideoFormats & VIDEO_FORMAT_MASK_10BIT)) {
-            emitLaunchWarning(tr("This PC's GPU doesn't support 10-bit HEVC or AV1 decoding for HDR streaming."));
+            if (!pyrowaveHdr) {
+                emitLaunchWarning(tr("This PC's GPU doesn't support 10-bit HEVC or AV1 decoding "
+                                     "for HDR streaming."));
+            }
         }
         // Check that the server GPU supports HDR
         else if (m_SupportedVideoFormats.maskByServerCodecModes(m_Computer->serverCodecModeSupport & SCM_MASK_10BIT) == 0) {
-            emitLaunchWarning(tr("Your host PC doesn't support HDR streaming."));
+            if (!pyrowaveHdr) {
+                emitLaunchWarning(tr("Your host PC doesn't support HDR streaming."));
+            }
             m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_MASK_10BIT);
         }
         else if (m_Preferences->videoCodecConfig != StreamingPreferences::VCC_AUTO) { // Auto was already checked during init
@@ -2181,7 +2266,10 @@ bool Session::validateLaunch(SDL_Window* testWindow)
         // Check for compatibility between server and client codecs
         if ((m_SupportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) && // Ignore this check if we already failed one above
             !(m_SupportedVideoFormats.maskByServerCodecModes(m_Computer->serverCodecModeSupport) & VIDEO_FORMAT_MASK_10BIT)) {
-            emitLaunchWarning(tr("Your host PC and client PC don't support the same HDR video codecs."));
+            if (!pyrowaveHdr) {
+                emitLaunchWarning(
+                    tr("Your host PC and client PC don't support the same HDR video codecs."));
+            }
             m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_MASK_10BIT);
         }
     }
@@ -2280,13 +2368,12 @@ bool Session::validateLaunch(SDL_Window* testWindow)
     }
 
     if (m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_HARDWARE &&
-            !(m_SupportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) && // HDR was already checked for hardware decode support above
-            getDecoderAvailability(testWindow,
-                                   m_Preferences->videoDecoderSelection,
-                                   m_SupportedVideoFormats.front(),
-                                   m_StreamConfig.width,
-                                   m_StreamConfig.height,
-                                   m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+        !(m_SupportedVideoFormats &
+          VIDEO_FORMAT_MASK_10BIT) && // HDR was already checked for hardware decode support above
+        getDecoderAvailability(testWindow, m_Preferences->videoDecoderSelection,
+                               m_SupportedVideoFormats.front(), m_StreamConfig.width,
+                               m_StreamConfig.height, m_StreamConfig.fps,
+                               m_StreamConfig.hdrMode) != DecoderAvailability::Hardware) {
         if (m_Preferences->videoCodecConfig == StreamingPreferences::VCC_AUTO) {
             emit displayLaunchError(tr("Your selection to force hardware decoding cannot be satisfied due to missing hardware decoding support on this PC's GPU."));
         }
@@ -4522,12 +4609,16 @@ void Session::start()
     k_ConnCallbacks.ds5HapticsPcm = nullptr;
     k_ConnCallbacks.ds5HapticsIrV2 = nullptr;
     LiSetDs5HapticsStateCallback(nullptr);
+    LiSetDs5OutputExtensionCallback(nullptr);
+    LiSetDs5PadAudioOffer(LI_DS5_PAD_AUDIO_OFF);
     if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
         enablePhysicalDualSenseHaptics = true;
         k_ConnCallbacks.ds5HapticsPcm = Session::clDs5HapticsPcm;
 #if SDL_VERSION_ATLEAST(2, 0, 16)
         LiSetDs5HapticsStateCallback(Session::clDs5HapticsState);
+        LiSetDs5OutputExtensionCallback(Session::clDs5OutputExtension);
+        LiSetDs5PadAudioOffer(LI_DS5_PAD_AUDIO_PCM);
 #endif
         if (m_DualSenseHapticsRenderer == nullptr) {
             m_DualSenseHapticsRenderer =
@@ -5001,6 +5092,9 @@ void Session::exec()
 
     bool needsFirstEnterCapture = false;
     bool needsPostDecoderCreationCapture = false;
+#ifdef HAVE_PYROWAVE
+    int lastReportedPyrowaveFormat = 0;
+#endif
 
     // Avoid capturing the mouse initially for windowed relative mode.
     // We still capture in windowed absolute mode because it doesn't
@@ -5583,16 +5677,14 @@ void Session::exec()
 
                 // Choose a new decoder (hopefully the same one, but possibly
                 // not if a GPU was removed or something).
-                if (!chooseDecoder(m_Preferences->videoDecoderSelection,
-                                   m_Preferences->rendererSelection,
-                                   m_Window, m_ActiveVideoFormat, m_ActiveVideoWidth,
-                                   m_ActiveVideoHeight, m_ActiveVideoFrameRate,
-                                   enableVsync,
-                                   enableVsync && m_Preferences->framePacing,
-                                   m_Preferences->videoEnhancement,
-                                   m_Preferences->ignoreAspectRatio,
-                                   false,
-                                   s_ActiveSession->m_VideoDecoder)) {
+                if (!chooseDecoder(
+                        m_Preferences->videoDecoderSelection, m_Preferences->rendererSelection,
+                        m_Window, m_ActiveVideoFormat, m_ActiveVideoWidth, m_ActiveVideoHeight,
+                        m_ActiveVideoFrameRate, enableVsync,
+                        enableVsync && m_Preferences->framePacing, m_Preferences->videoEnhancement,
+                        m_Preferences->ignoreAspectRatio, false, s_ActiveSession->m_VideoDecoder,
+                        m_StreamConfig.hdrMode,
+                        (m_VideoCallbacks.capabilities & CAPABILITY_PULL_RENDERER) != 0)) {
                     SDL_UnlockMutex(m_DecoderLock);
                     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                                  "Failed to recreate decoder after reset");
@@ -5631,6 +5723,24 @@ void Session::exec()
             m_InputHandler->updatePointerRegionLock();
 
             SDL_UnlockMutex(m_DecoderLock);
+#ifdef HAVE_PYROWAVE
+            // The negotiated format can change after reconnecting. Report it
+            // only after the decoder is ready and only when it changes.
+            if ((m_StreamConfig.supportedVideoFormats & VIDEO_FORMAT_PYROWAVE) &&
+                m_ActiveVideoFormat != lastReportedPyrowaveFormat) {
+                lastReportedPyrowaveFormat = m_ActiveVideoFormat;
+                if (m_ActiveVideoFormat == VIDEO_FORMAT_PYROWAVE) {
+                    showStreamingToast(tr("Using PyroWave video"), 3000);
+                } else {
+                    const QString codec =
+                        (m_ActiveVideoFormat & VIDEO_FORMAT_MASK_AV1)    ? QStringLiteral("AV1")
+                        : (m_ActiveVideoFormat & VIDEO_FORMAT_MASK_H265) ? QStringLiteral("HEVC")
+                                                                         : QStringLiteral("H.264");
+                    showStreamingToast(
+                        tr("PyroWave negotiation failed. Using %1 video.").arg(codec), 4500);
+                }
+            }
+#endif
             break;
 
         case SDL_KEYUP:

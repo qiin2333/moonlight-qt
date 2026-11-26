@@ -33,16 +33,10 @@ static_assert(PACER_MAX_OUTSTANDING_FRAMES == MAX_QUEUED_FRAMES + 2,
 // V-sync happens.
 #define TIMER_SLACK_MS 3
 
-Pacer::Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats) :
-    m_RenderThread(nullptr),
-    m_VsyncThread(nullptr),
-    m_DeferredFreeFrame(nullptr),
-    m_Stopping(false),
-    m_VsyncSource(nullptr),
-    m_VsyncRenderer(renderer),
-    m_MaxVideoFps(0),
-    m_DisplayFps(0),
-    m_VideoStats(videoStats)
+Pacer::Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats, QMutex* videoStatsMutex)
+    : m_RenderThread(nullptr), m_VsyncThread(nullptr), m_DeferredFreeFrame(nullptr),
+      m_Stopping(false), m_VsyncSource(nullptr), m_VsyncRenderer(renderer), m_MaxVideoFps(0),
+      m_DisplayFps(0), m_VideoStats(videoStats), m_VideoStatsMutex(videoStatsMutex)
 {
 
 }
@@ -248,7 +242,10 @@ void Pacer::handleVsync(int timeUntilNextVsyncMillis)
 
         // Drop the lock while we call av_frame_free()
         m_FrameQueueLock.unlock();
-        m_VideoStats->pacerDroppedFrames++;
+        {
+            QMutexLocker statsLocker(m_VideoStatsMutex);
+            m_VideoStats->pacerDroppedFrames++;
+        }
         av_frame_free(&frame);
         m_FrameQueueLock.lock();
     }
@@ -348,7 +345,7 @@ void Pacer::renderFrame(AVFrame* frame)
 {
     // Count time spent in Pacer's queues
     uint64_t beforeRender = LiGetMicroseconds();
-    m_VideoStats->totalPacerTimeUs += (beforeRender - (uint64_t)frame->pkt_dts);
+    const uint64_t pacerTimeUs = beforeRender - (uint64_t)frame->pkt_dts;
 
     // Render it
     {
@@ -359,8 +356,12 @@ void Pacer::renderFrame(AVFrame* frame)
     }
     uint64_t afterRender = LiGetMicroseconds();
 
-    m_VideoStats->totalRenderTimeUs += (afterRender - beforeRender);
-    m_VideoStats->renderedFrames++;
+    {
+        QMutexLocker statsLocker(m_VideoStatsMutex);
+        m_VideoStats->totalPacerTimeUs += pacerTimeUs;
+        m_VideoStats->totalRenderTimeUs += (afterRender - beforeRender);
+        m_VideoStats->renderedFrames++;
+    }
 
     // Wait until after next frame to free this one to ensure the GPU
     // doesn't stall or read garbage if the backing buffer gets returned
@@ -403,7 +404,10 @@ void Pacer::renderFrame(AVFrame* frame)
 
         // Drop the lock while we call av_frame_free()
         frameQueueLocker.unlock();
-        m_VideoStats->pacerDroppedFrames++;
+        {
+            QMutexLocker statsLocker(m_VideoStatsMutex);
+            m_VideoStats->pacerDroppedFrames++;
+        }
         av_frame_free(&frame);
         frameQueueLocker.relock();
     }
