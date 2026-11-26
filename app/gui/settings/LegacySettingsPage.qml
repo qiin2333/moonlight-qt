@@ -735,6 +735,29 @@ Column {
         }
 
         ToggleRow {
+            title: qsTr("Try PyroWave decoding (Experimental)")
+            searchKeywords: "PyroWave decoding Experimental"
+            readonly property bool requested: StreamingPreferences.enablePyrowave || StreamingPreferences.pyrowaveForcedByEnvironment
+            controlEnabled: StreamingPreferences.pyrowaveAvailable && !StreamingPreferences.pyrowaveForcedByEnvironment
+            checked: StreamingPreferences.pyrowaveAvailable && requested
+            description: !StreamingPreferences.pyrowaveAvailable
+                         ? qsTr("PyroWave support is not included in this build.")
+                         : (qsTr("Attempts PyroWave when both this device and the host support it. Otherwise, the stream uses the preferred video codec. Supports SDR, HDR10 and HLG in YUV 4:2:0. Requires automatic codec selection, automatic or Vulkan rendering, and hardware decoding.") +
+                            (StreamingPreferences.pyrowaveForcedByEnvironment
+                             ? "\n" + qsTr("Enabled by MOONLIGHT_ENABLE_PYROWAVE=1. Remove it from the launch environment to change this setting.") : "") +
+                            (requested && !StreamingPreferences.pyrowaveColorOverridesCompatible
+                             ? "\n" + qsTr("Custom color overrides must use full range and match the stream: BT.709 for SDR, BT.2020 for HDR.") : "") +
+                            (requested &&
+                             (StreamingPreferences.videoCodecConfig !== StreamingPreferences.VCC_AUTO ||
+                              StreamingPreferences.videoDecoderSelection === StreamingPreferences.VDS_FORCE_SOFTWARE ||
+                              (StreamingPreferences.rendererSelection !== StreamingPreferences.RS_AUTO &&
+                               StreamingPreferences.rendererSelection !== StreamingPreferences.RS_VULKAN) ||
+                              StreamingPreferences.enableYUV444)
+                             ? "\n" + qsTr("Current video settings are incompatible; the preferred video codec will be used.") : ""))
+            onToggled: function(value) { StreamingPreferences.enablePyrowave = value }
+        }
+
+        ToggleRow {
             title: qsTr("Enable YUV 4:4:4")
             searchKeywords: "Enable YUV 4:4:4"
             description: qsTr("Good for streaming desktop and text-heavy games, but not recommended for fast-paced games.")

@@ -4,7 +4,8 @@ CONFIG += c++17 console
 CONFIG -= app_bundle
 TEMPLATE = app
 TARGET = usb_forwarding_backend_list_test
-INCLUDEPATH += ../../app
+INCLUDEPATH += ../../app \
+    ../../moonlight-common-c/moonlight-common-c/src
 SOURCES += main.cpp \
     ../../app/backend/usbforwardingbackend.cpp \
     ../../app/backend/usbforwardingenvironment.cpp \

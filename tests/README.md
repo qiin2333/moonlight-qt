@@ -13,6 +13,8 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | 目录 | 验证内容 | CI 平台 |
 |---|---|---|
 | derive_version | scripts/derive-version.py 版本号推导 | Ubuntu(unittest) |
+| pyrowave_preferences | PyroWave 启用/禁用构建下的设置通知、保存、环境变量及 SDR/HDR 色彩覆盖 | Ubuntu(Qt) |
+| pyrowave_color_contract | SDR/HDR10/HLG 位深、色彩匹配与静态 HDR 元数据；使用固定版本的 PyroWave 头文件和真实 libavutil，无需 GPU | Ubuntu |
 | cursor_shape_classification | 光标位图 → 形状分类器的判定矩阵 | Windows |
 | clipboard_payload_routing | 剪贴板状态、复合内容、文件保护、IPC 分帧和本地 TLS 传输回归（offscreen） | Windows |
 | clipboard_helper_lifecycle | helper 异常退出、响应超时和进程管道背压 | Windows |

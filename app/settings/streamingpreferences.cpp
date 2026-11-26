@@ -1,5 +1,6 @@
 #include "streamingpreferences.h"
 #include "utils.h"
+#include <Limelight.h>
 
 #include <QSettings>
 #include <QTranslator>
@@ -26,6 +27,7 @@
 #define SER_MULTICONT "multicontroller"
 #define SER_AUDIOCFG "audiocfg"
 #define SER_VIDEOCFG "videocfg"
+#define SER_PYROWAVE "enablepyrowave"
 #define SER_HDR "hdr"
 #define SER_YUV444 "yuv444"
 #define SER_VIDEODEC "videodec"
@@ -172,6 +174,10 @@ StreamingPreferences::StreamingPreferences(QQmlEngine* qmlEngine)
       m_PersistedGamepadUiNavigation(true)
 {
     reload();
+    connect(this, &StreamingPreferences::enableHdrChanged, this,
+            &StreamingPreferences::pyrowaveCompatibilityChanged);
+    connect(this, &StreamingPreferences::hdrModeChanged, this,
+            &StreamingPreferences::pyrowaveCompatibilityChanged);
 }
 
 StreamingPreferences* StreamingPreferences::get(QQmlEngine *qmlEngine)
@@ -209,6 +215,35 @@ StreamingPreferences* StreamingPreferences::get(QQmlEngine *qmlEngine)
 
         return s_GlobalPrefs;
     }
+}
+
+bool StreamingPreferences::pyrowaveAvailable() const
+{
+#ifdef HAVE_PYROWAVE
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool StreamingPreferences::pyrowaveForcedByEnvironment() const
+{
+    return qEnvironmentVariableIntValue("MOONLIGHT_ENABLE_PYROWAVE") == 1;
+}
+
+bool StreamingPreferences::pyrowaveColorOverridesCompatible() const
+{
+    if (enableHdr && hdrMode != HDR_PQ && hdrMode != HDR_HLG) {
+        return false;
+    }
+
+    const int expectedColorSpace = enableHdr ? COLORSPACE_REC_2020 : COLORSPACE_REC_709;
+    int colorSpace;
+    int colorRange;
+    return (!Utils::getEnvironmentVariableOverride("COLOR_SPACE_OVERRIDE", &colorSpace) ||
+            colorSpace == expectedColorSpace) &&
+           (!Utils::getEnvironmentVariableOverride("COLOR_RANGE_OVERRIDE", &colorRange) ||
+            colorRange == COLOR_RANGE_FULL);
 }
 
 void StreamingPreferences::reload()
@@ -342,6 +377,7 @@ void StreamingPreferences::reload()
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
                                                   static_cast<int>(VideoCodecConfig::VCC_AUTO)).toInt());
+    enablePyrowave = settings.value(SER_PYROWAVE, false).toBool();
     videoDecoderSelection = static_cast<VideoDecoderSelection>(settings.value(SER_VIDEODEC,
                                                   static_cast<int>(VideoDecoderSelection::VDS_AUTO)).toInt());
     rendererSelection = static_cast<RendererSelection>(settings.value(SER_RENDERER,
@@ -787,6 +823,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_HDRMAXAVERAGEBRIGHTNESS, hdrMaxAverageBrightness);
     settings.setValue(SER_YUV444, enableYUV444);
     settings.setValue(SER_VIDEOCFG, static_cast<int>(videoCodecConfig));
+    settings.setValue(SER_PYROWAVE, enablePyrowave);
     settings.setValue(SER_VIDEODEC, static_cast<int>(videoDecoderSelection));
     settings.setValue(SER_RENDERER, static_cast<int>(rendererSelection));
     settings.setValue(SER_WINDOWMODE, static_cast<int>(windowMode));

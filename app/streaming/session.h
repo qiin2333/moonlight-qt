@@ -285,18 +285,16 @@ private:
         Hardware
     };
 
-    static
-    DecoderAvailability getDecoderAvailability(SDL_Window* window,
-                                               StreamingPreferences::VideoDecoderSelection vds,
-                                               int videoFormat, int width, int height, int frameRate);
+    static DecoderAvailability
+    getDecoderAvailability(SDL_Window* window, StreamingPreferences::VideoDecoderSelection vds,
+                           int videoFormat, int width, int height, int frameRate, int hdrMode = 0);
 
-    static
-    bool chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
-                       StreamingPreferences::RendererSelection renderer,
-                       SDL_Window* window, int videoFormat, int width, int height,
-                       int frameRate, bool enableVsync, bool enableFramePacing,
-                       bool enableVideoEnhancement, bool ignoreAspectRatio, bool testOnly,
-                       IVideoDecoder*& chosenDecoder);
+    static bool chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
+                              StreamingPreferences::RendererSelection renderer, SDL_Window* window,
+                              int videoFormat, int width, int height, int frameRate,
+                              bool enableVsync, bool enableFramePacing, bool enableVideoEnhancement,
+                              bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder,
+                              int hdrMode = 0, bool forcePullDecoder = false);
 
     static
     void clStageStarting(int stage);
