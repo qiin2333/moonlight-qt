@@ -294,7 +294,7 @@ private:
                               int videoFormat, int width, int height, int frameRate,
                               bool enableVsync, bool enableFramePacing, bool enableVideoEnhancement,
                               bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder,
-                              int hdrMode = 0);
+                              int hdrMode = 0, bool forcePullDecoder = false);
 
     static
     void clStageStarting(int stage);

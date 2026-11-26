@@ -987,7 +987,7 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
                             int videoFormat, int width, int height, int frameRate, bool enableVsync,
                             bool enableFramePacing, bool enableVideoEnhancement,
                             bool ignoreAspectRatio, bool testOnly, IVideoDecoder*& chosenDecoder,
-                            int hdrMode)
+                            int hdrMode, bool forcePullDecoder)
 {
     DECODER_PARAMETERS params = {};
 
@@ -1027,7 +1027,7 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
     // the preferred decoder uses pull mode, keep all fallback choices in pull
     // mode too; SLVideo only consumes push callbacks and would otherwise stall
     // when the host falls back to H.264.
-    if (!(m_VideoCallbacks.capabilities & CAPABILITY_PULL_RENDERER)) {
+    if (!forcePullDecoder) {
         chosenDecoder = new SLVideoDecoder(testOnly);
         if (chosenDecoder->initialize(&params)) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "SLVideo video decoder chosen");
@@ -5664,13 +5664,14 @@ void Session::exec()
 
                 // Choose a new decoder (hopefully the same one, but possibly
                 // not if a GPU was removed or something).
-                if (!chooseDecoder(m_Preferences->videoDecoderSelection,
-                                   m_Preferences->rendererSelection, m_Window, m_ActiveVideoFormat,
-                                   m_ActiveVideoWidth, m_ActiveVideoHeight, m_ActiveVideoFrameRate,
-                                   enableVsync, enableVsync && m_Preferences->framePacing,
-                                   m_Preferences->videoEnhancement,
-                                   m_Preferences->ignoreAspectRatio, false,
-                                   s_ActiveSession->m_VideoDecoder, m_StreamConfig.hdrMode)) {
+                if (!chooseDecoder(
+                        m_Preferences->videoDecoderSelection, m_Preferences->rendererSelection,
+                        m_Window, m_ActiveVideoFormat, m_ActiveVideoWidth, m_ActiveVideoHeight,
+                        m_ActiveVideoFrameRate, enableVsync,
+                        enableVsync && m_Preferences->framePacing, m_Preferences->videoEnhancement,
+                        m_Preferences->ignoreAspectRatio, false, s_ActiveSession->m_VideoDecoder,
+                        m_StreamConfig.hdrMode,
+                        (m_VideoCallbacks.capabilities & CAPABILITY_PULL_RENDERER) != 0)) {
                     SDL_UnlockMutex(m_DecoderLock);
                     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                                  "Failed to recreate decoder after reset");
