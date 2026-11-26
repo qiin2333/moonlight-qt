@@ -1023,17 +1023,20 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
                 enableVsync ? "enabled" : "disabled");
 
 #ifdef HAVE_SLVIDEO
-    chosenDecoder = new SLVideoDecoder(testOnly);
-    if (chosenDecoder->initialize(&params)) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "SLVideo video decoder chosen");
-        return true;
-    }
-    else {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Unable to load SLVideo decoder");
-        delete chosenDecoder;
-        chosenDecoder = nullptr;
+    // The callback contract is selected before the host negotiates a codec. If
+    // the preferred decoder uses pull mode, keep all fallback choices in pull
+    // mode too; SLVideo only consumes push callbacks and would otherwise stall
+    // when the host falls back to H.264.
+    if (!(m_VideoCallbacks.capabilities & CAPABILITY_PULL_RENDERER)) {
+        chosenDecoder = new SLVideoDecoder(testOnly);
+        if (chosenDecoder->initialize(&params)) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "SLVideo video decoder chosen");
+            return true;
+        } else {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load SLVideo decoder");
+            delete chosenDecoder;
+            chosenDecoder = nullptr;
+        }
     }
 #endif
 
