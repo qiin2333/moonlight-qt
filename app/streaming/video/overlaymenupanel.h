@@ -30,9 +30,11 @@
  * Menu structure:
  *   Level 0 (Top):      Quick Actions >, Menu Position >, Bitrate >, Fullscreen,
  *                        Microphone [toggle], Disconnect
- *   Level 1 (Actions):  Quit, Performance Stats, Mouse Mode, Cursor, Minimize, ...
+ *   Level 1 (Actions):  Quit, Performance Stats, Minimize, ...
  *   Level 2 (Bitrate):  piecewise-linear scrubber row + 1/2/5/10/20/30/50/100 Mbps presets
  *   Level 3 (Position): Top, Right, Left, Floating button, Disabled
+ *   Level 4 (Mouse):    Mouse mode, cursor source, host cursor, capture
+ *   Level 5 (USB):      Remote USB devices when supported
  *   Developer builds may append a function-test panel entry.
  *
  * Sub-level navigation uses a title bar with back button (◂ Title).
@@ -42,7 +44,8 @@ class OverlayMenuPanel : public OverlayRasterWindow
 {
     Q_OBJECT
 public:
-    enum class MenuAction {
+    enum class MenuAction
+    {
         // Quick actions (keyboard shortcuts)
         Quit,
         QuitAndExit,
@@ -50,6 +53,7 @@ public:
         ToggleStatsOverlay,
         ToggleMouseMode,
         ToggleCursorHide,
+        ToggleHostCursor,
         ToggleMinimize,
         UngrabInput,
         PasteText,
@@ -168,6 +172,7 @@ public:
     void updateBitrateState(int bitrateKbps);
     void updateMenuPositionState(MenuAction activePlacementAction);
     void updateGamepadMouseState(bool enabled);
+    void updateMouseState(bool absolute, bool localCursor, bool sunshineHost, bool captured);
     void updateFileMappingState(FileMappingState state, const QString& detail);
     void updateRemoteUsbState(bool available,
                               RemoteUsbState state,
@@ -283,6 +288,10 @@ private:
     int  m_CurrentLevel;
     int  m_HoveredIndex;
     bool m_Visible;
+    bool m_AbsoluteMouse = true;
+    bool m_LocalCursor = true;
+    bool m_SunshineCursorShortcut = false;
+    bool m_MouseCaptured = true;
     bool m_HasGamepads;
     GamepadUiStyle m_GamepadUiStyle;
     bool m_SwapFaceButtons;

@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>Absolutní režim myši</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>Odesílá polohu myši místo jejího pohybu. Hodí se pro vzdálenou plochu; relativní režim je vhodnější pro většinu her.</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>Zobrazovat vzdálený kurzor místně</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>K zobrazení vzdáleného kurzoru používá místní ukazatel. Tvar kurzoru závisí na podpoře hostitele. Vyžaduje absolutní režim myši.</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>Nastavení zvuku</translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>Uvolnit myš</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Přepnout kurzor Sunshine</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>Zachytit myš</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>Myš</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>Nezdařilo se inicializovat dekodér videa. Prosím zkontrolujte nastavení streamování a zkuste to znovu.</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>Absolutní režim myši může způsobit problémy ve hrách.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>Obrázek pozadí nelze načíst. Zkuste jiný obrázek.</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>Režim myši: Absolutní</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>Režim myši: Relativní</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>Kurzor: Lokální</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>Kurzor: Video hostitele</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>Myš zachycena.</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>Myš uvolněna. Kliknutím na stream obnovíte ovládání.</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>Pro použití místního kurzoru přepněte do absolutního režimu myši.</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Požadováno přepnutí kurzoru videa Sunshine.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>Odeslání požadavku na přepnutí kurzoru se nezdařilo.</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>Před použitím této akce uvolněte modifikační klávesy.</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>Odeslání požadavku na režim kurzoru se nezdařilo.</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>Tento hostitel nepodporuje synchronizaci tvaru kurzoru.</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>Pokud kurzor na ploše chybí, stisknutím kombinace kláves Ctrl+Alt+Shift+N přepněte kurzor videa Sunshine.</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Stisknutím Ctrl+Alt+Shift+O otevřete nabídku překrytí.</translation>
     </message>
 </context>
 </TS>

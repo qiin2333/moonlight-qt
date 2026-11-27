@@ -102,6 +102,10 @@ unix:if(!macx|disable-prebuilts) {
             PKGCONFIG += libavcodec libavutil libswscale
             CONFIG += ffmpeg
 
+            !disable-pyrowave:packagesExist(pyrowave-shared) {
+                CONFIG += pyrowave
+            }
+
             !disable-libva {
                 packagesExist(libva) {
                     !disable-x11 {
@@ -214,6 +218,12 @@ macx {
         CONFIG += discord-rpc libplacebo
     }
 
+    # PyroWave is distributed separately from the macOS dependency bundle.
+    # Use its pkg-config metadata when the optional shared library is present.
+    !disable-prebuilts:!disable-pyrowave:packagesExist(pyrowave-shared) {
+        CONFIG += pyrowave
+    }
+
     LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework UniformTypeIdentifiers -framework Metal -framework MetalFx -framework QuartzCore -framework GameController -framework CoreHaptics
 
     SOURCES += streaming/audio/dualsensehapticsmac.mm
@@ -246,6 +256,7 @@ SOURCES += \
     settings/devicelocalsettings.cpp \
     settings/mappingfetcher.cpp \
     settings/streamingpreferences.cpp \
+    settings/mousemode.cpp \
     streaming/input/abstouch.cpp \
     streaming/input/cursorshapeclassifier.cpp \
     streaming/input/gamepad.cpp \
@@ -326,6 +337,8 @@ HEADERS += \
     streaming/input/input.h \
     streaming/input/gamepadsensorrate.h \
     streaming/input/keyboardstate.h \
+    streaming/input/mousemodestatus.h \
+    streaming/input/remotecursorupdate.h \
     streaming/session.h \
     streaming/videocallbacks.h \
     streaming/filemappingclient.h \
@@ -506,6 +519,19 @@ libplacebo {
     macx {
         SOURCES += streaming/video/ffmpeg-renderers/plvk_objc.mm
     }
+}
+pyrowave:!config_pyrowave {
+    warning(AlkaidLab PyroWave high-bit-depth and color metadata API not found; PyroWave decoder disabled)
+    CONFIG -= pyrowave
+}
+pyrowave:libplacebo:ffmpeg:!config_SL {
+    message(PyroWave decoder enabled)
+
+    CONFIG += link_pkgconfig
+    PKGCONFIG += pyrowave-shared
+    DEFINES += HAVE_PYROWAVE
+    SOURCES += streaming/video/pyrowave.cpp
+    HEADERS += streaming/video/pyrowave.h streaming/video/pyrowavecolor.h
 }
 config_EGL {
     message(EGL renderer selected)

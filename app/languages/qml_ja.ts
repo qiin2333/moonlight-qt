@@ -847,6 +847,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>絶対マウスモード</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>マウスの移動量ではなく位置を送信します。リモートデスクトップに適しています。ほとんどのゲームでは相対モードの方が適しています。</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>リモートカーソルをローカルに表示</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>ローカルポインターを使ってリモートカーソルを表示します。カーソルの形状はホストの対応状況によって異なります。絶対マウスモードが必要です。</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="38"/>
         <source>Audio Settings</source>
         <translation>音声設定</translation>
@@ -1514,7 +1534,7 @@
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="180"/>
         <source>Ungrab Mouse</source>
-        <translation type="unfinished"></translation>
+        <translation>マウスのキャプチャを解除</translation>
     </message>
     <message>
         <location filename="../streaming/video/overlaymenupanel.cpp" line="182"/>
@@ -1565,6 +1585,18 @@
         <location filename="../streaming/video/overlaymenupanel.cpp" line="205"/>
         <source>100 Mbps</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>Sunshineカーソルの切り替え</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>マウスのキャプチャ</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>マウス</translation>
     </message>
 </context>
 <context>
@@ -2595,6 +2627,10 @@
         <source>Unable to initialize video decoder. Please check your streaming settings and try again.</source>
         <translation>ビデオデコーダを初期化できませんでした。ストリーミングの設定を確認して再度お試しください。</translation>
     </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>絶対マウス モードはゲームで問題を引き起こす可能性があります。</translation>
+    </message>
 </context>
 <context>
     <name>SettingsView</name>
@@ -2869,6 +2905,65 @@
     <message>
         <source>Unable to load the background image. Please try another image.</source>
         <translation>背景画像を読み込めません。別の画像をお試しください。</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>マウスモード：絶対</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>マウスモード：相対</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>カーソル：ローカル</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>カーソル：ホストビデオ</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>マウスがキャプチャされました。</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>マウスが解放されました。ストリームをクリックしてコントロールを再開してください。</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>ローカルカーソルを使用するには、絶対マウスモードに切り替えてください。</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>Sunshineビデオカーソルの切り替えをリクエストしました。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>カーソル切り替えリクエストの送信に失敗しました。</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>このアクションを使用する前に、修飾キーを離してください。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>カーソルモードのリクエストを送信できませんでした。</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>このホストは、カーソル形状の同期をサポートしていません。</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>デスクトップカーソルが表示されない場合は、Ctrl+Alt+Shift+Nを押してSunshineビデオカーソルを切り替えてください。</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>Ctrl+Alt+Shift+O でオーバーレイメニューを開きます。</translation>
     </message>
 </context>
 </TS>

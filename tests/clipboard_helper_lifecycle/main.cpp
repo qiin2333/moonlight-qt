@@ -138,11 +138,72 @@ public:
             check(client.m_Process != nullptr && client.m_StdoutBuffer.isEmpty(),
                   "legal aggregated stdout does not restart helper");
         }
+#ifdef Q_OS_LINUX
+        // Launch the probe through the production path, including supervision's
+        // restart path. It reports its environment without touching a clipboard.
+        const char* variable = "QT_WAYLAND_USE_DATA_CONTROL";
+        const char* probeVariable = "MOONLIGHT_TEST_CLIPBOARD_ENV_PROBE";
+        const QByteArray savedValue = qgetenv(variable);
+        const QByteArray savedProbe = qgetenv(probeVariable);
+        qputenv(probeVariable, "1");
+        const char* values[] = { nullptr, "0", "1", "" };
+        for (const char* value : values) {
+            if (value != nullptr) {
+                qputenv(variable, value);
+            } else {
+                qunsetenv(variable);
+            }
+            ClipboardHelperClient client(nullptr);
+            client.m_Enabled = true;
+            client.m_HelperPath = QCoreApplication::applicationFilePath();
+            check(client.startProcess(), "production helper launch succeeds");
+            for (int attempt = 0; attempt < 2 && client.m_Process != nullptr; ++attempt) {
+                check(client.m_Process->state() == QProcess::NotRunning ||
+                          client.m_Process->waitForFinished(3000),
+                      "environment probe exits");
+                check(client.m_Process->exitStatus() == QProcess::NormalExit &&
+                          client.m_Process->exitCode() == 0,
+                      "environment probe exits successfully");
+                check(client.m_Process->readAllStandardOutput() ==
+                          QByteArray("set:") + (value != nullptr ? value : "1") + '\n',
+                      "helper defaults data-control only when absent");
+                check(qEnvironmentVariableIsSet(variable) == (value != nullptr) &&
+                          qgetenv(variable) == QByteArray(value),
+                      "helper launch leaves the parent environment unchanged");
+                if (attempt == 0) {
+                    client.processPendingMessages();
+                    check(client.m_Process == nullptr && client.m_RestartAttempts == 1,
+                          "exited environment probe schedules a restart");
+                    client.m_NextRestartTicks = 0;
+                    client.processPendingMessages();
+                    check(client.m_Process != nullptr,
+                          "supervision restarts the environment probe");
+                }
+            }
+        }
+        if (savedValue.isNull()) {
+            qunsetenv(variable);
+        } else {
+            qputenv(variable, savedValue);
+        }
+        if (savedProbe.isNull()) {
+            qunsetenv(probeVariable);
+        } else {
+            qputenv(probeVariable, savedProbe);
+        }
+#endif
         return ok;
     }
 };
 int main(int argc, char** argv)
 {
+#ifdef Q_OS_LINUX
+    if (qEnvironmentVariableIsSet("MOONLIGHT_TEST_CLIPBOARD_ENV_PROBE")) {
+        const QByteArray value = qgetenv("QT_WAYLAND_USE_DATA_CONTROL");
+        std::puts(value.isNull() ? "unset" : (QByteArray("set:") + value).constData());
+        return 0;
+    }
+#endif
     if (argc == 2 && !std::strcmp(argv[1], "--invalid-output")) {
         std::puts("invalid JSON");
         return 0;

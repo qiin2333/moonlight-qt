@@ -300,6 +300,11 @@ QString PairCommandLineParser::getPredefinedPin() const
 
 StreamCommandLineParser::StreamCommandLineParser()
 {
+    m_MouseModeMap = {
+        { "relative", StreamingPreferences::MM_RELATIVE },
+        { "absolute-video", StreamingPreferences::MM_ABSOLUTE_VIDEO },
+        { "absolute-local", StreamingPreferences::MM_ABSOLUTE_LOCAL },
+    };
     m_WindowModeMap = {
         {"fullscreen", StreamingPreferences::WM_FULLSCREEN},
         {"windowed",   StreamingPreferences::WM_WINDOWED},
@@ -339,8 +344,11 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     parser.setupCommonOptions();
     parser.setApplicationDescription(
         "\n"
-        "Starts directly streaming a given app."
-    );
+        "Starts directly streaming a given app.\n"
+        "\n"
+        "Mouse compatibility options cannot be combined with --mouse-mode.\n"
+        "For repeated legacy toggles the last value wins.\n"
+        "--no-absolute-mouse cannot be combined with --show-local-cursor.");
     parser.addPositionalArgument("stream", "Start stream");
 
     // Add other arguments and options
@@ -361,7 +369,19 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     parser.addChoiceOption("audio-config", "audio config", m_AudioConfigMap.keys());
     parser.addToggleOption("multi-controller", "multiple controller support");
     parser.addToggleOption("quit-after", "quit app after session");
-    parser.addToggleOption("absolute-mouse", "remote desktop optimized mouse control");
+    parser.addChoiceOption("mouse-mode", "mouse mode", m_MouseModeMap.keys());
+    parser.addOption(QCommandLineOption(
+        "absolute-mouse",
+        "Compatibility alias: enable absolute mouse, preserving an absolute cursor mode; "
+        "relative becomes absolute-local. Prefer --mouse-mode."));
+    parser.addOption(QCommandLineOption(
+        "no-absolute-mouse",
+        "Compatibility alias: select relative mouse mode. Prefer --mouse-mode."));
+    parser.addOption(QCommandLineOption(
+        "show-local-cursor", "Compatibility alias: select absolute-local. Prefer --mouse-mode."));
+    parser.addOption(QCommandLineOption("no-show-local-cursor",
+                                        "Compatibility alias: select absolute-video when using "
+                                        "absolute mouse. Prefer --mouse-mode."));
     parser.addToggleOption("mouse-buttons-swap", "left and right mouse buttons swap");
     parser.addToggleOption("win-alt-swap", "win and alt keys swap");
     parser.addToggleOption("touchscreen-trackpad", "touchscreen in trackpad mode");
@@ -462,11 +482,44 @@ void StreamCommandLineParser::parse(const QStringList &args, StreamingPreference
     // Resolve --quit-after and --no-quit-after options
     preferences->quitAppAfter = parser.getToggleOptionValue("quit-after", preferences->quitAppAfter);
 
-    // Resolve --absolute-mouse and --no-absolute-mouse options
-    preferences->absoluteMouseMode = parser.getToggleOptionValue("absolute-mouse", preferences->absoluteMouseMode);
+    // Resolve --mouse-mode and the legacy mouse options.
+    const bool hasAbsoluteMouse =
+        parser.isSet("absolute-mouse") || parser.isSet("no-absolute-mouse");
+    const bool hasLocalCursor =
+        parser.isSet("show-local-cursor") || parser.isSet("no-show-local-cursor");
+    const bool absoluteMouse =
+        hasAbsoluteMouse && parser.getToggleOptionValue("absolute-mouse", false);
+    const bool noAbsoluteMouse = hasAbsoluteMouse && !absoluteMouse;
+    const bool showLocalCursor =
+        hasLocalCursor && parser.getToggleOptionValue("show-local-cursor", false);
+    const bool noShowLocalCursor = hasLocalCursor && !showLocalCursor;
+    const bool legacyMouseOption = hasAbsoluteMouse || hasLocalCursor;
+    if (parser.isSet("mouse-mode") && legacyMouseOption) {
+        parser.showError("--mouse-mode cannot be combined with mouse compatibility options");
+    }
+    if (noAbsoluteMouse && showLocalCursor) {
+        parser.showError("--no-absolute-mouse conflicts with --show-local-cursor");
+    }
 
-    // Resolve --show-local-cursor and --no-show-local-cursor options
-    preferences->showLocalCursor = parser.getToggleOptionValue("show-local-cursor", preferences->showLocalCursor);
+    auto selectedMouseMode = preferences->mouseMode;
+    if (parser.isSet("mouse-mode")) {
+        selectedMouseMode = mapValue(m_MouseModeMap, parser.getChoiceOptionValue("mouse-mode"));
+    } else {
+        if (noAbsoluteMouse) {
+            selectedMouseMode = StreamingPreferences::MM_RELATIVE;
+        } else if (absoluteMouse && selectedMouseMode == StreamingPreferences::MM_RELATIVE) {
+            selectedMouseMode = StreamingPreferences::MM_ABSOLUTE_LOCAL;
+        }
+
+        if (showLocalCursor) {
+            selectedMouseMode = StreamingPreferences::MM_ABSOLUTE_LOCAL;
+        } else if (noShowLocalCursor && selectedMouseMode != StreamingPreferences::MM_RELATIVE) {
+            selectedMouseMode = StreamingPreferences::MM_ABSOLUTE_VIDEO;
+        }
+    }
+    if (parser.isSet("mouse-mode") || legacyMouseOption) {
+        preferences->setMouseModeLaunchOverride(selectedMouseMode);
+    }
 
     // Resolve --mouse-buttons-swap and --no-mouse-buttons-swap options
     preferences->swapMouseButtons = parser.getToggleOptionValue("mouse-buttons-swap", preferences->swapMouseButtons);

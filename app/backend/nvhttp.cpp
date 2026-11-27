@@ -259,22 +259,25 @@ NvHTTP::startApp(QString verb,
     }
 
     QString query =
-            "appid="+QString::number(appId)+
-            "&mode="+appWidth+"x"+
-            appHeight+"x"+
-            appFps+
-            "&additionalStates=1&sops="+QString::number(sops ? 1 : 0)+
-            "&rikey="+QByteArray(streamConfig->remoteInputAesKey, sizeof(streamConfig->remoteInputAesKey)).toHex()+
-            "&rikeyid="+QString::number(riKeyId)+
-            ((streamConfig->supportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) ?
-                "&hdrMode="+QString::number(streamConfig->hdrMode)+
-                "&clientHdrCapVersion=0&clientHdrCapSupportedFlagsInUint32=0&clientHdrCapMetaDataId=NV_STATIC_METADATA_TYPE_1&clientHdrCapDisplayData=0x0x0x0x0x0x0x0x0x0x0" :
-                 "")+
-            "&localAudioPlayMode="+QString::number(localAudio ? 1 : 0)+
-            "&surroundAudioInfo="+QString::number(SURROUNDAUDIOINFO_FROM_AUDIO_CONFIGURATION(streamConfig->audioConfiguration))+
-            "&remoteControllersBitmap="+QString::number(gamepadMask)+
-            "&gcmap="+QString::number(gamepadMask)+
-            "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0);
+        "appid=" + QString::number(appId) + "&mode=" + appWidth + "x" + appHeight + "x" + appFps +
+        "&additionalStates=1&sops=" + QString::number(sops ? 1 : 0) + "&rikey=" +
+        QByteArray(streamConfig->remoteInputAesKey, sizeof(streamConfig->remoteInputAesKey))
+            .toHex() +
+        "&rikeyid=" + QString::number(riKeyId) +
+        (((streamConfig->supportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) ||
+          (streamConfig->hdrMode != 0 &&
+           (streamConfig->supportedVideoFormats & VIDEO_FORMAT_PYROWAVE)))
+             ? "&hdrMode=" + QString::number(streamConfig->hdrMode) +
+                   "&clientHdrCapVersion=0&clientHdrCapSupportedFlagsInUint32=0&"
+                   "clientHdrCapMetaDataId=NV_STATIC_METADATA_TYPE_1&clientHdrCapDisplayData="
+                   "0x0x0x0x0x0x0x0x0x0x0"
+             : "") +
+        "&localAudioPlayMode=" + QString::number(localAudio ? 1 : 0) + "&surroundAudioInfo=" +
+        QString::number(
+            SURROUNDAUDIOINFO_FROM_AUDIO_CONFIGURATION(streamConfig->audioConfiguration)) +
+        "&remoteControllersBitmap=" + QString::number(gamepadMask) +
+        "&gcmap=" + QString::number(gamepadMask) +
+        "&gcpersist=" + QString::number(persistGameControllersOnDisconnect ? 1 : 0);
 
     if (screenCombinationMode != -1) {
         query += "&customScreenMode="+QString::number(screenCombinationMode);

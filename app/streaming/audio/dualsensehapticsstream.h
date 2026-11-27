@@ -60,21 +60,25 @@ private:
     std::uint32_t m_ExpectedSequence = 0;
 };
 
-// The DualSense exposes a single four-channel USB audio endpoint: channels 1
-// and 2 drive the headset jack, channels 3 and 4 drive the two haptic voice
-// coils. We render silence to the headset pair and the authored PCM to the
-// haptics pair.
+// The DualSense exposes one four-channel USB endpoint. The first pair carries
+// speaker/headphone audio; the second pair drives the haptic voice coils.
 constexpr std::uint32_t EndpointChannelCount = 4;
 constexpr std::uint32_t HapticsChannelOffset = 2;
 
 constexpr std::uint32_t PrebufferFrames = 720; // 15 ms at 48 kHz
 
-// Expand interleaved 16-bit stereo into endpoint frames: silence on the headset
-// pair, authored PCM on the haptics pair.
+// Older hosts send only the two haptic channels. pad-audio hosts send all four
+// channels in endpoint order, keeping speaker audio and haptics in the same frame.
 template <typename Sample, typename Convert>
-void spreadToHapticsChannels(Sample* out, const std::int16_t* in, std::uint16_t frameCount,
-                             Convert convert)
+void writePcmChannels(Sample* out, const std::int16_t* in, std::uint16_t frameCount,
+                      std::uint8_t channelCount, Convert convert)
 {
+    if (channelCount == EndpointChannelCount) {
+        std::transform(in, in + static_cast<std::size_t>(frameCount) * EndpointChannelCount, out,
+                       convert);
+        return;
+    }
+
     std::fill_n(out, static_cast<std::size_t>(frameCount) * EndpointChannelCount, Sample{});
     for (std::uint16_t i = 0; i < frameCount; i++) {
         out[i * EndpointChannelCount + HapticsChannelOffset] = convert(in[i * 2]);

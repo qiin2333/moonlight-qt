@@ -1,5 +1,6 @@
 #include "streamingpreferences.h"
 #include "utils.h"
+#include <Limelight.h>
 
 #include <QSettings>
 #include <QTranslator>
@@ -26,13 +27,13 @@
 #define SER_MULTICONT "multicontroller"
 #define SER_AUDIOCFG "audiocfg"
 #define SER_VIDEOCFG "videocfg"
+#define SER_PYROWAVE "enablepyrowave"
 #define SER_HDR "hdr"
 #define SER_YUV444 "yuv444"
 #define SER_VIDEODEC "videodec"
 #define SER_WINDOWMODE "windowmode"
 #define SER_MDNS "mdns"
 #define SER_QUITAPPAFTER "quitAppAfter"
-#define SER_ABSMOUSEMODE "mouseacceleration"
 #define SER_ABSTOUCHMODE "abstouchmode"
 #define SER_NATIVETOUCHPAD "nativeTouchpad"
 #define SER_DUALSENSEHAPTICSMODE "dualSenseHapticsMode"
@@ -71,7 +72,6 @@
 #define SER_SCREENCOMBINATIONMODE "screencombinationmode"
 #define SER_LEGACY_CUSTOMSCREENMODE "customscreenmode"
 #define SER_LEGACY_CUSTOMVDDSCREENMODE "customvddscreenmode"
-#define SER_SHOWLOCALCURSOR "showLocalCursor"
 #define SER_MICROPHONE "microphone"
 #define SER_OVERLAYMENUPLACEMENT "overlaymenuplacement"
 #define SER_LEGACY_OVERLAYMENUPOS "overlaymenuposition"
@@ -174,6 +174,10 @@ StreamingPreferences::StreamingPreferences(QQmlEngine* qmlEngine)
       m_PersistedGamepadUiNavigation(true)
 {
     reload();
+    connect(this, &StreamingPreferences::enableHdrChanged, this,
+            &StreamingPreferences::pyrowaveCompatibilityChanged);
+    connect(this, &StreamingPreferences::hdrModeChanged, this,
+            &StreamingPreferences::pyrowaveCompatibilityChanged);
 }
 
 StreamingPreferences* StreamingPreferences::get(QQmlEngine *qmlEngine)
@@ -211,6 +215,35 @@ StreamingPreferences* StreamingPreferences::get(QQmlEngine *qmlEngine)
 
         return s_GlobalPrefs;
     }
+}
+
+bool StreamingPreferences::pyrowaveAvailable() const
+{
+#ifdef HAVE_PYROWAVE
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool StreamingPreferences::pyrowaveForcedByEnvironment() const
+{
+    return qEnvironmentVariableIntValue("MOONLIGHT_ENABLE_PYROWAVE") == 1;
+}
+
+bool StreamingPreferences::pyrowaveColorOverridesCompatible() const
+{
+    if (enableHdr && hdrMode != HDR_PQ && hdrMode != HDR_HLG) {
+        return false;
+    }
+
+    const int expectedColorSpace = enableHdr ? COLORSPACE_REC_2020 : COLORSPACE_REC_709;
+    int colorSpace;
+    int colorRange;
+    return (!Utils::getEnvironmentVariableOverride("COLOR_SPACE_OVERRIDE", &colorSpace) ||
+            colorSpace == expectedColorSpace) &&
+           (!Utils::getEnvironmentVariableOverride("COLOR_RANGE_OVERRIDE", &colorRange) ||
+            colorRange == COLOR_RANGE_FULL);
 }
 
 void StreamingPreferences::reload()
@@ -255,8 +288,9 @@ void StreamingPreferences::reload()
     multiController = settings.value(SER_MULTICONT, true).toBool();
     enableMdns = settings.value(SER_MDNS, true).toBool();
     quitAppAfter = settings.value(SER_QUITAPPAFTER, false).toBool();
-    absoluteMouseMode = settings.value(SER_ABSMOUSEMODE, false).toBool();
-    showLocalCursor = settings.value(SER_SHOWLOCALCURSOR, false).toBool();
+    mouseMode = loadMouseMode(settings);
+    m_HasMouseModeLaunchOverride = false;
+    m_PersistedMouseMode = mouseMode;
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
     enableNativeTouchpad = settings.value(SER_NATIVETOUCHPAD, false).toBool();
 #ifdef Q_OS_WIN32
@@ -343,6 +377,7 @@ void StreamingPreferences::reload()
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
                                                   static_cast<int>(VideoCodecConfig::VCC_AUTO)).toInt());
+    enablePyrowave = settings.value(SER_PYROWAVE, false).toBool();
     videoDecoderSelection = static_cast<VideoDecoderSelection>(settings.value(SER_VIDEODEC,
                                                   static_cast<int>(VideoDecoderSelection::VDS_AUTO)).toInt());
     rendererSelection = static_cast<RendererSelection>(settings.value(SER_RENDERER,
@@ -702,6 +737,30 @@ void StreamingPreferences::setGamepadUiNavigationLaunchOverride(bool enabled)
     emit enableGamepadUiNavigationChanged();
 }
 
+void StreamingPreferences::setMouseModeLaunchOverride(MouseMode mode)
+{
+    if (!m_HasMouseModeLaunchOverride) {
+        m_PersistedMouseMode = mouseMode;
+    }
+    m_HasMouseModeLaunchOverride = true;
+    if (mouseMode != mode) {
+        mouseMode = mode;
+        emit mouseModeChanged();
+    }
+}
+
+void StreamingPreferences::setMouseMode(MouseMode mode)
+{
+    if (mode < MM_RELATIVE || mode > MM_ABSOLUTE_LOCAL) {
+        return;
+    }
+    m_HasMouseModeLaunchOverride = false;
+    if (mouseMode != mode) {
+        mouseMode = mode;
+        emit mouseModeChanged();
+    }
+}
+
 void StreamingPreferences::setGamepadUiNavigationEnabled(bool enabled)
 {
     // An explicit change from the settings page ends the temporary launch
@@ -735,8 +794,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_MULTICONT, multiController);
     settings.setValue(SER_MDNS, enableMdns);
     settings.setValue(SER_QUITAPPAFTER, quitAppAfter);
-    settings.setValue(SER_ABSMOUSEMODE, absoluteMouseMode);
-    settings.setValue(SER_SHOWLOCALCURSOR, showLocalCursor);
+    saveMouseMode(settings, m_HasMouseModeLaunchOverride ? m_PersistedMouseMode : mouseMode);
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
     settings.setValue(SER_NATIVETOUCHPAD, enableNativeTouchpad);
     settings.setValue(SER_DUALSENSEHAPTICSMODE, dualSenseHapticsMode);
@@ -765,6 +823,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_HDRMAXAVERAGEBRIGHTNESS, hdrMaxAverageBrightness);
     settings.setValue(SER_YUV444, enableYUV444);
     settings.setValue(SER_VIDEOCFG, static_cast<int>(videoCodecConfig));
+    settings.setValue(SER_PYROWAVE, enablePyrowave);
     settings.setValue(SER_VIDEODEC, static_cast<int>(videoDecoderSelection));
     settings.setValue(SER_RENDERER, static_cast<int>(rendererSelection));
     settings.setValue(SER_WINDOWMODE, static_cast<int>(windowMode));

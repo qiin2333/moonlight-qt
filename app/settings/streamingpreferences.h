@@ -5,6 +5,8 @@
 #include <QQmlEngine>
 #include <QString>
 
+class QSettings;
+
 class StreamingPreferences : public QObject
 {
     Q_OBJECT
@@ -225,8 +227,15 @@ public:
     Q_PROPERTY(bool multiController MEMBER multiController NOTIFY multiControllerChanged)
     Q_PROPERTY(bool enableMdns MEMBER enableMdns NOTIFY enableMdnsChanged)
     Q_PROPERTY(bool quitAppAfter MEMBER quitAppAfter NOTIFY quitAppAfterChanged)
-    Q_PROPERTY(bool absoluteMouseMode MEMBER absoluteMouseMode NOTIFY absoluteMouseModeChanged)
-    Q_PROPERTY(bool showLocalCursor MEMBER showLocalCursor NOTIFY showLocalCursorChanged)
+    enum MouseMode
+    {
+        MM_RELATIVE = 0,
+        MM_ABSOLUTE_VIDEO = 1,
+        MM_ABSOLUTE_LOCAL = 2,
+    };
+    Q_ENUM(MouseMode)
+
+    Q_PROPERTY(MouseMode mouseMode READ getMouseMode WRITE setMouseMode NOTIFY mouseModeChanged)
     Q_PROPERTY(bool absoluteTouchMode MEMBER absoluteTouchMode NOTIFY absoluteTouchModeChanged)
     Q_PROPERTY(bool enableNativeTouchpad MEMBER enableNativeTouchpad NOTIFY enableNativeTouchpadChanged)
     Q_PROPERTY(DualSenseHapticsMode dualSenseHapticsMode MEMBER dualSenseHapticsMode NOTIFY dualSenseHapticsModeChanged)
@@ -248,6 +257,11 @@ public:
     Q_PROPERTY(bool showPerformanceOverlay MEMBER showPerformanceOverlay NOTIFY showPerformanceOverlayChanged)
     Q_PROPERTY(AudioConfig audioConfig MEMBER audioConfig NOTIFY audioConfigChanged)
     Q_PROPERTY(VideoCodecConfig videoCodecConfig MEMBER videoCodecConfig NOTIFY videoCodecConfigChanged)
+    Q_PROPERTY(bool enablePyrowave MEMBER enablePyrowave NOTIFY enablePyrowaveChanged)
+    Q_PROPERTY(bool pyrowaveAvailable READ pyrowaveAvailable CONSTANT)
+    Q_PROPERTY(bool pyrowaveForcedByEnvironment READ pyrowaveForcedByEnvironment CONSTANT)
+    Q_PROPERTY(bool pyrowaveColorOverridesCompatible READ pyrowaveColorOverridesCompatible NOTIFY
+                   pyrowaveCompatibilityChanged)
     Q_PROPERTY(bool enableHdr MEMBER enableHdr NOTIFY enableHdrChanged)
     Q_PROPERTY(HdrMode hdrMode MEMBER hdrMode NOTIFY hdrModeChanged)
     Q_PROPERTY(HdrBrightnessMode hdrBrightnessMode MEMBER hdrBrightnessMode NOTIFY hdrBrightnessModeChanged)
@@ -306,8 +320,17 @@ public:
     bool multiController;
     bool enableMdns;
     bool quitAppAfter;
-    bool absoluteMouseMode;
-    bool showLocalCursor;
+    MouseMode mouseMode;
+    MouseMode getMouseMode() const { return mouseMode; }
+    void setMouseMode(MouseMode mode);
+    void setMouseModeLaunchOverride(MouseMode mode);
+    static MouseMode loadMouseMode(const QSettings& settings);
+    static void saveMouseMode(QSettings& settings, MouseMode mode);
+    static bool isAbsoluteMouseMode(MouseMode mode) { return mode != MM_RELATIVE; }
+    static MouseMode toggleMouseInputMode(MouseMode mode, MouseMode& lastAbsoluteMode);
+    static MouseMode toggleMouseCursorMode(MouseMode mode);
+    static bool showHostCursorLocally(MouseMode mode, bool hostSupportsCursor,
+                                      bool hostCursorVisible);
     bool absoluteTouchMode;
     bool enableNativeTouchpad;
     DualSenseHapticsMode dualSenseHapticsMode;
@@ -341,6 +364,10 @@ public:
     int packetSize;
     AudioConfig audioConfig;
     VideoCodecConfig videoCodecConfig;
+    bool enablePyrowave;
+    bool pyrowaveAvailable() const;
+    bool pyrowaveForcedByEnvironment() const;
+    bool pyrowaveColorOverridesCompatible() const;
     bool enableHdr;
     HdrMode hdrMode;
     HdrBrightnessMode hdrBrightnessMode;
@@ -377,13 +404,14 @@ signals:
     void unsupportedFpsChanged();
     void enableMdnsChanged();
     void quitAppAfterChanged();
-    void absoluteMouseModeChanged();
-    void showLocalCursorChanged();
+    void mouseModeChanged();
     void absoluteTouchModeChanged();
     void enableNativeTouchpadChanged();
     void dualSenseHapticsModeChanged();
     void audioConfigChanged();
     void videoCodecConfigChanged();
+    void enablePyrowaveChanged();
+    void pyrowaveCompatibilityChanged();
     void enableHdrChanged();
     void hdrModeChanged();
     void hdrBrightnessModeChanged();
@@ -447,5 +475,7 @@ private:
     QQmlEngine* m_QmlEngine;
     bool m_HasGamepadUiNavigationLaunchOverride;
     bool m_PersistedGamepadUiNavigation;
+    bool m_HasMouseModeLaunchOverride = false;
+    MouseMode m_PersistedMouseMode = MM_RELATIVE;
 };
 

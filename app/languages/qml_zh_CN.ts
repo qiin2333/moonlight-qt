@@ -1405,6 +1405,26 @@
 <context>
     <name>LegacySettingsPage</name>
     <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="412"/>
+        <source>Absolute mouse mode</source>
+        <translation>绝对鼠标模式</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="414"/>
+        <source>Send mouse position instead of movement. Best for remote desktop; relative mode is better for most games.</source>
+        <translation>发送鼠标位置而非移动量。适合远程桌面；相对模式更适合大多数游戏。</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="432"/>
+        <source>Display remote cursor locally</source>
+        <translation>在本地显示远程光标</translation>
+    </message>
+    <message>
+        <location filename="../gui/settings/LegacySettingsPage.qml" line="434"/>
+        <source>Use the local pointer to show the remote cursor. Cursor shape depends on host support. Requires absolute mouse mode.</source>
+        <translation>使用本地指针显示远程光标。光标形状取决于主机是否支持。需要启用绝对鼠标模式。</translation>
+    </message>
+    <message>
         <source>Audio Settings</source>
         <translation>音频设置</translation>
     </message>
@@ -1925,6 +1945,30 @@
         <translation>渲染器</translation>
     </message>
     <message>
+        <source>Try PyroWave decoding (Experimental)</source>
+        <translation>尝试 PyroWave 解码（实验性）</translation>
+    </message>
+    <message>
+        <source>PyroWave support is not included in this build.</source>
+        <translation>当前版本未编入 PyroWave 支持。</translation>
+    </message>
+    <message>
+        <source>Enabled by MOONLIGHT_ENABLE_PYROWAVE=1. Remove it from the launch environment to change this setting.</source>
+        <translation>已由 MOONLIGHT_ENABLE_PYROWAVE=1 启用。请从启动环境中移除此变量后再更改设置。</translation>
+    </message>
+    <message>
+        <source>Attempts PyroWave when both this device and the host support it. Otherwise, the stream uses the preferred video codec. Supports SDR, HDR10 and HLG in YUV 4:2:0. Requires automatic codec selection, automatic or Vulkan rendering, and hardware decoding.</source>
+        <translation>本机和主机均支持时尝试使用 PyroWave，否则使用首选视频编码。支持 YUV 4:2:0 的 SDR、HDR10 和 HLG，需要自动选择编码、自动或 Vulkan 渲染以及硬件解码。</translation>
+    </message>
+    <message>
+        <source>Custom color overrides must use full range and match the stream: BT.709 for SDR, BT.2020 for HDR.</source>
+        <translation>自定义色彩覆盖必须使用全范围，并与串流匹配：SDR 使用 BT.709，HDR 使用 BT.2020。</translation>
+    </message>
+    <message>
+        <source>Current video settings are incompatible; the preferred video codec will be used.</source>
+        <translation>当前视频设置不兼容，将使用首选视频编码。</translation>
+    </message>
+    <message>
         <source>Enable YUV 4:4:4</source>
         <translation>启用 YUV 4:4:4</translation>
     </message>
@@ -2221,6 +2265,18 @@
     <message>
         <source>Select</source>
         <translation>选择</translation>
+    </message>
+    <message>
+        <source>Toggle Sunshine cursor</source>
+        <translation>切换 Sunshine 光标</translation>
+    </message>
+    <message>
+        <source>Capture Mouse</source>
+        <translation>捕获鼠标</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>鼠标</translation>
     </message>
 </context>
 <context>
@@ -3003,6 +3059,22 @@
 <context>
     <name>Session</name>
     <message>
+        <source>PyroWave requires automatic video codec, hardware decoding, an automatic or Vulkan renderer, and full-range 4:2:0 video with BT.709 SDR or BT.2020 HDR10/HLG. Using another codec for this session.</source>
+        <translation>PyroWave 需要自动选择视频编码、硬件解码、自动或 Vulkan 渲染器，以及全范围 4:2:0 的 BT.709 SDR 或 BT.2020 HDR10/HLG 画面。本次串流将使用其他编码。</translation>
+    </message>
+    <message>
+        <source>PyroWave could not initialize on this device. Using another codec for this session.</source>
+        <translation>此设备无法初始化 PyroWave。本次串流将使用其他编码。</translation>
+    </message>
+    <message>
+        <source>Using PyroWave video</source>
+        <translation>正在使用 PyroWave 视频</translation>
+    </message>
+    <message>
+        <source>PyroWave negotiation failed. Using %1 video.</source>
+        <translation>PyroWave 协商失败，正在使用 %1 视频。</translation>
+    </message>
+    <message>
         <source>Checking host USB forwarding support</source>
         <translation>正在检查主机 USB 转发支持</translation>
     </message>
@@ -3321,6 +3393,10 @@
     <message>
         <source>This USB device is in use by macOS and cannot be forwarded.</source>
         <translation>此 USB 设备正由 macOS 使用，无法转发。</translation>
+    </message>
+    <message>
+        <source>Absolute mouse mode may cause problems in games.</source>
+        <translation>绝对鼠标模式可能导致部分游戏出现问题。</translation>
     </message>
 </context>
 <context>
@@ -4124,6 +4200,65 @@
     <message>
         <source>OK</source>
         <translation>确定</translation>
+    </message>
+</context>
+<context>
+    <name>MouseModeStatus</name>
+    <message>
+        <source>Mouse mode: Absolute</source>
+        <translation>鼠标模式：绝对</translation>
+    </message>
+    <message>
+        <source>Mouse mode: Relative</source>
+        <translation>鼠标模式：相对</translation>
+    </message>
+    <message>
+        <source>Cursor: Local</source>
+        <translation>光标：本地</translation>
+    </message>
+    <message>
+        <source>Cursor: Host video</source>
+        <translation>光标：主机画面</translation>
+    </message>
+    <message>
+        <source>Mouse captured.</source>
+        <translation>鼠标已捕获。</translation>
+    </message>
+    <message>
+        <source>Mouse released. Click the stream to resume control.</source>
+        <translation>鼠标已释放。点击串流画面可恢复控制。</translation>
+    </message>
+    <message>
+        <source>Switch to absolute mouse mode to use a local cursor.</source>
+        <translation>切换到绝对鼠标模式后才能使用本地光标。</translation>
+    </message>
+    <message>
+        <source>Requested Sunshine video cursor toggle.</source>
+        <translation>已请求切换 Sunshine 视频光标。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor toggle request.</source>
+        <translation>无法发送主机光标切换请求。</translation>
+    </message>
+    <message>
+        <source>Release modifier keys before using this action.</source>
+        <translation>请松开修饰键后再执行此操作。</translation>
+    </message>
+    <message>
+        <source>Failed to send cursor mode request.</source>
+        <translation>无法发送光标模式请求。</translation>
+    </message>
+    <message>
+        <source>This host does not support cursor shape synchronization.</source>
+        <translation>此主机不支持光标形状同步。</translation>
+    </message>
+    <message>
+        <source>If the desktop cursor is missing, press Ctrl+Alt+Shift+N to toggle the Sunshine video cursor.</source>
+        <translation>如果远程桌面没有光标，可按 Ctrl+Alt+Shift+N 切换 Sunshine 视频光标。</translation>
+    </message>
+    <message>
+        <source>Press Ctrl+Alt+Shift+O to open the overlay menu.</source>
+        <translation>按 Ctrl+Alt+Shift+O 打开悬浮菜单。</translation>
     </message>
 </context>
 </TS>

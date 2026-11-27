@@ -87,6 +87,36 @@ On macOS, use:
 python3 setup-deps.py
 ```
 
+PyroWave decoding is optional and experimental. Unix and macOS builds detect
+`pyrowave-shared` via pkg-config alongside FFmpeg and libplacebo. Use the
+[AlkaidLab PyroWave fork](https://github.com/AlkaidLab/pyrowave) with its high-bit-depth
+CPU output and color metadata API. qmake checks these APIs at compile and link time;
+incompatible packages leave the experimental decoder disabled.
+Enable “Try PyroWave decoding (Experimental)” under Compatibility and diagnostics → Video pipeline,
+or set `MOONLIGHT_ENABLE_PYROWAVE=1` at runtime. This tries it with automatic codec
+selection and the automatic or Vulkan renderer for full-range YUV420 streams:
+8-bit BT.709 SDR, or 10-bit BT.2020 HDR10/PQ and HLG using the existing HDR settings.
+Custom `COLOR_SPACE_OVERRIDE` values must match the selected signal (BT.709 for SDR,
+BT.2020 for HDR), and `COLOR_RANGE_OVERRIDE` must remain full range. Incompatible
+settings use a conventional codec. HDR uses compute decoding because PyroWave's
+fragment path cannot write its 10-bit CPU format. Decoded color information is checked
+against the negotiated signal, and static host HDR metadata is passed to the renderer.
+Dynamic HDR metadata is not advertised by this decoder.
+The host must produce a real HDR signal. Turning off host HDR without an HDR-producing
+processing path can end the session; live switching from PyroWave HDR to SDR is not supported.
+Frames currently pass through CPU readback before Vulkan rendering; high-bit-depth
+output doubles the bytes per sample. HDR display correctness and sustained performance
+still require end-to-end validation on the target GPU and display. Negotiation failure
+falls back to the preferred conventional codec.
+The negotiated codec is reported when streaming starts and in the performance
+overlay. Use `CONFIG+=disable-pyrowave` to omit this path from the build.
+
+After installing PyroWave, verify that the package is visible with:
+
+```bash
+pkg-config --modversion pyrowave-shared
+```
+
 ### Windows
 
 Requirements:

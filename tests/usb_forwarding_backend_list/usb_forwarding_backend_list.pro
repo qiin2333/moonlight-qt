@@ -4,12 +4,14 @@ CONFIG += c++17 console
 CONFIG -= app_bundle
 TEMPLATE = app
 TARGET = usb_forwarding_backend_list_test
-INCLUDEPATH += ../../app
+INCLUDEPATH += ../../app \
+    ../../moonlight-common-c/moonlight-common-c/src
 SOURCES += main.cpp \
     ../../app/backend/usbforwardingbackend.cpp \
     ../../app/backend/usbforwardingenvironment.cpp \
     ../../app/backend/usbforwardinglocalserver.cpp \
-    ../../app/settings/streamingpreferences.cpp
+    ../../app/settings/streamingpreferences.cpp \
+    ../../app/settings/mousemode.cpp
 HEADERS += \
     ../../app/backend/usbforwardingbackend.h \
     ../../app/backend/usbforwardingenvironment.h \

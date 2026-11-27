@@ -9,6 +9,7 @@
 #include <QFileInfo>
 #include <QMutexLocker>
 #include <QProcess>
+#include <QProcessEnvironment>
 
 #include <SDL.h>
 
@@ -66,6 +67,15 @@ bool ClipboardHelperClient::startProcess()
     m_Process = new QProcess(this);
     m_Process->setProgram(m_HelperPath);
     m_Process->setProcessChannelMode(QProcess::SeparateChannels);
+#ifdef Q_OS_LINUX
+    // The windowless helper needs data-control for background Wayland clipboard access.
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString key = QStringLiteral("QT_WAYLAND_USE_DATA_CONTROL");
+    if (!env.contains(key)) {
+        env.insert(key, QStringLiteral("1"));
+    }
+    m_Process->setProcessEnvironment(env);
+#endif
     m_Process->start();
     if (!m_Process->waitForStarted(2000)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
