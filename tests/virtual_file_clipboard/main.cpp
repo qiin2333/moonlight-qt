@@ -34,18 +34,23 @@ public:
     std::vector<std::string> files;
     std::vector<std::pair<std::size_t, std::uint64_t>> opens;
     bool fail = false;
+    VirtualFiles::Failure failure = VirtualFiles::Failure::Other;
 
     std::unique_ptr<VirtualFiles::Reader> open(std::size_t index, std::uint64_t offset) override
     {
         opens.emplace_back(index, offset);
-        return std::make_unique<Reader>(fail ? nullptr : &files.at(index), offset);
+        return std::make_unique<Reader>(fail ? nullptr : &files.at(index), offset, failure);
     }
 
 private:
     class Reader : public VirtualFiles::Reader
     {
     public:
-        Reader(const std::string* data, std::uint64_t offset) : m_Data(data), m_Position(offset) {}
+        Reader(const std::string* data, std::uint64_t offset, VirtualFiles::Failure failure)
+            : m_Data(data), m_Position(offset), m_Failure(failure)
+        {
+        }
+        VirtualFiles::Failure failure() const override { return m_Failure; }
         std::int64_t read(void* buffer, std::uint32_t size) override
         {
             if (m_Data == nullptr) {
@@ -64,6 +69,7 @@ private:
     private:
         const std::string* m_Data;
         std::uint64_t m_Position;
+        VirtualFiles::Failure m_Failure;
     };
 };
 
@@ -228,17 +234,31 @@ int main()
     check(FAILED(clip->GetData(&contents, &medium)), "an index outside the offer has no contents");
 
     // A failing transfer is a read error, not a short file.
+    // Its cause picks the error Explorer shows; only an unknown one is a disk error.
     source->fail = true;
     contents.lindex = 0;
-    medium = {};
-    if (SUCCEEDED(clip->GetData(&contents, &medium))) {
-        char buffer[16];
-        ULONG got = 0;
-        check(FAILED(medium.pstm->Read(buffer, sizeof(buffer), &got)) && got == 0,
-              "failed source fails the read");
-        ReleaseStgMedium(&medium);
+    const std::pair<VirtualFiles::Failure, HRESULT> causes[] = {
+        { VirtualFiles::Failure::Other, STG_E_READFAULT },
+        { VirtualFiles::Failure::Changed, HRESULT_FROM_WIN32(ERROR_FILE_INVALID) },
+        { VirtualFiles::Failure::Gone, HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) },
+        { VirtualFiles::Failure::Timeout, HRESULT_FROM_WIN32(ERROR_TIMEOUT) },
+        { VirtualFiles::Failure::Network, HRESULT_FROM_WIN32(ERROR_UNEXP_NET_ERR) },
+    };
+    for (const auto& cause : causes) {
+        source->failure = cause.first;
+        medium = {};
+        if (SUCCEEDED(clip->GetData(&contents, &medium))) {
+            char buffer[16];
+            ULONG got = 0;
+            check(medium.pstm->Read(buffer, sizeof(buffer), &got) == cause.second && got == 0,
+                  "failed source fails the read with its cause");
+            ReleaseStgMedium(&medium);
+        } else {
+            check(false, "stream for the failing file");
+        }
     }
     source->fail = false;
+    source->failure = VirtualFiles::Failure::Other;
     clip->Release();
 
     // Another program taking the clipboard ends our ownership.

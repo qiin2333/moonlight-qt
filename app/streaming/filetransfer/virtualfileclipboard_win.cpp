@@ -13,6 +13,27 @@
 
 namespace {
 
+// What a failed read returns, so Explorer names the cause instead of a disk
+// error (its message for STG_E_READFAULT). Windows has no code for "the source
+// changed after the copy"; ERROR_FILE_INVALID ("the opened file is no longer
+// valid") is the closest.
+HRESULT readError(VirtualFiles::Failure failure)
+{
+    switch (failure) {
+    case VirtualFiles::Failure::Changed:
+        return HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
+    case VirtualFiles::Failure::Gone:
+        return HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
+    case VirtualFiles::Failure::Timeout:
+        return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    case VirtualFiles::Failure::Network:
+        return HRESULT_FROM_WIN32(ERROR_UNEXP_NET_ERR);
+    case VirtualFiles::Failure::Other:
+        break;
+    }
+    return STG_E_READFAULT;
+}
+
 // IDataObjectAsyncCapability from shobjidl_core.h, declared here with its IID
 // because MinGW's headers lack it. The method order is the interface's.
 const IID IID_AsyncCapability = {
@@ -123,11 +144,12 @@ public:
             const ULONG want = static_cast<ULONG>(std::min<std::uint64_t>(size - total, remaining));
             const std::int64_t got = m_Reader->read(static_cast<char*>(buffer) + total, want);
             if (got < 0) {
+                const HRESULT failed = readError(m_Reader->failure());
                 m_Reader.reset();
                 if (read != nullptr) {
                     *read = total;
                 }
-                return STG_E_READFAULT;
+                return failed;
             }
             if (got == 0) {
                 // The source ended before the announced size: the file is incomplete.

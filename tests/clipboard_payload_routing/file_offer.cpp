@@ -135,6 +135,7 @@ struct ReadResult
 {
     QByteArray bytes;
     bool failed = false;
+    VirtualFiles::Failure failure = VirtualFiles::Failure::Other;
 };
 
 ReadResult readAll(VirtualFiles::Source& source, std::size_t index, std::uint64_t offset = 0,
@@ -149,6 +150,7 @@ ReadResult readAll(VirtualFiles::Source& source, std::size_t index, std::uint64_
             const std::int64_t got = stream->read(buffer.data(), chunk);
             if (got < 0) {
                 result.failed = true;
+                result.failure = stream->failure();
                 break;
             }
             if (got == 0) {
@@ -443,12 +445,25 @@ bool runFileOfferRegression(QTextStream& err)
         };
         FileOfferDownloader source(host, offer);
         const ReadResult shortBody = readAll(source, 1);
-        ok &= check(shortBody.failed, "a body shorter than the offer fails the read", err);
+        ok &= check(shortBody.failed && shortBody.failure == VirtualFiles::Failure::Network,
+                    "a body shorter than the offer fails the read as a broken transfer", err);
 
-        server.respond = [](int, const QByteArray&, qint64) {
-            return QByteArray("HTTP/1.1 409 Conflict\r\nContent-Length: 0\r\n\r\n");
+        // Sunshine's answer names the cause the paste target shows.
+        const std::pair<const char*, VirtualFiles::Failure> answers[] = {
+            { "409 Conflict", VirtualFiles::Failure::Changed },
+            { "410 Gone", VirtualFiles::Failure::Gone },
+            { "404 Not Found", VirtualFiles::Failure::Gone },
+            { "503 Service Unavailable", VirtualFiles::Failure::Other },
         };
-        ok &= check(readAll(source, 1).failed, "an HTTP error fails the read", err);
+        for (const auto& answer : answers) {
+            const QByteArray status(answer.first);
+            server.respond = [status](int, const QByteArray&, qint64) {
+                return "HTTP/1.1 " + status + "\r\nContent-Length: 0\r\n\r\n";
+            };
+            const ReadResult failed = readAll(source, 1);
+            ok &= check(failed.failed && failed.failure == answer.second,
+                        "an HTTP error fails the read with its cause", err);
+        }
 
         server.respond = [](int, const QByteArray& body, qint64) {
             // Ignores the Range and sends the whole file with 200.

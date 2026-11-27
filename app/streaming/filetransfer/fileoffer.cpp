@@ -274,12 +274,28 @@ struct StreamState
     quint64 delivered = 0; // bytes handed to the reader
     bool done = false;
     bool failed = false;
+    VirtualFiles::Failure failure = VirtualFiles::Failure::Other; // the first cause, once failed
 
     // Worker thread only.
     QPointer<QNetworkReply> reply;
 };
 
 } // namespace
+
+// What Sunshine's answer to a download means: 409 the file changed since the
+// copy, 404 no such offer (expired) or entry, 410 the file can no longer be read.
+static VirtualFiles::Failure failureForStatus(int status)
+{
+    switch (status) {
+    case 409:
+        return VirtualFiles::Failure::Changed;
+    case 404:
+    case 410:
+        return VirtualFiles::Failure::Gone;
+    default:
+        return VirtualFiles::Failure::Other;
+    }
+}
 
 struct FileOfferDownloader::Core
 {
@@ -358,10 +374,14 @@ struct FileOfferDownloader::Core
         }
     }
 
-    static void failStream(const std::shared_ptr<StreamState>& st)
+    static void failStream(const std::shared_ptr<StreamState>& st,
+                           VirtualFiles::Failure failure = VirtualFiles::Failure::Other)
     {
         {
             std::lock_guard<std::mutex> lock(st->mutex);
+            if (!st->failed) {
+                st->failure = failure;
+            }
             st->failed = true;
         }
         st->changed.notify_all();
@@ -405,7 +425,7 @@ struct FileOfferDownloader::Core
                 const QVariant status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
                 if (status.isValid() && status.toInt() != wanted) {
                     ClipboardLog::warn("FileOffer: download answered HTTP %d", status.toInt());
-                    failStream(st);
+                    failStream(st, failureForStatus(status.toInt()));
                     return;
                 }
                 // A resumed read must be exactly the rest of the file.
@@ -440,6 +460,17 @@ struct FileOfferDownloader::Core
                     if (!st->failed) {
                         ClipboardLog::warn("FileOffer: download failed (%s)",
                                            reply->errorString().toUtf8().constData());
+                        // A connection that broke off; an answer that was wrong stays Other.
+                        const auto error = reply->error();
+                        const bool network =
+                            (error >= QNetworkReply::ConnectionRefusedError &&
+                             error <= QNetworkReply::UnknownNetworkError &&
+                             error != QNetworkReply::SslHandshakeFailedError) ||
+                            (error == QNetworkReply::NoError && st->received < st->expected);
+                        st->failure = error == QNetworkReply::TimeoutError
+                                          ? VirtualFiles::Failure::Timeout
+                                      : network ? VirtualFiles::Failure::Network
+                                                : VirtualFiles::Failure::Other;
                     }
                     st->failed = true;
                 } else {
@@ -501,6 +532,9 @@ public:
             return releasable() > 0 || m_State->done || m_State->failed;
         });
         if (!ready) {
+            if (!m_State->failed) {
+                m_State->failure = VirtualFiles::Failure::Timeout;
+            }
             m_State->failed = true;
             lock.unlock();
             ClipboardLog::warn("FileOffer: download stalled");
@@ -544,6 +578,12 @@ public:
                 Qt::QueuedConnection);
         }
         return copied;
+    }
+
+    VirtualFiles::Failure failure() const override
+    {
+        std::lock_guard<std::mutex> lock(m_State->mutex);
+        return m_State->failure;
     }
 
 private:
