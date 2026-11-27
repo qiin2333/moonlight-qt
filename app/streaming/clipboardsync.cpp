@@ -861,10 +861,15 @@ void ClipboardSync::serveFilePull(const QByteArray& payload)
     req.setSslConfiguration(sslConfig);
 
     QNetworkReply* reply = nam()->post(req, chunk.bytes);
-    auto* timeout = new QTimer(reply);
-    timeout->setSingleShot(true);
-    connect(timeout, &QTimer::timeout, reply, &QNetworkReply::abort);
-    timeout->start(60000);
+    // Give up on a stalled upload, not a slow one: the host's ticket lasts
+    // 30 s plus the chunk at 64 KiB/s and turns away a chunk that is too late.
+    auto* stall = new QTimer(reply);
+    stall->setSingleShot(true);
+    stall->setInterval(30000);
+    connect(stall, &QTimer::timeout, reply, &QNetworkReply::abort);
+    connect(reply, &QNetworkReply::uploadProgress, stall, qOverload<>(&QTimer::start));
+    connect(reply, &QNetworkReply::downloadProgress, stall, qOverload<>(&QTimer::start));
+    stall->start();
     connect(reply, &QNetworkReply::finished, this, [reply]() {
         reply->deleteLater();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
