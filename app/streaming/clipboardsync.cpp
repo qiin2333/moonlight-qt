@@ -268,6 +268,11 @@ bool ClipboardBridge::hasFileReferences()
 }
 
 #ifdef Q_OS_WIN
+bool ClipboardBridge::ownsVirtualFiles()
+{
+    return VirtualFileClipboard::ownsClipboard();
+}
+
 bool ClipboardBridge::writeVirtualFiles(std::vector<VirtualFiles::Entry> entries,
                                         std::shared_ptr<VirtualFiles::Source> source)
 {
@@ -339,6 +344,29 @@ QMimeData* ClipboardSync::clipboardBridgeClone()
         },
         Qt::BlockingQueuedConnection, &snapshot);
     return snapshot;
+}
+
+bool ClipboardSync::hostFilesOnClipboard()
+{
+#ifdef Q_OS_WIN
+    // The OLE clipboard object belongs to the bridge's thread.
+    bool owned = false;
+    if (clipboardBridgeNeeded()) {
+        QMetaObject::invokeMethod(
+            m_Bridge,
+            [bridge = QPointer<ClipboardBridge>(m_Bridge), &owned]() {
+                if (bridge != nullptr) {
+                    owned = bridge->ownsVirtualFiles();
+                }
+            },
+            Qt::BlockingQueuedConnection);
+    } else if (m_Bridge != nullptr) {
+        owned = m_Bridge->ownsVirtualFiles();
+    }
+    return owned;
+#else
+    return false;
+#endif
 }
 
 bool ClipboardSync::clipboardBridgeFileGuard(const char* context)
@@ -1283,6 +1311,13 @@ void ClipboardSync::onLocalClipboardChanged()
     }
     const QStringList filePaths = localFilePaths(mime);
     if (finderOrigin) {
+        // Our own write of the host's files (applyInboundFileOffer) is no new
+        // local copy: it must not abort a later offer still downloading.
+#ifdef Q_OS_WIN
+        if (hostFilesOnClipboard()) {
+            return;
+        }
+#endif
         // A repeated announcement of the same copy must not cancel its offer
         // while that is still uploading (a long list goes as a blob).
         if (isRepeatedFileCopy(filePaths)) {

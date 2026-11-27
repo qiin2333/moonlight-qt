@@ -81,6 +81,8 @@ public:
                            std::shared_ptr<VirtualFiles::Source> source);
     // Empty the clipboard if it still holds those files (the session ends).
     void clearVirtualFiles();
+    // Whether the clipboard still holds the host files written above.
+    bool ownsVirtualFiles();
 #endif
 
 signals:
@@ -353,6 +355,8 @@ private:
     bool clipboardBridgeNeeded() const;
     QMimeData* clipboardBridgeClone();
     bool clipboardBridgeFileGuard(const char* context);
+    // True while the clipboard holds host files this engine put there.
+    bool hostFilesOnClipboard();
     void clipboardBridgeWrite(const QString& text, const QImage& image, const QByteArray& pngBytes);
 
     ClipboardBridge* m_Bridge = nullptr;
