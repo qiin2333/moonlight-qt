@@ -167,6 +167,8 @@ public:
     // Mirrors the cross-client cap (64 MiB) shared with the Android and
     // HarmonyOS clients. The service-side blob store accepts up to this much.
     static constexpr qint64 MAX_BLOB_BYTES = 64LL * 1024 * 1024;
+    // A file offer too long for one control message comes as a REF of this type.
+    static constexpr const char* FILE_OFFER_MIME = "application/vnd.sunshine.file-offer+json";
     // Mirror the Android client's cap (32 Mpx) so a stray full-screen capture
     // doesn't try to PNG-encode a 100 MB bitmap and stall the GUI thread.
     static constexpr qint64  MAX_IMAGE_PIXELS = 32LL * 1024 * 1024;
@@ -338,6 +340,8 @@ private:
     std::unique_ptr<LocalFileOffers> m_LocalFileOffers;
     QStringList m_LastOfferedPaths;
     qint64 m_LastOfferedAtMs = -1;
+    // Id of the last host file offer that parsed (logs and tests).
+    QString m_LastInboundOfferId;
     QHash<quint32, BurstState> m_PendingBursts;
     quint32 m_NextToken = 1;
 

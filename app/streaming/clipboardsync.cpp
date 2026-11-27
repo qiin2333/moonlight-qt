@@ -647,7 +647,8 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
             ClipboardLog::warn("ClipboardSync: dropping inbound REF with invalid blob id");
             return;
         }
-        if (mime != QStringLiteral("image/png") && !mime.startsWith(QStringLiteral("text/"))) {
+        if (mime != QStringLiteral("image/png") && !mime.startsWith(QStringLiteral("text/")) &&
+            mime != QLatin1String(FILE_OFFER_MIME)) {
             return;
         }
     }
@@ -699,7 +700,9 @@ void ClipboardSync::onIncomingFrame(QByteArray frame)
     }
 
     if (kind == KIND_REF) {
-        if (token == 0) {
+        // A file offer is never part of a text/image burst, whatever its token
+        // (the host's agent numbers every offer it sends).
+        if (token == 0 || mime == QLatin1String(FILE_OFFER_MIME)) {
             fetchRefAndApply(id, mime, size);
             return;
         }
@@ -728,6 +731,7 @@ void ClipboardSync::applyInboundFileOffer(const QByteArray& payload)
                            error.toUtf8().constData());
         return;
     }
+    m_LastInboundOfferId = offer.id;
 
 #ifdef Q_OS_WIN
     // Newer clipboard content than anything still in flight.
@@ -808,7 +812,7 @@ bool ClipboardSync::offerLocalFiles(const QStringList& paths)
     ClipboardLog::info("ClipboardSync: offering %d copied path(s) to the host",
                        static_cast<int>(paths.size()));
     if (shouldTransferOutOfBand(json.size())) {
-        uploadAndSendRef(json, QStringLiteral("application/vnd.sunshine.file-offer+json"));
+        uploadAndSendRef(json, QLatin1String(FILE_OFFER_MIME));
         return true;
     }
     QByteArray frame;
@@ -1672,6 +1676,9 @@ void ClipboardSync::fetchRefAndApply(const QString& id, const QString& mime, qin
             applyInboundPng(bytes);
         } else if (mime.startsWith(QStringLiteral("text/"))) {
             applyInboundText(bytes);
+        } else if (mime == QLatin1String(FILE_OFFER_MIME)) {
+            // A newer clipboard change while this was downloading discards it (readBlobReply).
+            applyInboundFileOffer(bytes);
         } else {
             ClipboardLog::info("ClipboardSync: dropping fetched blob with unsupported mime '%s'",
                         mime.toUtf8().constData());
