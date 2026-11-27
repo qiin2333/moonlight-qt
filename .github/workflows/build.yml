@@ -697,6 +697,45 @@ jobs:
         sudo ldconfig
         cd ..
 
+    - name: Test native Wayland clipboard
+      if: matrix.arch == 'x86_64'
+      timeout-minutes: 5
+      run: |
+        sudo apt-get install -y --no-install-recommends sway wl-clipboard
+        for project in clipboard-helper tests/clipboard_helper_lifecycle; do
+          build_dir="$GITHUB_WORKSPACE/build/clipboard-tests/$project"
+          mkdir -p "$build_dir"
+          (
+            cd "$build_dir"
+            qmake "$GITHUB_WORKSPACE/$project/${project##*/}.pro"
+            make -j"$(nproc)"
+          )
+        done
+        build/clipboard-tests/tests/clipboard_helper_lifecycle/clipboard_helper_lifecycle
+
+        # Use a disposable native Wayland session with software rendering.
+        export XDG_RUNTIME_DIR="$(mktemp -d)"
+        export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1
+        unset DISPLAY WAYLAND_DISPLAY SWAYSOCK
+        sway --config /dev/null > build/clipboard-tests/sway.log 2>&1 &
+        sway_pid=$!
+        trap 'kill "$sway_pid" 2>/dev/null || true; wait "$sway_pid" 2>/dev/null || true; rm -rf "$XDG_RUNTIME_DIR"' EXIT
+        for attempt in {1..100}; do
+          for socket in "$XDG_RUNTIME_DIR"/wayland-*; do
+            if [[ -S "$socket" ]]; then
+              export WAYLAND_DISPLAY="${socket##*/}"
+              break 2
+            fi
+          done
+          sleep 0.1
+        done
+        if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+          cat build/clipboard-tests/sway.log
+          exit 1
+        fi
+        python3 tests/clipboard_wayland/smoke.py \
+          build/clipboard-tests/clipboard-helper/moonlight-clipboard-helper
+
     - name: Build SDL2_ttf
       run: |
         export SDL2_TTF_REV=a883e490e30fb44a5336ea3dcb990c6982c5216f
