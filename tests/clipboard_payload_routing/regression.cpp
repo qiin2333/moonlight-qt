@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QGuiApplication>
 #include <QImage>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMimeData>
@@ -15,12 +16,21 @@
 #include <QSslConfiguration>
 #include <QSslSocket>
 #include <QTcpServer>
+#include <QDir>
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
 #include <QtEndian>
 
 #include <atomic>
+
+#ifdef Q_OS_WIN
+#include "streaming/filetransfer/virtualfileclipboard_win.h"
+
+#include <ole2.h>
+#include <shlobj.h>
+#include <windows.h>
+#endif
 
 namespace {
 bool check(bool value, const char* name, QTextStream& err)
@@ -87,6 +97,30 @@ QByteArray ref(const char* id, int size)
                                       { "size", size } })
         .toJson(QJsonDocument::Compact);
 }
+#ifdef Q_OS_WIN
+// File descriptors on the native clipboard now, or -1 when it holds none.
+int nativeFileDescriptors()
+{
+    IDataObject* clip = nullptr;
+    if (FAILED(OleGetClipboard(&clip)) || clip == nullptr)
+        return -1;
+    FORMATETC fd = { static_cast<CLIPFORMAT>(RegisterClipboardFormatW(L"FileGroupDescriptorW")),
+                     nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+    STGMEDIUM medium = {};
+    int count = -1;
+    if (SUCCEEDED(clip->GetData(&fd, &medium))) {
+        if (medium.tymed == TYMED_HGLOBAL && medium.hGlobal != nullptr) {
+            if (auto* group = static_cast<FILEGROUPDESCRIPTORW*>(GlobalLock(medium.hGlobal))) {
+                count = static_cast<int>(group->cItems);
+                GlobalUnlock(medium.hGlobal);
+            }
+        }
+        ReleaseStgMedium(&medium);
+    }
+    clip->Release();
+    return count;
+}
+#endif
 bool waitFor(const std::function<bool()>& condition)
 {
     QElapsedTimer timer;
@@ -299,13 +333,36 @@ public:
             cb->clear();
             ClipboardSync sync;
             QList<QByteArray> sent;
-            QObject::connect(&sync, &ClipboardSync::outboundFrame,
-                             [&](QByteArray b) { sent.append(b); });
+            QList<QByteArray> offers; // file offers (kind 4): names and sizes only
+            QObject::connect(&sync, &ClipboardSync::outboundFrame, [&](QByteArray b) {
+                (b.size() > 1 && b[1] == ClipboardSync::KIND_FILE_OFFER ? offers : sent).append(b);
+            });
             sync.start();
             auto* file = new QMimeData;
             file->setUrls({ QUrl::fromLocalFile(path) });
             cb->setMimeData(file);
             ok &= check(sent.isEmpty(), "file URL cannot upload image file", err);
+#ifdef Q_OS_WIN
+            // Windows offers copied files to the host; the offer names the
+            // file but never carries its local path.
+            ok &= check(offers.size() == 1 && offers[0].contains("private.png") &&
+                            !offers[0].contains(dir.path().toUtf8()) &&
+                            !offers[0].contains(QDir::toNativeSeparators(dir.path()).toUtf8()),
+                        "a copied file is offered by name only", err);
+            // Text copied in between makes the same files a new copy, offered again.
+            auto* between = new QMimeData;
+            between->setText(QStringLiteral("between"));
+            cb->setMimeData(between);
+            auto* again = new QMimeData;
+            again->setUrls({ QUrl::fromLocalFile(path) });
+            cb->setMimeData(again);
+            ok &= check(offers.size() == 2,
+                        "the same files copied again after text are offered again", err);
+            sent.clear();
+            offers.clear();
+#else
+            ok &= check(offers.isEmpty(), "files are offered on Windows only", err);
+#endif
             auto* html = new QMimeData;
             html->setHtml("<img src='" + QUrl::fromLocalFile(path).toString() + "'>");
             cb->setMimeData(html);
@@ -413,6 +470,112 @@ public:
             QCoreApplication::processEvents();
             ok &= check(sync.m_BlobReplies.isEmpty() && cb->text() == "newer text",
                         "stop cancels pending network callbacks", err);
+        }
+        {
+            // A host file offer too long for one control message comes as a REF
+            // (1200 one-byte files: about 80 kB of offer JSON).
+            const auto bulkOffer = [](QChar fill) {
+                QJsonArray files;
+                files.append(QJsonObject{
+                    { "path", "bulk" }, { "size", 0 }, { "dir", true }, { "mtime", 0 } });
+                for (int i = 0; i < 1200; ++i) {
+                    files.append(QJsonObject{
+                        { "path", QStringLiteral("bulk/f%1.txt").arg(i, 4, 10, QLatin1Char('0')) },
+                        { "size", 1 },
+                        { "dir", false },
+                        { "mtime", 1790000000 } });
+                }
+                return QJsonDocument(QJsonObject{ { "version", 2 },
+                                                  { "id", QString(64, fill) },
+                                                  { "type", "files" },
+                                                  { "source", "clipboard" },
+                                                  { "total_size", 1200 },
+                                                  { "files", files } })
+                    .toJson(QJsonDocument::Compact);
+            };
+            const auto offerRef = [](const char* id, qint64 size) {
+                return QJsonDocument(
+                           QJsonObject{ { "id", QString::fromLatin1(id) },
+                                        { "mime", QLatin1String(ClipboardSync::FILE_OFFER_MIME) },
+                                        { "size", size } })
+                    .toJson(QJsonDocument::Compact);
+            };
+#ifdef Q_OS_WIN
+            // The offscreen platform does not start OLE; the virtual files need it.
+            const bool ole = SUCCEEDED(OleInitialize(nullptr));
+            ok &= check(ole, "OLE starts for the native file clipboard", err);
+#endif
+            cb->setText("before files");
+            ClipboardSync sync(host);
+            sync.start();
+            const QChar fills[] = { 'a', 'b' };
+            const quint32 tokens[] = { 0, 77 };
+            for (int i = 0; i < 2; ++i) {
+                const QByteArray json = bulkOffer(fills[i]);
+                ok &= check(json.size() > ClipboardSync::MAX_PAYLOAD,
+                            "the bulk offer does not fit one control message", err);
+                const int index = server.requests.size();
+                incoming(sync, 3, tokens[i], offerRef("offer", json.size()));
+                ok &= check(waitFor([&] { return server.requests.size() > index; }),
+                            tokens[i] ? "file offer REF with a token is fetched"
+                                      : "file offer REF without a token is fetched",
+                            err);
+                server.answer(index, json);
+                ok &= check(
+                    waitFor([&] { return sync.m_LastInboundOfferId == QString(64, fills[i]); }) &&
+                        sync.m_PendingBursts.isEmpty(),
+                    tokens[i] ? "file offer REF with a token is applied as files"
+                              : "file offer REF without a token is applied as files",
+                    err);
+#ifdef Q_OS_WIN
+                ok &=
+                    check(VirtualFileClipboard::ownsClipboard() && nativeFileDescriptors() == 1201,
+                          "the offer's 1201 entries are on the native clipboard", err);
+#else
+                // Elsewhere the offer is only logged; it is never pasted as text.
+                ok &= check(cb->text() == "before files", "file offer REF is not applied as text",
+                            err);
+#endif
+            }
+#ifdef Q_OS_WIN
+            {
+                // The notification of our own virtual-file write carries file
+                // formats; it is no local copy and must not abort the next offer.
+                const QByteArray json = bulkOffer('d');
+                const int index = server.requests.size();
+                incoming(sync, 3, 79, offerRef("next-offer", json.size()));
+                ok &= check(waitFor([&] { return server.requests.size() > index; }),
+                            "next file offer GET started", err);
+                auto* own = new QMimeData;
+                own->setData(QStringLiteral("FileGroupDescriptorW"), QByteArray(4, '\0'));
+                cb->setMimeData(own);
+                QMetaObject::invokeMethod(&sync, "onLocalClipboardChanged", Qt::DirectConnection);
+                ok &= check(!sync.m_BlobReplies.isEmpty(),
+                            "our own file write does not abort a download", err);
+                server.answer(index, json);
+                ok &= check(waitFor([&] { return sync.m_LastInboundOfferId == QString(64, 'd'); }),
+                            "the next offer still applies after our own file write", err);
+                // Plain text again for the case below (the same-thread harness has no
+                // bridge to tell our virtual files from a local file copy).
+                cb->setText("before files");
+            }
+#endif
+            const int index = server.requests.size();
+            incoming(sync, 3, 78, offerRef("stale-offer", bulkOffer('c').size()));
+            ok &= check(waitFor([&] { return server.requests.size() > index; }),
+                        "pending file offer GET started", err);
+            incoming(sync, 1, 0, "newer than the files");
+            server.answer(index, bulkOffer('c'));
+            QCoreApplication::processEvents();
+            ok &= check(sync.m_BlobReplies.isEmpty() && !sync.m_LastInboundOfferId.endsWith('c') &&
+                            cb->text() == "newer than the files",
+                        "a newer clipboard change discards a file offer still downloading", err);
+#ifdef Q_OS_WIN
+            sync.stop();
+            VirtualFileClipboard::clearIfOwned();
+            if (ole)
+                OleUninitialize();
+#endif
         }
         {
             cb->clear();

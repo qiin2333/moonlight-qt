@@ -16,9 +16,10 @@ main() 短、被测逻辑走生产源文件直编(见各 .pro 的 SOURCES)。
 | pyrowave_preferences | PyroWave 启用/禁用构建下的设置通知、保存、环境变量及 SDR/HDR 色彩覆盖 | Ubuntu(Qt) |
 | pyrowave_color_contract | SDR/HDR10/HLG 位深、色彩匹配与静态 HDR 元数据；使用固定版本的 PyroWave 头文件和真实 libavutil，无需 GPU | Ubuntu |
 | cursor_shape_classification | 光标位图 → 形状分类器的判定矩阵 | Windows |
-| clipboard_payload_routing | 剪贴板状态、复合内容、文件保护、IPC 分帧和本地 TLS 传输回归（offscreen） | Windows |
+| clipboard_payload_routing | 剪贴板状态、复合内容、文件保护、IPC 分帧、本地 TLS 传输回归，以及主机文件 offer 的校验、blob 清单与断点下载（offscreen） | Windows |
 | clipboard_helper_lifecycle | helper 异常退出、响应超时、进程管道背压；Linux 真实启动及重启的环境传递 | Windows + Linux |
 | clipboard_wayland | 正式 helper 与 wl-copy/wl-paste 的双向文本，原生 Wayland data-control 关闭/开启/关闭对照 | Linux(headless Sway) |
+| virtual_file_clipboard | 主机复制的文件以虚拟文件放进 OLE 剪贴板：文件描述、按需读取的流、短读补齐、Seek、读取失败、所有权与清空 | Windows |
 | overlay_button_position | 悬浮按钮归一化/还原坐标的跨分辨率往返 | Windows |
 | file_mapping_websocket_framing | 文件映射 WS 帧解析(fin/分片/ping-pong) | Windows |
 | shared_helpers | 配对证书策略、版本比较与 GFE 兼容性回退 | Windows |
