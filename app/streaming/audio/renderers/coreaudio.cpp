@@ -207,9 +207,16 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
 {
     StreamingPreferences* prefs = StreamingPreferences::get();
 
-    // Listen before reading anything, so a change during setup isn't missed
-    AudioObjectAddPropertyListenerBlock(kAudioObjectSystemObject, &DefaultDeviceAddress,
-                                        m_ListenerQueue, m_ListenerBlock);
+    // Listen before reading anything, so a change during setup isn't missed.
+    // Without this we'd keep playing to the old device after the user picks
+    // another one, so leave it to SDL, which follows the default by itself.
+    OSStatus status = AudioObjectAddPropertyListenerBlock(
+        kAudioObjectSystemObject, &DefaultDeviceAddress, m_ListenerQueue, m_ListenerBlock);
+    if (status != noErr) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Unable to watch the default audio output device: %d", (int)status);
+        return false;
+    }
 
     if (!getDeviceProperty(kAudioObjectSystemObject, kAudioHardwarePropertyDefaultOutputDevice,
                            kAudioObjectPropertyScopeGlobal, m_OutputDevice) ||
@@ -295,8 +302,8 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
     callback.inputProc = renderCallback;
     callback.inputProcRefCon = this;
 
-    OSStatus status = AudioUnitSetProperty(m_OutputUnit, kAudioUnitProperty_StreamFormat,
-                                           kAudioUnitScope_Input, 0, &asbd, sizeof(asbd));
+    status = AudioUnitSetProperty(m_OutputUnit, kAudioUnitProperty_StreamFormat,
+                                  kAudioUnitScope_Input, 0, &asbd, sizeof(asbd));
 
     // Let AUHAL route each channel to the matching speaker of the device's
     // layout. Without it, channels go to the device's channels in order.
