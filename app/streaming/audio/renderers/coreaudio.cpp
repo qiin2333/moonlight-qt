@@ -52,6 +52,13 @@ bool getDeviceProperty(AudioObjectID object, AudioObjectPropertySelector selecto
     return AudioObjectGetPropertyData(object, &addr, 0, nullptr, &size, &out) == noErr;
 }
 
+// Property selectors are four-character codes such as 'fsiz'
+QByteArray fourCharCode(UInt32 code)
+{
+    const char chars[] = { char(code >> 24), char(code >> 16), char(code >> 8), char(code) };
+    return QByteArray(chars, sizeof(chars));
+}
+
 QString deviceName(AudioDeviceID device)
 {
     CFStringRef value = nullptr;
@@ -205,7 +212,11 @@ std::vector<unsigned char> streamChannelLayout(int channelCount)
 CoreAudioRenderer::CoreAudioRenderer()
     : m_OutputUnit(nullptr), m_OutputDevice(kAudioObjectUnknown), m_NeedsReinit(false),
       m_ListenerQueue(dispatch_queue_create("CoreAudioRenderer", DISPATCH_QUEUE_SERIAL)),
-      m_ListenerBlock(Block_copy(^(UInt32, const AudioObjectPropertyAddress*) {
+      m_ListenerBlock(Block_copy(^(UInt32 count, const AudioObjectPropertyAddress* addresses) {
+        for (UInt32 i = 0; i < count; i++) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "CoreAudio property '%s' changed",
+                        fourCharCode(addresses[i].mSelector).constData());
+        }
         m_NeedsReinit = true;
       })),
       m_FrameSize(0), m_MaxFrames(0), m_Starved(true), m_SpatialMixer(nullptr)
@@ -369,11 +380,18 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
         return false;
     }
 
-    SDL_LogInfo(
-        SDL_LOG_CATEGORY_APPLICATION,
-        "CoreAudio output: %s (%u channels, %u speakers, output type %u), %s for %d-channel stream",
-        qUtf8Printable(deviceName(m_OutputDevice)), deviceChannels, deviceSpeakers,
-        (unsigned int)outputType, spatial ? "spatial audio" : "stereo", opusConfig->channelCount);
+    Float64 deviceRate = 0.0;
+    UInt32 deviceBufferFrames = 0;
+    getDeviceProperty(m_OutputDevice, kAudioDevicePropertyNominalSampleRate,
+                      kAudioObjectPropertyScopeGlobal, deviceRate);
+    getDeviceProperty(m_OutputDevice, kAudioDevicePropertyBufferFrameSize,
+                      kAudioObjectPropertyScopeGlobal, deviceBufferFrames);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "CoreAudio output: %s (%u channels, %u speakers, output type %u, %u frames at "
+                "%.0f Hz), %s for %d-channel stream, up to %u frames per callback",
+                qUtf8Printable(deviceName(m_OutputDevice)), deviceChannels, deviceSpeakers,
+                (unsigned int)outputType, deviceBufferFrames, deviceRate,
+                spatial ? "spatial audio" : "stereo", opusConfig->channelCount, m_MaxFrames);
     return true;
 }
 
