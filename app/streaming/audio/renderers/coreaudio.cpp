@@ -260,26 +260,6 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
         return false;
     }
 
-    // Ask for a device buffer of one packet to keep latency down. The device
-    // may not allow it, which only costs latency.
-    Float64 deviceRate = 0.0;
-    AudioValueRange range = {};
-    if (getDeviceProperty(m_OutputDevice, kAudioDevicePropertyNominalSampleRate,
-                          kAudioObjectPropertyScopeGlobal, deviceRate) &&
-        getDeviceProperty(m_OutputDevice, kAudioDevicePropertyBufferFrameSizeRange,
-                          kAudioObjectPropertyScopeOutput, range)) {
-        Float64 packetFrames = opusConfig->samplesPerFrame * deviceRate / opusConfig->sampleRate;
-        UInt32 bufferFrames = (UInt32)qBound(range.mMinimum, packetFrames, range.mMaximum);
-        AudioObjectPropertyAddress addr{ kAudioDevicePropertyBufferFrameSize,
-                                         kAudioObjectPropertyScopeOutput,
-                                         kAudioObjectPropertyElementMain };
-        if (AudioObjectSetPropertyData(m_OutputDevice, &addr, 0, nullptr, sizeof(bufferFrames),
-                                       &bufferFrames) != noErr) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Unable to set the audio device buffer to %u frames", bufferFrames);
-        }
-    }
-
     // The spatial mixer outputs non-interleaved stereo, otherwise we pass the
     // decoder's interleaved output straight through
     AudioStreamBasicDescription asbd = {};
