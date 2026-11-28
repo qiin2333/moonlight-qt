@@ -24,7 +24,7 @@ constexpr AudioObjectPropertyAddress DefaultDeviceAddress = {
 // The data source changes when headphones are plugged into the built-in jack,
 // which changes how spatial audio has to be rendered. The stream configuration
 // and the speaker layout change the speaker count that decides between spatial
-// audio and passthrough.
+// audio and the SDL renderer.
 constexpr AudioObjectPropertyAddress DeviceAddresses[] = {
     { kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal,
       kAudioObjectPropertyElementMain },
@@ -234,13 +234,14 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
                    outputType != kSpatialMixerOutputType_ExternalSpeakers &&
                    prefs->spatialAudioConfig != StreamingPreferences::SAC_DISABLED;
 
-    if (!spatial && deviceSpeakers < (UInt32)opusConfig->channelCount) {
-        // AUHAL drops channels the device doesn't have instead of downmixing
-        // them, so let the SDL renderer handle this as it did before. That
-        // includes surround devices with fewer speakers than the stream.
+    if (!spatial &&
+        (opusConfig->channelCount > 2 || deviceSpeakers < (UInt32)opusConfig->channelCount)) {
+        // AUHAL only plays a channel on a speaker with exactly its label, and
+        // devices label the same surround speakers differently, so leave
+        // surround speakers and mono devices to the SDL renderer as before
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "The output device has only %u speakers for the %d-channel stream",
-                    deviceSpeakers, opusConfig->channelCount);
+                    "Leaving the %d-channel stream on %u speakers to SDL", opusConfig->channelCount,
+                    deviceSpeakers);
         return false;
     }
 
@@ -356,8 +357,7 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
         SDL_LOG_CATEGORY_APPLICATION,
         "CoreAudio output: %s (%u channels, %u speakers, output type %u), %s for %d-channel stream",
         qUtf8Printable(deviceName(m_OutputDevice)), deviceChannels, deviceSpeakers,
-        (unsigned int)outputType, spatial ? "spatial audio" : "passthrough",
-        opusConfig->channelCount);
+        (unsigned int)outputType, spatial ? "spatial audio" : "stereo", opusConfig->channelCount);
     return true;
 }
 
