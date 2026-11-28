@@ -1449,6 +1449,22 @@
         <translation>7.1.4 环绕声</translation>
     </message>
     <message>
+        <source>Spatial audio</source>
+        <translation>空间音频</translation>
+    </message>
+    <message>
+        <source>Renders surround sound with Apple&apos;s spatial audio on headphones and built-in speakers. Disable it if you don&apos;t want binaural processing, such as with USB or Bluetooth speakers.</source>
+        <translation>在耳机和内置扬声器上，使用 Apple 的空间音频渲染环绕声。如果不需要双耳处理（例如使用 USB 或蓝牙扬声器时），请将其禁用。</translation>
+    </message>
+    <message>
+        <source>Head tracking</source>
+        <translation>头部追踪</translation>
+    </message>
+    <message>
+        <source>Requires supported AirPods or Beats headphones.</source>
+        <translation>需要支持的 AirPods 或 Beats 耳机。</translation>
+    </message>
+    <message>
         <source>Mute host PC speakers while streaming</source>
         <translation>流式传输启动时将主机的扬声器静音</translation>
     </message>

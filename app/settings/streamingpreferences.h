@@ -39,6 +39,13 @@ public:
     };
     Q_ENUM(AudioConfig)
 
+    enum SpatialAudioConfig
+    {
+        SAC_AUTO,
+        SAC_DISABLED
+    };
+    Q_ENUM(SpatialAudioConfig)
+
     enum VideoCodecConfig
     {
         VCC_AUTO,
@@ -256,6 +263,10 @@ public:
     Q_PROPERTY(bool detectNetworkBlocking MEMBER detectNetworkBlocking NOTIFY detectNetworkBlockingChanged)
     Q_PROPERTY(bool showPerformanceOverlay MEMBER showPerformanceOverlay NOTIFY showPerformanceOverlayChanged)
     Q_PROPERTY(AudioConfig audioConfig MEMBER audioConfig NOTIFY audioConfigChanged)
+    Q_PROPERTY(SpatialAudioConfig spatialAudioConfig MEMBER spatialAudioConfig NOTIFY
+                   spatialAudioConfigChanged)
+    Q_PROPERTY(
+        bool spatialHeadTracking MEMBER spatialHeadTracking NOTIFY spatialHeadTrackingChanged)
     Q_PROPERTY(VideoCodecConfig videoCodecConfig MEMBER videoCodecConfig NOTIFY videoCodecConfigChanged)
     Q_PROPERTY(bool enablePyrowave MEMBER enablePyrowave NOTIFY enablePyrowaveChanged)
     Q_PROPERTY(bool pyrowaveAvailable READ pyrowaveAvailable CONSTANT)
@@ -363,6 +374,8 @@ public:
     bool keepAwake;
     int packetSize;
     AudioConfig audioConfig;
+    SpatialAudioConfig spatialAudioConfig;
+    bool spatialHeadTracking;
     VideoCodecConfig videoCodecConfig;
     bool enablePyrowave;
     bool pyrowaveAvailable() const;
@@ -409,6 +422,8 @@ signals:
     void enableNativeTouchpadChanged();
     void dualSenseHapticsModeChanged();
     void audioConfigChanged();
+    void spatialAudioConfigChanged();
+    void spatialHeadTrackingChanged();
     void videoCodecConfigChanged();
     void enablePyrowaveChanged();
     void pyrowaveCompatibilityChanged();

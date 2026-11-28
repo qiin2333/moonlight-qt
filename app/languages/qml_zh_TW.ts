@@ -989,6 +989,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Spatial audio</source>
+        <translation>空間音訊</translation>
+    </message>
+    <message>
+        <source>Renders surround sound with Apple&apos;s spatial audio on headphones and built-in speakers. Disable it if you don&apos;t want binaural processing, such as with USB or Bluetooth speakers.</source>
+        <translation>在耳機和內建喇叭上，使用 Apple 的空間音訊轉譯環繞音效。如果不需要雙耳處理（例如使用 USB 或藍牙喇叭時），請將其停用。</translation>
+    </message>
+    <message>
+        <source>Head tracking</source>
+        <translation>頭部追蹤</translation>
+    </message>
+    <message>
+        <source>Requires supported AirPods or Beats headphones.</source>
+        <translation>需要支援的 AirPods 或 Beats 耳機。</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="98"/>
         <source>Mute host PC speakers while streaming</source>
         <translation>串流時將主機電腦的喇叭靜音</translation>

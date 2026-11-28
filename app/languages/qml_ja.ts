@@ -897,6 +897,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Spatial audio</source>
+        <translation>空間オーディオ</translation>
+    </message>
+    <message>
+        <source>Renders surround sound with Apple&apos;s spatial audio on headphones and built-in speakers. Disable it if you don&apos;t want binaural processing, such as with USB or Bluetooth speakers.</source>
+        <translation>ヘッドホンと内蔵スピーカーで、サラウンドを Apple の空間オーディオとして再生します。USB や Bluetooth のスピーカーなど、バイノーラル処理が不要な場合は無効にしてください。</translation>
+    </message>
+    <message>
+        <source>Head tracking</source>
+        <translation>ヘッドトラッキング</translation>
+    </message>
+    <message>
+        <source>Requires supported AirPods or Beats headphones.</source>
+        <translation>対応する AirPods または Beats のヘッドホンが必要です。</translation>
+    </message>
+    <message>
         <location filename="../gui/settings/LegacySettingsPage.qml" line="98"/>
         <source>Mute host PC speakers while streaming</source>
         <translation>ストリーミング中にホストPCのスピーカーをミュートする</translation>

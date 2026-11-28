@@ -59,6 +59,32 @@ Column {
             }
         }
 
+        ChoiceRow {
+            applicable: SystemProperties.isDarwin
+            title: qsTr("Spatial audio")
+            searchKeywords: "Spatial audio"
+            description: qsTr("Renders surround sound with Apple's spatial audio on headphones and built-in speakers. Disable it if you don't want binaural processing, such as with USB or Bluetooth speakers.")
+            controlEnabled: StreamingPreferences.audioConfig !== StreamingPreferences.AC_STEREO
+            selectedValue: StreamingPreferences.spatialAudioConfig
+            onValueActivated: function(value) { StreamingPreferences.spatialAudioConfig = value }
+
+            model: ListModel {
+                ListElement { text: qsTr("Automatic"); val: StreamingPreferences.SAC_AUTO }
+                ListElement { text: qsTr("Disabled"); val: StreamingPreferences.SAC_DISABLED }
+            }
+        }
+
+        ToggleRow {
+            applicable: SystemProperties.isDarwin
+            title: qsTr("Head tracking")
+            searchKeywords: "Head tracking"
+            description: qsTr("Requires supported AirPods or Beats headphones.")
+            controlEnabled: StreamingPreferences.audioConfig !== StreamingPreferences.AC_STEREO &&
+                            StreamingPreferences.spatialAudioConfig !== StreamingPreferences.SAC_DISABLED
+            checked: StreamingPreferences.spatialHeadTracking
+            onToggled: function(value) { StreamingPreferences.spatialHeadTracking = value }
+        }
+
         ToggleRow {
             title: qsTr("Mute host PC speakers while streaming")
             searchKeywords: "Mute host PC speakers while streaming"
