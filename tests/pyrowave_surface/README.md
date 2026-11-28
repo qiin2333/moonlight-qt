@@ -25,7 +25,8 @@ The GPU path uses the client's surface pool and semaphore handoff.
 * Outside the timed loop, three distinct patterns exercise a two-slot pool.
   The test holds the first frame, drops the second and reuses its slot for the
   third. It compares both surviving frames with CPU readback of their respective
-  packets while the pool is full.
+  packets while the pool is full. After releasing both slots, it decodes the
+  second pattern on the same GPU decoder and checks it against CPU readback.
 
 The measured interval excludes capture, network, client pacing, presentation
 and display scanout. The completion wait serializes frames so deferred GPU

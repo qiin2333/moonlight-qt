@@ -292,6 +292,20 @@ static std::vector<uint8_t> run(bool direct, const std::array<std::vector<uint8_
             verifySurface(reused, packets[2]);
             av_frame_free(&held);
             av_frame_free(&reused);
+
+            // Neither slot contains pattern 1 anymore. A stale surface cannot
+            // pass this comparison when GPU decoding resumes after CPU readback.
+            AVFrame* resumed = prepare(packets[1]);
+            CHECK(surfaces->decode(decoder, resumed) == PyrowaveSurfaces::Decoded);
+            render(resumed);
+            download(actual);
+            av_frame_free(&resumed);
+            AVFrame* reference = prepare(packets[1]);
+            readCpu(reference);
+            render(reference);
+            download(expected);
+            av_frame_free(&reference);
+            checkPixels(expected, actual, color.hdrMode ? 10 : 8);
         }
         for (auto& tex : uploads) {
             pl_tex_destroy(gpu, &tex);
