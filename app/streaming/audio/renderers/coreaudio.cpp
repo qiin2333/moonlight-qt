@@ -24,7 +24,8 @@ constexpr AudioObjectPropertyAddress DefaultDeviceAddress = {
 // The data source changes when headphones are plugged into the built-in jack,
 // which changes how spatial audio has to be rendered. The stream configuration
 // and the speaker layout change the speaker count that decides between spatial
-// audio and the SDL renderer.
+// audio and the SDL renderer. The buffer size and sample rate set the most
+// frames the output unit renders at once.
 constexpr AudioObjectPropertyAddress DeviceAddresses[] = {
     { kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal,
       kAudioObjectPropertyElementMain },
@@ -35,6 +36,10 @@ constexpr AudioObjectPropertyAddress DeviceAddresses[] = {
     { kAudioDevicePropertyStreamConfiguration, kAudioDevicePropertyScopeOutput,
       kAudioObjectPropertyElementMain },
     { kAudioDevicePropertyPreferredChannelLayout, kAudioDevicePropertyScopeOutput,
+      kAudioObjectPropertyElementMain },
+    { kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeWildcard,
+      kAudioObjectPropertyElementMain },
+    { kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal,
       kAudioObjectPropertyElementMain },
 };
 
@@ -227,7 +232,7 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
         return false;
     }
 
-    // The data source isn't present on every device, so failures are ignored
+    // Not every device has every property, so failures are ignored
     for (const AudioObjectPropertyAddress& addr : DeviceAddresses) {
         AudioObjectAddPropertyListenerBlock(m_OutputDevice, &addr, m_ListenerQueue,
                                             m_ListenerBlock);
@@ -436,7 +441,7 @@ OSStatus CoreAudioRenderer::renderCallback(void* inRefCon,
     me->m_Starved = !ready;
 
     if (inNumberFrames > me->m_MaxFrames) {
-        // The device buffer grew past what we sized everything for
+        // AUHAL shouldn't ask for this many, but our buffers couldn't take it
         me->m_NeedsReinit = true;
     } else if (me->m_SpatialMixer != nullptr) {
         // Keep the mixer running through an underrun so its output stays
