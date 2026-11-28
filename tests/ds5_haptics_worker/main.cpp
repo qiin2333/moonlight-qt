@@ -37,6 +37,7 @@ public:
     unsigned maxQueuedPackets() const { return 0; }
     bool start();
     void reset();
+    bool finishStream();
     WriteResult tryWrite(const Packet& packet);
 
 private:
@@ -122,6 +123,13 @@ bool MockEndpoint::start()
     std::lock_guard lock(device.mutex);
     m_Started = true;
     device.events.push_back({ 'S' });
+    device.changed.notify_all();
+    return true;
+}
+bool MockEndpoint::finishStream()
+{
+    std::lock_guard lock(device.mutex);
+    device.events.push_back({ 'F' });
     device.changed.notify_all();
     return true;
 }
@@ -283,15 +291,24 @@ void shortEffects()
             renderer.submit(end);
         }
         // kind 2 deliberately omits END, exercising idle prebuffer flushing.
-        await([] {
+        const char awaited = kind == 2 ? 'S' : 'F';
+        await([awaited] {
             return std::any_of(device.events.begin(), device.events.end(),
-                               [](const auto& e) { return e.kind == 'S'; });
+                               [awaited](const auto& e) { return e.kind == awaited; });
         });
         const auto events = snapshot();
         auto first =
             std::find_if(events.begin(), events.end(), [](const auto& e) { return e.kind == 'P'; });
         CHECK(first != events.end());
         CHECK(std::none_of(first, events.end(), [](const auto& e) { return e.kind == 'R'; }));
+        // Only an ended stream asks the endpoint to send what it holds back.
+        const auto finished =
+            std::find_if(events.begin(), events.end(), [](const auto& e) { return e.kind == 'F'; });
+        CHECK(kind == 2 ? finished == events.end()
+                        : finished != events.end() &&
+                              std::find_if(events.begin(), finished, [](const auto& e) {
+                                  return e.kind == 'S';
+                              }) != finished);
         CHECK(!renderer.hasControl(0)); // Old hosts keep the SDL compatibility path.
     }
 }

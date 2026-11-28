@@ -239,6 +239,8 @@ public:
     Q_PROPERTY(bool absoluteTouchMode MEMBER absoluteTouchMode NOTIFY absoluteTouchModeChanged)
     Q_PROPERTY(bool enableNativeTouchpad MEMBER enableNativeTouchpad NOTIFY enableNativeTouchpadChanged)
     Q_PROPERTY(DualSenseHapticsMode dualSenseHapticsMode MEMBER dualSenseHapticsMode NOTIFY dualSenseHapticsModeChanged)
+    Q_PROPERTY(int dualSenseBtHapticsGain MEMBER dualSenseBtHapticsGain NOTIFY
+                   dualSenseBtHapticsGainChanged)
     Q_PROPERTY(bool framePacing MEMBER framePacing NOTIFY framePacingChanged)
     Q_PROPERTY(bool videoEnhancement MEMBER videoEnhancement NOTIFY videoEnhancementChanged)
     Q_PROPERTY(bool streamResolutionScale MEMBER streamResolutionScale NOTIFY streamResolutionScaleChanged)
@@ -334,6 +336,9 @@ public:
     bool absoluteTouchMode;
     bool enableNativeTouchpad;
     DualSenseHapticsMode dualSenseHapticsMode;
+    // Gain in percent (50-400) for physical haptics on a Bluetooth DualSense,
+    // applied when the PCM is reduced to the controller's 8-bit samples.
+    int dualSenseBtHapticsGain;
     bool framePacing;
     bool videoEnhancement;
     bool streamResolutionScale;
@@ -408,6 +413,7 @@ signals:
     void absoluteTouchModeChanged();
     void enableNativeTouchpadChanged();
     void dualSenseHapticsModeChanged();
+    void dualSenseBtHapticsGainChanged();
     void audioConfigChanged();
     void videoCodecConfigChanged();
     void enablePyrowaveChanged();

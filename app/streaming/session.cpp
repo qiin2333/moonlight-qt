@@ -2388,9 +2388,15 @@ bool Session::validateLaunch(SDL_Window* testWindow)
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
     if (m_Preferences->dualSenseHapticsMode == StreamingPreferences::DSHM_PHYSICAL) {
         if (!DualSenseHapticsRenderer::isAvailable()) {
+#ifdef Q_OS_WIN32
+            emitLaunchWarning(tr(
+                "Physical DualSense haptics was selected, but no DualSense was found yet, neither "
+                "over USB nor over Bluetooth. Moonlight will keep checking during this stream."));
+#else
             emitLaunchWarning(tr(
                 "Physical DualSense haptics was selected, but no active USB DualSense four-channel "
                 "audio endpoint was found yet. Moonlight will keep checking during this stream."));
+#endif
         }
     }
 #endif
@@ -4620,6 +4626,7 @@ void Session::start()
         LiSetDs5OutputExtensionCallback(Session::clDs5OutputExtension);
         LiSetDs5PadAudioOffer(LI_DS5_PAD_AUDIO_PCM);
 #endif
+        DualSenseHapticsRenderer::setBluetoothGain(m_Preferences->dualSenseBtHapticsGain / 100.0f);
         if (m_DualSenseHapticsRenderer == nullptr) {
             m_DualSenseHapticsRenderer =
                 new DualSenseHapticsRenderer(DualSenseHapticsRenderer::Mode::Physical);

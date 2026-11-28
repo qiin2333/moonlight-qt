@@ -186,7 +186,7 @@ win32 {
 }
 win32:!winrt {
     DEFINES += HAVE_WINDOWS_RAW_TOUCHPAD HAVE_WINDOWS_PEN_INPUT HAVE_PHYSICAL_DS5_HAPTICS
-    LIBS += -lhid
+    LIBS += -lhid -lsetupapi
     SOURCES += \
         streaming/input/wintouchpad.cpp \
         streaming/input/winpen.cpp
@@ -354,6 +354,7 @@ HEADERS += \
     streaming/audio/dualsensehapticsrouting.h \
     streaming/audio/dualsensehapticsstream.h \
     streaming/audio/dualsensehapticscontrol.h \
+    streaming/audio/dualsensehapticsbt.h \
     streaming/audio/renderers/sdl.h \
     gui/computermodel.h \
     gui/appmodel.h \

@@ -37,6 +37,7 @@
 #define SER_ABSTOUCHMODE "abstouchmode"
 #define SER_NATIVETOUCHPAD "nativeTouchpad"
 #define SER_DUALSENSEHAPTICSMODE "dualSenseHapticsMode"
+#define SER_DUALSENSEBTHAPTICSGAIN "dualSenseBtHapticsGain"
 #define SER_STARTWINDOWED "startwindowed"
 #define SER_FRAMEPACING "framepacing"
 #define SER_VIDEOENHANCEMENT "videoenhancement"
@@ -311,6 +312,8 @@ void StreamingPreferences::reload()
         dualSenseHapticsMode = DSHM_EMULATED;
     }
 #endif
+    dualSenseBtHapticsGain =
+        qBound(50, settings.value(SER_DUALSENSEBTHAPTICSGAIN, 200).toInt(), 400);
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     videoEnhancement = settings.value(SER_VIDEOENHANCEMENT, false).toBool();
     enableMicrophone = settings.value(SER_MICROPHONE, false).toBool();
@@ -798,6 +801,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
     settings.setValue(SER_NATIVETOUCHPAD, enableNativeTouchpad);
     settings.setValue(SER_DUALSENSEHAPTICSMODE, dualSenseHapticsMode);
+    settings.setValue(SER_DUALSENSEBTHAPTICSGAIN, dualSenseBtHapticsGain);
     settings.setValue(SER_FRAMEPACING, framePacing);
     settings.setValue(SER_VIDEOENHANCEMENT, videoEnhancement);
     settings.setValue(SER_STREAMRESOLUTIONSCALE, streamResolutionScale);

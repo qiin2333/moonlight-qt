@@ -13,6 +13,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -30,7 +31,11 @@
 #include <ksmedia.h>
 #include <mmdeviceapi.h>
 #include <propvarutil.h>
+#include <setupapi.h>
+#include <hidsdi.h>
 #include <wrl/client.h>
+
+#include "dualsensehapticsbt.h"
 
 using Microsoft::WRL::ComPtr;
 #elif defined(Q_OS_MACOS)
@@ -285,10 +290,8 @@ public:
             return true;
         });
 
-        if (!found) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "No active 48 kHz four-channel DualSense audio endpoint was found");
-        }
+        // No warning here: WindowsHapticsEndpoint tries Bluetooth next and
+        // reports when neither transport is available.
         return found;
     }
 
@@ -326,6 +329,9 @@ public:
         }
         m_Started = false;
     }
+
+    // The audio device plays everything it was given; nothing is held back.
+    bool finishStream() { return true; }
 
     WriteResult tryWrite(const Packet& packet)
     {
@@ -368,10 +374,394 @@ private:
     bool m_Started = false;
 };
 
-using HapticsEndpoint = WasapiHapticsEndpoint;
+// A DualSense connected over Bluetooth has no audio endpoint. Its haptics PCM
+// goes out as HID output report 0x34 instead (see dualsensehapticsbt.h).
+//
+// SDL keeps its own handle to the same HID device for input, LEDs and adaptive
+// triggers (report 0x31); both handles are opened shared, and the controller
+// accepts the two report streams side by side.
+//
+// Reports are sent as soon as enough PCM has arrived, so the host's audio clock
+// paces them. That is how ds5-bridge drives the controller in production.
+
+// Set by the session from the user's preference before a stream starts.
+std::atomic<float> g_BluetoothHapticsGain{ dualsense_haptics::bt::DefaultGain };
+
+class BtHidHapticsEndpoint
+{
+public:
+    ~BtHidHapticsEndpoint() { close(); }
+
+    struct Device
+    {
+        std::wstring path;
+        USHORT productId = 0;
+        USHORT outputReportLength = 0;
+    };
+
+    // Call visit() for each present DualSense HID collection that is connected
+    // over Bluetooth, until it accepts one. Bluetooth is told apart from USB by
+    // the output report length: USB reports are 64 bytes at most, while the
+    // Bluetooth collection carries reports 0x31-0x39 of up to 547 bytes.
+    template <typename Visit> static bool findBluetoothDualSense(Visit visit)
+    {
+        GUID hidGuid;
+        HidD_GetHidGuid(&hidGuid);
+        HDEVINFO devices =
+            SetupDiGetClassDevsW(&hidGuid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+        if (devices == INVALID_HANDLE_VALUE)
+            return false;
+
+        bool found = false;
+        SP_DEVICE_INTERFACE_DATA interfaceData{};
+        interfaceData.cbSize = sizeof(interfaceData);
+        for (DWORD index = 0; !found && SetupDiEnumDeviceInterfaces(devices, nullptr, &hidGuid,
+                                                                    index, &interfaceData);
+             index++) {
+            DWORD detailSize = 0;
+            SetupDiGetDeviceInterfaceDetailW(devices, &interfaceData, nullptr, 0, &detailSize,
+                                             nullptr);
+            if (detailSize == 0)
+                continue;
+            std::vector<std::uint8_t> detailBuffer(detailSize);
+            auto* detail =
+                reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA_W*>(detailBuffer.data());
+            detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
+            if (!SetupDiGetDeviceInterfaceDetailW(devices, &interfaceData, detail, detailSize,
+                                                  nullptr, nullptr)) {
+                continue;
+            }
+
+            // No access rights are needed to read attributes and capabilities.
+            HANDLE handle = CreateFileW(detail->DevicePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                        nullptr, OPEN_EXISTING, 0, nullptr);
+            if (handle == INVALID_HANDLE_VALUE)
+                continue;
+
+            Device device;
+            HIDD_ATTRIBUTES attributes{};
+            attributes.Size = sizeof(attributes);
+            PHIDP_PREPARSED_DATA preparsed = nullptr;
+            HIDP_CAPS caps{};
+            const bool isDualSense =
+                HidD_GetAttributes(handle, &attributes) && attributes.VendorID == 0x054C &&
+                (attributes.ProductID == 0x0CE6 || attributes.ProductID == 0x0DF2);
+            if (isDualSense && HidD_GetPreparsedData(handle, &preparsed)) {
+                if (HidP_GetCaps(preparsed, &caps) == HIDP_STATUS_SUCCESS &&
+                    caps.OutputReportByteLength >= dualsense_haptics::bt::ReportLength) {
+                    device.path = detail->DevicePath;
+                    device.productId = attributes.ProductID;
+                    device.outputReportLength = caps.OutputReportByteLength;
+                }
+                HidD_FreePreparsedData(preparsed);
+            }
+            CloseHandle(handle);
+
+            if (!device.path.empty())
+                found = visit(device);
+        }
+        SetupDiDestroyDeviceInfoList(devices);
+        return found;
+    }
+
+    bool open()
+    {
+        close();
+        const bool found = findBluetoothDualSense([this](const Device& device) {
+            HANDLE handle =
+                CreateFileW(device.path.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+            if (handle == INVALID_HANDLE_VALUE) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "Unable to open Bluetooth DualSense for haptics: %lu",
+                            static_cast<unsigned long>(GetLastError()));
+                return false;
+            }
+            m_Device = handle;
+            m_Write = std::make_unique<WriteSlot>();
+            m_Write->buffer.assign(device.outputReportLength, 0);
+            return true;
+        });
+        if (!found)
+            return false;
+
+        m_Write->event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (m_Write->event == nullptr) {
+            close();
+            return false;
+        }
+        const float gain = g_BluetoothHapticsGain.load();
+        m_Assembler.reset();
+        m_Assembler.setGain(gain);
+        m_ConsecutiveFailures = 0;
+        SDL_LogInfo(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "DualSense haptics endpoint ready: Bluetooth HID report 0x34 "
+            "(%u-byte output reports, %u frames per report, ~%.0f Hz signed 8-bit, gain %.1f)",
+            static_cast<unsigned>(m_Write->buffer.size()),
+            static_cast<unsigned>(dualsense_haptics::bt::FramesPerReport),
+            dualsense_haptics::bt::InputRate * dualsense_haptics::bt::FramesPerReport /
+                dualsense_haptics::bt::InputFramesPerReport,
+            gain);
+        return true;
+    }
+
+    void close()
+    {
+        m_Started = false;
+        if (m_Device != INVALID_HANDLE_VALUE) {
+            if (m_Write && m_Write->pending) {
+                CancelIoEx(m_Device, &m_Write->overlapped);
+                if (!completePendingWrite(CloseWaitMs)) {
+                    // The driver ignored the cancel and may still touch the
+                    // OVERLAPPED and buffer, so they must never be freed.
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                                "Bluetooth DualSense haptics write did not finish after "
+                                "cancellation; abandoning its buffer");
+                    m_Write.release();
+                }
+            }
+            CloseHandle(m_Device);
+            m_Device = INVALID_HANDLE_VALUE;
+        }
+        m_Write.reset();
+        m_Assembler.reset();
+    }
+
+    bool isOpen() const { return m_Device != INVALID_HANDLE_VALUE; }
+    bool isStarted() const { return m_Started; }
+
+    // Reports go out as soon as they are complete, so this only bounds what the
+    // worker may prebuffer before start(): 200 ms at 48 kHz.
+    std::uint32_t bufferFrames() const { return 9600; }
+    std::uint32_t maxQueuedPackets() const { return 0; }
+
+    bool start()
+    {
+        m_Started = isOpen();
+        return m_Started;
+    }
+
+    // Whatever already reached the controller plays out; drop the partial report.
+    void reset()
+    {
+        m_Started = false;
+        m_Assembler.reset();
+    }
+
+    // The host ended the stream: send the partial report instead of holding it
+    // back until the next stream discards it.
+    bool finishStream()
+    {
+        return isOpen() && m_Assembler.flush(
+                               [this](const std::uint8_t* report) { return writeReport(report); });
+    }
+
+    WriteResult tryWrite(const Packet& packet)
+    {
+        if (!isOpen())
+            return WriteResult::Failed;
+        if (packet.frameCount == 0)
+            return WriteResult::Ok;
+
+        const bool ok =
+            m_Assembler.push(pcmSamples(packet), packet.frameCount,
+                             [this](const std::uint8_t* report) { return writeReport(report); });
+        return ok ? WriteResult::Ok : WriteResult::Failed;
+    }
+
+private:
+    // A single slow write is tolerated; repeated failures mean the controller
+    // went away (powered off, out of range) and the endpoint must be reopened.
+    static constexpr int MaxConsecutiveFailures = 3;
+    static constexpr DWORD WriteTimeoutMs = 100;
+    static constexpr DWORD CancelWaitMs = 20;
+    static constexpr DWORD CloseWaitMs = 500;
+
+    // One overlapped write at a time. The OVERLAPPED and buffer belong to the
+    // write until the driver completes it, so the worker never waits unbounded:
+    // a write that ignores cancellation keeps the slot busy (later reports fail
+    // until it completes) and close() abandons the slot rather than free it.
+    struct WriteSlot
+    {
+        OVERLAPPED overlapped{};
+        std::vector<std::uint8_t> buffer;
+        HANDLE event = nullptr;
+        bool pending = false;
+
+        WriteSlot() = default;
+        WriteSlot(const WriteSlot&) = delete;
+        WriteSlot& operator=(const WriteSlot&) = delete;
+        ~WriteSlot()
+        {
+            if (event != nullptr)
+                CloseHandle(event);
+        }
+    };
+
+    // Wait up to timeoutMs for the write in flight; true once the slot is free.
+    bool completePendingWrite(DWORD timeoutMs)
+    {
+        if (WaitForSingleObject(m_Write->event, timeoutMs) != WAIT_OBJECT_0)
+            return false;
+        DWORD written = 0;
+        GetOverlappedResult(m_Device, &m_Write->overlapped, &written, FALSE);
+        m_Write->pending = false;
+        return true;
+    }
+
+    bool issueWrite(const std::uint8_t* report)
+    {
+        if (m_Write->pending && !completePendingWrite(0))
+            return false;
+
+        std::copy_n(report, dualsense_haptics::bt::ReportLength, m_Write->buffer.begin());
+        // Bytes past the report stay zero: Windows wants the collection's
+        // longest output report length on every write.
+
+        m_Write->overlapped = OVERLAPPED{};
+        m_Write->overlapped.hEvent = m_Write->event;
+        ResetEvent(m_Write->event);
+        DWORD written = 0;
+        if (WriteFile(m_Device, m_Write->buffer.data(), static_cast<DWORD>(m_Write->buffer.size()),
+                      nullptr, &m_Write->overlapped))
+            return GetOverlappedResult(m_Device, &m_Write->overlapped, &written, FALSE) != FALSE;
+        if (GetLastError() != ERROR_IO_PENDING)
+            return false;
+
+        m_Write->pending = true;
+        if (WaitForSingleObject(m_Write->event, WriteTimeoutMs) == WAIT_OBJECT_0) {
+            m_Write->pending = false;
+            return GetOverlappedResult(m_Device, &m_Write->overlapped, &written, FALSE) != FALSE;
+        }
+        CancelIoEx(m_Device, &m_Write->overlapped);
+        completePendingWrite(CancelWaitMs);
+        return false;
+    }
+
+    bool writeReport(const std::uint8_t* report)
+    {
+        if (issueWrite(report)) {
+            m_ConsecutiveFailures = 0;
+            return true;
+        }
+        const DWORD error = GetLastError();
+        if (++m_ConsecutiveFailures < MaxConsecutiveFailures)
+            return true;
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Bluetooth DualSense stopped accepting haptics reports: %lu",
+                    static_cast<unsigned long>(error));
+        return false;
+    }
+
+    HANDLE m_Device = INVALID_HANDLE_VALUE;
+    std::unique_ptr<WriteSlot> m_Write;
+    dualsense_haptics::bt::ReportAssembler m_Assembler;
+    int m_ConsecutiveFailures = 0;
+    bool m_Started = false;
+};
+
+// USB first: its audio endpoint plays the authored PCM at the full 48 kHz.
+// Bluetooth is the fallback for a controller without one.
+class WindowsHapticsEndpoint
+{
+public:
+    bool threadInit() { return m_Usb.threadInit(); }
+    void threadCleanup() { m_Usb.threadCleanup(); }
+
+    bool open()
+    {
+        close();
+        if (m_Usb.open()) {
+            m_Active = Active::Usb;
+        } else if (m_Bt.open()) {
+            m_Active = Active::Bluetooth;
+        } else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "No DualSense haptics output was found (neither a 48 kHz four-channel "
+                        "USB audio endpoint nor a Bluetooth-connected DualSense)");
+            return false;
+        }
+        return true;
+    }
+
+    void close()
+    {
+        m_Usb.close();
+        m_Bt.close();
+        m_Active = Active::None;
+    }
+
+    bool isOpen() const { return m_Active != Active::None; }
+    bool isStarted() const
+    {
+        return m_Active == Active::Usb         ? m_Usb.isStarted()
+               : m_Active == Active::Bluetooth ? m_Bt.isStarted()
+                                               : false;
+    }
+    std::uint32_t bufferFrames() const
+    {
+        return m_Active == Active::Usb         ? m_Usb.bufferFrames()
+               : m_Active == Active::Bluetooth ? m_Bt.bufferFrames()
+                                               : 0;
+    }
+    std::uint32_t maxQueuedPackets() const
+    {
+        return m_Active == Active::Usb         ? m_Usb.maxQueuedPackets()
+               : m_Active == Active::Bluetooth ? m_Bt.maxQueuedPackets()
+                                               : 0;
+    }
+    bool start()
+    {
+        return m_Active == Active::Usb         ? m_Usb.start()
+               : m_Active == Active::Bluetooth ? m_Bt.start()
+                                               : false;
+    }
+    void reset()
+    {
+        if (m_Active == Active::Usb)
+            m_Usb.reset();
+        else if (m_Active == Active::Bluetooth)
+            m_Bt.reset();
+    }
+    bool finishStream()
+    {
+        return m_Active == Active::Usb         ? m_Usb.finishStream()
+               : m_Active == Active::Bluetooth ? m_Bt.finishStream()
+                                               : true;
+    }
+    WriteResult tryWrite(const Packet& packet)
+    {
+        return m_Active == Active::Usb         ? m_Usb.tryWrite(packet)
+               : m_Active == Active::Bluetooth ? m_Bt.tryWrite(packet)
+                                               : WriteResult::Failed;
+    }
+
+private:
+    enum class Active
+    {
+        None,
+        Usb,
+        Bluetooth
+    };
+    WasapiHapticsEndpoint m_Usb;
+    BtHidHapticsEndpoint m_Bt;
+    Active m_Active = Active::None;
+};
+
+using HapticsEndpoint = WindowsHapticsEndpoint;
+
+bool probeBluetoothHapticsEndpoint()
+{
+    return BtHidHapticsEndpoint::findBluetoothDualSense(
+        [](const BtHidHapticsEndpoint::Device&) { return true; });
+}
 
 bool probeHapticsEndpoint()
 {
+    if (probeBluetoothHapticsEndpoint())
+        return true;
+
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const bool shouldUninitialize = SUCCEEDED(comResult);
     if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE) {
@@ -658,6 +1048,9 @@ public:
         m_Started = false;
     }
 
+    // The queue plays everything it was given; nothing is held back.
+    bool finishStream() { return true; }
+
     WriteResult tryWrite(const Packet& packet)
     {
         if (m_Queue == nullptr || packet.frameCount == 0)
@@ -776,6 +1169,11 @@ struct DualSenseHapticsRenderer::Impl
     // the input handler picked is played, and only while it is the only
     // DualSense connected.
     std::atomic_int controllerTarget{ -1 };
+    // One-shot diagnostics, so a silent haptics stream can be told apart from
+    // one that is being filtered out on the client.
+    std::atomic_bool loggedFirstPcm{ false };
+    std::atomic_bool loggedTargetMismatch{ false };
+    std::atomic_bool loggedBadFormat{ false };
     int joystickTarget = -1;
     dualsense_haptics::ControlState controls;
     bool outputDirty = false;
@@ -908,11 +1306,14 @@ struct DualSenseHapticsRenderer::Impl
             // short prebuffer and samples already queued in the OS audio device.
             if (!prebuffer.empty() && !startPrebufferedStream())
                 failEndpoint();
+            else
+                finishStream();
             return;
         }
         if (action == dualsense_haptics::PcmStreamTracker::Action::ResetAndAccept) {
             resetAudioStream();
         }
+        const bool streamEnd = packet.flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_END;
 
         if (!endpoint.isOpen()) {
             const auto now = std::chrono::steady_clock::now();
@@ -949,7 +1350,6 @@ struct DualSenseHapticsRenderer::Impl
                 return;
             }
 
-            const bool streamEnd = packet.flags & LI_DS5_HAPTICS_PCM_FLAG_STREAM_END;
             prebufferedFrames += packet.frameCount;
             prebuffer.emplace_back(std::move(packet));
             if (!dualsense_haptics::isPrebufferFull(prebufferedFrames, endpoint.bufferFrames()) &&
@@ -958,10 +1358,21 @@ struct DualSenseHapticsRenderer::Impl
 
             if (!startPrebufferedStream()) {
                 failEndpoint();
+                return;
             }
         } else if (!writePacket(packet)) {
             failEndpoint();
+            return;
         }
+        if (streamEnd)
+            finishStream();
+    }
+
+    // Send whatever the endpoint still holds back for a stream that just ended.
+    void finishStream()
+    {
+        if (endpoint.isStarted() && !endpoint.finishStream())
+            failEndpoint();
     }
 
     void run()
@@ -1069,7 +1480,20 @@ bool DualSenseHapticsRenderer::isAvailable()
 void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
 {
 #ifdef HAVE_PHYSICAL_DS5_HAPTICS
+    if (!m_Impl->loggedFirstPcm.exchange(true)) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "First DualSense haptics PCM from host: controller %u (target %d), %u Hz, "
+                    "%u ch, %u-bit, %u frames, flags 0x%x",
+                    frame.controllerNumber, m_Impl->controllerTarget.load(), frame.sampleRate,
+                    frame.channelCount, frame.bitsPerSample, frame.frameCount, frame.flags);
+    }
+
     if (frame.controllerNumber != m_Impl->controllerTarget) {
+        if (!m_Impl->loggedTargetMismatch.exchange(true)) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Dropping DualSense haptics PCM for controller %u: local target is %d",
+                        frame.controllerNumber, m_Impl->controllerTarget.load());
+        }
         return;
     }
 
@@ -1077,6 +1501,13 @@ void DualSenseHapticsRenderer::submit(const LI_DS5_HAPTICS_PCM_FRAME& frame)
         frame.bitsPerSample != 16 || frame.frameCount > 480 ||
         frame.pcmDataLength != frame.frameCount * frame.channelCount * sizeof(std::int16_t) ||
         (frame.pcmDataLength != 0 && frame.pcmData == nullptr)) {
+        if (!m_Impl->loggedBadFormat.exchange(true)) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Dropping DualSense haptics PCM with unsupported format: %u Hz, %u ch, "
+                        "%u-bit, %u frames, %u bytes",
+                        frame.sampleRate, frame.channelCount, frame.bitsPerSample, frame.frameCount,
+                        frame.pcmDataLength);
+        }
         return;
     }
 
@@ -1176,6 +1607,16 @@ bool DualSenseHapticsRenderer::submitEffect(std::uint16_t controllerNumber, cons
 #endif
 }
 
+void DualSenseHapticsRenderer::setBluetoothGain(float gain)
+{
+#if defined(HAVE_PHYSICAL_DS5_HAPTICS) && defined(Q_OS_WIN32) &&                                   \
+    !defined(MOONLIGHT_DS5_TEST_ENDPOINT)
+    g_BluetoothHapticsGain = std::clamp(gain, 0.5f, 4.0f);
+#else
+    Q_UNUSED(gain);
+#endif
+}
+
 void DualSenseHapticsRenderer::setControllerTarget(int controllerNumber, int joystickInstanceId)
 {
     Q_UNUSED(controllerNumber);
@@ -1186,6 +1627,9 @@ void DualSenseHapticsRenderer::setControllerTarget(int controllerNumber, int joy
         if (m_Impl->controllerTarget == controllerNumber &&
             m_Impl->joystickTarget == joystickInstanceId)
             return;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "DualSense haptics target: controller %d (joystick %d)", controllerNumber,
+                    joystickInstanceId);
         m_Impl->controllerTarget = controllerNumber;
         m_Impl->joystickTarget = joystickInstanceId;
         m_Impl->queue.clear();
