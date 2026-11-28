@@ -1,6 +1,6 @@
 QT -= core gui
-CONFIG += console c++17 link_pkgconfig
+CONFIG += console c++17
 CONFIG -= app_bundle
-PKGCONFIG += pyrowave-shared
+include(dependency.pri)
 macx:!disable-prebuilts: INCLUDEPATH += $$PWD/../../libs/mac/include
 SOURCES = main.cpp
