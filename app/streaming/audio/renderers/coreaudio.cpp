@@ -98,36 +98,58 @@ UInt32 outputSpeakerCount(AudioDeviceID device, UInt32 channelCount)
                                      kAudioDevicePropertyScopeOutput,
                                      kAudioObjectPropertyElementMain };
     UInt32 size = 0;
-    if (AudioObjectGetPropertyDataSize(device, &addr, 0, nullptr, &size) != noErr ||
-        size < offsetof(AudioChannelLayout, mChannelDescriptions)) {
-        return qMin(channelCount, 2U);
+    std::vector<unsigned char> storage;
+    if (AudioObjectGetPropertyDataSize(device, &addr, 0, nullptr, &size) == noErr &&
+        size >= offsetof(AudioChannelLayout, mChannelDescriptions)) {
+        storage.resize(size);
+        if (AudioObjectGetPropertyData(device, &addr, 0, nullptr, &size, storage.data()) != noErr) {
+            storage.clear();
+        }
     }
 
-    std::vector<unsigned char> storage(size);
-    auto layout = reinterpret_cast<AudioChannelLayout*>(storage.data());
-    if (AudioObjectGetPropertyData(device, &addr, 0, nullptr, &size, layout) != noErr) {
-        return qMin(channelCount, 2U);
+    // Spell out a layout given as a tag or a bitmap
+    auto layout = reinterpret_cast<const AudioChannelLayout*>(storage.data());
+    if (!storage.empty() &&
+        layout->mChannelLayoutTag != kAudioChannelLayoutTag_UseChannelDescriptions) {
+        bool bitmap = layout->mChannelLayoutTag == kAudioChannelLayoutTag_UseChannelBitmap;
+        AudioFormatPropertyID property = bitmap ? kAudioFormatProperty_ChannelLayoutForBitmap
+                                                : kAudioFormatProperty_ChannelLayoutForTag;
+        const void* specifier =
+            bitmap ? (const void*)&layout->mChannelBitmap : (const void*)&layout->mChannelLayoutTag;
+        UInt32 specifierSize =
+            bitmap ? sizeof(layout->mChannelBitmap) : sizeof(layout->mChannelLayoutTag);
+
+        std::vector<unsigned char> expanded;
+        if (AudioFormatGetPropertyInfo(property, specifierSize, specifier, &size) == noErr &&
+            size >= offsetof(AudioChannelLayout, mChannelDescriptions)) {
+            expanded.resize(size);
+            if (AudioFormatGetProperty(property, specifierSize, specifier, &size,
+                                       expanded.data()) != noErr) {
+                expanded.clear();
+            }
+        }
+        storage = std::move(expanded);
+        layout = reinterpret_cast<const AudioChannelLayout*>(storage.data());
     }
 
     UInt32 speakers = 0;
-    if (layout->mChannelLayoutTag == kAudioChannelLayoutTag_UseChannelDescriptions) {
+    if (!storage.empty()) {
         UInt32 descriptions =
             qMin(layout->mNumberChannelDescriptions,
                  (UInt32)((size - offsetof(AudioChannelLayout, mChannelDescriptions)) /
                           sizeof(AudioChannelDescription)));
         for (UInt32 i = 0; i < descriptions; i++) {
+            // Labels from Discrete up (Discrete_N, HOA, Unknown) number or encode
+            // channels without placing a speaker
             AudioChannelLabel label = layout->mChannelDescriptions[i].mChannelLabel;
-            if (label != kAudioChannelLabel_Unknown && label != kAudioChannelLabel_Unused) {
+            if (label != kAudioChannelLabel_Unused && label < kAudioChannelLabel_Discrete) {
                 speakers++;
             }
         }
-    } else if (layout->mChannelLayoutTag == kAudioChannelLayoutTag_UseChannelBitmap) {
-        speakers = (UInt32)__builtin_popcount(layout->mChannelBitmap);
-    } else {
-        speakers = AudioChannelLayoutTag_GetNumberOfChannels(layout->mChannelLayoutTag);
     }
 
-    // A device nobody has set up has no labels. macOS plays stereo on those.
+    // A device nobody has set up has no speaker positions. macOS plays stereo
+    // on those.
     if (speakers == 0) {
         speakers = 2;
     }
