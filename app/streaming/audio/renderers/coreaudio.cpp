@@ -28,6 +28,8 @@ constexpr AudioObjectPropertyAddress DefaultDeviceAddress = {
 constexpr AudioObjectPropertyAddress DeviceAddresses[] = {
     { kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal,
       kAudioObjectPropertyElementMain },
+    { kAudioDevicePropertyIOStoppedAbnormally, kAudioObjectPropertyScopeGlobal,
+      kAudioObjectPropertyElementMain },
     { kAudioDevicePropertyDataSource, kAudioDevicePropertyScopeOutput,
       kAudioObjectPropertyElementMain },
     { kAudioDevicePropertyStreamConfiguration, kAudioDevicePropertyScopeOutput,
