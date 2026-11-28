@@ -100,8 +100,9 @@ HDR 使用 compute 解码，避开 fragment 路径无法输出 10-bit CPU 格式
 协商一致，静态主机 HDR 元数据会传给渲染器，此解码器暂不广告动态 HDR 能力。
 主机必须实际输出 HDR 信号；关闭主机 HDR 且没有生成 HDR 的处理路径时，会话可能结束，
 暂不支持在 PyroWave 串流中从 HDR 动态切换到 SDR。
-当前使用 CPU readback 后再由 Vulkan renderer 显示，高位深输出每个样本占用的字节数翻倍；
-HDR 显示正确性与持续串流性能仍需在目标 GPU 和显示设备上做端到端验证。
+在兼容的 Vulkan 设备上，解码器直接写入渲染器的 YUV 纹理，通过 timeline semaphore
+通知渲染器采样。不支持直通的设备自动使用 CPU 回读。设置 `PYROWAVE_CPU_READBACK=1`
+可强制使用回读路径做对照测试。
 协商失败时回退到原有的首选编码；如需关闭
 编译可传入 `CONFIG+=disable-pyrowave`。串流开始时会提示协商结果，开启性能统计后也可查看实际编码。
 
@@ -112,6 +113,11 @@ pkg-config --modversion pyrowave-shared
 ```
 
 ### Windows
+
+如需启用可选的 PyroWave 支持，先运行 `setup-deps.ps1`，再将 AlkaidLab 的
+`pyrowave.h` 放入 `libs/windows/include/<arch>/pyrowave/`，将配套 MSVC 导入库
+`pyrowave-shared.lib` 和运行时 DLL 放入 `libs/windows/lib/<arch>/`，然后运行 qmake。
+`<arch>` 与目标架构一致，可取 `x64` 或 `arm64`。
 
 要求：
 

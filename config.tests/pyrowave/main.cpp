@@ -10,7 +10,10 @@ int main()
     buffer.format = PYROWAVE_CPU_BUFFER_FORMAT_YUV420P10;
     bool (*volatile readMetadata)(pyrowave_decoder, pyrowave_color_metadata*) =
         &pyrowave_decoder_get_color_metadata;
-    return readMetadata != nullptr && metadata.transfer == PYROWAVE_TRANSFER_HLG &&
+    auto* volatile decodeSurface = &pyrowave_decoder_decode_gpu_buffer;
+    auto* volatile borrowDevice = &pyrowave_create_device;
+    return readMetadata != nullptr && decodeSurface != nullptr && borrowDevice != nullptr &&
+                   metadata.transfer == PYROWAVE_TRANSFER_HLG &&
                    buffer.format == PYROWAVE_CPU_BUFFER_FORMAT_YUV420P10
                ? 0
                : 1;

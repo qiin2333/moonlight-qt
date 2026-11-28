@@ -182,6 +182,7 @@ unix:if(!macx|disable-prebuilts) {
 win32 {
     LIBS += -llibssl -llibcrypto -lSDL2 -lSDL2_ttf -lavcodec -lavutil -lswscale -lopus -ldxgi -ld3d11 -llibplacebo
     CONFIG += ffmpeg libplacebo
+    !disable-pyrowave:config_pyrowave: CONFIG += pyrowave
 }
 win32:!winrt {
     DEFINES += HAVE_WINDOWS_RAW_TOUCHPAD HAVE_WINDOWS_PEN_INPUT HAVE_PHYSICAL_DS5_HAPTICS
@@ -527,10 +528,10 @@ pyrowave:!config_pyrowave {
 pyrowave:libplacebo:ffmpeg:!config_SL {
     message(PyroWave decoder enabled)
 
-    CONFIG += link_pkgconfig
-    PKGCONFIG += pyrowave-shared
+    include(../config.tests/pyrowave/dependency.pri)
     DEFINES += HAVE_PYROWAVE
-    SOURCES += streaming/video/pyrowave.cpp
+    SOURCES += streaming/video/pyrowave.cpp streaming/video/pyrowavesurfaces.cpp
+    HEADERS += streaming/video/pyrowavesurfaces.h
     HEADERS += streaming/video/pyrowave.h streaming/video/pyrowavecolor.h
 }
 config_EGL {

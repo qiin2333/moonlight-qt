@@ -1,4 +1,5 @@
 #include "pyrowave.h"
+#include "pyrowavesurfaces.h"
 
 #include "streaming/session.h"
 
@@ -35,9 +36,6 @@ PyrowaveVideoDecoder::~PyrowaveVideoDecoder()
         Session::get()->getOverlayManager().setOverlayRenderer(nullptr);
     }
 
-    delete m_Renderer;
-    m_Renderer = nullptr;
-
     if (m_Decoder != nullptr) {
         pyrowave_decoder_destroy(m_Decoder);
         m_Decoder = nullptr;
@@ -46,6 +44,7 @@ PyrowaveVideoDecoder::~PyrowaveVideoDecoder()
         pyrowave_device_destroy(m_Device);
         m_Device = nullptr;
     }
+    delete m_Renderer;
 }
 
 bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
@@ -70,31 +69,45 @@ bool PyrowaveVideoDecoder::initialize(PDECODER_PARAMETERS params)
     m_Width = params->width;
     m_Height = params->height;
 
-    if (pyrowave_create_default_device(&m_Device) != PYROWAVE_SUCCESS || m_Device == nullptr) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unable to create a Vulkan device for PyroWave");
-        return false;
-    }
-
-    pyrowave_decoder_create_info decoderInfo = {};
-    decoderInfo.device = m_Device;
-    decoderInfo.width = m_Width;
-    decoderInfo.height = m_Height;
-    decoderInfo.chroma = PYROWAVE_CHROMA_SUBSAMPLING_420;
-    decoderInfo.fragment_path =
-        m_ColorContract.useFragmentPath(pyrowave_decoder_device_prefers_fragment_path(m_Device));
-
-    if (pyrowave_decoder_create(&decoderInfo, &m_Decoder) != PYROWAVE_SUCCESS ||
-        m_Decoder == nullptr) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unable to create the PyroWave decoder");
-        return false;
-    }
-
     m_Renderer = new PlVkRenderer(AV_HWDEVICE_TYPE_NONE);
     if (!m_Renderer->initialize(params)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Unable to initialize the Vulkan renderer for PyroWave");
         return false;
     }
+
+    pyrowave_decoder_create_info decoderInfo = {};
+    decoderInfo.width = m_Width;
+    decoderInfo.height = m_Height;
+    decoderInfo.chroma = PYROWAVE_CHROMA_SUBSAMPLING_420;
+    if (!qEnvironmentVariableIntValue("PYROWAVE_CPU_READBACK")) {
+        auto surfaces = m_Renderer->createPyrowaveSurfaces(PACER_MAX_OUTSTANDING_FRAMES + 1);
+        if (surfaces->createDevice(&m_Device)) {
+            decoderInfo.device = m_Device;
+            if (pyrowave_decoder_create(&decoderInfo, &m_Decoder) == PYROWAVE_SUCCESS) {
+                m_Surfaces = surfaces;
+            } else {
+                pyrowave_device_destroy(m_Device);
+                m_Device = nullptr;
+            }
+        }
+    }
+    if (!m_Surfaces) {
+        if (pyrowave_create_default_device(&m_Device) != PYROWAVE_SUCCESS) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Unable to create a Vulkan device for PyroWave");
+            return false;
+        }
+        decoderInfo.device = m_Device;
+        decoderInfo.fragment_path = m_ColorContract.useFragmentPath(
+            pyrowave_decoder_device_prefers_fragment_path(m_Device));
+        if (pyrowave_decoder_create(&decoderInfo, &m_Decoder) != PYROWAVE_SUCCESS) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unable to create the PyroWave decoder");
+            return false;
+        }
+    }
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "PyroWave output: %s",
+                m_Surfaces ? "Vulkan surfaces" : "CPU readback");
     if (m_ColorContract.hdrMode != 0 && !isHdrSupported()) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Vulkan renderer cannot handle PyroWave HDR");
         return false;
@@ -216,11 +229,35 @@ bool PyrowaveVideoDecoder::createFrame(const pyrowave_color_metadata& metadata, 
     PyrowaveColor::applyToFrame(m_ColorContract, metadata, output);
     output->width = m_Width;
     output->height = m_Height;
-    if (av_frame_get_buffer(output, 32) < 0) {
+    auto surfaceResult =
+        m_Surfaces ? m_Surfaces->decode(m_Decoder, output) : PyrowaveSurfaces::Unavailable;
+    if (surfaceResult != PyrowaveSurfaces::Decoded) {
+        if (m_Surfaces && surfaceResult == PyrowaveSurfaces::Unavailable) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "PyroWave surface unavailable; using CPU readback");
+            m_Surfaces = nullptr;
+        }
+        if (!readCpuFrame(output)) {
+            av_frame_free(&output);
+            return false;
+        }
+    }
+
+    SS_HDR_METADATA hdrMetadata;
+    if (m_ColorContract.hdrMode != 0 && LiGetHdrMetadata(&hdrMetadata) &&
+        !PyrowaveColor::attachHdrMetadata(output, hdrMetadata)) {
         av_frame_free(&output);
         return false;
     }
+    *frame = output;
+    return true;
+}
 
+bool PyrowaveVideoDecoder::readCpuFrame(AVFrame* output)
+{
+    if (av_frame_get_buffer(output, 32) < 0) {
+        return false;
+    }
     pyrowave_cpu_buffer buffers = {};
     buffers.data[0] = output->data[0];
     buffers.data[1] = output->data[1];
@@ -237,20 +274,7 @@ bool PyrowaveVideoDecoder::createFrame(const pyrowave_color_metadata& metadata, 
     buffers.height = m_Height;
     buffers.format = m_ColorContract.cpuFormat;
 
-    if (pyrowave_decoder_decode_cpu_buffer_synchronous(m_Decoder, &buffers) != PYROWAVE_SUCCESS) {
-        av_frame_free(&output);
-        return false;
-    }
-
-    SS_HDR_METADATA hdrMetadata;
-    if (m_ColorContract.hdrMode != 0 && LiGetHdrMetadata(&hdrMetadata) &&
-        !PyrowaveColor::attachHdrMetadata(output, hdrMetadata)) {
-        av_frame_free(&output);
-        return false;
-    }
-
-    *frame = output;
-    return true;
+    return pyrowave_decoder_decode_cpu_buffer_synchronous(m_Decoder, &buffers) == PYROWAVE_SUCCESS;
 }
 
 void PyrowaveVideoDecoder::updatePerformanceOverlay(uint64_t nowUs)
@@ -325,11 +349,11 @@ void PyrowaveVideoDecoder::updatePerformanceOverlay(uint64_t nowUs)
         SDL_snprintf(text, sizeof(text),
                      " {18}%dx%d@%.0f PyroWave %s "
                      " {18}FPS  %.1f {14}Rx{18} · %.1f {14}De{18} · %.1f {14}Rd{18} \n"
-                     " Network %s Loss %.2f%% Bandwidth %s {16}|  {18}Render %s · Decode %s %s",
+                     " Network %s Loss %.2f%% Bandwidth %s {16}|  {18}Render %s · %s %s %s",
                      m_Width, m_Height, total / elapsedSeconds, m_ColorContract.label,
                      received / elapsedSeconds, decoded / elapsedSeconds, rendered / elapsedSeconds,
                      rttString, total != 0 ? 100.0 * lost / total : 0.0, bandwidthString,
-                     renderString, decodeString, encodeString);
+                     renderString, m_Surfaces ? "Submit" : "Decode", decodeString, encodeString);
         Session::get()->getOverlayManager().updateOverlayText(Overlay::OverlayDebug, text);
     }
 

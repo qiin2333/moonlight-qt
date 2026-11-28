@@ -1,4 +1,7 @@
 #include "plvk.h"
+#ifdef HAVE_PYROWAVE
+#include "../pyrowavesurfaces.h"
+#endif
 
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
@@ -158,6 +161,9 @@ PlVkRenderer::PlVkRenderer(AVHWDeviceType hwDeviceType, IFFmpegRenderer *backend
 
 PlVkRenderer::~PlVkRenderer()
 {
+#ifdef HAVE_PYROWAVE
+    m_PyrowaveSurfaces.reset();
+#endif
     // The render context must have been cleaned up by now
     SDL_assert(!m_HasPendingSwapchainFrame);
 
@@ -379,7 +385,17 @@ bool PlVkRenderer::tryInitializeDevice(VkPhysicalDevice device, VkPhysicalDevice
         // Don't let Qt take DRM master from us during pl_vulkan_create()
         DrmMasterLocker locker;
 
-        m_Vulkan = pl_vulkan_create(m_Log, &vkParams);
+#ifdef HAVE_PYROWAVE
+        if (decoderParams->videoFormat == VIDEO_FORMAT_PYROWAVE &&
+            !qEnvironmentVariableIntValue("PYROWAVE_CPU_READBACK")) {
+            auto sharedParams = vkParams;
+            PyrowaveSurfaces::configure(sharedParams);
+            m_Vulkan = pl_vulkan_create(m_Log, &sharedParams);
+        }
+#endif
+        if (!m_Vulkan) {
+            m_Vulkan = pl_vulkan_create(m_Log, &vkParams);
+        }
     }
 
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(60, 26, 100)
@@ -683,27 +699,34 @@ bool PlVkRenderer::prepareDecoderContext(AVCodecContext *context, AVDictionary *
     return true;
 }
 
-bool PlVkRenderer::mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFrame)
+bool PlVkRenderer::mapFrameTextures(const AVFrame *frame, pl_frame *mappedFrame)
 {
+#ifdef HAVE_PYROWAVE
+    if (m_PyrowaveSurfaces && m_PyrowaveSurfaces->owns(frame)) {
+        m_PyrowaveSurfaces->map(frame, mappedFrame);
+        return true;
+    }
+#endif
 #ifdef Q_OS_DARWIN
     if (frame->format == AV_PIX_FMT_VIDEOTOOLBOX) {
-        if (!m_MetalTextureFactory->mapVideoToolboxToPlacebo(frame, mappedFrame)) {
-            return false;
-        }
+        return m_MetalTextureFactory->mapVideoToolboxToPlacebo(frame, mappedFrame);
     }
-    else
 #endif
-    {
-        pl_avframe_params mapParams = {};
-        mapParams.frame = frame;
-        mapParams.tex = m_Textures;
-        if (!pl_map_avframe_ex(m_Vulkan->gpu, mappedFrame, &mapParams)) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                         "pl_map_avframe_ex() failed");
-            return false;
-        }
+    pl_avframe_params mapParams = {};
+    mapParams.frame = frame;
+    mapParams.tex = m_Textures;
+    if (!pl_map_avframe_ex(m_Vulkan->gpu, mappedFrame, &mapParams)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "pl_map_avframe_ex() failed");
+        return false;
     }
+    return true;
+}
 
+bool PlVkRenderer::mapAvFrameToPlacebo(const AVFrame *frame, pl_frame *mappedFrame)
+{
+    if (!mapFrameTextures(frame, mappedFrame)) {
+        return false;
+    }
     // libplacebo assumes a minimum luminance value of 0 means the actual value was unknown.
     // Since we assume the host values are correct, we use the PL_COLOR_HDR_BLACK constant to
     // indicate infinite contrast.
@@ -725,6 +748,11 @@ bool PlVkRenderer::mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFra
 
 void PlVkRenderer::unmapAvFrameFromPlacebo(const AVFrame *frame, pl_frame* mappedFrame)
 {
+#ifdef HAVE_PYROWAVE
+    if (m_PyrowaveSurfaces && m_PyrowaveSurfaces->owns(frame)) {
+        return;
+    }
+#endif
 #ifdef Q_OS_DARWIN
     if (frame->format == AV_PIX_FMT_VIDEOTOOLBOX) {
         m_MetalTextureFactory->unmapVideoToolboxFromPlacebo(mappedFrame);
@@ -737,6 +765,14 @@ void PlVkRenderer::unmapAvFrameFromPlacebo(const AVFrame *frame, pl_frame* mappe
         pl_unmap_avframe(m_Vulkan->gpu, mappedFrame);
     }
 }
+
+#ifdef HAVE_PYROWAVE
+PyrowaveSurfaces *PlVkRenderer::createPyrowaveSurfaces(size_t capacity)
+{
+    m_PyrowaveSurfaces = std::make_unique<PyrowaveSurfaces>(m_PlVkInstance, m_Vulkan, capacity);
+    return m_PyrowaveSurfaces.get();
+}
+#endif
 
 bool PlVkRenderer::populateQueues(int videoFormat)
 {

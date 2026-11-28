@@ -104,10 +104,10 @@ against the negotiated signal, and static host HDR metadata is passed to the ren
 Dynamic HDR metadata is not advertised by this decoder.
 The host must produce a real HDR signal. Turning off host HDR without an HDR-producing
 processing path can end the session; live switching from PyroWave HDR to SDR is not supported.
-Frames currently pass through CPU readback before Vulkan rendering; high-bit-depth
-output doubles the bytes per sample. HDR display correctness and sustained performance
-still require end-to-end validation on the target GPU and display. Negotiation failure
-falls back to the preferred conventional codec.
+On compatible Vulkan devices, the decoder writes directly to the renderer's YUV
+textures. A timeline semaphore signals when the planes are ready to sample.
+Unsupported devices use CPU readback. Set `PYROWAVE_CPU_READBACK=1` to force that
+path for comparison. Negotiation failure falls back to the preferred conventional codec.
 The negotiated codec is reported when streaming starts and in the performance
 overlay. Use `CONFIG+=disable-pyrowave` to omit this path from the build.
 
@@ -118,6 +118,11 @@ pkg-config --modversion pyrowave-shared
 ```
 
 ### Windows
+
+For optional PyroWave support, install the AlkaidLab header as
+`libs/windows/include/<arch>/pyrowave/pyrowave.h` after running `setup-deps.ps1`.
+Place the matching MSVC import library `pyrowave-shared.lib` and its runtime DLL in
+`libs/windows/lib/<arch>/` before running qmake. Use `x64` or `arm64` to match the build.
 
 Requirements:
 

@@ -11,7 +11,7 @@
 #include <QMutex>
 
 // PyroWave is an optional experimental decoder for full-range YUV420:
-// 8-bit BT.709 SDR or 10-bit BT.2020 PQ/HLG. Frames currently use CPU readback.
+// 8-bit BT.709 SDR or 10-bit BT.2020 PQ/HLG.
 class PyrowaveVideoDecoder : public IVideoDecoder
 {
 public:
@@ -34,6 +34,7 @@ public:
 private:
     static int decoderThreadProc(void* context);
     bool createFrame(const pyrowave_color_metadata& metadata, AVFrame** frame);
+    bool readCpuFrame(AVFrame* output);
     bool copyDecodeUnit(PDECODE_UNIT du, QByteArray& payload) const;
     void updatePerformanceOverlay(uint64_t nowUs);
 
@@ -44,6 +45,7 @@ private:
     pyrowave_device m_Device;
     pyrowave_decoder m_Decoder;
     PlVkRenderer* m_Renderer;
+    PyrowaveSurfaces* m_Surfaces = nullptr;
     Pacer* m_Pacer;
     bool m_OverlayRegistered;
     SDL_Thread* m_DecoderThread;

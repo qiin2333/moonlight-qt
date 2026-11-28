@@ -12,6 +12,11 @@
 #include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
+#ifdef HAVE_PYROWAVE
+#include <memory>
+class PyrowaveSurfaces;
+#endif
+
 #ifdef Q_OS_DARWIN
 class MetalVulkanTextureFactory {
 public:
@@ -56,6 +61,9 @@ public:
     virtual bool isPixelFormatSupported(int videoFormat, enum AVPixelFormat pixelFormat) override;
     virtual AVPixelFormat getPreferredPixelFormat(int videoFormat) override;
     virtual ToneMappingSource getActiveToneMappingSource() override;
+#ifdef HAVE_PYROWAVE
+    PyrowaveSurfaces* createPyrowaveSurfaces(size_t capacity);
+#endif
 
 private:
     static void lockQueue(AVHWDeviceContext *dev_ctx, uint32_t queue_family, uint32_t index);
@@ -68,6 +76,7 @@ private:
     bool createSwapchain(int depth);
     bool createOverlay(pl_overlay* overlay, SDL_Surface* surface);
     bool mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFrame);
+    bool mapFrameTextures(const AVFrame* frame, pl_frame* mappedFrame);
     void unmapAvFrameFromPlacebo(const AVFrame *frame, pl_frame* mappedFrame);
     bool populateQueues(int videoFormat);
     bool chooseVulkanDevice(PDECODER_PARAMETERS params, bool hdrOutputRequired);
@@ -104,6 +113,9 @@ private:
     int m_SwapchainDepth = 0;
     VkPresentModeKHR m_VkPresentMode;
     pl_vulkan m_Vulkan = nullptr;
+#ifdef HAVE_PYROWAVE
+    std::unique_ptr<PyrowaveSurfaces> m_PyrowaveSurfaces;
+#endif
     pl_swapchain m_Swapchain = nullptr;
     pl_renderer m_Renderer = nullptr;
     pl_tex m_Textures[PL_MAX_PLANES] = {};
