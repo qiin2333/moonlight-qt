@@ -109,9 +109,12 @@ bool CoreAudioSpatialMixer::initialize(AUSpatialMixerOutputType outputType, int 
         return false;
     }
 
-    // Both only take effect when rendering for headphones. Neither is fatal:
-    // the mixer falls back to the generic HRTF without head tracking.
-    if (outputType == kSpatialMixerOutputType_Headphones) {
+    // Both only take effect when rendering for headphones on macOS 14 or later.
+    // Neither is fatal: the mixer falls back to the generic HRTF without head
+    // tracking.
+    if (outputType != kSpatialMixerOutputType_Headphones) {
+        headTracking = false;
+    } else if (__builtin_available(macOS 14.0, *)) {
         setProperty(m_Mixer, kAudioUnitProperty_SpatialMixerPersonalizedHRTFMode,
                     kAudioUnitScope_Global, (UInt32)kSpatialMixerPersonalizedHRTFMode_Auto);
         if (headTracking && !setProperty(m_Mixer, kAudioUnitProperty_SpatialMixerEnableHeadTracking,
