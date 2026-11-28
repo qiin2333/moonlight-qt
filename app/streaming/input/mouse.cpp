@@ -110,10 +110,20 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
             button = BUTTON_RIGHT;
     }
 
-    LiSendMouseButtonEvent(event->state == SDL_PRESSED ?
-                               BUTTON_ACTION_PRESS :
-                               BUTTON_ACTION_RELEASE,
-                           button);
+    const int action = event->state == SDL_PRESSED ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE;
+#if defined(HAVE_MACOS_NATIVE_TOUCHPAD) && defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
+    // AppKit may deliver the press before or after the third touch. In the
+    // software-pointer fallback, remember an early press as well.
+    if (action == BUTTON_ACTION_PRESS && event->button == SDL_BUTTON_LEFT &&
+        (!m_MacSystemDragContacts.isEmpty() || (m_NativeTouchpadTransport == NTT_SOFTWARE_POINTER &&
+                                                !m_MacTouchpadGestureContacts.isEmpty()))) {
+        if (LiSendMouseButtonEvent(action, button) == 0) {
+            m_MacSystemDragButton.recordPress(button);
+        }
+        return;
+    }
+#endif
+    LiSendMouseButtonEvent(action, button);
 }
 
 void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)

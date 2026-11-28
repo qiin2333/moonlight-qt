@@ -337,6 +337,7 @@ HEADERS += \
     streaming/input/input.h \
     streaming/input/gamepadsensorrate.h \
     streaming/input/keyboardstate.h \
+    streaming/input/macosdragbuttonstate.h \
     streaming/input/mousemodestatus.h \
     streaming/input/remotecursorupdate.h \
     streaming/session.h \

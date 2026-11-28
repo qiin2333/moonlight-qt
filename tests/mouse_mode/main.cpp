@@ -1,10 +1,12 @@
 #include "settings/streamingpreferences.h"
 #include "streaming/input/remotecursorupdate.h"
 #include "streaming/input/mousemodestatus.h"
+#include "streaming/input/macosdragbuttonstate.h"
 
 #include <QCoreApplication>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QVector>
 
 namespace {
 void require(bool condition, const char* message)
@@ -13,11 +15,126 @@ void require(bool condition, const char* message)
         qFatal("%s", message);
     }
 }
+
+void testMacSystemDragButtonState()
+{
+    constexpr int leftButton = 1;
+    constexpr int rightButton = 3;
+    MacSystemDragButtonState state;
+    QVector<int> releases;
+    int releaseResult = 0;
+    const auto sendRelease = [&](int button) {
+        releases.append(button);
+        return releaseResult;
+    };
+
+    state.recordPress(rightButton);
+    require(state.activeButton() == rightButton, "a queued press must retain its mapped button");
+    releaseResult = -1;
+    state.releaseForReset(sendRelease);
+    require(state.activeButton() == 0,
+            "a failed release must not be mistaken for a new active press");
+    require(releases == QVector<int>{ rightButton },
+            "capture loss must attempt to release the original mapped button");
+    releaseResult = 0;
+    require(state.handleButtonUp(sendRelease), "a failed cleanup must retain release ownership");
+    require(releases == QVector<int>({ rightButton, rightButton }),
+            "the matching physical release must retry the original mapped button");
+    require(!state.handleButtonUp(sendRelease), "successful physical release must clear ownership");
+
+    releases.clear();
+    state.recordPress(rightButton);
+    const int earlyPress = state.activeButton();
+    state.releaseForReset(sendRelease);
+    require(state.allowButtonDown(sendRelease), "a queued handoff release must allow re-press");
+    state.recordPress(earlyPress);
+    require(state.handleButtonUp(sendRelease), "a transferred early press must own its release");
+    require(releases == QVector<int>({ rightButton, rightButton }),
+            "the handoff and final release must keep the original mapped button");
+
+    releases.clear();
+    state.recordPress(rightButton);
+    releaseResult = -1;
+    state.releaseForReset(sendRelease);
+    releaseResult = 0;
+    state.releaseForReset(sendRelease);
+    require(state.handleButtonUp(sendRelease), "a retried cleanup must consume the matching up");
+    require(releases == QVector<int>({ rightButton, rightButton }),
+            "a later cleanup must retry without duplicating the physical release");
+
+    releases.clear();
+    state.recordPress(rightButton);
+    releaseResult = -1;
+    state.releaseForReset(sendRelease);
+    require(state.hasPendingRelease(), "failed cleanup must schedule an automatic retry");
+    state.retryPendingRelease(sendRelease);
+    require(state.hasPendingRelease(), "failed automatic retry must preserve ownership");
+    releaseResult = 0;
+    state.retryPendingRelease(sendRelease);
+    require(!state.hasPendingRelease(), "successful automatic retry must clear pending state");
+    require(state.handleButtonUp(sendRelease), "automatic cleanup retry must consume physical up");
+    require(releases == QVector<int>({ rightButton, rightButton, rightButton }),
+            "physical up after automatic cleanup must not send another release");
+
+    releases.clear();
+    state.recordPress(leftButton);
+    releaseResult = -1;
+    require(state.handleButtonUp(sendRelease), "a failed physical up must retain ownership");
+    releaseResult = 0;
+    state.retryPendingRelease(sendRelease);
+    require(!state.handleButtonUp(sendRelease),
+            "automatic retry after physical up must not consume a later unrelated up");
+    require(releases == QVector<int>({ leftButton, leftButton }),
+            "automatic retry must release the button whose physical up failed");
+
+    releases.clear();
+    state.recordPress(rightButton);
+    releaseResult = -1;
+    require(state.handleButtonUp(sendRelease), "the old physical up must be consumed");
+    require(!state.allowButtonDown(sendRelease), "a new press must wait for the pending release");
+    releaseResult = 0;
+    state.retryPendingRelease(sendRelease);
+    require(state.handleButtonUp(sendRelease),
+            "automatic retry must consume the up of the suppressed new press");
+    require(releases == QVector<int>({ rightButton, rightButton, rightButton }),
+            "the suppressed new press must not cause an extra release");
+
+    releases.clear();
+    state.recordPress(leftButton);
+    state.releaseForReset(sendRelease);
+    require(state.handleButtonUp(sendRelease), "cleanup must consume the matching physical up");
+    require(releases == QVector<int>{ leftButton },
+            "a successful cleanup must not queue a duplicate release");
+    require(!state.handleButtonUp(sendRelease), "the physical up must be consumed only once");
+
+    releases.clear();
+    state.recordPress(rightButton);
+    releaseResult = -1;
+    require(state.handleButtonUp(sendRelease), "a failed physical release must be consumed");
+    require(!state.allowButtonDown(sendRelease),
+            "a new press must be suppressed while the old release still fails");
+    releaseResult = 0;
+    require(state.allowButtonDown(sendRelease),
+            "a new press may proceed after the release retries");
+    require(releases == QVector<int>({ rightButton, rightButton, rightButton }),
+            "each retry must release the original button before accepting another press");
+    state.recordPress(leftButton);
+    require(state.handleButtonUp(sendRelease), "the new press must own its matching release");
+    require(releases.last() == leftButton, "the new press must release its own mapped button");
+
+    releases.clear();
+    state.recordPress(leftButton);
+    state.releaseForReset(sendRelease);
+    require(state.allowButtonDown(sendRelease), "a new press must clear a stale pending up");
+    require(!state.handleButtonUp(sendRelease),
+            "an unrelated physical up must not be consumed after a new press");
+}
 }
 
 int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
+    testMacSystemDragButtonState();
     QTemporaryDir directory;
     require(directory.isValid(), "test settings directory must be available");
     QSettings settings(directory.filePath("mouse-mode.ini"), QSettings::IniFormat);
