@@ -209,7 +209,8 @@ PyrowaveSurfaces::DecodeResult PyrowaveSurfaces::decode(pyrowave_decoder decoder
     }
     pyrowave_gpu_sync_operation acquire = {}, release = {};
     acquire.sync = { m_Ready, m_ReadyValue };
-    release.sync = { m_Done, ++m_DoneValue };
+    // The final plane's ready value uniquely identifies this decode on both timelines.
+    release.sync = { m_Done, m_ReadyValue };
     bool decoded = held == 3 && pyrowave_decoder_decode_gpu_buffer(decoder, &acquire, &release,
                                                                    &buffers) == PYROWAVE_SUCCESS;
     for (int p = 0; p < held; ++p) {
@@ -217,8 +218,7 @@ PyrowaveSurfaces::DecodeResult PyrowaveSurfaces::decode(pyrowave_decoder decoder
         back.tex = target->planes[p];
         back.layout = VK_IMAGE_LAYOUT_GENERAL;
         back.qf = m_Vk->queue_graphics.index;
-        back.semaphore =
-            decoded ? pl_vulkan_sem{ m_Done, m_DoneValue } : pl_vulkan_sem{ m_Ready, m_ReadyValue };
+        back.semaphore = { decoded ? m_Done : m_Ready, m_ReadyValue };
         pl_vulkan_release_ex(gpu, &back);
     }
     if (!decoded) {

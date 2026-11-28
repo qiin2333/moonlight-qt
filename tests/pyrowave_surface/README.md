@@ -22,8 +22,10 @@ The GPU path uses the client's surface pool and semaphore handoff.
 * Both timings report P50/P95/P99. `effective_fps` reports the observed input
   cadence. `over_budget` counts completed frames taking longer than one target
   frame period.
-* The test compares rendered RGB code values, exercises CPU fallback when all
-  pool slots have outstanding references and reuses a dropped frame's slot.
+* Outside the timed loop, three distinct patterns exercise a two-slot pool.
+  The test holds the first frame, drops the second and reuses its slot for the
+  third. It compares both surviving frames with CPU readback of their respective
+  packets while the pool is full.
 
 The measured interval excludes capture, network, client pacing, presentation
 and display scanout. The completion wait serializes frames so deferred GPU

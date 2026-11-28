@@ -5,10 +5,12 @@
 #include <libplacebo/utils/libav.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 #include <thread>
 #include <vector>
 #ifdef _WIN32
@@ -42,7 +44,7 @@ static pyrowave_cpu_buffer cpuBuffer(AVFrame* frame, pyrowave_cpu_buffer_format 
 }
 
 static std::vector<uint8_t> encode(int width, int height, const PyrowaveColor::Contract& color,
-                                   size_t byteBudget)
+                                   size_t byteBudget, int pattern)
 {
     pyrowave_device device = nullptr;
     CHECK(pyrowave_create_default_device(&device) == PYROWAVE_SUCCESS);
@@ -60,7 +62,7 @@ static std::vector<uint8_t> encode(int width, int height, const PyrowaveColor::C
         for (int y = 0; y < (p ? height / 2 : height); ++y) {
             auto row = frame->data[p] + y * frame->linesize[p];
             for (int x = 0; x < (p ? width / 2 : width); ++x) {
-                int value = x + (p + 1) * y + p * 89;
+                int value = x + (p + 1) * y + p * 89 + pattern * (color.hdrMode ? 341 : 85);
                 if (color.hdrMode) {
                     reinterpret_cast<uint16_t*>(row)[x] = value % 1024;
                 } else {
@@ -98,8 +100,33 @@ static void report(const char* metric, std::vector<double>& samples)
     std::printf(" %s_ms=%.3f/%.3f/%.3f", metric, percentile(50), percentile(95), percentile(99));
 }
 
-static std::vector<uint8_t> run(bool direct, const std::vector<uint8_t>& packet, int w, int h,
-                                const PyrowaveColor::Contract& color, int samples, int fps)
+static void checkPixels(const std::vector<uint8_t>& reference, const std::vector<uint8_t>& pixels,
+                        int bits)
+{
+    CHECK(reference.size() == pixels.size());
+    int maxError = 0;
+    uint64_t totalError = 0;
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+        uint32_t a, b;
+        std::memcpy(&a, reference.data() + i, sizeof(a));
+        std::memcpy(&b, pixels.data() + i, sizeof(b));
+        int mask = (1 << bits) - 1;
+        for (int c = 0; c < 3; ++c) {
+            int error = std::abs(int(a & mask) - int(b & mask));
+            totalError += error;
+            maxError = std::max(error, maxError);
+            a >>= bits;
+            b >>= bits;
+        }
+    }
+    std::printf("RGB%d max_error=%d mean_abs_error=%.5f\n", bits, maxError,
+                double(totalError) / (pixels.size() / 4 * 3));
+    CHECK(maxError <= 3);
+}
+
+static std::vector<uint8_t> run(bool direct, const std::array<std::vector<uint8_t>, 3>& packets,
+                                int w, int h, const PyrowaveColor::Contract& color, int samples,
+                                int fps)
 {
     pl_vk_inst_params instanceParams = pl_vk_inst_default_params;
 #ifdef _WIN32
@@ -131,30 +158,20 @@ static std::vector<uint8_t> run(bool direct, const std::vector<uint8_t>& packet,
     CHECK(output);
     std::vector<uint8_t> pixels(size_t(w) * h * 4);
     {
-        PyrowaveSurfaces surfaces(instance, vk, 2);
+        std::optional<PyrowaveSurfaces> surfaces;
         pyrowave_device device = nullptr;
-        CHECK(direct ? surfaces.createDevice(&device)
-                     : pyrowave_create_default_device(&device) == PYROWAVE_SUCCESS);
+        if (direct) {
+            surfaces.emplace(instance, vk, 2);
+            CHECK(surfaces->createDevice(&device));
+        } else {
+            CHECK(pyrowave_create_default_device(&device) == PYROWAVE_SUCCESS);
+        }
         pyrowave_decoder_create_info info = { device, w, h, PYROWAVE_CHROMA_SUBSAMPLING_420,
                                               false };
         pyrowave_decoder decoder = nullptr;
         CHECK(pyrowave_decoder_create(&info, &decoder) == PYROWAVE_SUCCESS);
         pl_tex uploads[4] = {};
-        std::vector<double> submit, complete;
-        auto next = Clock::now(), first = next, last = next;
-        const auto period = std::chrono::nanoseconds(1000000000 / fps);
-        int overBudget = 0;
-        for (int i = -24; i < samples; ++i) {
-            std::this_thread::sleep_until(next);
-            auto start = Clock::now();
-            last = start;
-            if (i == 0) {
-                first = start;
-            }
-            next += period;
-            if (next < start) {
-                next = start + period;
-            }
+        auto prepare = [&](const std::vector<uint8_t>& packet) {
             pyrowave_decoder_clear(decoder);
             CHECK(pyrowave_decoder_push_packet(decoder, packet.data(), packet.size()) ==
                   PYROWAVE_SUCCESS);
@@ -167,19 +184,19 @@ static std::vector<uint8_t> run(bool direct, const std::vector<uint8_t>& packet,
             PyrowaveColor::applyToFrame(color, meta, frame);
             frame->width = w;
             frame->height = h;
-            if (direct) {
-                CHECK(surfaces.decode(decoder, frame) == PyrowaveSurfaces::Decoded);
-            } else {
-                CHECK(av_frame_get_buffer(frame, 32) == 0);
-                auto buffer = cpuBuffer(frame, color.cpuFormat);
-                CHECK(pyrowave_decoder_decode_cpu_buffer_synchronous(decoder, &buffer) ==
-                      PYROWAVE_SUCCESS);
-            }
-            auto submitted = Clock::now();
+            return frame;
+        };
+        auto readCpu = [&](AVFrame* frame) {
+            CHECK(av_frame_get_buffer(frame, 32) == 0);
+            auto buffer = cpuBuffer(frame, color.cpuFormat);
+            CHECK(pyrowave_decoder_decode_cpu_buffer_synchronous(decoder, &buffer) ==
+                  PYROWAVE_SUCCESS);
+        };
+        auto render = [&](AVFrame* frame) {
             pl_frame src = {}, dst = {};
-            if (direct) {
-                CHECK(surfaces.owns(frame));
-                surfaces.map(frame, &src);
+            const bool isSurface = surfaces && surfaces->owns(frame);
+            if (isSurface) {
+                surfaces->map(frame, &src);
             } else {
                 pl_avframe_params map = {};
                 map.frame = frame;
@@ -195,10 +212,40 @@ static std::vector<uint8_t> run(bool direct, const std::vector<uint8_t>& packet,
             dst.color = src.color;
             dst.repr = pl_color_repr_rgb;
             CHECK(pl_render_image(renderer, &src, &dst, &pl_render_fast_params));
-            if (!direct) {
+            if (!isSurface) {
                 pl_unmap_avframe(gpu, &src);
             }
             pl_gpu_finish(gpu);
+        };
+        auto download = [&](std::vector<uint8_t>& result) {
+            pl_tex_transfer_params transfer = {};
+            transfer.tex = output;
+            transfer.ptr = result.data();
+            CHECK(pl_tex_download(gpu, &transfer));
+        };
+        std::vector<double> submit, complete;
+        auto next = Clock::now(), first = next, last = next;
+        const auto period = std::chrono::nanoseconds(1000000000 / fps);
+        int overBudget = 0;
+        for (int i = -24; i < samples; ++i) {
+            std::this_thread::sleep_until(next);
+            auto start = Clock::now();
+            last = start;
+            if (i == 0) {
+                first = start;
+            }
+            next += period;
+            if (next < start) {
+                next = start + period;
+            }
+            AVFrame* frame = prepare(packets[0]);
+            if (direct) {
+                CHECK(surfaces->decode(decoder, frame) == PyrowaveSurfaces::Decoded);
+            } else {
+                readCpu(frame);
+            }
+            auto submitted = Clock::now();
+            render(frame);
             auto end = Clock::now();
             if (i >= 0) {
                 submit.push_back(
@@ -216,39 +263,35 @@ static std::vector<uint8_t> run(bool direct, const std::vector<uint8_t>& packet,
                     (samples - 1) / std::chrono::duration<double>(last - first).count(),
                     overBudget);
         std::puts("");
-        pl_tex_transfer_params download = {};
-        download.tex = output;
-        download.ptr = pixels.data();
-        CHECK(pl_tex_download(gpu, &download));
+        download(pixels);
         if (direct) {
             // Hold both pacer references, drop one frame without rendering, and
             // reuse that slot while its previous decode may still be in flight.
-            AVFrame* frames[3];
-            for (auto& f : frames) {
-                f = av_frame_alloc();
-                CHECK(f);
-                f->width = w;
-                f->height = h;
-                f->format = color.pixelFormat;
-            }
-            CHECK(surfaces.decode(decoder, frames[0]) == PyrowaveSurfaces::Decoded);
-            CHECK(surfaces.decode(decoder, frames[1]) == PyrowaveSurfaces::Decoded);
-            CHECK(frames[0]->buf[0]->data != frames[1]->buf[0]->data);
-            CHECK(surfaces.decode(decoder, frames[2]) == PyrowaveSurfaces::PoolBusy);
-            av_frame_unref(frames[1]);
-            CHECK(surfaces.decode(decoder, frames[2]) == PyrowaveSurfaces::Decoded);
-            frames[1]->width = w;
-            frames[1]->height = h;
-            frames[1]->format = color.pixelFormat;
-            CHECK(surfaces.decode(decoder, frames[1]) == PyrowaveSurfaces::PoolBusy);
-            CHECK(av_frame_get_buffer(frames[1], 32) == 0);
-            auto fallback = cpuBuffer(frames[1], color.cpuFormat);
-            CHECK(pyrowave_decoder_decode_cpu_buffer_synchronous(decoder, &fallback) ==
-                  PYROWAVE_SUCCESS);
-            CHECK(!surfaces.owns(frames[1]));
-            for (auto& f : frames) {
-                av_frame_free(&f);
-            }
+            AVFrame* held = prepare(packets[0]);
+            CHECK(surfaces->decode(decoder, held) == PyrowaveSurfaces::Decoded);
+            AVFrame* dropped = prepare(packets[1]);
+            CHECK(surfaces->decode(decoder, dropped) == PyrowaveSurfaces::Decoded);
+            AVFrame* reused = prepare(packets[2]);
+            CHECK(surfaces->decode(decoder, reused) == PyrowaveSurfaces::PoolBusy);
+            av_frame_free(&dropped);
+            CHECK(surfaces->decode(decoder, reused) == PyrowaveSurfaces::Decoded);
+
+            std::vector<uint8_t> actual(pixels.size()), expected(pixels.size());
+            auto verifySurface = [&](AVFrame* frame, const std::vector<uint8_t>& packet) {
+                render(frame);
+                download(actual);
+                AVFrame* fallback = prepare(packet);
+                CHECK(surfaces->decode(decoder, fallback) == PyrowaveSurfaces::PoolBusy);
+                readCpu(fallback);
+                render(fallback);
+                download(expected);
+                av_frame_free(&fallback);
+                checkPixels(expected, actual, color.hdrMode ? 10 : 8);
+            };
+            verifySurface(held, packets[0]);
+            verifySurface(reused, packets[2]);
+            av_frame_free(&held);
+            av_frame_free(&reused);
         }
         for (auto& tex : uploads) {
             pl_tex_destroy(gpu, &tex);
@@ -282,33 +325,18 @@ int main(int argc, char** argv)
 #ifdef _WIN32
     CHECK(timeBeginPeriod(1) == TIMERR_NOERROR);
 #endif
-    auto packet = encode(w, h, color, size_t(mbps) * 125000 / fps);
-    std::printf("packet_bytes=%zu; percentiles=P50/P95/P99\n", packet.size());
+    std::array<std::vector<uint8_t>, 3> packets;
+    for (int i = 0; i < 3; ++i) {
+        packets[i] = encode(w, h, color, size_t(mbps) * 125000 / fps, i);
+    }
+    std::printf("packet_bytes=%zu; percentiles=P50/P95/P99\n", packets[0].size());
     std::vector<uint8_t> reference;
     for (bool gpu : { false, true, true, false }) {
-        auto pixels = run(gpu, packet, w, h, color, samples, fps);
+        auto pixels = run(gpu, packets, w, h, color, samples, fps);
         if (reference.empty()) {
             reference = std::move(pixels);
         } else {
-            int maxError = 0;
-            uint64_t totalError = 0;
-            for (size_t i = 0; i < pixels.size(); i += 4) {
-                uint32_t a, b;
-                std::memcpy(&a, reference.data() + i, sizeof(a));
-                std::memcpy(&b, pixels.data() + i, sizeof(b));
-                int bits = color.hdrMode ? 10 : 8;
-                int mask = (1 << bits) - 1;
-                for (int c = 0; c < 3; ++c) {
-                    int error = std::abs(int(a & mask) - int(b & mask));
-                    totalError += error;
-                    maxError = std::max(error, maxError);
-                    a >>= bits;
-                    b >>= bits;
-                }
-            }
-            std::printf("RGB%d max_error=%d mean_abs_error=%.5f\n", color.hdrMode ? 10 : 8,
-                        maxError, double(totalError) / (size_t(w) * h * 3));
-            CHECK(maxError <= 3);
+            checkPixels(reference, pixels, color.hdrMode ? 10 : 8);
         }
     }
 #ifdef _WIN32

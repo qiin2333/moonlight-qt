@@ -50,5 +50,4 @@ private:
     VkSemaphore m_Ready = VK_NULL_HANDLE;
     VkSemaphore m_Done = VK_NULL_HANDLE;
     uint64_t m_ReadyValue = 0;
-    uint64_t m_DoneValue = 0;
 };
