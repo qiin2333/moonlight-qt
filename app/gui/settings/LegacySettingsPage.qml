@@ -62,6 +62,7 @@ Column {
         ChoiceRow {
             applicable: SystemProperties.isDarwin
             title: qsTr("Spatial audio")
+            searchKeywords: "Spatial audio"
             description: qsTr("Renders surround sound with Apple's spatial audio on headphones and built-in speakers. Disable it if you don't want binaural processing, such as with USB or Bluetooth speakers.")
             controlEnabled: StreamingPreferences.audioConfig !== StreamingPreferences.AC_STEREO
             selectedValue: StreamingPreferences.spatialAudioConfig
@@ -76,6 +77,7 @@ Column {
         ToggleRow {
             applicable: SystemProperties.isDarwin
             title: qsTr("Head tracking")
+            searchKeywords: "Head tracking"
             description: qsTr("Requires supported AirPods or Beats headphones.")
             controlEnabled: StreamingPreferences.audioConfig !== StreamingPreferences.AC_STEREO &&
                             StreamingPreferences.spatialAudioConfig !== StreamingPreferences.SAC_DISABLED
